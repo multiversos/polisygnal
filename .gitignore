@@ -1,0 +1,42 @@
+.DS_Store
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.next/
+node_modules/
+dist/
+build/
+coverage/
+.idea/
+.vscode/
+apps/api/uvicorn-phase1.stdout.log
+apps/api/uvicorn-phase1.stderr.log
+*.log
+
+# Python packaging
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Logs & pipeline artifacts
+logs/
+
+# Local env overrides
+.env.local
+.env.*.local
+
+# Claude Code local config
+.claude/
+
+# Test validation artifacts
+**/.validation/
+
+# SQLite databases
+*.sqlite3
+*.db
