@@ -1335,6 +1335,66 @@ Ambos comandos devuelven JSON con:
 - `skipped_markets`
 - `partial_errors`
 
+### Contexto deportivo estructurado
+
+La etapa de evidence deja una sola convencion para contexto deportivo estructurado y esa es la fuente de verdad que usa scoring:
+
+- path canonico:
+  `evidence_items.metadata_json.structured_context`
+- version actual:
+  `sports_context_v1`
+- campos numericos canonicos:
+  `injury_score`, `form_score`, `rest_score`, `home_advantage_score`
+
+Shape persistido:
+
+```json
+{
+  "structured_context": {
+    "version": "sports_context_v1",
+    "injury_score": "0.0000",
+    "form_score": "0.0000",
+    "rest_score": "0.0000",
+    "home_advantage_score": "0.0000",
+    "availability": {
+      "injury_score": false,
+      "form_score": false,
+      "rest_score": false,
+      "home_advantage_score": false
+    },
+    "reasons": {
+      "injury_score": "missing_injury_score",
+      "form_score": "missing_form_score",
+      "rest_score": "missing_rest_score",
+      "home_advantage_score": "missing_home_advantage_score"
+    }
+  }
+}
+```
+
+Reglas simples del MVP:
+
+- scoring lee primero y de forma canonica solo `metadata_json.structured_context`
+- si un provider trae `raw_json.structured_context` con el mismo shape, evidence lo normaliza y lo persiste en `metadata_json.structured_context`
+- si falta un componente, evidence lo deja en `0.0000` con `availability = false`
+- si existe dato usable, evidence lo deja visible con valor pequeno y `availability = true`
+- valores pequenos y acotados por componente:
+  maximo absoluto `0.0150`
+
+Derivacion minima actual:
+
+- odds:
+  deriva `home_advantage_score` desde `home_team` y `away_team` del evento matcheado
+- news:
+  acepta `raw_json.structured_context` con el shape canonico
+  y, si no viene completo, intenta derivar senales chicas de `injury_score`, `form_score` y `rest_score` desde texto persistido
+
+Importante:
+
+- esta capa no cambia la formula principal `market + odds`
+- solo deja contexto estructurado persistido y reusable
+- si no hay contexto suficiente, scoring mantiene el comportamiento actual y aplica `0.0`
+
 ### Comportamiento sin `ODDS_API_KEY`
 
 Si `ODDS_API_KEY` no esta configurada:
@@ -1436,6 +1496,8 @@ Salida util:
 Notas:
 
 - `news` no mueve direccion en v1; solo impacta `confidence_score`
+- el ajuste estructurado deportivo usa solo `evidence_items.metadata_json.structured_context`
+- `injury_score`, `form_score`, `rest_score` y `home_advantage_score` son pequenos y explicitos; si faltan, quedan en `0.0000`
 - el scoring no se dispara automaticamente desde evidence pipeline en esta fase
 - el scoring sigue corriendo para todo `nba / winner`, pero ignora evidence en mercados no elegibles para este pipeline
 - `explanation_json` deja trazabilidad simple de inputs, bonuses, penalties, counts y summary

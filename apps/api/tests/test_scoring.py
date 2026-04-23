@@ -357,12 +357,7 @@ def test_score_market_applies_structured_context_adjustments_when_present(
         published_at=run_at - timedelta(minutes=90),
         fetched_at=run_at - timedelta(minutes=90),
         raw_text="Lakers get healthier ahead of Warriors matchup.",
-        raw_json={
-            "structured_context": {
-                "rest_score": "-0.0030",
-                "home_advantage_score": "0.0080",
-            }
-        },
+        raw_json={"url": "https://www.espn.com/story/score-4"},
     )
     db_session.add_all([odds_source, news_source])
     db_session.flush()
@@ -380,8 +375,13 @@ def test_score_market_applies_structured_context_adjustments_when_present(
         bookmaker_count=3,
         metadata_json={
             "structured_context": {
-                "injury_score": "0.0100",
-                "form_score": "0.0050",
+                "home_advantage_score": "0.0080",
+                "availability": {
+                    "home_advantage_score": True,
+                },
+                "reasons": {
+                    "home_advantage_score": "target_team_is_home",
+                },
             }
         },
     )
@@ -395,7 +395,24 @@ def test_score_market_applies_structured_context_adjustments_when_present(
         confidence=Decimal("0.60"),
         summary="Lakers structured context summary",
         high_contradiction=False,
-        metadata_json={"url": "https://www.espn.com/story/score-4"},
+        metadata_json={
+            "url": "https://www.espn.com/story/score-4",
+            "structured_context": {
+                "injury_score": "0.0100",
+                "form_score": "0.0050",
+                "rest_score": "-0.0030",
+                "availability": {
+                    "injury_score": True,
+                    "form_score": True,
+                    "rest_score": True,
+                },
+                "reasons": {
+                    "injury_score": "positive_injury_score_target_team",
+                    "form_score": "positive_form_score_target_team",
+                    "rest_score": "negative_rest_score_target_team",
+                },
+            },
+        },
     )
     db_session.add_all([odds_evidence, news_evidence])
     db_session.commit()
@@ -433,12 +450,12 @@ def test_score_market_applies_structured_context_adjustments_when_present(
     assert prediction.explanation_json["structured_context"]["components"]["injury_score"] == {
         "value": "0.0100",
         "available": True,
-        "source": "the_odds_api:odds:metadata_json",
-        "note": "resolved_from_structured_context",
+        "source": "espn_rss:news:metadata_json",
+        "note": "positive_injury_score_target_team",
     }
     assert prediction.explanation_json["structured_context"]["components"]["home_advantage_score"] == {
         "value": "0.0080",
         "available": True,
-        "source": "espn_rss:news:source_raw_json",
-        "note": "resolved_from_structured_context",
+        "source": "the_odds_api:odds:metadata_json",
+        "note": "target_team_is_home",
     }

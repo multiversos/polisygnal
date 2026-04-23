@@ -18,13 +18,25 @@ from app.services.nba_team_matching import (
     OddsEventMatch,
     assess_market_for_evidence,
     canonicalize_nba_team_name,
+    extract_nba_teams,
     is_relevant_news_item,
     match_market_to_odds_event,
+)
+from app.services.structured_context import (
+    STRUCTURED_CONTEXT_KEY,
+    build_structured_context_payload,
+    merge_structured_context_records,
+    normalize_structured_context_payload,
 )
 
 CONFIDENCE_SCALE = Decimal("0.00")
 STRENGTH_SCALE = Decimal("0.0001")
 ONE = Decimal("1")
+ZERO = Decimal("0")
+HOME_ADVANTAGE_SIGNAL = Decimal("0.0100")
+INJURY_SIGNAL = Decimal("0.0080")
+FORM_SIGNAL = Decimal("0.0050")
+REST_SIGNAL = Decimal("0.0040")
 
 
 @dataclass(slots=True)
@@ -131,6 +143,7 @@ def capture_market_evidence(
         settings=settings,
         news_items=context.news_items,
         teams=assessment.teams,
+        target_team=assessment.teams[0] if assessment.teams else None,
         fetched_at=context.fetched_at,
     )
     _merge_summary(summary, news_result)
@@ -259,6 +272,10 @@ def _persist_odds_evidence(
         "mean_implied_prob": str(mean_implied_prob.quantize(STRENGTH_SCALE, rounding=ROUND_HALF_UP)),
         "max_implied_prob": str(max(implied_probabilities).quantize(STRENGTH_SCALE, rounding=ROUND_HALF_UP)),
         "min_implied_prob": str(min(implied_probabilities).quantize(STRENGTH_SCALE, rounding=ROUND_HALF_UP)),
+        STRUCTURED_CONTEXT_KEY: _build_odds_structured_context(
+            match=match,
+            raw_event=raw_event,
+        ),
     }
     _, evidence_created = upsert_evidence_item(
         db,
@@ -290,6 +307,7 @@ def _persist_news_evidence(
     settings: Settings,
     news_items: list[EspnNewsItem],
     teams: list[str],
+    target_team: str | None,
     fetched_at: datetime,
 ) -> EvidencePipelineSummary:
     summary = EvidencePipelineSummary()
@@ -328,6 +346,10 @@ def _persist_news_evidence(
             "matched_teams": teams,
             "url": item.url,
             "published_at": _serialize_datetime(item.published_at),
+            STRUCTURED_CONTEXT_KEY: _build_news_structured_context(
+                item=item,
+                target_team=target_team,
+            ),
         }
         _, evidence_created = upsert_evidence_item(
             db,
@@ -349,6 +371,188 @@ def _persist_news_evidence(
             summary.evidence_updated += 1
 
     return summary
+
+
+def _build_odds_structured_context(
+    *,
+    match: OddsEventMatch,
+    raw_event: dict[str, object],
+) -> dict[str, object]:
+    explicit_context = normalize_structured_context_payload(raw_event)
+
+    home_team = canonicalize_nba_team_name(_as_text(raw_event.get("home_team")))
+    away_team = canonicalize_nba_team_name(_as_text(raw_event.get("away_team")))
+    home_advantage_score = ZERO
+    home_advantage_available = False
+    home_advantage_reason = "missing_home_advantage_score"
+
+    if home_team is not None and match.target_team == home_team:
+        home_advantage_score = HOME_ADVANTAGE_SIGNAL
+        home_advantage_available = True
+        home_advantage_reason = "target_team_is_home"
+    elif away_team is not None and match.target_team == away_team:
+        home_advantage_score = ZERO - HOME_ADVANTAGE_SIGNAL
+        home_advantage_available = True
+        home_advantage_reason = "target_team_is_away"
+    elif home_team is not None or away_team is not None:
+        home_advantage_reason = "target_team_not_resolved_in_odds_event"
+
+    derived_context = build_structured_context_payload(
+        values={"home_advantage_score": home_advantage_score},
+        availability={"home_advantage_score": home_advantage_available},
+        reasons={"home_advantage_score": home_advantage_reason},
+    )
+    return merge_structured_context_records(explicit_context, derived_context)
+
+
+def _build_news_structured_context(
+    *,
+    item: EspnNewsItem,
+    target_team: str | None,
+) -> dict[str, object]:
+    explicit_context = normalize_structured_context_payload(item.raw_json)
+    derived_values, derived_availability, derived_reasons = _derive_news_structured_context(
+        raw_text=item.raw_text,
+        target_team=target_team,
+    )
+    derived_context = build_structured_context_payload(
+        values=derived_values,
+        availability=derived_availability,
+        reasons=derived_reasons,
+    )
+    return merge_structured_context_records(explicit_context, derived_context)
+
+
+def _derive_news_structured_context(
+    *,
+    raw_text: str,
+    target_team: str | None,
+) -> tuple[dict[str, Decimal], dict[str, bool], dict[str, str]]:
+    values: dict[str, Decimal] = {}
+    availability: dict[str, bool] = {}
+    reasons: dict[str, str] = {}
+
+    injury_value, injury_available, injury_reason = _derive_team_oriented_signal(
+        raw_text=raw_text,
+        target_team=target_team,
+        component="injury_score",
+        positive_keywords=(
+            "injury report improves",
+            "healthier",
+            "healthy",
+            "available",
+            "returns",
+            "returning",
+            "cleared",
+            "deeper rotation",
+        ),
+        negative_keywords=(
+            "ruled out",
+            "out for",
+            "questionable",
+            "doubtful",
+            "shorthanded",
+            "without",
+            "injury concern",
+            "injury report worsens",
+        ),
+        magnitude=INJURY_SIGNAL,
+    )
+    form_value, form_available, form_reason = _derive_team_oriented_signal(
+        raw_text=raw_text,
+        target_team=target_team,
+        component="form_score",
+        positive_keywords=(
+            "win streak",
+            "winning streak",
+            "surging",
+            "rolling",
+            "hot streak",
+            "strong stretch",
+        ),
+        negative_keywords=(
+            "losing streak",
+            "slumping",
+            "struggling",
+            "cold stretch",
+            "skid",
+        ),
+        magnitude=FORM_SIGNAL,
+    )
+    rest_value, rest_available, rest_reason = _derive_team_oriented_signal(
+        raw_text=raw_text,
+        target_team=target_team,
+        component="rest_score",
+        positive_keywords=(
+            "extra rest",
+            "rest advantage",
+            "two days rest",
+            "three days rest",
+            "well rested",
+        ),
+        negative_keywords=(
+            "back to back",
+            "back-to-back",
+            "second night",
+            "short rest",
+            "no rest",
+        ),
+        magnitude=REST_SIGNAL,
+    )
+
+    values["injury_score"] = injury_value
+    values["form_score"] = form_value
+    values["rest_score"] = rest_value
+    values["home_advantage_score"] = ZERO
+
+    availability["injury_score"] = injury_available
+    availability["form_score"] = form_available
+    availability["rest_score"] = rest_available
+    availability["home_advantage_score"] = False
+
+    reasons["injury_score"] = injury_reason
+    reasons["form_score"] = form_reason
+    reasons["rest_score"] = rest_reason
+    reasons["home_advantage_score"] = "missing_home_advantage_score"
+
+    return values, availability, reasons
+
+
+def _derive_team_oriented_signal(
+    *,
+    raw_text: str,
+    target_team: str | None,
+    component: str,
+    positive_keywords: tuple[str, ...],
+    negative_keywords: tuple[str, ...],
+    magnitude: Decimal,
+) -> tuple[Decimal, bool, str]:
+    if not raw_text.strip() or not target_team:
+        return ZERO, False, f"missing_{component}"
+
+    lowered_text = " ".join(raw_text.lower().split())
+    primary_team = _extract_primary_team(raw_text)
+    if primary_team is None:
+        return ZERO, False, f"missing_{component}"
+
+    direction = Decimal("1") if primary_team == target_team else Decimal("-1")
+
+    if any(keyword in lowered_text for keyword in positive_keywords):
+        reason_suffix = "target_team" if direction > ZERO else "opponent_team"
+        return magnitude * direction, True, f"positive_{component}_{reason_suffix}"
+
+    if any(keyword in lowered_text for keyword in negative_keywords):
+        reason_suffix = "target_team" if direction > ZERO else "opponent_team"
+        return (ZERO - magnitude) * direction, True, f"negative_{component}_{reason_suffix}"
+
+    return ZERO, False, f"missing_{component}"
+
+
+def _extract_primary_team(raw_text: str) -> str | None:
+    teams = extract_nba_teams(raw_text)
+    if not teams:
+        return None
+    return teams[0]
 
 
 def _extract_bookmaker_probabilities(match: OddsEventMatch) -> list[dict[str, object]]:

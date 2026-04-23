@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy.orm import Session
 
@@ -16,19 +16,18 @@ from app.repositories.market_snapshots import get_latest_market_snapshot
 from app.repositories.markets import list_nba_winner_evidence_candidates
 from app.repositories.predictions import create_prediction
 from app.services.nba_team_matching import assess_market_for_evidence
+from app.services.structured_context import (
+    STRUCTURED_CONTEXT_COMPONENTS,
+    STRUCTURED_CONTEXT_COMPONENT_CAP,
+    STRUCTURED_CONTEXT_TOTAL_CAP,
+    normalize_structured_context_payload,
+    parse_structured_context_decimal,
+)
 
 PROBABILITY_SCALE = Decimal("0.0001")
 CONFIDENCE_SCALE = Decimal("0.0001")
 ONE = Decimal("1")
 ZERO = Decimal("0")
-STRUCTURED_CONTEXT_COMPONENTS = (
-    "injury_score",
-    "form_score",
-    "rest_score",
-    "home_advantage_score",
-)
-STRUCTURED_CONTEXT_COMPONENT_CAP = Decimal("0.0150")
-STRUCTURED_CONTEXT_TOTAL_CAP = Decimal("0.0300")
 
 
 @dataclass(slots=True)
@@ -573,47 +572,32 @@ def _extract_structured_context_component(
     item: EvidenceItem,
     code: str,
 ) -> StructuredContextComponent | None:
-    payload_sources = (
-        ("metadata_json", item.metadata_json),
-        ("source_raw_json", item.source.raw_json),
+    payload = normalize_structured_context_payload(item.metadata_json)
+    if payload is None:
+        return None
+
+    availability = payload.get("availability")
+    if not isinstance(availability, dict) or not bool(availability.get(code, False)):
+        return None
+
+    value = parse_structured_context_decimal(payload.get(code))
+    if value is None:
+        return None
+
+    reasons = payload.get("reasons")
+    note = (
+        str(reasons.get(code))
+        if isinstance(reasons, dict) and reasons.get(code) is not None
+        else "provided_structured_context"
     )
-    for origin, payload in payload_sources:
-        value, location = _extract_structured_context_score(payload=payload, code=code)
-        if value is None or location is None:
-            continue
-        clamped_value, was_clamped = _clamp_structured_context_value(value)
-        note = f"resolved_from_{location}"
-        if was_clamped:
-            note = f"{note}_clamped"
-        return StructuredContextComponent(
-            code=code,
-            value=clamped_value,
-            available=True,
-            source=f"{item.provider}:{item.evidence_type}:{origin}",
-            note=note,
-        )
+    return StructuredContextComponent(
+        code=code,
+        value=_quantize_signed(value),
+        available=True,
+        source=f"{item.provider}:{item.evidence_type}:metadata_json",
+        note=note,
+    )
     return None
-
-
-def _extract_structured_context_score(
-    *,
-    payload: object,
-    code: str,
-) -> tuple[Decimal | None, str | None]:
-    if not isinstance(payload, dict):
-        return None, None
-
-    structured_context_payload = payload.get("structured_context")
-    if isinstance(structured_context_payload, dict):
-        value = _parse_decimal(structured_context_payload.get(code))
-        if value is not None:
-            return value, "structured_context"
-
-    value = _parse_decimal(payload.get(code))
-    if value is not None:
-        return value, "top_level"
-
-    return None, None
 
 
 def _compute_structured_context_adjustment(
@@ -626,26 +610,6 @@ def _compute_structured_context_adjustment(
     lower_bound = ZERO - STRUCTURED_CONTEXT_TOTAL_CAP
     clamped = max(min(total, STRUCTURED_CONTEXT_TOTAL_CAP), lower_bound)
     return _quantize_signed(clamped)
-
-
-def _clamp_structured_context_value(value: Decimal) -> tuple[Decimal, bool]:
-    lower_bound = ZERO - STRUCTURED_CONTEXT_COMPONENT_CAP
-    was_clamped = value > STRUCTURED_CONTEXT_COMPONENT_CAP or value < lower_bound
-    clamped = max(min(value, STRUCTURED_CONTEXT_COMPONENT_CAP), lower_bound)
-    return _quantize_signed(clamped), was_clamped
-
-
-def _parse_decimal(value: object) -> Decimal | None:
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, Decimal):
-        return value
-    if isinstance(value, int | float | str):
-        try:
-            return Decimal(str(value))
-        except InvalidOperation:
-            return None
-    return None
 
 
 def _build_summary(
