@@ -55,6 +55,14 @@ class Prediction(Base):
     def used_evidence_in_scoring(self) -> bool:
         return (self.used_odds_count + self.used_news_count) > 0
 
+    @property
+    def action_score(self) -> Decimal | None:
+        return _extract_prediction_decimal(
+            self.explanation_json,
+            ("computed", "action_score"),
+            ("action", "action_score"),
+        )
+
 
 def _extract_prediction_count(payload: dict[str, object] | list[object], key: str) -> int:
     if not isinstance(payload, dict):
@@ -73,3 +81,26 @@ def _extract_prediction_count(payload: dict[str, object] | list[object], key: st
         except ValueError:
             return 0
     return 0
+
+
+def _extract_prediction_decimal(
+    payload: dict[str, object] | list[object],
+    *paths: tuple[str, str],
+) -> Decimal | None:
+    if not isinstance(payload, dict):
+        return None
+    for section_key, value_key in paths:
+        section = payload.get(section_key)
+        if not isinstance(section, dict):
+            continue
+        value = section.get(value_key)
+        if isinstance(value, Decimal):
+            return value
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float, str)):
+            try:
+                return Decimal(str(value))
+            except ArithmeticError:
+                continue
+    return None

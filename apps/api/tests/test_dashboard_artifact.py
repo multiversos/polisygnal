@@ -59,6 +59,7 @@ def test_generate_dashboard_writes_html_with_real_sections(
         edge_magnitude=Decimal("0.1800"),
         edge_class="strong",
         opportunity=True,
+        action_score=Decimal("0.8400"),
         used_odds_count=1,
     )
     _add_prediction(
@@ -72,6 +73,7 @@ def test_generate_dashboard_writes_html_with_real_sections(
         edge_magnitude=Decimal("0.0300"),
         edge_class="moderate",
         opportunity=False,
+        action_score=Decimal("0.4100"),
         used_odds_count=0,
     )
     _add_prediction(
@@ -165,6 +167,8 @@ def test_generate_dashboard_writes_html_with_real_sections(
     assert "mercado" in html
     assert "sí 0.7000" in html
     assert "confianza" in html
+    assert "score de accion 0.84" in html
+    assert "score de accion 0.41" in html
     assert "diferencia" in html
     assert "prioridad" in html
     assert "Knicks vs. Hawks" in html
@@ -220,6 +224,7 @@ def test_render_dashboard_html_shows_closed_market_status_chip() -> None:
                     question="NBA Playoffs: Who Will Win Series? - Knicks vs. Hawks",
                     yes_probability=Decimal("0.6100"),
                     confidence_score=Decimal("0.8200"),
+                    action_score=Decimal("0.7600"),
                     edge_magnitude=Decimal("0.1200"),
                     priority_bucket="priority",
                     evaluation_available=False,
@@ -307,7 +312,9 @@ def _add_prediction(
     edge_class: str,
     opportunity: bool,
     used_odds_count: int,
+    action_score: Decimal | None = None,
 ) -> None:
+    computed = {"action_score": str(action_score)} if action_score is not None else {}
     db_session.add(
         Prediction(
             market_id=market.id,
@@ -324,6 +331,7 @@ def _add_prediction(
             review_edge=False,
             explanation_json={
                 "summary": f"Prediction for market {market.id}",
+                "computed": computed,
                 "counts": {
                     "odds_count": used_odds_count,
                     "news_count": 0,

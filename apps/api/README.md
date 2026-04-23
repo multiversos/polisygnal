@@ -1395,6 +1395,120 @@ Importante:
 - solo deja contexto estructurado persistido y reusable
 - si no hay contexto suficiente, scoring mantiene el comportamiento actual y aplica `0.0`
 
+### Mercado externo y line movement
+
+La etapa de evidence tambien deja una convencion canonica para mercado externo en odds. Scoring usa este bloque como capa pequena y explicita despues de `market + odds + structured_context`.
+
+- path canonico:
+  `evidence_items.metadata_json.external_market`
+- version actual:
+  `external_market_v1`
+- campos canonicos:
+  `opening_implied_prob`, `current_implied_prob`, `line_movement_score`, `consensus_strength`
+
+Shape persistido:
+
+```json
+{
+  "external_market": {
+    "version": "external_market_v1",
+    "opening_implied_prob": null,
+    "current_implied_prob": "0.5917",
+    "line_movement_score": "0.0000",
+    "consensus_strength": "0.7500",
+    "availability": {
+      "opening_implied_prob": false,
+      "current_implied_prob": true,
+      "line_movement_score": false,
+      "consensus_strength": true
+    },
+    "reasons": {
+      "opening_implied_prob": "missing_opening_implied_prob",
+      "current_implied_prob": "derived_from_current_bookmaker_odds",
+      "line_movement_score": "missing_opening_implied_prob",
+      "consensus_strength": "derived_from_bookmaker_count_and_dispersion"
+    }
+  }
+}
+```
+
+Reglas simples del MVP:
+
+- `current_implied_prob` se deriva del promedio de implied probability de bookmakers del evento odds matcheado
+- `opening_implied_prob` se acepta si el provider ya lo trae en `raw_json.external_market.opening_implied_prob`; si falta, queda `null`
+- `line_movement_score` se deriva como `current_implied_prob - opening_implied_prob` cuando ambos existen
+- `line_movement_score` esta acotado a maximo absoluto `0.0150`
+- `consensus_strength` se deriva de profundidad de bookmakers y dispersion simple entre implied probabilities
+- `consensus_strength` afecta confianza con una bonificacion pequena; no mueve agresivamente probabilidad
+- si faltan datos, `line_movement_score` y `consensus_strength` quedan en `0.0000` o no disponibles, y scoring mantiene comportamiento equivalente
+
+### Data quality score
+
+Scoring calcula un `data_quality_score` explicativo en rango `0.0000` a `1.0000` usando solo senales ya cargadas en el contexto de scoring.
+No cambia la probabilidad base ni recalcula datos externos.
+
+Formula simple:
+
+- `valid_odds`:
+  `+0.2500` si hay odds validas recientes
+- `useful_evidence_count`:
+  hasta `+0.1500`, proporcional a `min(evidence_count / 2, 1)`
+- `structured_context_available`:
+  `+0.1500` si existe al menos un componente de `structured_context`
+- `external_market_available`:
+  `+0.1500` si existe `external_market` usable
+- `liquidity_available`:
+  `+0.1000` si el snapshot trae liquidez
+- `liquidity_above_threshold`:
+  `+0.1000` si la liquidez supera `POLYSIGNAL_SCORING_LOW_LIQUIDITY_THRESHOLD`
+- `low_contradiction`:
+  `+0.1000` si hay evidencia util y no hay `high_contradiction`
+- `high_contradiction_penalty`:
+  `-0.1500` si hay `high_contradiction`
+
+Uso en confidence:
+
+- si `data_quality_score >= 0.5000`, agrega un apoyo menor:
+  `0.0300 * data_quality_score`
+- si es menor, no modifica `confidence_score`
+- nunca modifica `yes_probability`
+
+`explanation_json.data_quality` muestra:
+
+- `data_quality_score`
+- rango
+- regla de apoyo a confianza
+- componentes con `code`, `weight`, `value`, `applied` y `note`
+
+### Action score
+
+Scoring calcula un `action_score` explicativo en rango `0.0000` a `1.0000`.
+Es solo una senal operativa de priorizacion: no cambia `yes_probability`, no cambia `opportunity`, no escribe columnas nuevas y no dispara trading.
+
+Formula simple:
+
+- `edge_magnitude`:
+  peso `0.4000`, normalizado contra `0.2500`
+- `confidence_score`:
+  peso `0.2500`, usa el `confidence_score` ya calculado
+- `data_quality_score`:
+  peso `0.2000`, usa el score explicativo de calidad de datos
+- `opportunity_bonus`:
+  peso `0.1000`, solo si la regla existente de `opportunity` ya dio `true`
+- `liquidity_signal`:
+  peso `0.0500`, `1.0` si la liquidez supera el umbral, `0.5` si hay liquidez baja, `0.0` si falta
+
+La suma se acota a `0.0000` - `1.0000`.
+Si faltan datos, el score sigue funcionando con los componentes disponibles.
+
+`explanation_json.action` muestra:
+
+- `action_score`
+- rango
+- `usage = prioritization_only`
+- impacto nulo sobre probabilidad y `opportunity`
+- componentes con `code`, `weight`, `value`, `applied` y `note`
+
 ### Comportamiento sin `ODDS_API_KEY`
 
 Si `ODDS_API_KEY` no esta configurada:
@@ -1498,6 +1612,10 @@ Notas:
 - `news` no mueve direccion en v1; solo impacta `confidence_score`
 - el ajuste estructurado deportivo usa solo `evidence_items.metadata_json.structured_context`
 - `injury_score`, `form_score`, `rest_score` y `home_advantage_score` son pequenos y explicitos; si faltan, quedan en `0.0000`
+- line movement usa solo `evidence_items.metadata_json.external_market.line_movement_score` y queda visible en `explanation_json.external_market`
+- `consensus_strength` queda visible en `explanation_json.external_market` y afecta solo la confianza
+- `data_quality_score` queda visible en `explanation_json.data_quality` y puede dar un apoyo menor a `confidence_score`; no cambia probabilidad
+- `action_score` queda visible en `explanation_json.action`; sirve solo para priorizacion/orden operativo y no cambia probabilidad ni `opportunity`
 - el scoring no se dispara automaticamente desde evidence pipeline en esta fase
 - el scoring sigue corriendo para todo `nba / winner`, pero ignora evidence en mercados no elegibles para este pipeline
 - `explanation_json` deja trazabilidad simple de inputs, bonuses, penalties, counts y summary

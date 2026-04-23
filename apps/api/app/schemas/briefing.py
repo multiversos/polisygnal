@@ -27,6 +27,7 @@ class BriefingMarketItem(BaseModel):
     snapshot_captured_at: datetime | None = None
     yes_probability: Decimal | None = None
     confidence_score: Decimal | None = None
+    action_score: Decimal | None = None
     edge_magnitude: Decimal | None = None
     edge_class: str | None = None
     opportunity: bool | None = None

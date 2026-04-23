@@ -13,6 +13,15 @@ from app.models.market import Market
 from app.repositories.evidence_items import upsert_evidence_item
 from app.repositories.markets import list_nba_winner_evidence_candidates
 from app.repositories.sources import upsert_source
+from app.services.external_market import (
+    EXTERNAL_MARKET_KEY,
+    build_external_market_payload,
+    normalize_external_market_payload,
+    parse_external_market_decimal,
+    quantize_consensus_strength,
+    quantize_external_probability,
+    quantize_line_movement_score,
+)
 from app.services.nba_team_matching import (
     EvidenceMarketAssessment,
     OddsEventMatch,
@@ -37,6 +46,7 @@ HOME_ADVANTAGE_SIGNAL = Decimal("0.0100")
 INJURY_SIGNAL = Decimal("0.0080")
 FORM_SIGNAL = Decimal("0.0050")
 REST_SIGNAL = Decimal("0.0040")
+CONSENSUS_DISPERSION_PENALTY_DELTA = Decimal("0.0500")
 
 
 @dataclass(slots=True)
@@ -272,6 +282,11 @@ def _persist_odds_evidence(
         "mean_implied_prob": str(mean_implied_prob.quantize(STRENGTH_SCALE, rounding=ROUND_HALF_UP)),
         "max_implied_prob": str(max(implied_probabilities).quantize(STRENGTH_SCALE, rounding=ROUND_HALF_UP)),
         "min_implied_prob": str(min(implied_probabilities).quantize(STRENGTH_SCALE, rounding=ROUND_HALF_UP)),
+        EXTERNAL_MARKET_KEY: _build_odds_external_market(
+            raw_event=raw_event,
+            current_implied_prob=mean_implied_prob,
+            implied_probabilities=implied_probabilities,
+        ),
         STRUCTURED_CONTEXT_KEY: _build_odds_structured_context(
             match=match,
             raw_event=raw_event,
@@ -371,6 +386,164 @@ def _persist_news_evidence(
             summary.evidence_updated += 1
 
     return summary
+
+
+def _build_odds_external_market(
+    *,
+    raw_event: dict[str, object],
+    current_implied_prob: Decimal,
+    implied_probabilities: list[Decimal],
+) -> dict[str, object]:
+    explicit_market = normalize_external_market_payload(raw_event)
+    explicit_availability = (
+        explicit_market.get("availability") if isinstance(explicit_market, dict) else None
+    )
+    explicit_reasons = (
+        explicit_market.get("reasons") if isinstance(explicit_market, dict) else None
+    )
+
+    opening_implied_prob = _external_market_field(
+        explicit_market,
+        "opening_implied_prob",
+    )
+    current_prob = (
+        _external_market_field(explicit_market, "current_implied_prob")
+        or current_implied_prob
+    )
+    explicit_line_movement_score = _external_market_field(
+        explicit_market,
+        "line_movement_score",
+    )
+    line_movement_score = explicit_line_movement_score
+    if line_movement_score is None and opening_implied_prob is not None:
+        line_movement_score = current_prob - opening_implied_prob
+
+    explicit_consensus_strength = _external_market_field(
+        explicit_market,
+        "consensus_strength",
+    )
+    consensus_strength = explicit_consensus_strength or _derive_consensus_strength(
+        implied_probabilities
+    )
+
+    availability = {
+        "opening_implied_prob": _external_market_available(
+            explicit_availability,
+            "opening_implied_prob",
+            opening_implied_prob is not None,
+        ),
+        "current_implied_prob": _external_market_available(
+            explicit_availability,
+            "current_implied_prob",
+            True,
+        ),
+        "line_movement_score": _external_market_available(
+            explicit_availability,
+            "line_movement_score",
+            explicit_line_movement_score is not None
+            or (line_movement_score is not None and opening_implied_prob is not None),
+        ),
+        "consensus_strength": _external_market_available(
+            explicit_availability,
+            "consensus_strength",
+            explicit_consensus_strength is not None or len(implied_probabilities) >= 2,
+        ),
+    }
+    reasons = {
+        "opening_implied_prob": _external_market_reason(
+            explicit_reasons,
+            "opening_implied_prob",
+            "provided_opening_implied_prob",
+            "missing_opening_implied_prob",
+            availability["opening_implied_prob"],
+        ),
+        "current_implied_prob": _external_market_reason(
+            explicit_reasons,
+            "current_implied_prob",
+            "derived_from_current_bookmaker_odds",
+            "missing_current_implied_prob",
+            availability["current_implied_prob"],
+        ),
+        "line_movement_score": _external_market_reason(
+            explicit_reasons,
+            "line_movement_score",
+            "derived_from_opening_and_current_implied_prob",
+            "missing_opening_implied_prob",
+            availability["line_movement_score"],
+        ),
+        "consensus_strength": _external_market_reason(
+            explicit_reasons,
+            "consensus_strength",
+            "derived_from_bookmaker_count_and_dispersion",
+            "missing_consensus_strength",
+            availability["consensus_strength"],
+        ),
+    }
+
+    return build_external_market_payload(
+        opening_implied_prob=opening_implied_prob,
+        current_implied_prob=current_prob,
+        line_movement_score=quantize_line_movement_score(line_movement_score),
+        consensus_strength=quantize_consensus_strength(consensus_strength),
+        availability=availability,
+        reasons=reasons,
+    )
+
+
+def _external_market_field(
+    payload: dict[str, object] | None,
+    field: str,
+) -> Decimal | None:
+    if payload is None:
+        return None
+    availability = payload.get("availability")
+    if isinstance(availability, dict) and not bool(availability.get(field, False)):
+        return None
+    value = parse_external_market_decimal(payload.get(field))
+    if field in {"opening_implied_prob", "current_implied_prob"}:
+        return quantize_external_probability(value)
+    if field == "line_movement_score":
+        return quantize_line_movement_score(value)
+    if field == "consensus_strength":
+        return quantize_consensus_strength(value)
+    return value
+
+
+def _external_market_available(
+    availability: object,
+    field: str,
+    fallback: bool,
+) -> bool:
+    if isinstance(availability, dict) and field in availability:
+        return bool(availability[field]) or fallback
+    return fallback
+
+
+def _external_market_reason(
+    reasons: object,
+    field: str,
+    available_reason: str,
+    missing_reason: str,
+    available: bool,
+) -> str:
+    if isinstance(reasons, dict) and reasons.get(field) is not None:
+        explicit_reason = str(reasons[field])
+        if not (available and explicit_reason.startswith("missing_")):
+            return explicit_reason
+    return available_reason if available else missing_reason
+
+
+def _derive_consensus_strength(implied_probabilities: list[Decimal]) -> Decimal:
+    if len(implied_probabilities) < 2:
+        return ZERO
+    bookmaker_depth = min(Decimal(len(implied_probabilities)) / Decimal("4"), ONE)
+    dispersion = max(implied_probabilities) - min(implied_probabilities)
+    penalty = ZERO
+    if dispersion >= Decimal("0.1000"):
+        penalty = Decimal("0.2500")
+    elif dispersion >= CONSENSUS_DISPERSION_PENALTY_DELTA:
+        penalty = Decimal("0.1000")
+    return quantize_consensus_strength(bookmaker_depth - penalty)
 
 
 def _build_odds_structured_context(

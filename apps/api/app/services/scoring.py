@@ -15,6 +15,13 @@ from app.repositories.evidence_items import list_market_evidence_items
 from app.repositories.market_snapshots import get_latest_market_snapshot
 from app.repositories.markets import list_nba_winner_evidence_candidates
 from app.repositories.predictions import create_prediction
+from app.services.external_market import (
+    LINE_MOVEMENT_SCORE_CAP,
+    normalize_external_market_payload,
+    parse_external_market_decimal,
+    quantize_consensus_strength,
+    quantize_line_movement_score,
+)
 from app.services.nba_team_matching import assess_market_for_evidence
 from app.services.structured_context import (
     STRUCTURED_CONTEXT_COMPONENTS,
@@ -45,12 +52,55 @@ class PenaltyApplied:
 
 
 @dataclass(slots=True)
+class DataQualityComponent:
+    code: str
+    weight: Decimal
+    value: Decimal
+    applied: bool
+    note: str
+
+
+@dataclass(slots=True)
+class DataQualityResult:
+    score: Decimal
+    components: list[DataQualityComponent]
+
+
+@dataclass(slots=True)
+class ActionScoreComponent:
+    code: str
+    weight: Decimal
+    value: Decimal
+    applied: bool
+    note: str
+
+
+@dataclass(slots=True)
+class ActionScoreResult:
+    score: Decimal
+    components: list[ActionScoreComponent]
+
+
+@dataclass(slots=True)
 class StructuredContextComponent:
     code: str
     value: Decimal
     available: bool
     source: str | None
     note: str
+
+
+@dataclass(slots=True)
+class ExternalMarketContext:
+    opening_implied_prob: Decimal | None
+    current_implied_prob: Decimal | None
+    line_movement_score: Decimal
+    consensus_strength: Decimal
+    available: bool
+    source: str | None
+    note: str
+    field_availability: dict[str, bool]
+    field_reasons: dict[str, str]
 
 
 @dataclass(slots=True)
@@ -65,6 +115,7 @@ class ScoringContext:
     latest_evidence_at: datetime | None
     has_high_contradiction: bool
     structured_context_components: dict[str, StructuredContextComponent]
+    external_market_context: ExternalMarketContext
     odds_implied_prob: Decimal | None
     odds_bookmaker_count: int | None
 
@@ -228,6 +279,7 @@ def _build_scoring_context(
     structured_context_components = _resolve_structured_context_components(
         evidence_items=[item for item in evidence_items if item.id in usable_evidence_ids]
     )
+    external_market_context = _resolve_external_market_context(evidence_items=usable_odds)
     distinct_providers = {item.provider for item in usable_evidence}
     timestamps = [timestamp for timestamp in (_resolve_evidence_timestamp(item) for item in usable_evidence) if timestamp is not None]
     latest_evidence_at = max(timestamps) if timestamps else None
@@ -251,6 +303,7 @@ def _build_scoring_context(
         latest_evidence_at=latest_evidence_at,
         has_high_contradiction=has_high_contradiction,
         structured_context_components=structured_context_components,
+        external_market_context=external_market_context,
         odds_implied_prob=latest_odds_item.strength if latest_odds_item is not None else None,
         odds_bookmaker_count=latest_odds_item.bookmaker_count if latest_odds_item is not None else None,
     )
@@ -280,22 +333,42 @@ def _compute_scoring_values(
     structured_context_adjustment = _compute_structured_context_adjustment(
         context.structured_context_components
     )
-    yes_probability = _quantize_probability(base_yes_probability + structured_context_adjustment)
+    structured_yes_probability = _quantize_probability(
+        base_yes_probability + structured_context_adjustment
+    )
+    line_movement_adjustment = (
+        context.external_market_context.line_movement_score
+        if context.external_market_context.available
+        else quantize_line_movement_score(None)
+    )
+    yes_probability = _quantize_probability(
+        structured_yes_probability + line_movement_adjustment
+    )
     no_probability = _quantize_probability(ONE - yes_probability)
 
     edge_signed = _quantize_signed(yes_probability - market_yes_price)
     edge_magnitude = _quantize_probability(abs(edge_signed))
     edge_class = _classify_edge(edge_magnitude)
 
+    data_quality = _compute_data_quality(context=context, settings=settings)
     bonuses, penalties, confidence_score = _compute_confidence(
         context=context,
         settings=settings,
         current_time=current_time,
+        data_quality=data_quality,
     )
 
     opportunity = edge_magnitude >= Decimal("0.05") and confidence_score >= Decimal("0.40")
     review_confidence = confidence_score > Decimal("0.80")
     review_edge = edge_magnitude > Decimal("0.25")
+    action_score = _compute_action_score(
+        context=context,
+        settings=settings,
+        edge_magnitude=edge_magnitude,
+        confidence_score=confidence_score,
+        data_quality=data_quality,
+        opportunity=opportunity,
+    )
 
     explanation_json = _build_explanation(
         market=market,
@@ -305,6 +378,8 @@ def _compute_scoring_values(
         odds_implied_prob=odds_implied_prob,
         base_yes_probability=base_yes_probability,
         structured_context_adjustment=structured_context_adjustment,
+        structured_yes_probability=structured_yes_probability,
+        line_movement_adjustment=line_movement_adjustment,
         yes_probability=yes_probability,
         no_probability=no_probability,
         confidence_score=confidence_score,
@@ -316,6 +391,8 @@ def _compute_scoring_values(
         review_edge=review_edge,
         bonuses=bonuses,
         penalties=penalties,
+        data_quality=data_quality,
+        action_score=action_score,
     )
 
     return {
@@ -337,6 +414,7 @@ def _compute_confidence(
     context: ScoringContext,
     settings: Settings,
     current_time: datetime,
+    data_quality: DataQualityResult,
 ) -> tuple[list[BonusApplied], list[PenaltyApplied], Decimal]:
     bonuses: list[BonusApplied] = []
     penalties: list[PenaltyApplied] = []
@@ -351,6 +429,30 @@ def _compute_confidence(
             )
         )
         confidence += Decimal("0.25")
+
+    if context.external_market_context.available and context.external_market_context.consensus_strength > ZERO:
+        consensus_bonus = _quantize_probability(
+            Decimal("0.05") * context.external_market_context.consensus_strength
+        )
+        bonuses.append(
+            BonusApplied(
+                code="external_consensus_strength",
+                value=consensus_bonus,
+                reason="Existe consenso externo persistido en metadata_json.external_market.",
+            )
+        )
+        confidence += consensus_bonus
+
+    if data_quality.score >= Decimal("0.5000"):
+        data_quality_bonus = _quantize_probability(Decimal("0.0300") * data_quality.score)
+        bonuses.append(
+            BonusApplied(
+                code="data_quality_support",
+                value=data_quality_bonus,
+                reason="data_quality_score >= 0.50 aporta un apoyo menor a confidence_score.",
+            )
+        )
+        confidence += data_quality_bonus
 
     if len(context.distinct_providers) >= 2:
         bonuses.append(
@@ -439,6 +541,8 @@ def _build_explanation(
     odds_implied_prob: Decimal | None,
     base_yes_probability: Decimal,
     structured_context_adjustment: Decimal,
+    structured_yes_probability: Decimal,
+    line_movement_adjustment: Decimal,
     yes_probability: Decimal,
     no_probability: Decimal,
     confidence_score: Decimal,
@@ -450,6 +554,8 @@ def _build_explanation(
     review_edge: bool,
     bonuses: list[BonusApplied],
     penalties: list[PenaltyApplied],
+    data_quality: DataQualityResult,
+    action_score: ActionScoreResult,
 ) -> dict[str, object]:
     inputs = {
         "market_id": market.id,
@@ -473,6 +579,7 @@ def _build_explanation(
         "low_liquidity_threshold": str(Decimal(str(settings.scoring_low_liquidity_threshold))),
         "structured_context_component_cap": str(STRUCTURED_CONTEXT_COMPONENT_CAP),
         "structured_context_total_cap": str(STRUCTURED_CONTEXT_TOTAL_CAP),
+        "line_movement_score_cap": str(LINE_MOVEMENT_SCORE_CAP),
     }
 
     counts = {
@@ -525,9 +632,65 @@ def _build_explanation(
                 for code, component in context.structured_context_components.items()
             },
         },
+        "external_market": {
+            "available": context.external_market_context.available,
+            "opening_implied_prob": _serialize_decimal(
+                context.external_market_context.opening_implied_prob
+            ),
+            "current_implied_prob": _serialize_decimal(
+                context.external_market_context.current_implied_prob
+            ),
+            "line_movement_score": _serialize_decimal(
+                context.external_market_context.line_movement_score
+            ),
+            "line_movement_adjustment": str(line_movement_adjustment),
+            "consensus_strength": _serialize_decimal(
+                context.external_market_context.consensus_strength
+            ),
+            "source": context.external_market_context.source,
+            "note": context.external_market_context.note,
+            "field_availability": context.external_market_context.field_availability,
+            "field_reasons": context.external_market_context.field_reasons,
+        },
+        "data_quality": {
+            "data_quality_score": str(data_quality.score),
+            "range": {"min": "0.0000", "max": "1.0000"},
+            "confidence_support_rule": "adds 0.0300 * data_quality_score to confidence_score only when score >= 0.5000",
+            "components": [
+                {
+                    "code": component.code,
+                    "weight": str(component.weight),
+                    "value": str(component.value),
+                    "applied": component.applied,
+                    "note": component.note,
+                }
+                for component in data_quality.components
+            ],
+        },
+        "action": {
+            "action_score": str(action_score.score),
+            "range": {"min": "0.0000", "max": "1.0000"},
+            "usage": "prioritization_only",
+            "probability_impact": "none",
+            "opportunity_impact": "none",
+            "components": [
+                {
+                    "code": component.code,
+                    "weight": str(component.weight),
+                    "value": str(component.value),
+                    "applied": component.applied,
+                    "note": component.note,
+                }
+                for component in action_score.components
+            ],
+        },
         "computed": {
             "base_yes_probability": str(base_yes_probability),
             "structured_context_adjustment": str(structured_context_adjustment),
+            "structured_yes_probability": str(structured_yes_probability),
+            "line_movement_adjustment": str(line_movement_adjustment),
+            "data_quality_score": str(data_quality.score),
+            "action_score": str(action_score.score),
             "yes_probability": str(yes_probability),
             "no_probability": str(no_probability),
             "confidence_score": str(confidence_score),
@@ -567,6 +730,306 @@ def _resolve_structured_context_components(
     return components
 
 
+def _compute_data_quality(
+    *,
+    context: ScoringContext,
+    settings: Settings,
+) -> DataQualityResult:
+    evidence_count = len(context.usable_odds) + len(context.usable_news)
+    low_liquidity_threshold = Decimal(str(settings.scoring_low_liquidity_threshold))
+    liquidity = context.snapshot.liquidity
+    has_structured_context = any(
+        component.available for component in context.structured_context_components.values()
+    )
+
+    components = [
+        _data_quality_component(
+            code="valid_odds",
+            weight=Decimal("0.2500"),
+            fraction=ONE if context.odds_implied_prob is not None and context.usable_odds else ZERO,
+            note="odds_implied_prob disponible desde evidencia odds reciente.",
+        ),
+        _data_quality_component(
+            code="useful_evidence_count",
+            weight=Decimal("0.1500"),
+            fraction=min(Decimal(evidence_count) / Decimal("2"), ONE) if evidence_count > 0 else ZERO,
+            note=f"{evidence_count} evidencia(s) util(es) en ventana de scoring.",
+        ),
+        _data_quality_component(
+            code="structured_context_available",
+            weight=Decimal("0.1500"),
+            fraction=ONE if has_structured_context else ZERO,
+            note="Existe al menos un componente de structured_context disponible.",
+        ),
+        _data_quality_component(
+            code="external_market_available",
+            weight=Decimal("0.1500"),
+            fraction=ONE if context.external_market_context.available else ZERO,
+            note="Existe metadata_json.external_market usable.",
+        ),
+        _data_quality_component(
+            code="liquidity_available",
+            weight=Decimal("0.1000"),
+            fraction=ONE if liquidity is not None else ZERO,
+            note="El snapshot trae liquidez disponible.",
+        ),
+        _data_quality_component(
+            code="liquidity_above_threshold",
+            weight=Decimal("0.1000"),
+            fraction=ONE if liquidity is not None and liquidity >= low_liquidity_threshold else ZERO,
+            note=f"Liquidez >= umbral configurado {low_liquidity_threshold}.",
+        ),
+        _data_quality_component(
+            code="low_contradiction",
+            weight=Decimal("0.1000"),
+            fraction=ONE if evidence_count > 0 and not context.has_high_contradiction else ZERO,
+            note="Hay evidencia util y no se detecto high_contradiction.",
+        ),
+        _data_quality_component(
+            code="high_contradiction_penalty",
+            weight=Decimal("-0.1500"),
+            fraction=ONE if context.has_high_contradiction else ZERO,
+            note="Penaliza calidad cuando hay high_contradiction en evidencia usada.",
+        ),
+    ]
+
+    raw_score = sum((component.value for component in components), start=ZERO)
+    score = _quantize_probability(max(min(raw_score, ONE), ZERO))
+    return DataQualityResult(score=score, components=components)
+
+
+def _data_quality_component(
+    *,
+    code: str,
+    weight: Decimal,
+    fraction: Decimal,
+    note: str,
+) -> DataQualityComponent:
+    clamped_fraction = max(min(fraction, ONE), ZERO)
+    value = _quantize_probability(weight * clamped_fraction) if weight >= ZERO else _quantize_signed(weight * clamped_fraction)
+    return DataQualityComponent(
+        code=code,
+        weight=_quantize_signed(weight),
+        value=value,
+        applied=value != ZERO,
+        note=note,
+    )
+
+
+def _compute_action_score(
+    *,
+    context: ScoringContext,
+    settings: Settings,
+    edge_magnitude: Decimal,
+    confidence_score: Decimal,
+    data_quality: DataQualityResult,
+    opportunity: bool,
+) -> ActionScoreResult:
+    low_liquidity_threshold = Decimal(str(settings.scoring_low_liquidity_threshold))
+    liquidity = context.snapshot.liquidity
+    if liquidity is None:
+        liquidity_fraction = ZERO
+        liquidity_note = "Liquidez no disponible; no aporta apoyo operativo."
+    elif liquidity >= low_liquidity_threshold:
+        liquidity_fraction = ONE
+        liquidity_note = f"Liquidez >= umbral configurado {low_liquidity_threshold}."
+    else:
+        liquidity_fraction = Decimal("0.5000")
+        liquidity_note = f"Liquidez disponible pero debajo del umbral {low_liquidity_threshold}."
+
+    components = [
+        _action_score_component(
+            code="edge_magnitude",
+            weight=Decimal("0.4000"),
+            fraction=edge_magnitude / Decimal("0.2500") if edge_magnitude > ZERO else ZERO,
+            note="edge_magnitude normalizado contra 0.2500; no modifica opportunity.",
+        ),
+        _action_score_component(
+            code="confidence_score",
+            weight=Decimal("0.2500"),
+            fraction=confidence_score,
+            note="confidence_score persistido por el scoring actual.",
+        ),
+        _action_score_component(
+            code="data_quality_score",
+            weight=Decimal("0.2000"),
+            fraction=data_quality.score,
+            note="data_quality_score explicativo calculado con senales existentes.",
+        ),
+        _action_score_component(
+            code="opportunity_bonus",
+            weight=Decimal("0.1000"),
+            fraction=ONE if opportunity else ZERO,
+            note="Bonus de priorizacion si la regla existente de opportunity ya marco true.",
+        ),
+        _action_score_component(
+            code="liquidity_signal",
+            weight=Decimal("0.0500"),
+            fraction=liquidity_fraction,
+            note=liquidity_note,
+        ),
+    ]
+
+    raw_score = sum((component.value for component in components), start=ZERO)
+    score = _quantize_probability(max(min(raw_score, ONE), ZERO))
+    return ActionScoreResult(score=score, components=components)
+
+
+def _action_score_component(
+    *,
+    code: str,
+    weight: Decimal,
+    fraction: Decimal,
+    note: str,
+) -> ActionScoreComponent:
+    clamped_fraction = max(min(fraction, ONE), ZERO)
+    value = _quantize_probability(weight * clamped_fraction)
+    return ActionScoreComponent(
+        code=code,
+        weight=_quantize_probability(weight),
+        value=value,
+        applied=value != ZERO,
+        note=note,
+    )
+
+
+def _resolve_external_market_context(
+    *,
+    evidence_items: list[EvidenceItem],
+) -> ExternalMarketContext:
+    for item in evidence_items:
+        payload = normalize_external_market_payload(item.metadata_json)
+        if payload is None:
+            continue
+
+        field_availability = _external_market_field_availability(payload)
+        field_reasons = _external_market_field_reasons(payload)
+        if not any(field_availability.values()):
+            continue
+
+        line_movement_score = (
+            quantize_line_movement_score(payload.get("line_movement_score"))
+            if field_availability.get("line_movement_score", False)
+            else ZERO
+        )
+        consensus_strength = (
+            quantize_consensus_strength(payload.get("consensus_strength"))
+            if field_availability.get("consensus_strength", False)
+            else ZERO
+        )
+        note = _external_market_note(field_availability=field_availability, reasons=field_reasons)
+        return ExternalMarketContext(
+            opening_implied_prob=parse_external_market_decimal(payload.get("opening_implied_prob")),
+            current_implied_prob=parse_external_market_decimal(payload.get("current_implied_prob")),
+            line_movement_score=line_movement_score,
+            consensus_strength=consensus_strength,
+            available=True,
+            source=f"{item.provider}:{item.evidence_type}:metadata_json",
+            note=note,
+            field_availability=field_availability,
+            field_reasons=field_reasons,
+        )
+
+    return _default_external_market_context()
+
+
+def _default_external_market_context() -> ExternalMarketContext:
+    return ExternalMarketContext(
+        opening_implied_prob=None,
+        current_implied_prob=None,
+        line_movement_score=ZERO,
+        consensus_strength=ZERO,
+        available=False,
+        source=None,
+        note="missing_external_market",
+        field_availability={
+            "opening_implied_prob": False,
+            "current_implied_prob": False,
+            "line_movement_score": False,
+            "consensus_strength": False,
+        },
+        field_reasons={
+            "opening_implied_prob": "missing_opening_implied_prob",
+            "current_implied_prob": "missing_current_implied_prob",
+            "line_movement_score": "missing_line_movement_score",
+            "consensus_strength": "missing_consensus_strength",
+        },
+    )
+
+
+def _external_market_field_availability(payload: dict[str, object]) -> dict[str, bool]:
+    availability = payload.get("availability")
+    return {
+        "opening_implied_prob": bool(
+            availability.get("opening_implied_prob", False)
+            if isinstance(availability, dict)
+            else False
+        ),
+        "current_implied_prob": bool(
+            availability.get("current_implied_prob", False)
+            if isinstance(availability, dict)
+            else False
+        ),
+        "line_movement_score": bool(
+            availability.get("line_movement_score", False)
+            if isinstance(availability, dict)
+            else False
+        ),
+        "consensus_strength": bool(
+            availability.get("consensus_strength", False)
+            if isinstance(availability, dict)
+            else False
+        ),
+    }
+
+
+def _external_market_field_reasons(payload: dict[str, object]) -> dict[str, str]:
+    reasons = payload.get("reasons")
+    return {
+        "opening_implied_prob": _external_market_reason(
+            reasons,
+            "opening_implied_prob",
+            "missing_opening_implied_prob",
+        ),
+        "current_implied_prob": _external_market_reason(
+            reasons,
+            "current_implied_prob",
+            "missing_current_implied_prob",
+        ),
+        "line_movement_score": _external_market_reason(
+            reasons,
+            "line_movement_score",
+            "missing_line_movement_score",
+        ),
+        "consensus_strength": _external_market_reason(
+            reasons,
+            "consensus_strength",
+            "missing_consensus_strength",
+        ),
+    }
+
+
+def _external_market_reason(
+    reasons: object,
+    field: str,
+    default: str,
+) -> str:
+    if isinstance(reasons, dict) and reasons.get(field) is not None:
+        return str(reasons[field])
+    return default
+
+
+def _external_market_note(
+    *,
+    field_availability: dict[str, bool],
+    reasons: dict[str, str],
+) -> str:
+    for field in ("line_movement_score", "consensus_strength", "current_implied_prob"):
+        if field_availability.get(field, False):
+            return reasons[field]
+    return "missing_external_market"
+
+
 def _extract_structured_context_component(
     *,
     item: EvidenceItem,
@@ -597,7 +1060,6 @@ def _extract_structured_context_component(
         source=f"{item.provider}:{item.evidence_type}:metadata_json",
         note=note,
     )
-    return None
 
 
 def _compute_structured_context_adjustment(

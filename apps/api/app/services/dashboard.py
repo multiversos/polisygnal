@@ -30,6 +30,7 @@ class DashboardTableRow:
     question: str
     yes_probability: Decimal | None
     confidence_score: Decimal | None
+    action_score: Decimal | None
     edge_magnitude: Decimal | None
     priority_bucket: str
     evaluation_available: bool
@@ -742,6 +743,7 @@ def _dashboard_row_from_overview_item(
         question=item.market.question,
         yes_probability=prediction.yes_probability if prediction is not None else None,
         confidence_score=prediction.confidence_score if prediction is not None else None,
+        action_score=prediction.action_score if prediction is not None else None,
         edge_magnitude=prediction.edge_magnitude if prediction is not None else None,
         priority_bucket=item.priority_bucket,
         evaluation_available=evaluation_available,
@@ -764,6 +766,7 @@ def _dashboard_row_from_briefing_item(
         question=item.question,
         yes_probability=item.yes_probability,
         confidence_score=item.confidence_score,
+        action_score=item.action_score,
         edge_magnitude=item.edge_magnitude,
         priority_bucket=item.priority_bucket,
         evaluation_available=evaluation_available,
@@ -800,6 +803,7 @@ def _render_market_card(row: DashboardTableRow) -> str:
         "</div>"
         f'<p class="market-question">{escape(row.question)}</p>'
         '<div class="market-metrics">'
+        f'{_render_value_chip(f"score de accion { _format_compact_decimal(row.action_score) }", _tone_for_action_score(row.action_score))}'
         f'{_render_value_chip(f"sí { _format_decimal(row.yes_probability) }", _tone_for_yes_probability(row.yes_probability))}'
         f'{_render_value_chip(f"confianza { _format_decimal(row.confidence_score) }", _tone_for_confidence(row.confidence_score))}'
         f'{_render_value_chip(f"diferencia { _format_decimal(row.edge_magnitude) }", _tone_for_edge(row.edge_magnitude))}'
@@ -1062,6 +1066,16 @@ def _tone_for_confidence(value: Decimal | None) -> str:
     return "neutral"
 
 
+def _tone_for_action_score(value: Decimal | None) -> str:
+    if value is None:
+        return "neutral"
+    if value >= Decimal("0.70"):
+        return "positive"
+    if value < Decimal("0.30"):
+        return "negative"
+    return "neutral"
+
+
 def _tone_for_edge(value: Decimal | None) -> str:
     if value is None:
         return "neutral"
@@ -1123,6 +1137,12 @@ def _format_decimal(value: Decimal | None) -> str:
     if value is None:
         return "n/d"
     return f"{value:.4f}"
+
+
+def _format_compact_decimal(value: Decimal | None) -> str:
+    if value is None:
+        return "n/d"
+    return f"{value:.2f}"
 
 
 def _format_optional_float(value: float | None) -> str:

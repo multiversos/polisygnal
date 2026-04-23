@@ -138,6 +138,12 @@ def _overview_sort_key(
     prediction = item.latest_prediction
     opportunity_rank = 0 if prediction is not None and prediction.opportunity else 1
     evidence_rank = 0 if item.market.evidence_eligible else 1
+    action_score = (
+        prediction.action_score
+        if prediction is not None and prediction.action_score is not None
+        else Decimal("0")
+    )
+    action_rank = -action_score
     edge_rank = -(prediction.edge_magnitude if prediction is not None else Decimal("0"))
     confidence_rank = -(prediction.confidence_score if prediction is not None else Decimal("0"))
     run_rank = -prediction.run_at.timestamp() if prediction is not None else float("inf")
@@ -172,6 +178,7 @@ def _overview_sort_key(
 
     return (
         opportunity_rank,
+        action_rank,
         evidence_rank,
         edge_rank,
         confidence_rank,

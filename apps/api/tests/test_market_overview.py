@@ -132,6 +132,7 @@ def test_get_markets_overview_returns_aggregated_items_in_operational_order(
     assert first_item["latest_snapshot"]["yes_price"] == "0.3111"
     assert first_item["latest_prediction"]["edge_class"] == "review"
     assert first_item["latest_prediction"]["opportunity"] is True
+    assert first_item["latest_prediction"]["action_score"] is None
     assert first_item["evidence_summary"]["evidence_count"] == 2
     assert first_item["evidence_summary"]["odds_evidence_count"] == 1
     assert first_item["evidence_summary"]["news_evidence_count"] == 1
@@ -318,6 +319,66 @@ def test_get_markets_overview_supports_filters_and_pagination(
     assert pagination_payload["items"][0]["market"]["id"] == inactive_market.id
 
 
+def test_get_markets_overview_orders_top_opportunities_by_action_score(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    base_time = datetime(2026, 4, 21, 12, 0, tzinfo=UTC)
+    high_action_market = _create_market(
+        db_session,
+        suffix="action-high",
+        question="NBA Playoffs: Who Will Win Series? - Nuggets vs. Thunder",
+    )
+    high_edge_market = _create_market(
+        db_session,
+        suffix="action-edge",
+        question="NBA Playoffs: Who Will Win Series? - Clippers vs. Wolves",
+    )
+
+    _add_prediction(
+        db_session,
+        market=high_action_market,
+        run_at=base_time,
+        yes_probability=Decimal("0.5600"),
+        no_probability=Decimal("0.4400"),
+        confidence_score=Decimal("0.6500"),
+        edge_signed=Decimal("0.0600"),
+        edge_magnitude=Decimal("0.0600"),
+        edge_class="moderate",
+        opportunity=True,
+        review_confidence=False,
+        review_edge=False,
+        action_score=Decimal("0.9000"),
+    )
+    _add_prediction(
+        db_session,
+        market=high_edge_market,
+        run_at=base_time,
+        yes_probability=Decimal("0.7000"),
+        no_probability=Decimal("0.3000"),
+        confidence_score=Decimal("0.9000"),
+        edge_signed=Decimal("0.2000"),
+        edge_magnitude=Decimal("0.2000"),
+        edge_class="strong",
+        opportunity=True,
+        review_confidence=True,
+        review_edge=False,
+        action_score=Decimal("0.4000"),
+    )
+    db_session.commit()
+
+    response = client.get("/markets/overview", params={"opportunity_only": "true"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["market"]["id"] for item in payload["items"]] == [
+        high_action_market.id,
+        high_edge_market.id,
+    ]
+    assert payload["items"][0]["latest_prediction"]["action_score"] == "0.9000"
+    assert payload["items"][1]["latest_prediction"]["action_score"] == "0.4000"
+
+
 def _create_market(
     db_session: Session,
     *,
@@ -391,9 +452,11 @@ def _add_prediction(
     opportunity: bool,
     review_confidence: bool,
     review_edge: bool,
+    action_score: Decimal | None = None,
     used_odds_count: int = 0,
     used_news_count: int = 0,
 ) -> None:
+    computed = {"action_score": str(action_score)} if action_score is not None else {}
     db_session.add(
         Prediction(
             market_id=market.id,
@@ -410,6 +473,7 @@ def _add_prediction(
             review_edge=review_edge,
             explanation_json={
                 "summary": f"Prediction for market {market.id}",
+                "computed": computed,
                 "counts": {
                     "odds_count": used_odds_count,
                     "news_count": used_news_count,

@@ -266,6 +266,7 @@ def _to_briefing_item(item: MarketOverviewItem) -> BriefingMarketItem:
         ),
         yes_probability=prediction.yes_probability if prediction is not None else None,
         confidence_score=prediction.confidence_score if prediction is not None else None,
+        action_score=prediction.action_score if prediction is not None else None,
         edge_magnitude=prediction.edge_magnitude if prediction is not None else None,
         edge_class=prediction.edge_class if prediction is not None else None,
         opportunity=prediction.opportunity if prediction is not None else None,
@@ -328,13 +329,14 @@ def _render_market_lines(
         return [f"  {empty_message}"]
     return [
         (
-            "  #{0} | rank={1} bucket={2} mode={3} yes={4} conf={5} edge={6} | {7}".format(
+            "  #{0} | rank={1} bucket={2} mode={3} yes={4} conf={5} action={6} edge={7} | {8}".format(
                 item.market_id,
                 item.priority_rank,
                 item.priority_bucket,
                 item.scoring_mode,
                 _format_decimal(item.yes_probability),
                 _format_decimal(item.confidence_score),
+                _format_decimal(item.action_score),
                 _format_decimal(item.edge_magnitude),
                 item.question,
             )

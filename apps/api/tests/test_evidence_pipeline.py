@@ -161,6 +161,22 @@ def test_capture_market_evidence_persists_and_updates_records(db_session: Sessio
     assert odds_evidence.strength is not None
     assert odds_evidence.strength > Decimal("0.55")
     assert odds_evidence.metadata_json is not None
+    assert odds_evidence.metadata_json["external_market"]["opening_implied_prob"] is None
+    assert odds_evidence.metadata_json["external_market"]["current_implied_prob"] == "0.5917"
+    assert odds_evidence.metadata_json["external_market"]["line_movement_score"] == "0.0000"
+    assert odds_evidence.metadata_json["external_market"]["consensus_strength"] == "0.7500"
+    assert odds_evidence.metadata_json["external_market"]["availability"]["opening_implied_prob"] is False
+    assert odds_evidence.metadata_json["external_market"]["availability"]["current_implied_prob"] is True
+    assert odds_evidence.metadata_json["external_market"]["availability"]["line_movement_score"] is False
+    assert odds_evidence.metadata_json["external_market"]["availability"]["consensus_strength"] is True
+    assert (
+        odds_evidence.metadata_json["external_market"]["reasons"]["current_implied_prob"]
+        == "derived_from_current_bookmaker_odds"
+    )
+    assert (
+        odds_evidence.metadata_json["external_market"]["reasons"]["consensus_strength"]
+        == "derived_from_bookmaker_count_and_dispersion"
+    )
     assert odds_evidence.metadata_json["structured_context"]["home_advantage_score"] == "-0.0100"
     assert odds_evidence.metadata_json["structured_context"]["availability"]["home_advantage_score"] is True
     assert odds_evidence.metadata_json["structured_context"]["reasons"]["home_advantage_score"] == "target_team_is_away"
@@ -379,6 +395,15 @@ def test_capture_market_evidence_persists_structured_context_for_scoring_end_to_
                 "home_team": "Boston Celtics",
                 "away_team": "New York Knicks",
                 "commence_time": "2026-04-20T23:30:00Z",
+                "external_market": {
+                    "opening_implied_prob": "0.5817",
+                    "availability": {
+                        "opening_implied_prob": True,
+                    },
+                    "reasons": {
+                        "opening_implied_prob": "controlled_opening_implied_prob",
+                    },
+                },
                 "bookmakers": [
                     {
                         "title": "DraftKings",
@@ -478,9 +503,25 @@ def test_capture_market_evidence_persists_structured_context_for_scoring_end_to_
 
     assert scoring_result.prediction is not None
     prediction = scoring_result.prediction
-    assert prediction.yes_probability == Decimal("0.5620")
+    assert prediction.yes_probability == Decimal("0.5720")
     assert prediction.explanation_json["computed"]["base_yes_probability"] == "0.5550"
     assert prediction.explanation_json["computed"]["structured_context_adjustment"] == "0.0070"
+    assert prediction.explanation_json["computed"]["structured_yes_probability"] == "0.5620"
+    assert prediction.explanation_json["computed"]["line_movement_adjustment"] == "0.0100"
+    assert prediction.explanation_json["computed"]["data_quality_score"] == "1.0000"
+    assert prediction.explanation_json["computed"]["action_score"] == "0.7152"
+    assert prediction.explanation_json["data_quality"]["data_quality_score"] == "1.0000"
+    assert prediction.explanation_json["action"]["action_score"] == "0.7152"
+    assert prediction.explanation_json["external_market"]["available"] is True
+    assert prediction.explanation_json["external_market"]["opening_implied_prob"] == "0.5817"
+    assert prediction.explanation_json["external_market"]["current_implied_prob"] == "0.5917"
+    assert prediction.explanation_json["external_market"]["line_movement_score"] == "0.0100"
+    assert prediction.explanation_json["external_market"]["consensus_strength"] == "0.7500"
+    assert prediction.explanation_json["external_market"]["source"] == "the_odds_api:odds:metadata_json"
+    assert (
+        prediction.explanation_json["external_market"]["note"]
+        == "derived_from_opening_and_current_implied_prob"
+    )
     assert prediction.explanation_json["structured_context"]["has_structured_data"] is True
     assert prediction.explanation_json["structured_context"]["components"]["injury_score"] == {
         "value": "0.0080",

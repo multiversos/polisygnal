@@ -45,6 +45,7 @@ class OverviewPredictionSummary(BaseModel):
     yes_probability: Decimal
     no_probability: Decimal
     confidence_score: Decimal
+    action_score: Decimal | None = None
     edge_signed: Decimal
     edge_magnitude: Decimal
     edge_class: str
