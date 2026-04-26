@@ -34,9 +34,9 @@ from app.schemas.codex_agent_research import (
     CodexAgentRiskResponse,
     CodexAgentSnapshotPayload,
 )
+from app.services.research.classification import classify_market_research_context
 from app.services.research.prompts import select_research_template
 from app.services.research.scoring import ResearchScoringResult, score_codex_agent_research
-from app.services.research.screener import ResearchScreeningDecision, screen_market_for_research
 
 CODEX_AGENT_RESEARCH_MODE = "codex_agent"
 CODEX_AGENT_MODEL_VERSION = "research_codex_agent_v1"
@@ -74,20 +74,20 @@ def prepare_codex_agent_research_request(
     started_at: datetime | None = None,
 ) -> CodexAgentPreparedRequest:
     current_started_at = started_at or datetime.now(tz=UTC)
-    screening = _build_screening(
+    classification = classify_market_research_context(
         market=market,
         sport_override=sport_override,
         market_shape_override=market_shape_override,
     )
-    template = select_research_template(screening=screening)
+    template = select_research_template(classification=classification)
     snapshot = get_latest_market_snapshot(db, market.id)
     research_run = create_research_run(
         db,
         market=market,
         status="pending_agent",
-        vertical=screening.vertical,
-        subvertical=screening.subvertical,
-        market_shape=screening.market_shape,
+        vertical=classification.vertical,
+        subvertical=classification.sport,
+        market_shape=classification.market_shape,
         research_mode=CODEX_AGENT_RESEARCH_MODE,
         model_used="codex_agent_external",
         web_search_used=False,
@@ -97,6 +97,8 @@ def prepare_codex_agent_research_request(
             "adapter": "codex_agent_research",
             "output_schema_version": CODEX_AGENT_OUTPUT_SCHEMA_VERSION,
             "research_template_name": template.name,
+            "classification_reason": classification.classification_reason,
+            "classification_metadata": classification.metadata,
         },
     )
     request_payload = CodexAgentResearchRequest(
@@ -105,9 +107,9 @@ def prepare_codex_agent_research_request(
         market_question=market.question,
         market_slug=market.slug,
         event_title=market.event.title if market.event is not None else None,
-        vertical=screening.vertical,
-        sport=screening.subvertical,
-        market_shape=screening.market_shape,
+        vertical=classification.vertical,
+        sport=classification.sport,
+        market_shape=classification.market_shape,
         current_market_yes_price=snapshot.yes_price if snapshot is not None else None,
         current_market_no_price=snapshot.no_price if snapshot is not None else None,
         liquidity=snapshot.liquidity if snapshot is not None else None,
@@ -116,6 +118,8 @@ def prepare_codex_agent_research_request(
         latest_snapshot=_snapshot_payload(snapshot),
         existing_evidence=_existing_evidence_payload(db, market_id=market.id),
         research_template_name=template.name,
+        classification_reason=classification.classification_reason,
+        classification_metadata=classification.metadata,
         instructions=_build_agent_instructions(template.instructions),
     )
     request_path = _resolve_artifact_path(
@@ -270,24 +274,6 @@ def ingest_codex_agent_research_response(
         prediction=prediction,
         report=report,
         findings=findings,
-    )
-
-
-def _build_screening(
-    *,
-    market: Market,
-    sport_override: str | None,
-    market_shape_override: str | None,
-) -> ResearchScreeningDecision:
-    screening = screen_market_for_research(market)
-    if sport_override is None and market_shape_override is None:
-        return screening
-    return ResearchScreeningDecision(
-        vertical=screening.vertical,
-        subvertical=sport_override or screening.subvertical,
-        market_shape=market_shape_override or screening.market_shape,
-        should_research=screening.should_research,
-        skip_reason=screening.skip_reason,
     )
 
 

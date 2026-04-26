@@ -14,6 +14,7 @@ MAX_TOTAL_ADJUSTMENT = Decimal("0.1200")
 FINDING_MULTIPLIER = Decimal("0.0800")
 MIN_RESEARCH_PROBABILITY = Decimal("0.0100")
 MAX_RESEARCH_PROBABILITY = Decimal("0.9900")
+MATCH_WINNER_SHAPES = {"matchup", "match_winner"}
 
 
 @dataclass(slots=True)
@@ -339,7 +340,7 @@ def _compute_confidence(
         if has_for and has_against:
             confidence += Decimal("0.0500")
 
-    if market_shape != "matchup":
+    if market_shape not in MATCH_WINNER_SHAPES:
         confidence *= Decimal("0.8500")
     if degraded_mode:
         confidence = min(confidence, Decimal("0.7800"))
@@ -382,7 +383,7 @@ def _build_risks(
                 "summary": "No existe evidencia local util para ajustar con conviccion.",
             }
         )
-    if market_shape != "matchup":
+    if market_shape not in MATCH_WINNER_SHAPES:
         risks.append(
             {
                 "code": "non_matchup_shape",

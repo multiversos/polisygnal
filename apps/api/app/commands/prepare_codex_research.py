@@ -50,6 +50,11 @@ def main() -> None:
                 "market_id": market.id,
                 "research_mode": prepared.research_run.research_mode,
                 "research_status": prepared.research_run.status,
+                "vertical": prepared.request_payload.vertical,
+                "sport": prepared.request_payload.sport,
+                "market_shape": prepared.request_payload.market_shape,
+                "research_template_name": prepared.request_payload.research_template_name,
+                "classification_reason": prepared.request_payload.classification_reason,
                 "request_path": str(prepared.request_path),
                 "response_path_expected": str(
                     prepared.request_path.parents[1]

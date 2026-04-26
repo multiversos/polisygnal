@@ -4,9 +4,21 @@ from decimal import Decimal
 
 from app.models.market import Market
 from app.models.market_snapshot import MarketSnapshot
+from app.services.research.classification import (
+    ResearchMarketClassification,
+    classification_from_screening,
+    classify_market_research_context,
+    normalize_sport,
+    normalize_vertical,
+    select_research_template as select_research_template_name,
+)
 from app.services.research.screener import ResearchScreeningDecision
 from app.services.research.templates.base import ResearchPromptTemplate
-from app.services.research.templates.sports_nba_winner import SPORTS_NBA_WINNER_TEMPLATE
+from app.services.research.templates.sports_generic import SPORTS_GENERIC_TEMPLATE
+from app.services.research.templates.sports_nba_futures import SPORTS_NBA_FUTURES_TEMPLATE
+from app.services.research.templates.sports_nba_match_winner import (
+    SPORTS_NBA_MATCH_WINNER_TEMPLATE,
+)
 
 DEFAULT_TRUSTED_GENERAL_DOMAINS = (
     "reuters.com",
@@ -18,17 +30,6 @@ DEFAULT_TRUSTED_SPORTS_DOMAINS = (
     "apnews.com",
     "reuters.com",
 )
-
-SUPPORTED_SPORTS = {
-    "nba",
-    "nfl",
-    "soccer",
-    "horse_racing",
-    "mlb",
-    "tennis",
-    "mma",
-    "other",
-}
 
 CHEAP_RESEARCH_SYSTEM_PROMPT = (
     "You are PolySignal research. Use cheap web-backed research, not Deep Research. "
@@ -65,27 +66,32 @@ def trusted_domains_for_market(screening: ResearchScreeningDecision) -> list[str
 
 def select_research_template(
     *,
-    screening: ResearchScreeningDecision,
+    screening: ResearchScreeningDecision | None = None,
+    classification: ResearchMarketClassification | None = None,
 ) -> ResearchPromptTemplate:
-    vertical = _normalize_vertical(screening.vertical)
-    sport = _normalize_sport(screening.subvertical)
-    market_shape = _normalize_market_shape(screening.market_shape)
+    research_context = classification
+    if research_context is None:
+        if screening is None:
+            raise ValueError("select_research_template requiere screening o classification.")
+        research_context = classification_from_screening(screening)
 
-    if (
-        vertical == "sports"
-        and sport == "nba"
-        and market_shape in {"winner", "championship", "match_winner"}
-    ):
-        return SPORTS_NBA_WINNER_TEMPLATE
-
-    if vertical == "sports":
+    template_name = select_research_template_name(
+        vertical=research_context.vertical,
+        sport=research_context.sport,
+        market_shape=research_context.market_shape,
+    )
+    if template_name == SPORTS_NBA_MATCH_WINNER_TEMPLATE.name:
+        return SPORTS_NBA_MATCH_WINNER_TEMPLATE
+    if template_name == SPORTS_NBA_FUTURES_TEMPLATE.name:
+        return SPORTS_NBA_FUTURES_TEMPLATE
+    if template_name == SPORTS_GENERIC_TEMPLATE.name:
         return ResearchPromptTemplate(
-            name=f"sports_{sport or 'other'}_{market_shape}",
+            name=SPORTS_GENERIC_TEMPLATE.name,
             vertical="sports",
-            sport=sport or "other",
-            market_shape=market_shape,
-            trusted_domains=DEFAULT_TRUSTED_SPORTS_DOMAINS,
-            instructions=GENERIC_RESEARCH_INSTRUCTIONS,
+            sport=research_context.sport,
+            market_shape=research_context.market_shape,
+            trusted_domains=SPORTS_GENERIC_TEMPLATE.trusted_domains,
+            instructions=SPORTS_GENERIC_TEMPLATE.instructions,
         )
 
     return GENERIC_RESEARCH_TEMPLATE
@@ -100,22 +106,27 @@ def build_cheap_research_prompt(
     blocked_domains: list[str] | None = None,
     max_sources: int = 6,
 ) -> dict[str, str]:
-    template = select_research_template(screening=screening)
+    classification = classify_market_research_context(
+        market=market,
+        sport_override=screening.subvertical,
+    )
+    template = select_research_template(classification=classification)
     baseline = _format_decimal(snapshot.yes_price) if snapshot is not None else "unknown"
     no_price = _format_decimal(snapshot.no_price) if snapshot is not None else "unknown"
     liquidity = _format_decimal(snapshot.liquidity) if snapshot is not None else "unknown"
     volume = _format_decimal(snapshot.volume) if snapshot is not None else "unknown"
     allowed = ", ".join(allowed_domains or list(template.trusted_domains))
     blocked = ", ".join(blocked_domains or []) or "none"
-    sport = _normalize_sport(screening.subvertical) or "other"
-    market_shape = _normalize_market_shape(screening.market_shape)
+    sport = normalize_sport(classification.sport)
+    market_shape = classification.market_shape
 
     user_prompt = (
         f"Research template: {template.name}\n"
         f"Market question: {market.question}\n"
-        f"Vertical: {_normalize_vertical(screening.vertical)}\n"
+        f"Vertical: {normalize_vertical(classification.vertical)}\n"
         f"Sport: {sport}\n"
         f"Market shape: {market_shape}\n"
+        f"Classification reason: {classification.classification_reason}\n"
         f"Raw sport_type: {market.sport_type or 'unknown'}\n"
         f"Raw market_type: {market.market_type or 'unknown'}\n"
         f"Current Polymarket YES baseline: {baseline}\n"
@@ -138,43 +149,6 @@ def build_cheap_research_prompt(
         "user": user_prompt,
         "research_template": template.name,
     }
-
-
-def _normalize_vertical(value: str | None) -> str:
-    parsed = (value or "").strip().lower()
-    if parsed in {"sports", "sport"}:
-        return "sports"
-    return parsed or "general"
-
-
-def _normalize_sport(value: str | None) -> str | None:
-    parsed = (value or "").strip().lower().replace("-", "_").replace(" ", "_")
-    aliases = {
-        "football": "soccer",
-        "ufc": "mma",
-        "mixed_martial_arts": "mma",
-        "horse": "horse_racing",
-        "horse_race": "horse_racing",
-        "horses": "horse_racing",
-    }
-    parsed = aliases.get(parsed, parsed)
-    if not parsed:
-        return None
-    if parsed in SUPPORTED_SPORTS:
-        return parsed
-    return "other"
-
-
-def _normalize_market_shape(value: str | None) -> str:
-    parsed = (value or "").strip().lower().replace("-", "_").replace(" ", "_")
-    aliases = {
-        "matchup": "match_winner",
-        "winner": "winner",
-        "champion": "championship",
-        "championship_winner": "championship",
-        "race": "race_winner",
-    }
-    return aliases.get(parsed, parsed or "other")
 
 
 def _format_decimal(value: Decimal | None) -> str:

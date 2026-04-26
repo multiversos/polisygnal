@@ -19,14 +19,15 @@ def test_select_research_template_uses_nba_winner_adapter() -> None:
 
     template = select_research_template(screening=screening)
 
-    assert template.name == "sports_nba_winner"
+    assert template.name == "sports_nba_match_winner"
     assert template.vertical == "sports"
     assert template.sport == "nba"
+    assert template.market_shape == "match_winner"
     assert "nba.com" in template.trusted_domains
     assert "injuries" in template.instructions
 
 
-def test_select_research_template_keeps_future_sports_generic() -> None:
+def test_select_research_template_uses_generic_sports_fallback() -> None:
     screening = ResearchScreeningDecision(
         vertical="sports",
         subvertical="horse racing",
@@ -37,11 +38,11 @@ def test_select_research_template_keeps_future_sports_generic() -> None:
 
     template = select_research_template(screening=screening)
 
-    assert template.name == "sports_horse_racing_race_winner"
+    assert template.name == "sports_generic"
     assert template.vertical == "sports"
     assert template.sport == "horse_racing"
     assert template.market_shape == "race_winner"
-    assert "Polymarket market" in template.instructions
+    assert "sports market" in template.instructions
 
 
 def test_build_cheap_research_prompt_is_template_routed() -> None:
@@ -72,7 +73,8 @@ def test_build_cheap_research_prompt_is_template_routed() -> None:
 
     prompt = build_cheap_research_prompt(market, screening, snapshot=snapshot)
 
-    assert prompt["research_template"] == "sports_nba_winner"
+    assert prompt["research_template"] == "sports_nba_match_winner"
     assert "Sport: nba" in prompt["user"]
-    assert "Market shape: winner" in prompt["user"]
+    assert "Market shape: match_winner" in prompt["user"]
+    assert "Classification reason:" in prompt["user"]
     assert "offensive/defensive statistics" in prompt["user"]

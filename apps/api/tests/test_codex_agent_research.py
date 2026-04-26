@@ -46,7 +46,12 @@ def test_prepare_codex_research_request_writes_safe_json(
     assert prepared.research_run.research_mode == "codex_agent"
     assert payload["run_id"] == prepared.research_run.id
     assert payload["market_id"] == market.id
-    assert payload["research_template_name"] == "sports_nba_winner"
+    assert payload["vertical"] == "sports"
+    assert payload["sport"] == "nba"
+    assert payload["market_shape"] == "match_winner"
+    assert payload["research_template_name"] == "sports_nba_match_winner"
+    assert payload["classification_reason"]
+    assert payload["classification_metadata"]["market_shape_reason"]
     assert payload["constraints"]["no_automatic_betting"] is True
     assert payload["existing_evidence"]
     assert "OPENAI_API_KEY" not in raw_text

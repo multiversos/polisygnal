@@ -66,6 +66,8 @@ class CodexAgentResearchRequest(BaseModel):
     latest_snapshot: CodexAgentSnapshotPayload | None = None
     existing_evidence: list[CodexAgentExistingEvidencePayload] = Field(default_factory=list)
     research_template_name: str
+    classification_reason: str | None = None
+    classification_metadata: dict[str, str] = Field(default_factory=dict)
     instructions: str
     output_schema_version: str = CODEX_AGENT_OUTPUT_SCHEMA_VERSION
     constraints: CodexAgentResearchConstraints = Field(default_factory=CodexAgentResearchConstraints)
