@@ -639,3 +639,120 @@ Después de validar Fase A con fixtures y pruebas read-only, los siguientes spri
 3. Exponer señales guardadas en endpoints read-only.
 4. Mostrar comparación Kalshi vs Polymarket en el dashboard.
 5. Evaluar uso opcional en scoring, solo si `source_confidence` y `match_confidence` son altos.
+## 17. Fase B implementada: External Market Signals Foundation
+
+Fase B agrega la base generica para guardar senales externas de mercado sin acoplar PolySignal a Kalshi. La tabla y los endpoints estan pensados para que despues puedan convivir otras fuentes, como otros prediction markets u odds providers, siempre bajo el mismo principio: datos read-only para comparacion, no trading.
+
+### 17.1 Tabla creada
+
+La migracion `0008_external_market_signals.py` crea la tabla:
+
+```text
+external_market_signals
+```
+
+Campos principales:
+
+| Campo | Uso |
+| --- | --- |
+| `source` | Fuente externa, por ejemplo `kalshi`. |
+| `source_market_id` | Identificador externo del mercado si existe. |
+| `source_event_id` | Identificador externo del evento si existe. |
+| `source_ticker` | Ticker Kalshi u otro identificador de la fuente. |
+| `polymarket_market_id` | Mercado local relacionado, nullable porque el matching aun no es obligatorio. |
+| `title` | Titulo externo usado para auditoria y matching futuro. |
+| `yes_probability`, `no_probability` | Probabilidades implicitas normalizadas en rango `0.0` a `1.0`. |
+| `best_yes_bid`, `best_yes_ask`, `best_no_bid`, `best_no_ask` | Precios normalizados cuando estan disponibles. |
+| `mid_price`, `last_price`, `spread` | Senal de precio y calidad del mercado. |
+| `volume`, `liquidity`, `open_interest` | Actividad y profundidad cuando la fuente los expone. |
+| `source_confidence` | Calidad heuristica de la senal de la fuente. |
+| `match_confidence`, `match_reason` | Matching contra Polymarket, reservado para uso gradual. |
+| `warnings` | Alertas estructuradas. |
+| `raw_json` | Resumen auditable del payload normalizado, sin secretos. |
+| `fetched_at`, `created_at` | Timestamps de consulta y persistencia local. |
+
+La tabla no crea predicciones, no crea research runs y no implica ninguna accion de trading.
+
+### 17.2 CLI controlado
+
+Se agrego el comando:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.fetch_kalshi_signals --limit 3 --status open --json
+```
+
+Por defecto corre en modo:
+
+```text
+DRY RUN / READ ONLY
+```
+
+Para guardar senales en DB se requiere pedirlo de forma explicita:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.fetch_kalshi_signals --limit 1 --status open --persist --json
+```
+
+El modo `--persist` solo guarda filas en `external_market_signals`. No llama endpoints de trading, no crea ordenes, no crea `predictions` y no crea `research_runs`.
+
+### 17.3 Endpoints read-only
+
+Fase B expone senales ya guardadas, sin llamar Kalshi en vivo:
+
+```text
+GET /external-signals
+GET /external-signals/kalshi
+GET /markets/{market_id}/external-signals
+```
+
+Estos endpoints:
+
+- solo leen la base local;
+- no hacen fetch remoto;
+- no guardan datos;
+- no ejecutan trading;
+- no crean predicciones;
+- no crean research runs.
+
+### 17.4 Matching inicial
+
+Se agrego un modulo heuristico inicial para estimar relacion entre un mercado de Polymarket y una senal externa:
+
+```text
+app.services.external_market_matching
+```
+
+Compara:
+
+- similitud textual de titulo/pregunta;
+- participantes NBA detectables;
+- anos/temporadas;
+- pistas de forma de mercado como `match_winner` o `championship`.
+
+El resultado incluye:
+
+- `match_confidence`;
+- `match_reason`;
+- `warnings`.
+
+Este matching es conservador. Si la confianza es baja, la senal debe mostrarse como posible relacion, no como equivalente.
+
+### 17.5 Garantias de seguridad de Fase B
+
+- No usa credenciales Kalshi.
+- No usa OpenAI API.
+- No llama endpoints de account, portfolio u orders.
+- No ejecuta trades.
+- No crea ordenes.
+- No crea predicciones.
+- No crea research runs.
+- No descarga assets externos.
+- No convierte Kalshi en recomendacion de apuesta.
+
+### 17.6 Proximos pasos
+
+1. Poblar senales Kalshi de forma controlada con `--persist` y limites pequenos.
+2. Mejorar matching Polymarket/Kalshi con mas deportes y market shapes.
+3. Agregar dashboard de `External Market Signals`.
+4. Mostrar diferencia entre Polymarket YES price y Kalshi implied probability.
+5. Usar estas senales en scoring solo como componente opcional, y solo con `source_confidence` y `match_confidence` altos.

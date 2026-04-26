@@ -14,6 +14,7 @@ from app.main import app
 from app.models import (
     EvidenceItem,
     Event,
+    ExternalMarketSignal,
     Market,
     MarketOutcome,
     MarketSnapshot,
@@ -30,6 +31,7 @@ def db_session() -> Generator[Session, None, None]:
     _ = (
         EvidenceItem,
         Event,
+        ExternalMarketSignal,
         Market,
         MarketOutcome,
         MarketSnapshot,

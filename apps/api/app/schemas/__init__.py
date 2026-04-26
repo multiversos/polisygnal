@@ -33,6 +33,12 @@ from app.schemas.diff import (
     LatestDiffResponse,
 )
 from app.schemas.evidence import EvidenceItemResponse, EvidenceSourceSummary
+from app.schemas.external_market_signal import (
+    ExternalMarketSignalCreate,
+    ExternalMarketSignalPreview,
+    ExternalMarketSignalRead,
+    ExternalMarketSignalsResponse,
+)
 from app.schemas.evaluation import (
     EvaluationHistoryItemResponse,
     EvaluationHistoryResponse,
@@ -148,6 +154,10 @@ __all__ = [
     "DiffTopOpportunityChange",
     "EvidenceItemResponse",
     "EvidenceSourceSummary",
+    "ExternalMarketSignalCreate",
+    "ExternalMarketSignalPreview",
+    "ExternalMarketSignalRead",
+    "ExternalMarketSignalsResponse",
     "EvaluationHistoryItemResponse",
     "EvaluationHistoryResponse",
     "EvaluationMarketHistoryItemResponse",

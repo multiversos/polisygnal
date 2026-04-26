@@ -32,6 +32,7 @@ class KalshiNormalizedMarket(BaseModel):
     no_ask: Decimal | None = None
     last_price: Decimal | None = None
     volume: Decimal | None = None
+    liquidity: Decimal | None = None
     open_interest: Decimal | None = None
     close_time: datetime | None = None
     yes_probability: Decimal | None = None
@@ -75,6 +76,7 @@ class KalshiMarketSignalPreview(BaseModel):
     mid_price: Decimal | None = None
     spread: Decimal | None = None
     volume: Decimal | None = None
+    liquidity: Decimal | None = None
     open_interest: Decimal | None = None
     source_confidence: Decimal
     warnings: list[str] = Field(default_factory=list)

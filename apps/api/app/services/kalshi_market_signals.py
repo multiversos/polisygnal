@@ -47,6 +47,7 @@ def normalize_kalshi_market(raw_market: KalshiMarketPayload | dict[str, object])
         no_ask=no_ask,
         last_price=last_price,
         volume=market.volume_fp,
+        liquidity=market.liquidity_dollars,
         open_interest=market.open_interest_fp,
         close_time=market.close_time or market.expiration_time or market.expected_expiration_time,
         yes_probability=result.yes_probability,

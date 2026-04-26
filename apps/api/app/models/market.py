@@ -76,6 +76,12 @@ class Market(Base):
         cascade="all, delete-orphan",
         order_by="PredictionReport.created_at.desc()",
     )
+    external_signals = relationship(
+        "ExternalMarketSignal",
+        back_populates="market",
+        passive_deletes=True,
+        order_by="ExternalMarketSignal.fetched_at.desc()",
+    )
     outcome = relationship(
         "MarketOutcome",
         back_populates="market",

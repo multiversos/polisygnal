@@ -92,6 +92,7 @@ def test_kalshi_client_get_market_parse_response() -> None:
     assert market.ticker == "KXNBAFINAL-26CELTICS-CELTICS"
     assert market.title == "Will the Boston Celtics win the 2026 NBA Finals?"
     assert market.volume_fp == Decimal("10000.00")
+    assert market.liquidity_dollars == Decimal("25000.00")
 
 
 def test_kalshi_client_get_orderbook_parse_response() -> None:
@@ -161,6 +162,14 @@ def test_normalize_kalshi_market_generates_warnings_for_incomplete_data() -> Non
     assert normalized.source_confidence == Decimal("0.0000")
     assert "missing_complete_bid_ask" in normalized.warnings
     assert "zero_volume" in normalized.warnings
+
+
+def test_normalize_kalshi_market_preserves_liquidity() -> None:
+    raw = _fixture("market_open_with_bid_ask.json")["market"]
+
+    normalized = normalize_kalshi_market(raw)
+
+    assert normalized.liquidity == Decimal("25000.00")
 
 
 def test_normalize_orderbook_calculates_reciprocal_ask_and_spread() -> None:

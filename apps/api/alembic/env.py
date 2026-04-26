@@ -10,6 +10,7 @@ from app.db.base import Base
 from app.models import (
     evidence_item,
     event,
+    external_market_signal,
     market,
     market_outcome,
     market_snapshot,

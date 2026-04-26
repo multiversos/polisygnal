@@ -146,6 +146,7 @@ def _print_market(market: dict[str, object]) -> None:
         "mid_price",
         "spread",
         "volume",
+        "liquidity",
         "open_interest",
         "source_confidence",
         "warnings",
