@@ -199,6 +199,76 @@ function formatCompact(value: unknown): string {
   }).format(number);
 }
 
+function normalizeProbability(value: unknown): number | null {
+  const number = toNumber(value);
+  if (number === null || number < 0) {
+    return null;
+  }
+
+  if (number <= 1) {
+    return number;
+  }
+
+  if (number <= 100) {
+    return number / 100;
+  }
+
+  return null;
+}
+
+function clampProbability(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function formatMarketPercent(value: unknown): string {
+  const number = normalizeProbability(value);
+  if (number === null) {
+    return "--";
+  }
+
+  return `${(number * 100).toFixed(1)}%`;
+}
+
+function formatMarketMetric(value: unknown): string {
+  const number = toNumber(value);
+  if (number === null) {
+    return "--";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(number);
+}
+
+function getNoProbability(yesValue: unknown, noValue: unknown): number | null {
+  const explicitNo = normalizeProbability(noValue);
+  if (explicitNo !== null) {
+    return explicitNo;
+  }
+
+  const yes = normalizeProbability(yesValue);
+  if (yes === null) {
+    return null;
+  }
+
+  return clampProbability(1 - yes);
+}
+
+function getProbabilityBarWidth(yesValue: unknown, noValue: unknown): number | null {
+  const yes = normalizeProbability(yesValue);
+  if (yes !== null) {
+    return Math.round(clampProbability(yes) * 1000) / 10;
+  }
+
+  const no = getNoProbability(yesValue, noValue);
+  if (no !== null) {
+    return Math.round(clampProbability(1 - no) * 1000) / 10;
+  }
+
+  return null;
+}
+
 function formatScore(value: unknown): string {
   const number = toNumber(value);
   if (number === null) {
@@ -393,6 +463,62 @@ function CandidateParticipants({ candidate }: { candidate: ResearchCandidate }) 
           </span>
         </span>
       ))}
+    </div>
+  );
+}
+
+function MarketPricePanel({ candidate }: { candidate: ResearchCandidate }) {
+  const yes = normalizeProbability(candidate.market_yes_price);
+  const no = getNoProbability(candidate.market_yes_price, candidate.market_no_price);
+  const yesWidth = getProbabilityBarWidth(
+    candidate.market_yes_price,
+    candidate.market_no_price,
+  );
+  const hasPriceData = yes !== null || no !== null;
+  const displayWidth = yesWidth ?? 50;
+
+  return (
+    <div className="market-price-panel">
+      <div className="market-price-heading">
+        <span>Market price</span>
+        {!hasPriceData ? <strong>Missing price data</strong> : null}
+      </div>
+
+      <div className="price-split">
+        <div>
+          <span>YES</span>
+          <strong>{formatMarketPercent(yes)}</strong>
+        </div>
+        <div>
+          <span>NO</span>
+          <strong>{formatMarketPercent(no)}</strong>
+        </div>
+      </div>
+
+      <div
+        aria-label={`YES ${formatMarketPercent(yes)} and NO ${formatMarketPercent(no)}`}
+        className={`probability-bar ${hasPriceData ? "" : "neutral"}`}
+        role="img"
+      >
+        <span
+          className="probability-bar-yes"
+          style={{ width: `${displayWidth}%` }}
+        />
+        <span className="probability-bar-no" />
+      </div>
+
+      <div className="market-depth-row">
+        <div>
+          <span>Liquidity</span>
+          <strong>{formatMarketMetric(candidate.liquidity)}</strong>
+        </div>
+        <div>
+          <span>Volume</span>
+          <strong>{formatMarketMetric(candidate.volume)}</strong>
+        </div>
+      </div>
+
+      <p className="market-price-note">YES/NO reflejan el precio implicito del mercado.</p>
     </div>
   );
 }
@@ -805,8 +931,7 @@ export default function DashboardPage() {
                   <th>Mercado</th>
                   <th>Clasificacion</th>
                   <th>Score</th>
-                  <th>YES / NO</th>
-                  <th>Profundidad</th>
+                  <th>Market price</th>
                   <th>Template</th>
                   <th>Reasons / warnings</th>
                 </tr>
@@ -814,11 +939,11 @@ export default function DashboardPage() {
               <tbody>
                 {state.loading ? (
                   <tr>
-                    <td colSpan={7}>Cargando candidatos...</td>
+                    <td colSpan={6}>Cargando candidatos...</td>
                   </tr>
                 ) : topCandidates.length === 0 ? (
                   <tr>
-                    <td colSpan={7}>
+                    <td colSpan={6}>
                       No hay candidatos disponibles para estos filtros. Prueba
                       con sport all, market shape all o un limit mayor.
                     </td>
@@ -848,16 +973,7 @@ export default function DashboardPage() {
                         </span>
                       </td>
                       <td>
-                        <div className="stacked-number">
-                          <span>YES {formatProbability(candidate.market_yes_price)}</span>
-                          <span>NO {formatProbability(candidate.market_no_price)}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="stacked-number">
-                          <span>Liq. {formatCompact(candidate.liquidity)}</span>
-                          <span>Vol. {formatCompact(candidate.volume)}</span>
-                        </div>
+                        <MarketPricePanel candidate={candidate} />
                       </td>
                       <td>
                         <span className="template-chip">
