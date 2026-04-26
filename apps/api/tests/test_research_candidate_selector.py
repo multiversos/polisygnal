@@ -146,6 +146,84 @@ def test_prepare_codex_market_id_still_resolves_explicit_market(
     assert selected_candidate is None
 
 
+def test_prepare_codex_cli_writes_packet_for_explicit_market(
+    db_session: Session,
+    monkeypatch,
+    tmp_path,
+    capsys,
+) -> None:
+    market = _create_market(
+        db_session,
+        suffix="cli-packet",
+        question="Will the Celtics beat the Knicks?",
+    )
+    _add_snapshot(db_session, market=market)
+    monkeypatch.setattr(prepare_codex_research, "SessionLocal", lambda: db_session)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prepare_codex_research",
+            "--market-id",
+            str(market.id),
+            "--output-dir",
+            str(tmp_path / "requests"),
+            "--packet-dir",
+            str(tmp_path / "packets"),
+        ],
+    )
+
+    prepare_codex_research.main()
+    payload = __import__("json").loads(capsys.readouterr().out)
+
+    assert payload["market_id"] == market.id
+    assert payload["packet_path"].endswith(".md")
+    assert payload["response_path_expected"].endswith(".json")
+    assert payload["ingest_command"] == (
+        f"python -m app.commands.ingest_codex_research --run-id "
+        f"{payload['research_run_id']}"
+    )
+    packet_text = __import__("pathlib").Path(payload["packet_path"]).read_text(
+        encoding="utf-8"
+    )
+    assert "Do not invent sources" in packet_text
+    assert "Do not include secrets" in packet_text
+
+
+def test_prepare_codex_cli_supports_no_packet(
+    db_session: Session,
+    monkeypatch,
+    tmp_path,
+    capsys,
+) -> None:
+    market = _create_market(
+        db_session,
+        suffix="cli-no-packet",
+        question="Will the Celtics beat the Knicks?",
+    )
+    _add_snapshot(db_session, market=market)
+    monkeypatch.setattr(prepare_codex_research, "SessionLocal", lambda: db_session)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prepare_codex_research",
+            "--market-id",
+            str(market.id),
+            "--output-dir",
+            str(tmp_path / "requests"),
+            "--packet-dir",
+            str(tmp_path / "packets"),
+            "--no-packet",
+        ],
+    )
+
+    prepare_codex_research.main()
+    payload = __import__("json").loads(capsys.readouterr().out)
+
+    assert payload["packet_path"] is None
+    assert payload["response_path_expected"].endswith(".json")
+    assert not (tmp_path / "packets").exists()
+
+
 def test_prepare_codex_auto_select_picks_valid_candidate(
     db_session: Session,
 ) -> None:

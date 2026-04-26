@@ -19,26 +19,75 @@ Codex CLI puede estar autenticado con la membresia de ChatGPT del usuario, pero 
 
 ## Paso 1: generar request
 
+Opcionalmente, revisa candidatos antes de preparar un run:
+
+```powershell
+cd N:\projects\polimarket\apps\api
+.\.venv\Scripts\python.exe -m app.commands.list_research_candidates --sport nba --limit 5
+```
+
+El selector muestra `candidate_score`, razones y warnings. Sirve para elegir mercados a
+investigar; no es una recomendacion de apuesta.
+
+Puedes usar un mercado explicito:
+
 ```powershell
 cd N:\projects\polimarket\apps\api
 .\.venv\Scripts\python.exe -m app.commands.prepare_codex_research --market-id 123
+```
+
+O dejar que PolySignal seleccione un candidato:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.prepare_codex_research --auto-select --sport nba --limit 1
 ```
 
 Esto crea:
 
 ```text
 N:\projects\polimarket\logs\research-agent\requests\{run_id}.json
+N:\projects\polimarket\logs\research-agent\packets\{run_id}.md
 ```
 
-Tambien imprime un prompt corto para pedirle a Codex que procese el archivo.
+Tambien imprime:
 
-## Paso 2: pedir a Codex que investigue
+- `request_path`
+- `packet_path`
+- `response_path_expected`
+- `ingest_command`
+- un prompt corto para pedirle a Codex que procese el archivo
 
-En Codex/ChatGPT, pide que lea el request JSON, investigue fuentes publicas si corresponde, y devuelva solo JSON valido con el schema indicado. La respuesta debe guardarse en:
+Si necesitas solo el request JSON, usa `--no-packet`.
+
+## Paso 2: usar el research packet
+
+Abre el packet markdown y pasalo a Codex/ChatGPT como instrucciones operativas. El packet
+incluye:
+
+- la ruta exacta del request JSON
+- la ruta esperada para la response JSON
+- el comando exacto de ingesta
+- reglas de seguridad
+- resumen del schema esperado
+- checklist de revision humana
+
+Codex/ChatGPT debe leer el request JSON completo, investigar fuentes publicas si tiene
+acceso web, y devolver solo JSON valido. Si no tiene acceso web, debe devolver un mock
+estructural marcado claramente como mock y no inventar fuentes.
+
+La respuesta debe guardarse en:
 
 ```text
 N:\projects\polimarket\logs\research-agent\responses\{run_id}.json
 ```
+
+Antes de ingestar, revisa manualmente que:
+
+- existan `evidence_for_yes` y `evidence_against_yes`
+- los `citation_url` sean reales cuando el response diga que uso fuentes reales
+- no haya fuentes inventadas
+- `recommended_probability_adjustment` este entre `-0.12` y `0.12`
+- `recommendation` no se interprete como orden de apuesta
 
 ## Paso 3: ingestar response
 
@@ -52,6 +101,7 @@ Si el JSON es valido y coincide con el `run_id` y `market_id`, PolySignal crea f
 ## Archivos creados
 
 - Requests: `logs/research-agent/requests/{run_id}.json`
+- Packets: `logs/research-agent/packets/{run_id}.md`
 - Responses: `logs/research-agent/responses/{run_id}.json`
 
 La carpeta `logs/` esta ignorada por git.
@@ -62,3 +112,5 @@ La carpeta `logs/` esta ignorada por git.
 - El JSON puede fallar validacion si falta evidencia a favor/en contra.
 - No hay garantia de que Codex haya usado web search real; PolySignal infiere uso de fuentes a partir de citas.
 - Es experimental y requiere revision humana.
+- El selector de candidatos y la recomendacion del response no son instrucciones de trading.
+- Nunca incluyas secretos, `.env`, tokens o credenciales en request, packet o response.

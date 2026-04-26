@@ -14,6 +14,10 @@ from app.services.research.codex_agent_adapter import (
     DEFAULT_REQUEST_DIR,
     prepare_codex_agent_research_request,
 )
+from app.services.research.codex_agent_packet import (
+    DEFAULT_PACKET_DIR,
+    write_codex_agent_research_packet,
+)
 from app.services.research.candidate_selector import ResearchCandidate, list_research_candidates
 
 
@@ -45,6 +49,16 @@ def main() -> None:
         default=str(DEFAULT_REQUEST_DIR),
         help="Directorio donde se escribira {run_id}.json.",
     )
+    parser.add_argument(
+        "--packet-dir",
+        default=str(DEFAULT_PACKET_DIR),
+        help="Directorio donde se escribira el packet markdown {run_id}.md.",
+    )
+    parser.add_argument(
+        "--no-packet",
+        action="store_true",
+        help="No genera research packet markdown.",
+    )
     args = parser.parse_args()
     if args.market_id is None and not args.auto_select:
         parser.error("usa --market-id o --auto-select.")
@@ -67,7 +81,31 @@ def main() -> None:
                 sport_override=args.sport,
                 market_shape_override=args.market_shape,
             )
+            packet = (
+                None
+                if args.no_packet
+                else write_codex_agent_research_packet(
+                    request_payload=prepared.request_payload,
+                    request_path=prepared.request_path,
+                    packet_dir=Path(args.packet_dir),
+                )
+            )
             db.commit()
+            expected_response_path = (
+                packet.expected_response_path
+                if packet is not None
+                else prepared.request_path.parents[1]
+                / "responses"
+                / f"{prepared.research_run.id}.json"
+            )
+            ingest_command = (
+                packet.ingest_command
+                if packet is not None
+                else (
+                    "python -m app.commands.ingest_codex_research "
+                    f"--run-id {prepared.research_run.id}"
+                )
+            )
             payload = {
                 "status": "ok",
                 "research_run_id": prepared.research_run.id,
@@ -84,11 +122,9 @@ def main() -> None:
                 "research_template_name": prepared.request_payload.research_template_name,
                 "classification_reason": prepared.request_payload.classification_reason,
                 "request_path": str(prepared.request_path),
-                "response_path_expected": str(
-                    prepared.request_path.parents[1]
-                    / "responses"
-                    / f"{prepared.research_run.id}.json"
-                ),
+                "packet_path": str(packet.packet_path) if packet is not None else None,
+                "response_path_expected": str(expected_response_path),
+                "ingest_command": ingest_command,
                 "codex_prompt": prepared.prompt,
             }
     except Exception as exc:

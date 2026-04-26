@@ -24,6 +24,10 @@ from app.services.research.codex_agent_adapter import (
     ingest_codex_agent_research_response,
     prepare_codex_agent_research_request,
 )
+from app.services.research.codex_agent_packet import (
+    render_codex_agent_research_packet,
+    write_codex_agent_research_packet,
+)
 
 
 def test_prepare_codex_research_request_writes_safe_json(
@@ -57,6 +61,65 @@ def test_prepare_codex_research_request_writes_safe_json(
     assert "OPENAI_API_KEY" not in raw_text
     assert "auth.json" not in raw_text
     assert "sk-" not in raw_text
+
+
+def test_codex_research_packet_contains_operational_instructions(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    market = _create_market_with_context(db_session, suffix="packet")
+    prepared = prepare_codex_agent_research_request(
+        db_session,
+        market=market,
+        output_dir=tmp_path / "requests",
+    )
+
+    packet = write_codex_agent_research_packet(
+        request_payload=prepared.request_payload,
+        request_path=prepared.request_path,
+        packet_dir=tmp_path / "packets",
+    )
+    packet_text = packet.packet_path.read_text(encoding="utf-8")
+
+    assert packet.packet_path.exists()
+    assert str(prepared.request_path) in packet_text
+    assert str(packet.expected_response_path) in packet_text
+    assert packet.ingest_command == (
+        f"python -m app.commands.ingest_codex_research --run-id {prepared.research_run.id}"
+    )
+    assert packet.ingest_command in packet_text
+    assert "Do not invent sources" in packet_text
+    assert "Do not include secrets" in packet_text
+    assert "Do not execute trades or automatic betting actions" in packet_text
+    assert "confidence_score as evidence quality" in packet_text
+
+
+def test_codex_research_packet_render_is_testable_without_io(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    market = _create_market_with_context(db_session, suffix="packet-render")
+    prepared = prepare_codex_agent_research_request(
+        db_session,
+        market=market,
+        output_dir=tmp_path / "requests",
+    )
+    expected_response_path = tmp_path / "responses" / f"{prepared.research_run.id}.json"
+
+    packet_text = render_codex_agent_research_packet(
+        request_payload=prepared.request_payload,
+        request_path=prepared.request_path,
+        expected_response_path=expected_response_path,
+        ingest_command=(
+            f"python -m app.commands.ingest_codex_research --run-id "
+            f"{prepared.research_run.id}"
+        ),
+    )
+
+    assert f"market_id: {market.id}" in packet_text
+    assert "evidence_for_yes" in packet_text
+    assert "evidence_against_yes" in packet_text
+    assert "recommended_probability_adjustment between -0.12 and 0.12" in packet_text
 
 
 def test_ingest_valid_codex_response_creates_artifacts_and_keeps_families(
