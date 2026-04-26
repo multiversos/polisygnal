@@ -84,6 +84,23 @@ def get_latest_research_run_for_market(
     return db.scalar(stmt)
 
 
+def get_research_run_by_id(
+    db: Session,
+    research_run_id: int,
+) -> ResearchRun | None:
+    stmt = (
+        select(ResearchRun)
+        .where(ResearchRun.id == research_run_id)
+        .options(
+            joinedload(ResearchRun.market).joinedload(Market.event),
+            selectinload(ResearchRun.findings).joinedload(ResearchFinding.source),
+            selectinload(ResearchRun.reports),
+            selectinload(ResearchRun.predictions),
+        )
+    )
+    return db.scalar(stmt)
+
+
 def list_research_runs_for_market(
     db: Session,
     market_id: int,

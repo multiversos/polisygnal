@@ -278,6 +278,39 @@ def score_llm_research(
     )
 
 
+def score_codex_agent_research(
+    *,
+    market: Market,
+    snapshot: MarketSnapshot,
+    findings: list[ResearchFinding],
+    market_summary: str,
+    participants: list[str],
+    confidence_score: Decimal,
+    recommended_probability_adjustment: Decimal,
+    final_reasoning: str,
+    recommendation: str,
+    risks: list[dict[str, object]],
+) -> ResearchScoringResult:
+    scoring = score_llm_research(
+        market=market,
+        snapshot=snapshot,
+        findings=findings,
+        market_summary=market_summary,
+        participants=participants,
+        confidence_score=confidence_score,
+        recommended_probability_adjustment=recommended_probability_adjustment,
+        final_reasoning=final_reasoning,
+        recommendation=recommendation,
+        risks=risks,
+        model_used="codex_agent_external",
+    )
+    scoring.explanation_json["mode"] = "codex_agent"
+    scoring.explanation_json["model_used"] = "codex_agent_external"
+    scoring.components_json["research_mode"] = "codex_agent"
+    scoring.components_json["model_used"] = "codex_agent_external"
+    return scoring
+
+
 def _weighted_strength(finding: ResearchFinding) -> Decimal:
     return _quantize_probability(
         finding.impact_score * finding.freshness_score * finding.credibility_score

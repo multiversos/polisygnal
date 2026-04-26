@@ -66,7 +66,7 @@ def test_post_market_research_run_cheap_without_api_key_falls_back_to_local_only
     db_session: Session,
     monkeypatch,
 ) -> None:
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.setenv("OPENAI_RESEARCH_ENABLED", "true")
     get_settings.cache_clear()
     market = _create_research_market(db_session, suffix="cheap-no-key")
