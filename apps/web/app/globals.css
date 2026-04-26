@@ -1253,10 +1253,101 @@ h2 {
   line-height: 1.35;
 }
 
+.comparison-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.comparison-panel h4 {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.comparison-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.comparison-metric-grid div {
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.comparison-metric-grid span,
+.comparison-market-row > span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.comparison-metric-grid strong {
+  color: var(--foreground);
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.comparison-market-bars {
+  display: grid;
+  gap: 8px;
+}
+
+.comparison-market-row {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) 56px;
+  gap: 8px;
+  align-items: center;
+}
+
+.comparison-market-row strong {
+  color: var(--foreground);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.comparison-mini-track {
+  position: relative;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--probability-score-track);
+}
+
+.comparison-mini-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 4px;
+  border-radius: inherit;
+}
+
+.comparison-mini-fill.polymarket {
+  background: var(--blue);
+}
+
+.comparison-mini-fill.external {
+  background: var(--accent);
+}
+
 .external-signal-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.external-signal-metrics.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .external-signal-metrics div {
@@ -1697,9 +1788,14 @@ h2 {
   }
 
   .external-signal-metrics,
+  .comparison-metric-grid,
   .candidate-explain-grid,
   .market-depth-row {
     grid-template-columns: 1fr;
+  }
+
+  .comparison-market-row {
+    grid-template-columns: 74px minmax(0, 1fr) 52px;
   }
 
   .external-summary-grid {

@@ -558,24 +558,63 @@ function externalWarnings(value: AnalysisExternalSignal["warnings"]): string[] {
   return Object.entries(value).map(([key, item]) => `${key}: ${String(item)}`);
 }
 
+function formatSourceLabel(value?: string | null): string {
+  if (!value) {
+    return "Fuente externa";
+  }
+  return value.toLowerCase() === "kalshi" ? "Kalshi" : humanizeToken(value);
+}
+
 function compareExternalToPolymarket(
   signal: AnalysisExternalSignal,
   snapshot?: AnalysisSnapshot | null,
-): { diff: number | null; label: string; tone: string } {
+): {
+  external: number | null;
+  polymarket: number | null;
+  diff: number | null;
+  label: string;
+  tone: string;
+} {
   const external = normalizeProbability(signal.yes_probability ?? signal.mid_price);
   const polymarket = normalizeProbability(snapshot?.yes_price);
   if (external === null || polymarket === null) {
-    return { diff: null, label: "Sin comparación", tone: "neutral" };
+    return { external, polymarket, diff: null, label: "Datos insuficientes", tone: "neutral" };
   }
   const diff = external - polymarket;
   const magnitude = Math.abs(diff);
   if (magnitude >= 0.08) {
-    return { diff, label: "Divergencia alta", tone: "high-divergence" };
+    return { external, polymarket, diff, label: "Divergencia alta", tone: "high-divergence" };
   }
   if (magnitude >= 0.03) {
-    return { diff, label: "Divergente", tone: "divergent" };
+    return { external, polymarket, diff, label: "Divergencia moderada", tone: "divergent" };
   }
-  return { diff, label: "Alineado", tone: "aligned" };
+  return { external, polymarket, diff, label: "Mercados alineados", tone: "aligned" };
+}
+
+function comparisonWarnings(
+  signal: AnalysisExternalSignal,
+  snapshot?: AnalysisSnapshot | null,
+): string[] {
+  const warnings: string[] = [];
+  if (normalizeProbability(snapshot?.yes_price) === null) {
+    warnings.push("falta precio SÍ de Polymarket");
+  }
+  if (normalizeProbability(signal.yes_probability ?? signal.mid_price) === null) {
+    warnings.push("falta probabilidad externa");
+  }
+  const sourceConfidence = normalizeProbability(signal.source_confidence);
+  if (sourceConfidence !== null && sourceConfidence < 0.5) {
+    warnings.push("confianza de fuente baja");
+  }
+  const matchConfidence = normalizeProbability(signal.match_confidence);
+  if (matchConfidence !== null && matchConfidence < 0.5) {
+    warnings.push("confianza de coincidencia baja");
+  }
+  const spread = normalizeProbability(signal.spread);
+  if (spread !== null && spread >= 0.08) {
+    warnings.push("diferencial alto");
+  }
+  return warnings;
 }
 
 function evidenceGroup(stance: string): "for" | "against" | "neutral" {
@@ -905,13 +944,17 @@ function ExternalSignalsPanel({
         <div className="analysis-card-grid">
           {signals.map((signal) => {
             const comparison = compareExternalToPolymarket(signal, snapshot);
-            const warnings = externalWarnings(signal.warnings);
+            const sourceLabel = formatSourceLabel(signal.source);
+            const warnings = [
+              ...comparisonWarnings(signal, snapshot),
+              ...externalWarnings(signal.warnings).map(formatWarningLabel),
+            ];
             return (
               <article className="external-signal-card" key={signal.id}>
                 <div className="external-signal-header">
                   <div>
                     <div className="badge-row">
-                      <span className="badge source-badge">{signal.source}</span>
+                      <span className="badge source-badge">{sourceLabel}</span>
                       <span className="badge muted">{signal.source_ticker || "sin ticker"}</span>
                     </div>
                     <h3>{signal.title || "Señal externa"}</h3>
@@ -919,19 +962,50 @@ function ExternalSignalsPanel({
                   </div>
                   <span className={`comparison-badge ${comparison.tone}`}>{comparison.label}</span>
                 </div>
-                <div className="external-signal-metrics">
-                  <div><span>Prob. SÍ</span><strong>{formatProbability(signal.yes_probability)}</strong></div>
-                  <div><span>Prob. NO</span><strong>{formatProbability(signal.no_probability)}</strong></div>
-                  <div><span>Diferencia</span><strong>{comparison.diff === null ? "N/D" : `${(comparison.diff * 100).toFixed(1)} pts`}</strong></div>
+                <div className="comparison-panel">
+                  <h4>Comparación de mercado</h4>
+                  <div className="comparison-metric-grid">
+                    <div><span>Polymarket SÍ</span><strong>{formatProbability(comparison.polymarket)}</strong></div>
+                    <div><span>{sourceLabel} SÍ</span><strong>{formatProbability(comparison.external)}</strong></div>
+                    <div><span>Diferencia</span><strong>{comparison.diff === null ? "N/D" : `${(comparison.diff * 100).toFixed(1)} pts`}</strong></div>
+                    <div><span>Estado</span><strong>{comparison.label}</strong></div>
+                  </div>
+                  <div className="comparison-market-bars" aria-label="Comparación visual de probabilidades SÍ">
+                    <div className="comparison-market-row">
+                      <span>Polymarket</span>
+                      <div className="comparison-mini-track">
+                        <span
+                          className="comparison-mini-fill polymarket"
+                          style={{ width: `${comparison.polymarket === null ? 50 : comparison.polymarket * 100}%` }}
+                        />
+                      </div>
+                      <strong>{formatProbability(comparison.polymarket)}</strong>
+                    </div>
+                    <div className="comparison-market-row">
+                      <span>{sourceLabel}</span>
+                      <div className="comparison-mini-track">
+                        <span
+                          className="comparison-mini-fill external"
+                          style={{ width: `${comparison.external === null ? 50 : comparison.external * 100}%` }}
+                        />
+                      </div>
+                      <strong>{formatProbability(comparison.external)}</strong>
+                    </div>
+                  </div>
+                </div>
+                <div className="external-signal-metrics compact">
+                  <div><span>{sourceLabel} NO</span><strong>{formatProbability(signal.no_probability)}</strong></div>
                   <div><span>Diferencial</span><strong>{formatProbability(signal.spread)}</strong></div>
                   <div><span>Conf. fuente</span><strong>{formatProbability(signal.source_confidence)}</strong></div>
-                  <div><span>Conf. match</span><strong>{formatProbability(signal.match_confidence)}</strong></div>
+                  <div><span>Conf. coincidencia</span><strong>{formatProbability(signal.match_confidence)}</strong></div>
+                  <div><span>Volumen</span><strong>{formatCompact(signal.volume)}</strong></div>
+                  <div><span>Interés abierto</span><strong>{formatCompact(signal.open_interest)}</strong></div>
                 </div>
                 {signal.match_reason ? <p className="match-reason">Motivo: {signal.match_reason}</p> : null}
                 {warnings.length > 0 ? (
                   <div className="warning-list">
                     {warnings.map((warning) => (
-                      <span key={`${signal.id}-${warning}`}>{formatWarningLabel(warning)}</span>
+                      <span key={`${signal.id}-${warning}`}>{warning}</span>
                     ))}
                   </div>
                 ) : null}
@@ -940,6 +1014,9 @@ function ExternalSignalsPanel({
           })}
         </div>
       )}
+      <p className="section-note">
+        Las diferencias entre mercados son señales comparativas, no recomendaciones de apuesta.
+      </p>
     </section>
   );
 }
