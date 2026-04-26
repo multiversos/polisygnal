@@ -87,3 +87,30 @@ class ResearchRunResponse(BaseModel):
     report: PredictionReportRead | None = None
     prediction: PredictionItemResponse | None = None
     partial_errors: list[str] = Field(default_factory=list)
+
+
+class ResearchCandidateRead(BaseModel):
+    market_id: int
+    question: str
+    event_title: str | None = None
+    vertical: str
+    sport: str
+    market_shape: str
+    research_template_name: str
+    market_yes_price: Decimal | None = None
+    market_no_price: Decimal | None = None
+    liquidity: Decimal | None = None
+    volume: Decimal | None = None
+    close_time: datetime | None = None
+    candidate_score: Decimal
+    candidate_reasons: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ResearchCandidatesResponse(BaseModel):
+    count: int
+    limit: int
+    vertical: str | None = None
+    sport: str | None = None
+    market_shape: str | None = None
+    candidates: list[ResearchCandidateRead] = Field(default_factory=list)

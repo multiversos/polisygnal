@@ -15,14 +15,45 @@ from app.repositories.research_runs import (
 from app.schemas.prediction import PredictionItemResponse
 from app.schemas.research import (
     PredictionReportRead,
+    ResearchCandidatesResponse,
     ResearchFindingRead,
     ResearchRunRead,
     ResearchRunRequest,
     ResearchRunResponse,
 )
+from app.services.research.candidate_selector import list_research_candidates
 from app.services.research.pipeline import run_market_research
 
 router = APIRouter()
+
+
+@router.get(
+    "/research/candidates",
+    response_model=ResearchCandidatesResponse,
+    tags=["research"],
+)
+def get_research_candidates(
+    limit: int = Query(default=10, ge=1, le=50),
+    vertical: str | None = Query(default="sports"),
+    sport: str | None = Query(default=None),
+    market_shape: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> ResearchCandidatesResponse:
+    candidates = list_research_candidates(
+        db,
+        limit=limit,
+        vertical=vertical,
+        sport=sport,
+        market_shape=market_shape,
+    )
+    return ResearchCandidatesResponse(
+        count=len(candidates),
+        limit=limit,
+        vertical=vertical,
+        sport=sport,
+        market_shape=market_shape,
+        candidates=[candidate.to_payload() for candidate in candidates],
+    )
 
 
 @router.post(

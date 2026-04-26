@@ -21,7 +21,7 @@ class Settings(BaseSettings):
         alias="POLYSIGNAL_DATABASE_URL",
     )
     cors_origins: Annotated[list[str], NoDecode] = Field(
-        default_factory=lambda: ["http://localhost:3000"],
+        default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"],
         alias="POLYSIGNAL_CORS_ORIGINS",
     )
     polymarket_base_url: str = Field(

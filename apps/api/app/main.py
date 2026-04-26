@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.api.routes_research import router as research_router
@@ -13,6 +14,15 @@ app = FastAPI(
     version="0.1.0",
     description="API base para análisis de mercados de Polymarket.",
 )
+if settings.cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 app.include_router(router)
 app.include_router(research_router)
 

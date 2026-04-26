@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
+from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.commands import list_research_candidates, prepare_codex_research
@@ -85,6 +86,103 @@ def test_candidate_selector_uses_research_classification(db_session: Session) ->
     assert candidate.sport == "nba"
     assert candidate.market_shape == "match_winner"
     assert candidate.research_template_name == "sports_nba_match_winner"
+
+
+def test_research_candidates_endpoint_lists_candidates_without_mutating_db(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(
+        db_session,
+        suffix="endpoint",
+        question="Will the Lakers beat the Warriors?",
+    )
+    _add_snapshot(db_session, market=market)
+    db_session.commit()
+    before_new = len(db_session.new)
+    before_dirty = len(db_session.dirty)
+    before_deleted = len(db_session.deleted)
+
+    response = client.get("/research/candidates?limit=5&sport=nba")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    assert payload["limit"] == 5
+    assert payload["sport"] == "nba"
+    assert payload["candidates"][0]["market_id"] == market.id
+    assert payload["candidates"][0]["question"] == market.question
+    assert payload["candidates"][0]["vertical"] == "sports"
+    assert payload["candidates"][0]["market_shape"] == "match_winner"
+    assert payload["candidates"][0]["candidate_score"] is not None
+    assert len(db_session.new) == before_new
+    assert len(db_session.dirty) == before_dirty
+    assert len(db_session.deleted) == before_deleted
+
+
+def test_research_candidates_endpoint_respects_limit_and_market_shape(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    finals_market = _create_market(
+        db_session,
+        suffix="endpoint-finals",
+        question="Will the Boston Celtics win the NBA Finals?",
+    )
+    match_market = _create_market(
+        db_session,
+        suffix="endpoint-match",
+        question="Will the Lakers beat the Warriors?",
+    )
+    _add_snapshot(db_session, market=finals_market)
+    _add_snapshot(db_session, market=match_market)
+    db_session.commit()
+
+    response = client.get(
+        "/research/candidates?limit=1&sport=nba&market_shape=championship"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    assert payload["limit"] == 1
+    assert payload["market_shape"] == "championship"
+    assert payload["candidates"][0]["market_id"] == finals_market.id
+    assert payload["candidates"][0]["market_shape"] == "championship"
+    assert payload["candidates"][0]["research_template_name"] == "sports_nba_futures"
+    assert isinstance(payload["candidates"][0]["candidate_reasons"], list)
+    assert isinstance(payload["candidates"][0]["warnings"], list)
+
+
+def test_research_candidates_endpoint_handles_empty_results(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(
+        db_session,
+        suffix="endpoint-empty",
+        question="Will the Lakers beat the Warriors?",
+    )
+    _add_snapshot(db_session, market=market)
+    db_session.commit()
+
+    response = client.get("/research/candidates?limit=5&sport=soccer")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 0
+    assert payload["sport"] == "soccer"
+    assert payload["candidates"] == []
+
+
+def test_research_candidates_endpoint_is_documented_in_openapi(
+    client: TestClient,
+) -> None:
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "/research/candidates" in payload["paths"]
 
 
 def test_candidate_selector_penalizes_poor_metadata_false_positive(
