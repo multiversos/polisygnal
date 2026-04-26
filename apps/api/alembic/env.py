@@ -7,7 +7,18 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
 from app.db.base import Base
-from app.models import evidence_item, event, market, market_outcome, market_snapshot, prediction, source
+from app.models import (
+    evidence_item,
+    event,
+    market,
+    market_outcome,
+    market_snapshot,
+    prediction,
+    prediction_report,
+    research_finding,
+    research_run,
+    source,
+)
 
 config = context.config
 

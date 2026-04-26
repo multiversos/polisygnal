@@ -11,12 +11,34 @@ from sqlalchemy.pool import StaticPool
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
-from app.models import EvidenceItem, Event, Market, MarketOutcome, MarketSnapshot, Prediction, Source
+from app.models import (
+    EvidenceItem,
+    Event,
+    Market,
+    MarketOutcome,
+    MarketSnapshot,
+    Prediction,
+    PredictionReport,
+    ResearchFinding,
+    ResearchRun,
+    Source,
+)
 
 
 @pytest.fixture
 def db_session() -> Generator[Session, None, None]:
-    _ = (EvidenceItem, Event, Market, MarketOutcome, MarketSnapshot, Prediction, Source)
+    _ = (
+        EvidenceItem,
+        Event,
+        Market,
+        MarketOutcome,
+        MarketSnapshot,
+        Prediction,
+        PredictionReport,
+        ResearchFinding,
+        ResearchRun,
+        Source,
+    )
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
         future=True,

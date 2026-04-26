@@ -8,6 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
+DEFAULT_PREDICTION_FAMILY = "scoring_v1"
+
 
 class Prediction(Base):
     __tablename__ = "predictions"
@@ -25,6 +27,16 @@ class Prediction(Base):
         nullable=False,
     )
     model_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    prediction_family: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default=DEFAULT_PREDICTION_FAMILY,
+    )
+    research_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("research_runs.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
     yes_probability: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
     no_probability: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
     confidence_score: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
@@ -35,6 +47,10 @@ class Prediction(Base):
     review_confidence: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     review_edge: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     explanation_json: Mapped[dict[str, object] | list[object]] = mapped_column(JSON, nullable=False)
+    components_json: Mapped[dict[str, object] | list[object] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -42,6 +58,12 @@ class Prediction(Base):
     )
 
     market = relationship("Market", back_populates="predictions")
+    research_run = relationship("ResearchRun", back_populates="predictions")
+    reports = relationship(
+        "PredictionReport",
+        back_populates="prediction",
+        order_by="PredictionReport.created_at.desc()",
+    )
 
     @property
     def used_odds_count(self) -> int:

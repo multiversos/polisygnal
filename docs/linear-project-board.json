@@ -1,0 +1,288 @@
+{
+  "project_name": "PolySignal",
+  "snapshot_date": "2026-04-25",
+  "project_stage": "operational_mvp",
+  "current_focus": "convertir el MVP operativo en un producto accionable y aumentar cobertura de evidence sin perder trazabilidad",
+  "source_of_truth": [
+    "docs/project-status.md",
+    "docs/reglamento-operativo.md",
+    "docs/roadmap.md",
+    "docs/tasks.md",
+    "docs/decision-log.md"
+  ],
+  "issues": [
+    {
+      "sync_id": "backend-operational-mvp",
+      "initiative": "Platform & Reliability",
+      "title": "Consolidar MVP operativo del backend",
+      "state_type": "completed",
+      "summary": "El backend ya cubre discovery, sync, snapshots, evidence, scoring, evaluation y lectura operativa por HTTP.",
+      "outcome": "Mantener una base estable, explicable y auditable para iterar producto sin reescribir el core.",
+      "done": [
+        "API FastAPI y dominio base estabilizados",
+        "sync manual de Polymarket operativo",
+        "snapshots, evidence, scoring y evaluation disponibles",
+        "status, history, compare, reports, briefing, diff y dashboard listos"
+      ],
+      "next_steps": [
+        "preservar compatibilidad al extender nuevas capacidades"
+      ],
+      "risks": [
+        "si el dominio crece sin disciplina, la capa API puede volverse acoplada"
+      ],
+      "source_paths": [
+        "README.md",
+        "apps/api/README.md",
+        "docs/project-status.md"
+      ]
+    },
+    {
+      "sync_id": "pipeline-and-artifacts",
+      "initiative": "Platform & Reliability",
+      "title": "Automatizar pipeline operativo y artifacts auditables",
+      "state_type": "completed",
+      "summary": "El pipeline principal ya deja summaries, reports, briefing, diff y dashboard como artifacts versionables y consultables.",
+      "outcome": "Operar el MVP con visibilidad de corridas, errores parciales y salud global sin depender de memoria humana.",
+      "done": [
+        "wrappers de snapshots, evidence, scoring, reports, briefing, diff y dashboard",
+        "Task Scheduler listo para ejecucion periodica en Windows",
+        "artifacts latest y timestamped disponibles en logs"
+      ],
+      "next_steps": [
+        "agregar alerting y notificaciones cuando una corrida deje de estar sana"
+      ],
+      "risks": [
+        "la operacion sigue apoyada en Windows local y carece de alertas proactivas"
+      ],
+      "source_paths": [
+        "scripts/run_market_pipeline.ps1",
+        "logs/market_pipeline/latest-summary.json",
+        "docs/project-status.md"
+      ]
+    },
+    {
+      "sync_id": "evidence-pipeline-v1",
+      "initiative": "Data & Intelligence",
+      "title": "Implementar evidence pipeline v1 para NBA winner",
+      "state_type": "completed",
+      "summary": "El MVP ya enriquece mercados elegibles con odds estructuradas y noticias RSS de ESPN.",
+      "outcome": "Disponer de evidencia externa persistida y reusable para scoring y lectura operativa.",
+      "done": [
+        "The Odds API integrada para markets matchables",
+        "ESPN RSS integrado para senales de noticias",
+        "structured_context y external_market normalizados en persistencia"
+      ],
+      "next_steps": [
+        "aumentar cantidad de mercados elegibles y calidad de matching"
+      ],
+      "risks": [
+        "al 2026-04-25 solo 8 de 141 mercados activos usan evidence real"
+      ],
+      "source_paths": [
+        "apps/api/README.md",
+        "logs/market_pipeline/latest-summary.json",
+        "docs/project-status.md"
+      ]
+    },
+    {
+      "sync_id": "scoring-and-evaluation-v1",
+      "initiative": "Data & Intelligence",
+      "title": "Implementar scoring y evaluation v1",
+      "state_type": "completed",
+      "summary": "El scoring v1 ya calcula probabilidad, confianza, edge, action_score y trazabilidad por mercado.",
+      "outcome": "Priorizar mercados con una capa explicable y evaluable en lugar de intuicion manual.",
+      "done": [
+        "predictions persistidas con explanation_json",
+        "evaluation history y summary por HTTP",
+        "overview y reportes de oportunidades listos para consumo operativo"
+      ],
+      "next_steps": [
+        "mejorar calibracion con mas mercados resueltos y validaciones de calidad"
+      ],
+      "risks": [
+        "133 de 141 mercados siguen usando snapshot fallback en lugar de evidence real"
+      ],
+      "source_paths": [
+        "apps/api/README.md",
+        "logs/reports/latest-summary.json",
+        "docs/project-status.md"
+      ]
+    },
+    {
+      "sync_id": "linear-operating-system",
+      "initiative": "Execution",
+      "title": "Instalar sistema operativo de ejecucion con Linear y documentacion viva",
+      "state_type": "started",
+      "summary": "El proyecto necesitaba una fuente unica para saber que se hizo, que falta, donde estamos y cual es la cadencia del equipo.",
+      "outcome": "Trabajar como un startup serio: backlog visible, estado vivo, decisiones registradas y cero trabajo oculto.",
+      "done": [
+        "catalogo canonico del backlog para sync con Linear",
+        "reglamento operativo inicial",
+        "snapshot ejecutivo del proyecto al 2026-04-25",
+        "proyecto PolySignal creado en Linear",
+        "backlog inicial sembrado en Linear",
+        "documento ejecutivo del proyecto creado en Linear"
+      ],
+      "next_steps": [
+        "configurar credenciales OAuth o API key para el sync local",
+        "correr dry-run del sync con credenciales reales",
+        "adoptar el formato de update diario y semanal"
+      ],
+      "risks": [
+        "sin disciplina de update el sistema se vuelve decorativo",
+        "sin credenciales locales no hay sync automatico repo -> Linear"
+      ],
+      "source_paths": [
+        "docs/reglamento-operativo.md",
+        "docs/project-status.md",
+        "docs/linear-sync.md"
+      ]
+    },
+    {
+      "sync_id": "consumption-layer-next",
+      "initiative": "Product",
+      "title": "Convertir briefing y diff en una capa de consumo accionable",
+      "state_type": "started",
+      "summary": "La siguiente fase natural del MVP es transformar los artifacts operativos en una experiencia de consumo mas directa.",
+      "outcome": "Dar a producto, research y operaciones una lectura accionable sin inspeccionar JSON ni endpoints manualmente.",
+      "done": [
+        "briefing operativo y diff entre corridas ya existen",
+        "dashboard HTML estatico ya esta disponible"
+      ],
+      "next_steps": [
+        "definir vista principal del operador",
+        "priorizar digest, tablero o inbox de cambios",
+        "cerrar recorrido de insight a accion"
+      ],
+      "risks": [
+        "si no se productoza esta capa, el MVP sigue siendo util solo para perfiles tecnicos"
+      ],
+      "source_paths": [
+        "README.md",
+        "logs/briefings/latest-summary.json",
+        "logs/diffs/latest-summary.json"
+      ]
+    },
+    {
+      "sync_id": "expand-evidence-coverage",
+      "initiative": "Data & Intelligence",
+      "title": "Expandir cobertura de evidence mas alla de mercados matchables actuales",
+      "state_type": "unstarted",
+      "summary": "La restriccion mas visible del MVP es que solo 8 de 141 mercados activos reciben evidence real al snapshot del 2026-04-25.",
+      "outcome": "Aumentar porcentaje de mercados con evidence real para elevar calidad del scoring y utilidad del overview.",
+      "done": [
+        "pipeline v1 ya existe y deja claro donde falla la elegibilidad"
+      ],
+      "next_steps": [
+        "soportar shapes no matchables actuales",
+        "mejorar matching de equipos y parsing de preguntas",
+        "agregar nuevas fuentes estructuradas"
+      ],
+      "risks": [
+        "si la cobertura no sube, el valor incremental del scoring se estanca"
+      ],
+      "source_paths": [
+        "logs/market_pipeline/latest-summary.json",
+        "docs/project-status.md",
+        "docs/tasks.md"
+      ]
+    },
+    {
+      "sync_id": "frontend-productization",
+      "initiative": "Product",
+      "title": "Producto frontend y dashboard navegable",
+      "state_type": "unstarted",
+      "summary": "Existe un frontend base, pero la experiencia principal de producto aun no capitaliza el backend ni los artifacts operativos.",
+      "outcome": "Ofrecer una interfaz navegable que convierta el trabajo del backend en una experiencia de uso real.",
+      "done": [
+        "base de Next.js creada",
+        "dashboard HTML estatico generado desde pipeline"
+      ],
+      "next_steps": [
+        "definir el shell del producto",
+        "mostrar top opportunities, watchlist y health operacional",
+        "alinear la vista con operadores no tecnicos"
+      ],
+      "risks": [
+        "sin frontend producto, la validacion con usuarios y feedback real queda limitada"
+      ],
+      "source_paths": [
+        "apps/web",
+        "docs/roadmap.md",
+        "docs/project-status.md"
+      ]
+    },
+    {
+      "sync_id": "operational-alerting",
+      "initiative": "Platform & Reliability",
+      "title": "Alerting y monitoreo proactivo de corridas",
+      "state_type": "unstarted",
+      "summary": "Hoy el proyecto expone estado y artifacts, pero la deteccion de fallas sigue siendo pull-based y manual.",
+      "outcome": "Saber antes de que alguien pregunte si el pipeline se rompio, se estanco o bajo de calidad.",
+      "done": [
+        "status global, history, summary y compare ya existen"
+      ],
+      "next_steps": [
+        "definir umbrales operativos",
+        "emitir notificaciones cuando freshness o health caigan",
+        "registrar incidentes y owners"
+      ],
+      "risks": [
+        "una falla silenciosa puede dejar artefactos viejos y erosionar confianza"
+      ],
+      "source_paths": [
+        "apps/api/README.md",
+        "docs/tasks.md",
+        "docs/reglamento-operativo.md"
+      ]
+    },
+    {
+      "sync_id": "scoring-quality-guardrails",
+      "initiative": "Data & Intelligence",
+      "title": "Guardrails de calidad y regresion para scoring",
+      "state_type": "unstarted",
+      "summary": "El scoring ya funciona, pero hace falta institucionalizar pruebas de calidad sobre coverage, calibration y drift.",
+      "outcome": "Poder cambiar el motor sin degradar silenciosamente la calidad del output.",
+      "done": [
+        "evaluation historica y explanation_json disponibles"
+      ],
+      "next_steps": [
+        "definir metricas minimas por release",
+        "crear datasets de regresion",
+        "bloquear cambios con evidencia de degradacion"
+      ],
+      "risks": [
+        "sin guardrails el sistema puede empeorar aunque los tests funcionales sigan verdes"
+      ],
+      "source_paths": [
+        "apps/api/tests",
+        "docs/roadmap.md",
+        "docs/tasks.md"
+      ]
+    },
+    {
+      "sync_id": "ai-news-classification",
+      "initiative": "Data & Intelligence",
+      "title": "Clasificacion y resumen de noticias con IA",
+      "state_type": "backlog",
+      "summary": "El README ya marca la capa de IA de noticias como un faltante importante del MVP.",
+      "outcome": "Pasar de ingestión basica de noticias a señales estructuradas, resumidas y priorizadas para decisiones.",
+      "done": [
+        "RSS de ESPN ya esta integrado como base"
+      ],
+      "next_steps": [
+        "definir taxonomia de eventos y stance",
+        "agregar modelo o proveedor",
+        "persistir explicaciones y evidencia generada"
+      ],
+      "risks": [
+        "si se agrega IA sin trazabilidad, se pierde explicabilidad y auditabilidad"
+      ],
+      "source_paths": [
+        "README.md",
+        "docs/roadmap.md",
+        "docs/project-status.md"
+      ]
+    }
+  ]
+}

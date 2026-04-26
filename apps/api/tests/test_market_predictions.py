@@ -164,6 +164,89 @@ def test_get_market_predictions_returns_404_for_unknown_market(client: TestClien
     assert history_response.status_code == 404
 
 
+def test_legacy_prediction_endpoints_ignore_research_family_predictions(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(db_session, suffix="research-family")
+    base_time = datetime(2026, 4, 21, 12, 0, tzinfo=UTC)
+
+    legacy_prediction = Prediction(
+        market_id=market.id,
+        run_at=base_time,
+        model_version="scoring_v1",
+        yes_probability=Decimal("0.4800"),
+        no_probability=Decimal("0.5200"),
+        confidence_score=Decimal("0.6200"),
+        edge_signed=Decimal("0.0300"),
+        edge_magnitude=Decimal("0.0300"),
+        edge_class="no_signal",
+        opportunity=False,
+        review_confidence=False,
+        review_edge=False,
+        explanation_json={"summary": "Legacy scoring prediction"},
+    )
+    research_prediction = Prediction(
+        market_id=market.id,
+        run_at=base_time + timedelta(minutes=5),
+        model_version="research_local_v1",
+        prediction_family="research_v1_local",
+        yes_probability=Decimal("0.6100"),
+        no_probability=Decimal("0.3900"),
+        confidence_score=Decimal("0.5500"),
+        edge_signed=Decimal("0.1300"),
+        edge_magnitude=Decimal("0.1300"),
+        edge_class="strong",
+        opportunity=True,
+        review_confidence=False,
+        review_edge=False,
+        explanation_json={"summary": "Research prediction"},
+        components_json={"baseline_yes_probability": "0.4800"},
+    )
+    db_session.add_all([legacy_prediction, research_prediction])
+    db_session.commit()
+
+    latest_response = client.get(f"/markets/{market.id}/prediction")
+    history_response = client.get(f"/markets/{market.id}/predictions")
+
+    assert latest_response.status_code == 200
+    latest_payload = latest_response.json()
+    assert latest_payload["prediction"]["id"] == legacy_prediction.id
+    assert latest_payload["prediction"]["prediction_family"] == "scoring_v1"
+
+    assert history_response.status_code == 200
+    history_payload = history_response.json()
+    assert len(history_payload["items"]) == 1
+    assert history_payload["items"][0]["id"] == legacy_prediction.id
+    assert history_payload["items"][0]["prediction_family"] == "scoring_v1"
+
+
+def test_prediction_model_defaults_prediction_family_to_scoring_v1(
+    db_session: Session,
+) -> None:
+    market = _create_market(db_session, suffix="default-family")
+    prediction = Prediction(
+        market_id=market.id,
+        run_at=datetime(2026, 4, 21, 12, 0, tzinfo=UTC),
+        model_version="scoring_v1",
+        yes_probability=Decimal("0.5100"),
+        no_probability=Decimal("0.4900"),
+        confidence_score=Decimal("0.6000"),
+        edge_signed=Decimal("0.0100"),
+        edge_magnitude=Decimal("0.0100"),
+        edge_class="no_signal",
+        opportunity=False,
+        review_confidence=False,
+        review_edge=False,
+        explanation_json={"summary": "Default family"},
+    )
+    db_session.add(prediction)
+    db_session.commit()
+    db_session.refresh(prediction)
+
+    assert prediction.prediction_family == "scoring_v1"
+
+
 def _create_market(db_session: Session, *, suffix: str) -> Market:
     event = Event(
         polymarket_event_id=f"event-prediction-{suffix}",

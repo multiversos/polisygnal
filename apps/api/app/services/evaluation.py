@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.market import Market
 from app.models.market_outcome import MarketOutcome
-from app.models.prediction import Prediction
+from app.models.prediction import DEFAULT_PREDICTION_FAMILY, Prediction
 from app.schemas.evaluation import (
     EvaluationHistoryItemResponse,
     EvaluationHistoryResponse,
@@ -31,6 +31,7 @@ def build_evaluation_summary(db: Session) -> EvaluationSummaryResponse:
         )
         .select_from(Prediction)
         .outerjoin(MarketOutcome, Prediction.market_id == MarketOutcome.market_id)
+        .where(Prediction.prediction_family == DEFAULT_PREDICTION_FAMILY)
     )
     rows = db.execute(stmt).all()
 
@@ -114,6 +115,7 @@ def build_evaluation_history(
         .select_from(Prediction)
         .join(MarketOutcome, Prediction.market_id == MarketOutcome.market_id)
         .join(Market, Prediction.market_id == Market.id)
+        .where(Prediction.prediction_family == DEFAULT_PREDICTION_FAMILY)
         .order_by(
             MarketOutcome.resolved_at.desc(),
             Prediction.run_at.desc(),
@@ -172,7 +174,10 @@ def build_evaluation_market_history(
         .select_from(Prediction)
         .join(MarketOutcome, Prediction.market_id == MarketOutcome.market_id)
         .join(Market, Prediction.market_id == Market.id)
-        .where(Prediction.market_id == market_id)
+        .where(
+            Prediction.market_id == market_id,
+            Prediction.prediction_family == DEFAULT_PREDICTION_FAMILY,
+        )
         .order_by(Prediction.run_at.asc(), Prediction.id.asc())
     )
     rows = db.execute(stmt).all()

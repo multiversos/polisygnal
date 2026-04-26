@@ -55,6 +55,13 @@ from app.schemas.prediction import (
     PredictionItemResponse,
     PredictionMarketSummary,
 )
+from app.schemas.research import (
+    PredictionReportRead,
+    ResearchFindingRead,
+    ResearchRunRead,
+    ResearchRunRequest,
+    ResearchRunResponse,
+)
 from app.schemas.pipeline_artifacts import (
     PipelineArtifactResponse,
     PipelineComponentStatuses,
@@ -142,7 +149,12 @@ __all__ = [
     "PredictionHistoryResponse",
     "PredictionItemResponse",
     "PredictionMarketSummary",
+    "PredictionReportRead",
     "PolymarketSyncResponse",
+    "ResearchFindingRead",
+    "ResearchRunRead",
+    "ResearchRunRequest",
+    "ResearchRunResponse",
     "OperationalBriefingResponse",
     "PipelineArtifactResponse",
     "PipelineComponentStatuses",

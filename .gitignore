@@ -33,6 +33,7 @@ logs/
 
 # Claude Code local config
 .claude/
+.linear/
 
 # Test validation artifacts
 **/.validation/

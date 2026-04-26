@@ -25,6 +25,8 @@ class PredictionItemResponse(BaseModel):
     market_id: int
     run_at: datetime
     model_version: str
+    prediction_family: str
+    research_run_id: int | None = None
     yes_probability: Decimal
     no_probability: Decimal
     confidence_score: Decimal
@@ -35,6 +37,7 @@ class PredictionItemResponse(BaseModel):
     review_confidence: bool
     review_edge: bool
     explanation_json: dict[str, object] | list[object]
+    components_json: dict[str, object] | list[object] | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

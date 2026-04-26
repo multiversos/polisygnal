@@ -488,6 +488,39 @@ npm.cmd install
 npm.cmd run dev:web
 ```
 
+## Linear y ejecucion
+
+El proyecto ahora incluye una base de sincronizacion con Linear y un sistema documental para operar el roadmap y el estado real del MVP sin perder trazabilidad.
+
+Archivos clave:
+
+- `docs/project-status.md`
+- `docs/reglamento-operativo.md`
+- `docs/linear-project-board.json`
+- `docs/linear-sync.md`
+- `docs/decision-log.md`
+
+Dry run del sync:
+
+```powershell
+cd apps/api
+.\.venv\Scripts\python -m app.commands.sync_linear
+```
+
+Login OAuth local con aprobacion web:
+
+```powershell
+cd apps/api
+.\.venv\Scripts\python -m app.commands.login_linear
+```
+
+Aplicar cambios en Linear:
+
+```powershell
+cd apps/api
+.\.venv\Scripts\python -m app.commands.sync_linear --apply
+```
+
 ## Siguiente paso recomendado
 
 La siguiente fase natural es aprovechar `briefing + diff` para una capa de consumo todavia mas accionable, por ejemplo un digest HTTP o un resumen de cambios de corrida sin necesidad de leer todo el overview/export.

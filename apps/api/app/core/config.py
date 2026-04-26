@@ -128,6 +128,74 @@ class Settings(BaseSettings):
         default=50000.0,
         alias="POLYSIGNAL_SCORING_LOW_LIQUIDITY_THRESHOLD",
     )
+    openai_api_key: str | None = Field(
+        default=None,
+        alias="OPENAI_API_KEY",
+    )
+    openai_base_url: str = Field(
+        default="https://api.openai.com/v1",
+        alias="POLYSIGNAL_OPENAI_BASE_URL",
+    )
+    research_timeout_seconds: float = Field(
+        default=45.0,
+        alias="POLYSIGNAL_RESEARCH_TIMEOUT_SECONDS",
+    )
+    research_cheap_model: str = Field(
+        default="gpt-5-mini",
+        alias="POLYSIGNAL_RESEARCH_CHEAP_MODEL",
+    )
+    linear_api_url: str = Field(
+        default="https://api.linear.app/graphql",
+        alias="POLYSIGNAL_LINEAR_API_URL",
+    )
+    linear_api_key: str | None = Field(
+        default=None,
+        alias="LINEAR_API_KEY",
+    )
+    linear_oauth_authorize_url: str = Field(
+        default="https://linear.app/oauth/authorize",
+        alias="POLYSIGNAL_LINEAR_OAUTH_AUTHORIZE_URL",
+    )
+    linear_oauth_token_url: str = Field(
+        default="https://api.linear.app/oauth/token",
+        alias="POLYSIGNAL_LINEAR_OAUTH_TOKEN_URL",
+    )
+    linear_oauth_client_id: str | None = Field(
+        default=None,
+        alias="LINEAR_OAUTH_CLIENT_ID",
+    )
+    linear_oauth_client_secret: str | None = Field(
+        default=None,
+        alias="LINEAR_OAUTH_CLIENT_SECRET",
+    )
+    linear_oauth_redirect_uri: str = Field(
+        default="http://127.0.0.1:8765/callback",
+        alias="POLYSIGNAL_LINEAR_OAUTH_REDIRECT_URI",
+    )
+    linear_oauth_scopes: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["read", "write"],
+        alias="POLYSIGNAL_LINEAR_OAUTH_SCOPES",
+    )
+    linear_oauth_actor: str = Field(
+        default="user",
+        alias="POLYSIGNAL_LINEAR_OAUTH_ACTOR",
+    )
+    linear_oauth_credentials_path: str = Field(
+        default=".linear/oauth-credentials.json",
+        alias="POLYSIGNAL_LINEAR_OAUTH_CREDENTIALS_PATH",
+    )
+    linear_team_id: str | None = Field(
+        default=None,
+        alias="LINEAR_TEAM_ID",
+    )
+    linear_project_id: str | None = Field(
+        default=None,
+        alias="LINEAR_PROJECT_ID",
+    )
+    linear_sync_source_path: str = Field(
+        default="docs/linear-project-board.json",
+        alias="POLYSIGNAL_LINEAR_SYNC_SOURCE_PATH",
+    )
 
     model_config = SettingsConfigDict(
         env_file=(API_DIR / ".env", REPO_ROOT / ".env"),
@@ -138,6 +206,13 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("linear_oauth_scopes", mode="before")
+    @classmethod
+    def parse_linear_oauth_scopes(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
@@ -153,6 +228,18 @@ class Settings(BaseSettings):
                 "POLYSIGNAL_MVP_DISCOVERY_SCOPE debe ser uno de: nba, sports, all."
             )
         return scope
+
+    @field_validator("linear_oauth_actor", mode="before")
+    @classmethod
+    def parse_linear_oauth_actor(cls, value: object) -> str:
+        if not isinstance(value, str):
+            raise TypeError("POLYSIGNAL_LINEAR_OAUTH_ACTOR debe ser un string.")
+        actor = value.strip().lower()
+        if actor not in {"user", "app"}:
+            raise ValueError(
+                "POLYSIGNAL_LINEAR_OAUTH_ACTOR debe ser uno de: user, app."
+            )
+        return actor
 
 
 @lru_cache

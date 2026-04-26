@@ -51,3 +51,7 @@ class Source(Base):
         back_populates="source",
         cascade="all, delete-orphan",
     )
+    research_findings = relationship(
+        "ResearchFinding",
+        back_populates="source",
+    )

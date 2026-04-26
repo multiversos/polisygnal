@@ -379,6 +379,61 @@ def test_get_markets_overview_orders_top_opportunities_by_action_score(
     assert payload["items"][1]["latest_prediction"]["action_score"] == "0.4000"
 
 
+def test_get_markets_overview_ignores_research_family_predictions(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    base_time = datetime(2026, 4, 21, 12, 0, tzinfo=UTC)
+    market = _create_market(
+        db_session,
+        suffix="overview-research-family",
+        question="NBA Playoffs: Who Will Win Series? - Heat vs. Bulls",
+    )
+
+    _add_prediction(
+        db_session,
+        market=market,
+        run_at=base_time,
+        yes_probability=Decimal("0.5200"),
+        no_probability=Decimal("0.4800"),
+        confidence_score=Decimal("0.6500"),
+        edge_signed=Decimal("0.0400"),
+        edge_magnitude=Decimal("0.0400"),
+        edge_class="no_signal",
+        opportunity=False,
+        review_confidence=False,
+        review_edge=False,
+        used_odds_count=1,
+        used_news_count=0,
+    )
+    db_session.add(
+        Prediction(
+            market_id=market.id,
+            run_at=base_time + timedelta(minutes=10),
+            model_version="research_local_v1",
+            prediction_family="research_v1_local",
+            yes_probability=Decimal("0.6800"),
+            no_probability=Decimal("0.3200"),
+            confidence_score=Decimal("0.5500"),
+            edge_signed=Decimal("0.1600"),
+            edge_magnitude=Decimal("0.1600"),
+            edge_class="strong",
+            opportunity=True,
+            review_confidence=False,
+            review_edge=False,
+            explanation_json={"summary": "Research only"},
+            components_json={"baseline_yes_probability": "0.5200"},
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/markets/overview")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["items"][0]["latest_prediction"]["yes_probability"] == "0.5200"
+
+
 def _create_market(
     db_session: Session,
     *,

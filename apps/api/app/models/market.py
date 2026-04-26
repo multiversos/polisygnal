@@ -56,6 +56,24 @@ class Market(Base):
         cascade="all, delete-orphan",
         order_by="Prediction.run_at.desc()",
     )
+    research_runs = relationship(
+        "ResearchRun",
+        back_populates="market",
+        cascade="all, delete-orphan",
+        order_by="ResearchRun.started_at.desc()",
+    )
+    research_findings = relationship(
+        "ResearchFinding",
+        back_populates="market",
+        cascade="all, delete-orphan",
+        order_by="ResearchFinding.id.asc()",
+    )
+    prediction_reports = relationship(
+        "PredictionReport",
+        back_populates="market",
+        cascade="all, delete-orphan",
+        order_by="PredictionReport.created_at.desc()",
+    )
     outcome = relationship(
         "MarketOutcome",
         back_populates="market",
