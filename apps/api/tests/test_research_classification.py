@@ -55,6 +55,12 @@ from app.services.research.classification import (
             "player_prop",
             "sports_generic",
         ),
+        (
+            "NBA Playoffs: Suns vs. Thunder Total Games O/U 4.5",
+            "nba",
+            "team_prop",
+            "sports_generic",
+        ),
     ],
 )
 def test_classify_sports_market_examples(

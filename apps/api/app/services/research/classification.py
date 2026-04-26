@@ -109,6 +109,9 @@ PLAYER_PROP_HINTS = (
 )
 TEAM_PROP_HINTS = (
     "team total",
+    "total games",
+    "over under",
+    "o/u",
     "win total",
     "regular season wins",
     "score first",
