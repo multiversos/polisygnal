@@ -13,7 +13,26 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var storedTheme = localStorage.getItem("polysignal-theme");
+                var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                var theme = storedTheme === "dark" || storedTheme === "light"
+                  ? storedTheme
+                  : prefersDark
+                    ? "dark"
+                    : "light";
+                document.documentElement.dataset.theme = theme;
+                document.documentElement.style.colorScheme = theme;
+              } catch (error) {}
+            `,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );
