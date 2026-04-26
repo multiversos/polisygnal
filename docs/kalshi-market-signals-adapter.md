@@ -756,3 +756,97 @@ Este matching es conservador. Si la confianza es baja, la senal debe mostrarse c
 3. Agregar dashboard de `External Market Signals`.
 4. Mostrar diferencia entre Polymarket YES price y Kalshi implied probability.
 5. Usar estas senales en scoring solo como componente opcional, y solo con `source_confidence` y `match_confidence` altos.
+
+## 18. Fase C implementada: Matching Polymarket/Kalshi MVP
+
+Fase C agrega un MVP conservador para proponer vinculos entre senales externas
+guardadas, empezando por Kalshi, y mercados locales de Polymarket. El matching
+no llama Kalshi en vivo, no ejecuta trading y no crea predicciones ni research
+runs.
+
+### 18.1 Como funciona el matching
+
+El modulo `app.services.external_market_matching` estima `match_confidence` con
+senales heuristicas:
+
+- similitud textual entre pregunta de Polymarket y titulo/ticker externo;
+- anos o temporadas detectadas;
+- deporte inferido;
+- tipo de mercado (`match_winner`, `championship`, `futures`, etc.);
+- participantes/equipos NBA detectados;
+- terminos como `Finals`, `Championship`, `Conference`;
+- fecha de cierre si esta disponible en el payload externo;
+- advertencias para mercados multivariados o ambiguos.
+
+El resultado siempre incluye:
+
+- `match_confidence` entre `0.0000` y `1.0000`;
+- `match_reason` auditable;
+- `warnings`.
+
+### 18.2 Thresholds
+
+| Score | Accion recomendada |
+| --- | --- |
+| `>= 0.80` | Candidato vinculable por CLI si se usa `--apply`. |
+| `0.60 - 0.79` | Requiere revision humana; no vincular automaticamente. |
+| `< 0.60` | No vincular automaticamente. |
+
+Reglas conservadoras:
+
+- si el ano difiere, la confianza queda fuertemente penalizada;
+- si el deporte difiere, la confianza queda fuertemente penalizada;
+- si los participantes no coinciden, no se vincula automaticamente;
+- si el mercado externo parece multivariado, la confianza queda capada;
+- si solo hay coincidencia debil de palabras, no puede pasar como match fuerte.
+
+### 18.3 CLI dry-run
+
+Comando seguro por defecto:
+
+```powershell
+cd N:\projects\polimarket\apps\api
+.\.venv\Scripts\python.exe -m app.commands.match_external_signals --source kalshi --limit 5 --dry-run --json
+```
+
+El dry-run:
+
+- busca senales sin `polymarket_market_id`;
+- compara contra mercados locales;
+- devuelve top matches por senal;
+- reporta `would_link`, `review_required` o `no_match`;
+- no modifica la base de datos.
+
+### 18.4 Apply controlado
+
+Solo para matches claros:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.match_external_signals --source kalshi --limit 1 --min-confidence 0.80 --apply --json
+```
+
+Con `--apply`, el comando solo actualiza:
+
+- `polymarket_market_id`;
+- `match_confidence`;
+- `match_reason`;
+- `warnings`.
+
+No crea:
+
+- `predictions`;
+- `research_runs`;
+- ordenes;
+- trades;
+- apuestas automaticas.
+
+### 18.5 Riesgos
+
+El principal riesgo es un falso match entre mercados parecidos pero no
+equivalentes. Por eso el MVP no vincula senales con confianza baja, marca los
+casos intermedios como revision requerida y deja la aplicacion real detras de un
+flag explicito `--apply`.
+
+Las senales externas siguen siendo datos comparativos. No son recomendaciones
+de apuesta, no son instrucciones de trading y no reemplazan la investigacion de
+PolySignal.
