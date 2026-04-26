@@ -129,11 +129,59 @@ def test_external_signal_routes_are_read_only(client: TestClient, db_session: Se
     assert response.status_code == 200
     assert response.json()["count"] == 1
     assert response.json()["signals"][0]["source"] == "kalshi"
+    assert set(response.json()["signals"][0]).issuperset(
+        {
+            "id",
+            "source",
+            "source_ticker",
+            "source_market_id",
+            "source_event_id",
+            "polymarket_market_id",
+            "title",
+            "yes_probability",
+            "no_probability",
+            "mid_price",
+            "last_price",
+            "best_yes_bid",
+            "best_yes_ask",
+            "spread",
+            "volume",
+            "liquidity",
+            "open_interest",
+            "source_confidence",
+            "match_confidence",
+            "match_reason",
+            "warnings",
+            "fetched_at",
+            "created_at",
+        }
+    )
     assert kalshi_response.status_code == 200
     assert kalshi_response.json()["source"] == "kalshi"
     assert market_response.status_code == 200
     assert market_response.json()["market_id"] == market.id
     assert market_response.json()["signals"][0]["polymarket_market_id"] == market.id
+    after = db_session.scalar(select(func.count()).select_from(ExternalMarketSignal))
+    assert after == before
+
+
+def test_external_signal_routes_return_stable_empty_state(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    before = db_session.scalar(select(func.count()).select_from(ExternalMarketSignal))
+
+    response = client.get("/external-signals/kalshi?limit=10")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "count": 0,
+        "limit": 10,
+        "source": "kalshi",
+        "ticker": None,
+        "market_id": None,
+        "signals": [],
+    }
     after = db_session.scalar(select(func.count()).select_from(ExternalMarketSignal))
     assert after == before
 
@@ -222,7 +270,18 @@ def _create_signal(
             polymarket_market_id=market_id,
             title=f"{ticker} title",
             yes_probability=Decimal("0.5000"),
+            no_probability=Decimal("0.5000"),
+            best_yes_bid=Decimal("0.4500"),
+            best_yes_ask=Decimal("0.5500"),
+            mid_price=Decimal("0.5000"),
+            last_price=Decimal("0.4900"),
+            spread=Decimal("0.1000"),
+            volume=Decimal("100.0000"),
+            liquidity=Decimal("250.0000"),
+            open_interest=Decimal("50.0000"),
             source_confidence=Decimal("0.7000"),
+            match_confidence=Decimal("0.6000") if market_id is not None else None,
+            match_reason="fixture_match" if market_id is not None else None,
             warnings=[],
             fetched_at=datetime(2026, 4, 26, 12, 0, tzinfo=UTC),
         ),

@@ -10,7 +10,19 @@ def test_settings_parse_cors_origins_from_csv(monkeypatch) -> None:
 
     assert settings.cors_origins == [
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "http://localhost:3001",
+    ]
+
+
+def test_settings_keeps_localhost_and_loopback_cors_aliases_together(monkeypatch) -> None:
+    monkeypatch.setenv("POLYSIGNAL_CORS_ORIGINS", "http://127.0.0.1:3000")
+
+    settings = Settings()
+
+    assert settings.cors_origins == [
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
     ]
 
 

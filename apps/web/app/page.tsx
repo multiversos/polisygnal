@@ -55,11 +55,49 @@ type CandidatesResponse = {
   candidates: ResearchCandidate[];
 };
 
+type ExternalMarketSignal = {
+  id: number;
+  source: string;
+  source_market_id?: string | null;
+  source_event_id?: string | null;
+  source_ticker?: string | null;
+  polymarket_market_id?: number | null;
+  title?: string | null;
+  yes_probability?: string | number | null;
+  no_probability?: string | number | null;
+  best_yes_bid?: string | number | null;
+  best_yes_ask?: string | number | null;
+  best_no_bid?: string | number | null;
+  best_no_ask?: string | number | null;
+  mid_price?: string | number | null;
+  last_price?: string | number | null;
+  spread?: string | number | null;
+  volume?: string | number | null;
+  liquidity?: string | number | null;
+  open_interest?: string | number | null;
+  source_confidence?: string | number | null;
+  match_confidence?: string | number | null;
+  match_reason?: string | null;
+  warnings?: unknown[] | Record<string, unknown> | null;
+  fetched_at?: string | null;
+  created_at?: string | null;
+};
+
+type ExternalSignalsResponse = {
+  count: number;
+  limit: number;
+  source?: string | null;
+  ticker?: string | null;
+  market_id?: number | null;
+  signals: ExternalMarketSignal[];
+};
+
 type DashboardState = {
   health: HealthResponse | null;
   overview: MarketsOverviewResponse | null;
   dashboardMeta: DashboardMetaResponse | null;
   candidates: ResearchCandidate[];
+  externalSignals: ExternalMarketSignal[];
   loading: boolean;
   error: string | null;
   updatedAt: Date | null;
@@ -108,6 +146,7 @@ const quickLinks = [
     label: "Research candidates",
     href: `${API_BASE_URL}/research/candidates?limit=10&vertical=sports`,
   },
+  { label: "External signals", href: `${API_BASE_URL}/external-signals/kalshi?limit=10` },
 ];
 
 async function fetchJson<T>(path: string): Promise<T> {
@@ -169,6 +208,16 @@ function formatScore(value: unknown): string {
   return number.toFixed(1);
 }
 
+function formatPercentDelta(value: unknown): string {
+  const number = toNumber(value);
+  if (number === null) {
+    return "N/D";
+  }
+
+  const sign = number > 0 ? "+" : "";
+  return `${sign}${(number * 100).toFixed(1)} pts`;
+}
+
 function formatDateTime(value: Date | string | null | undefined): string {
   if (!value) {
     return "N/D";
@@ -196,6 +245,48 @@ function scoreTone(score: unknown): string {
     return "medium";
   }
   return "low";
+}
+
+function confidenceTone(score: unknown): string {
+  const number = toNumber(score) ?? 0;
+  if (number >= 0.75) {
+    return "high";
+  }
+  if (number >= 0.45) {
+    return "medium";
+  }
+  return "low";
+}
+
+function externalWarnings(value: ExternalMarketSignal["warnings"]): string[] {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean);
+  }
+  return Object.entries(value).map(([key, item]) => `${key}: ${String(item)}`);
+}
+
+function compareSignalToCandidate(
+  signal: ExternalMarketSignal,
+  candidate?: ResearchCandidate,
+): { diff: number | null; label: string; tone: string } {
+  const signalProbability = toNumber(signal.yes_probability ?? signal.mid_price);
+  const marketPrice = toNumber(candidate?.market_yes_price);
+  if (signalProbability === null || marketPrice === null) {
+    return { diff: null, label: "Sin comparacion", tone: "neutral" };
+  }
+
+  const diff = signalProbability - marketPrice;
+  const magnitude = Math.abs(diff);
+  if (magnitude >= 0.08) {
+    return { diff, label: "High divergence", tone: "high-divergence" };
+  }
+  if (magnitude >= 0.03) {
+    return { diff, label: "Divergent", tone: "divergent" };
+  }
+  return { diff, label: "Aligned", tone: "aligned" };
 }
 
 function buildCandidatesPath(filters: DashboardFilters): string {
@@ -306,6 +397,116 @@ function CandidateParticipants({ candidate }: { candidate: ResearchCandidate }) 
   );
 }
 
+function ExternalSignalCard({
+  signal,
+  candidate,
+}: {
+  signal: ExternalMarketSignal;
+  candidate?: ResearchCandidate;
+}) {
+  const comparison = compareSignalToCandidate(signal, candidate);
+  const warnings = externalWarnings(signal.warnings);
+  const lowMatchConfidence =
+    signal.match_confidence !== null &&
+    signal.match_confidence !== undefined &&
+    (toNumber(signal.match_confidence) ?? 0) < 0.5;
+
+  return (
+    <article className={`external-signal-card ${candidate ? "matched" : "unmatched"}`}>
+      <div className="external-signal-header">
+        <div>
+          <div className="badge-row">
+            <span className="badge source-badge">{signal.source || "external"}</span>
+            <span className="badge muted">
+              {candidate ? `Market #${candidate.market_id}` : "Unmatched"}
+            </span>
+          </div>
+          <h3>{signal.title || signal.source_ticker || "External market signal"}</h3>
+          <p>{signal.source_ticker || signal.source_market_id || "Ticker no disponible"}</p>
+        </div>
+        <span className={`comparison-badge ${comparison.tone}`}>
+          {comparison.label}
+        </span>
+      </div>
+
+      {candidate ? (
+        <div className="matched-market-note">
+          <strong>{candidate.question}</strong>
+          <span>
+            Polymarket YES {formatProbability(candidate.market_yes_price)} | Kalshi{" "}
+            {formatProbability(signal.yes_probability ?? signal.mid_price)} | Diff{" "}
+            {formatPercentDelta(comparison.diff)}
+          </span>
+        </div>
+      ) : (
+        <p className="unmatched-note">
+          Esta senal aun no esta vinculada a un mercado Polymarket. Se muestra
+          como contexto externo, no como equivalente.
+        </p>
+      )}
+
+      <div className="external-signal-metrics">
+        <div>
+          <span>YES prob.</span>
+          <strong>{formatProbability(signal.yes_probability)}</strong>
+        </div>
+        <div>
+          <span>NO prob.</span>
+          <strong>{formatProbability(signal.no_probability)}</strong>
+        </div>
+        <div>
+          <span>Mid / last</span>
+          <strong>
+            {formatProbability(signal.mid_price)} / {formatProbability(signal.last_price)}
+          </strong>
+        </div>
+        <div>
+          <span>Spread</span>
+          <strong>{formatProbability(signal.spread)}</strong>
+        </div>
+        <div>
+          <span>Volume</span>
+          <strong>{formatCompact(signal.volume)}</strong>
+        </div>
+        <div>
+          <span>Open interest</span>
+          <strong>{formatCompact(signal.open_interest)}</strong>
+        </div>
+      </div>
+
+      <div className="confidence-row">
+        <span className={`confidence-pill ${confidenceTone(signal.source_confidence)}`}>
+          Source confidence {formatProbability(signal.source_confidence)}
+        </span>
+        <span className={`confidence-pill ${confidenceTone(signal.match_confidence)}`}>
+          Match confidence {formatProbability(signal.match_confidence)}
+        </span>
+        <span className="timestamp-pill">Fetched {formatDateTime(signal.fetched_at)}</span>
+      </div>
+
+      {signal.match_reason ? (
+        <p className="match-reason">Match reason: {signal.match_reason}</p>
+      ) : null}
+
+      {lowMatchConfidence ? (
+        <p className="warning-text">
+          Match confidence bajo: tratar como comparacion debil.
+        </p>
+      ) : null}
+
+      {warnings.length > 0 ? (
+        <div className="warning-list">
+          {warnings.slice(0, 4).map((warning) => (
+            <span key={`${signal.id}-${warning}`}>{warning}</span>
+          ))}
+        </div>
+      ) : (
+        <span className="quiet-text">Sin warnings de fuente.</span>
+      )}
+    </article>
+  );
+}
+
 export default function DashboardPage() {
   const [filters, setFilters] = useState<DashboardFilters>({
     sport: "all",
@@ -317,6 +518,7 @@ export default function DashboardPage() {
     overview: null,
     dashboardMeta: null,
     candidates: [],
+    externalSignals: [],
     loading: true,
     error: null,
     updatedAt: null,
@@ -326,12 +528,13 @@ export default function DashboardPage() {
     setState((current) => ({ ...current, loading: true, error: null }));
 
     const candidatesPath = buildCandidatesPath(filters);
-    const [health, overview, candidates, dashboardMeta] =
+    const [health, overview, candidates, dashboardMeta, externalSignals] =
       await Promise.allSettled([
         fetchJson<HealthResponse>("/health"),
         fetchJson<MarketsOverviewResponse>("/markets/overview"),
         fetchJson<CandidatesResponse>(candidatesPath),
         fetchJson<DashboardMetaResponse>("/dashboard/latest/meta"),
+        fetchJson<ExternalSignalsResponse>("/external-signals/kalshi?limit=10"),
       ]);
 
     const errors: string[] = [];
@@ -341,6 +544,9 @@ export default function DashboardPage() {
     if (candidates.status === "rejected") {
       errors.push("No se pudieron cargar candidatos");
     }
+    if (externalSignals.status === "rejected") {
+      errors.push("No se pudieron cargar external signals");
+    }
 
     setState({
       health: health.status === "fulfilled" ? health.value : null,
@@ -349,6 +555,8 @@ export default function DashboardPage() {
         dashboardMeta.status === "fulfilled" ? dashboardMeta.value : null,
       candidates:
         candidates.status === "fulfilled" ? candidates.value.candidates : [],
+      externalSignals:
+        externalSignals.status === "fulfilled" ? externalSignals.value.signals : [],
       loading: false,
       error: errors.length > 0 ? errors.join(". ") : null,
       updatedAt: new Date(),
@@ -385,6 +593,30 @@ export default function DashboardPage() {
 
   const topCandidates = state.candidates.slice(0, filters.limit);
   const candidatesPath = buildCandidatesPath(filters);
+  const candidatesById = useMemo(() => {
+    const entries = state.candidates.map((candidate) => [candidate.market_id, candidate] as const);
+    return new Map(entries);
+  }, [state.candidates]);
+  const matchedExternalSignals = useMemo(
+    () =>
+      state.externalSignals.filter(
+        (signal) =>
+          signal.polymarket_market_id !== null &&
+          signal.polymarket_market_id !== undefined &&
+          candidatesById.has(signal.polymarket_market_id),
+      ),
+    [candidatesById, state.externalSignals],
+  );
+  const unmatchedExternalSignals = useMemo(
+    () =>
+      state.externalSignals.filter(
+        (signal) =>
+          signal.polymarket_market_id === null ||
+          signal.polymarket_market_id === undefined ||
+          !candidatesById.has(signal.polymarket_market_id),
+      ),
+    [candidatesById, state.externalSignals],
+  );
 
   return (
     <main className="dashboard-shell">
@@ -439,6 +671,11 @@ export default function DashboardPage() {
           <span>Research candidates</span>
           <strong>{state.loading ? "..." : topCandidates.length}</strong>
           <p>Lectura read-only del selector</p>
+        </article>
+        <article className="metric-card">
+          <span>External signals</span>
+          <strong>{state.loading ? "..." : state.externalSignals.length}</strong>
+          <p>Senales guardadas localmente; no fetch remoto desde UI</p>
         </article>
         <article className="metric-card">
           <span>Actualizacion local</span>
@@ -649,6 +886,100 @@ export default function DashboardPage() {
           </div>
         </article>
 
+        <article className="panel panel-wide external-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>External Market Signals</h2>
+              <p>
+                Segunda opinion de mercado usando fuentes externas como Kalshi.
+                Son inputs de comparacion, no recomendaciones de apuesta.
+              </p>
+            </div>
+            <a
+              className="text-link"
+              href={`${API_BASE_URL}/external-signals/kalshi?limit=10`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Ver Kalshi JSON
+            </a>
+          </div>
+
+          <div className="external-summary-grid">
+            <div>
+              <span>Total loaded</span>
+              <strong>{state.loading ? "..." : state.externalSignals.length}</strong>
+            </div>
+            <div>
+              <span>Matched to candidates</span>
+              <strong>{matchedExternalSignals.length}</strong>
+            </div>
+            <div>
+              <span>Unmatched</span>
+              <strong>{unmatchedExternalSignals.length}</strong>
+            </div>
+          </div>
+
+          {state.loading ? (
+            <div className="empty-state">Loading external signals...</div>
+          ) : state.externalSignals.length === 0 ? (
+            <div className="empty-state">
+              <strong>No external signals yet</strong>
+              <p>
+                No hay senales externas guardadas todavia. Para cargar una senal
+                Kalshi controlada usa el CLI con limite pequeno y persistencia
+                explicita.
+              </p>
+              <code>
+                python -m app.commands.fetch_kalshi_signals --limit 1 --status
+                open --persist --json
+              </code>
+              <span>Solo lectura / sin trading / sin ordenes.</span>
+            </div>
+          ) : (
+            <div className="external-signal-sections">
+              {matchedExternalSignals.length > 0 ? (
+                <section>
+                  <h3>Matched signals</h3>
+                  <div className="external-card-grid">
+                    {matchedExternalSignals.map((signal) => (
+                      <ExternalSignalCard
+                        key={signal.id}
+                        signal={signal}
+                        candidate={
+                          signal.polymarket_market_id
+                            ? candidatesById.get(signal.polymarket_market_id)
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </div>
+                </section>
+              ) : (
+                <div className="empty-state compact">
+                  Signals loaded but no matches. Las senales actuales no tienen
+                  `polymarket_market_id` vinculado a los candidatos visibles.
+                </div>
+              )}
+
+              {unmatchedExternalSignals.length > 0 ? (
+                <section>
+                  <h3>Unmatched external signals</h3>
+                  <p className="section-note">
+                    Estas senales aun no estan vinculadas a un mercado
+                    Polymarket. No se asume equivalencia por texto parecido.
+                  </p>
+                  <div className="external-card-grid">
+                    {unmatchedExternalSignals.map((signal) => (
+                      <ExternalSignalCard key={signal.id} signal={signal} />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          )}
+        </article>
+
         <aside className="panel">
           <div className="panel-heading compact">
             <div>
@@ -692,6 +1023,30 @@ export default function DashboardPage() {
             <div>
               <dt>Quality Gate</dt>
               <dd>Validacion previa a ingestar findings, report y prediction.</dd>
+            </div>
+            <div>
+              <dt>Kalshi implied probability</dt>
+              <dd>Probabilidad implicita normalizada desde precios Kalshi.</dd>
+            </div>
+            <div>
+              <dt>Source confidence</dt>
+              <dd>Calidad operativa de la fuente externa: spread, volumen y datos.</dd>
+            </div>
+            <div>
+              <dt>Match confidence</dt>
+              <dd>Confianza de que una senal externa corresponde al mercado local.</dd>
+            </div>
+            <div>
+              <dt>Spread</dt>
+              <dd>Diferencia entre bid y ask. Spread alto reduce confiabilidad.</dd>
+            </div>
+            <div>
+              <dt>Aligned / divergent</dt>
+              <dd>Comparacion simple entre Kalshi y Polymarket, no senal de apuesta.</dd>
+            </div>
+            <div>
+              <dt>External signal</dt>
+              <dd>Segunda opinion de mercado guardada localmente y mostrada read-only.</dd>
             </div>
           </dl>
         </aside>

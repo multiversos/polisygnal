@@ -11,6 +11,18 @@ API_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = API_DIR.parents[1]
 
 
+def _expand_local_dev_cors_origins(origins: list[str]) -> list[str]:
+    expanded: list[str] = []
+    for origin in origins:
+        if origin not in expanded:
+            expanded.append(origin)
+        if origin == "http://localhost:3000" and "http://127.0.0.1:3000" not in expanded:
+            expanded.append("http://127.0.0.1:3000")
+        if origin == "http://127.0.0.1:3000" and "http://localhost:3000" not in expanded:
+            expanded.append("http://localhost:3000")
+    return expanded
+
+
 class Settings(BaseSettings):
     app_name: str = "PolySignal API"
     environment: str = Field(default="development", alias="POLYSIGNAL_ENV")
@@ -234,7 +246,11 @@ class Settings(BaseSettings):
     @classmethod
     def parse_cors_origins(cls, value: object) -> object:
         if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
+            origins = [item.strip() for item in value.split(",") if item.strip()]
+            return _expand_local_dev_cors_origins(origins)
+        if isinstance(value, list):
+            origins = [str(item).strip() for item in value if str(item).strip()]
+            return _expand_local_dev_cors_origins(origins)
         return value
 
     @field_validator("linear_oauth_scopes", mode="before")
