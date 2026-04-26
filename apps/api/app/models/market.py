@@ -22,6 +22,8 @@ class Market(Base):
     no_token_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     sport_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     market_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    icon_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     closed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

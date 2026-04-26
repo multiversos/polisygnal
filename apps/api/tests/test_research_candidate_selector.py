@@ -203,6 +203,35 @@ def test_research_candidates_endpoint_handles_empty_results(
     assert payload["candidates"] == []
 
 
+def test_research_candidates_endpoint_returns_visual_fields_from_models(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(
+        db_session,
+        suffix="endpoint-visual",
+        question="Will the Boston Celtics win the NBA Finals?",
+    )
+    market.image_url = "https://polymarket.example/markets/celtics.png"
+    market.icon_url = "https://polymarket.example/markets/celtics-icon.png"
+    assert market.event is not None
+    market.event.image_url = "https://polymarket.example/events/nba-finals.png"
+    market.event.icon_url = "https://polymarket.example/events/nba-finals-icon.png"
+    _add_snapshot(db_session, market=market)
+    db_session.commit()
+
+    response = client.get("/research/candidates?limit=1&sport=nba")
+
+    assert response.status_code == 200
+    candidate = response.json()["candidates"][0]
+    assert candidate["market_image_url"] == "https://polymarket.example/markets/celtics.png"
+    assert candidate["event_image_url"] == "https://polymarket.example/events/nba-finals.png"
+    assert candidate["icon_url"] == "https://polymarket.example/markets/celtics-icon.png"
+    assert candidate["participants"][0]["name"] == "Boston Celtics"
+    assert candidate["participants"][0]["logo_url"] is None
+    assert candidate["participants"][0]["image_url"] is None
+
+
 def test_research_candidates_endpoint_is_documented_in_openapi(
     client: TestClient,
 ) -> None:

@@ -161,18 +161,17 @@ def _sync_single_event(db: Session, event_payload: PolymarketEventPayload) -> Ev
         )
         db.add(event)
 
-    event_changed = _apply_model_updates(
-        event,
-        {
-            "title": event_title,
-            "category": event_payload.category or _derive_event_category(event_payload),
-            "slug": event_slug,
-            "active": bool(event_payload.active),
-            "closed": bool(event_payload.closed),
-            "start_at": event_payload.start_date,
-            "end_at": event_payload.end_date,
-        },
-    )
+    event_updates: dict[str, object] = {
+        "title": event_title,
+        "category": event_payload.category or _derive_event_category(event_payload),
+        "slug": event_slug,
+        "active": bool(event_payload.active),
+        "closed": bool(event_payload.closed),
+        "start_at": event_payload.start_date,
+        "end_at": event_payload.end_date,
+    }
+    event_updates.update(_image_update_values(event_payload))
+    event_changed = _apply_model_updates(event, event_updates)
     db.flush()
 
     result = EventSyncResult(
@@ -235,22 +234,21 @@ def _sync_single_market(
         )
         db.add(market)
 
-    market_changed = _apply_model_updates(
-        market,
-        {
-            "event_id": event.id,
-            "question": market_question,
-            "slug": market_slug,
-            "yes_token_id": yes_token_id,
-            "no_token_id": no_token_id,
-            "active": bool(market_payload.active),
-            "closed": bool(market_payload.closed),
-            "end_date": market_payload.end_date,
-            "rules_text": market_payload.description,
-            "sport_type": classify_sport_type(event_payload),
-            "market_type": classify_market_type(event_payload, market_payload),
-        },
-    )
+    market_updates: dict[str, object] = {
+        "event_id": event.id,
+        "question": market_question,
+        "slug": market_slug,
+        "yes_token_id": yes_token_id,
+        "no_token_id": no_token_id,
+        "active": bool(market_payload.active),
+        "closed": bool(market_payload.closed),
+        "end_date": market_payload.end_date,
+        "rules_text": market_payload.description,
+        "sport_type": classify_sport_type(event_payload),
+        "market_type": classify_market_type(event_payload, market_payload),
+    }
+    market_updates.update(_image_update_values(market_payload))
+    market_changed = _apply_model_updates(market, market_updates)
 
     return EventSyncResult(
         markets_created=1 if market_created else 0,
@@ -340,6 +338,20 @@ def _apply_model_updates(instance: object, values: dict[str, object]) -> bool:
             setattr(instance, field_name, value)
             changed = True
     return changed
+
+
+def _image_update_values(
+    payload: PolymarketEventPayload | PolymarketMarketPayload,
+) -> dict[str, str]:
+    values: dict[str, str] = {}
+    fields_set = getattr(payload, "model_fields_set", set())
+    for field_name in ("image_url", "icon_url"):
+        if field_name not in fields_set:
+            continue
+        value = _required_text(getattr(payload, field_name, None))
+        if value is not None:
+            values[field_name] = value
+    return values
 
 
 def _derive_event_category(event_payload: PolymarketEventPayload) -> str | None:

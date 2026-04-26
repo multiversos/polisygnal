@@ -7,7 +7,14 @@ from datetime import datetime
 from decimal import Decimal
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+)
 
 from app.core.config import Settings, get_settings
 
@@ -29,6 +36,30 @@ class PolymarketMarketPayload(BaseModel):
     question: str | None = None
     slug: str | None = None
     description: str | None = None
+    image_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "image",
+            "imageUrl",
+            "image_url",
+            "imageOptimized",
+            "imageOptimizedUrl",
+            "thumbnail",
+            "thumbnailUrl",
+        ),
+    )
+    icon_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "icon",
+            "iconUrl",
+            "icon_url",
+            "iconOptimized",
+            "iconOptimizedUrl",
+            "logo",
+            "logoUrl",
+        ),
+    )
     active: bool | None = None
     closed: bool | None = None
     end_date: datetime | None = Field(default=None, alias="endDate")
@@ -56,6 +87,11 @@ class PolymarketMarketPayload(BaseModel):
                 return [str(item) for item in parsed]
         return []
 
+    @field_validator("image_url", "icon_url", mode="before")
+    @classmethod
+    def parse_optional_url(cls, value: object) -> str | None:
+        return _parse_optional_text(value)
+
 
 class PolymarketMarketDetailsPayload(PolymarketMarketPayload):
     liquidity: Decimal | None = None
@@ -73,6 +109,30 @@ class PolymarketEventPayload(BaseModel):
     title: str | None = None
     category: str | None = None
     description: str | None = None
+    image_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "image",
+            "imageUrl",
+            "image_url",
+            "imageOptimized",
+            "imageOptimizedUrl",
+            "thumbnail",
+            "thumbnailUrl",
+        ),
+    )
+    icon_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "icon",
+            "iconUrl",
+            "icon_url",
+            "iconOptimized",
+            "iconOptimizedUrl",
+            "logo",
+            "logoUrl",
+        ),
+    )
     active: bool | None = None
     closed: bool | None = None
     start_date: datetime | None = Field(default=None, alias="startDate")
@@ -81,6 +141,11 @@ class PolymarketEventPayload(BaseModel):
     markets: list[PolymarketMarketPayload] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    @field_validator("image_url", "icon_url", mode="before")
+    @classmethod
+    def parse_optional_url(cls, value: object) -> str | None:
+        return _parse_optional_text(value)
 
 
 @dataclass(slots=True)
@@ -224,3 +289,12 @@ def _parse_decimal(value: object) -> Decimal | None:
         except Exception:
             return None
     return None
+
+
+def _parse_optional_text(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return str(value).strip() or None

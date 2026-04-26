@@ -16,6 +16,8 @@ class Event(Base):
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     category: Mapped[str | None] = mapped_column(String(128), nullable=True)
     slug: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    icon_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     closed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -28,4 +30,3 @@ class Event(Base):
     )
 
     markets = relationship("Market", back_populates="event", cascade="all, delete-orphan")
-

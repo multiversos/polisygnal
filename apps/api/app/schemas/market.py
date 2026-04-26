@@ -17,6 +17,8 @@ class MarketListItem(BaseModel):
     event_id: int
     question: str
     slug: str
+    image_url: str | None = None
+    icon_url: str | None = None
     sport_type: str | None = None
     market_type: str | None = None
     evidence_eligible: bool
@@ -38,6 +40,8 @@ class EventSummary(BaseModel):
     title: str
     category: str | None = None
     slug: str
+    image_url: str | None = None
+    icon_url: str | None = None
     active: bool
     closed: bool
     start_at: datetime | None = None
@@ -71,6 +75,8 @@ class MarketDetail(BaseModel):
     slug: str
     yes_token_id: str | None = None
     no_token_id: str | None = None
+    image_url: str | None = None
+    icon_url: str | None = None
     sport_type: str | None = None
     market_type: str | None = None
     evidence_eligible: bool
