@@ -447,12 +447,198 @@ const warningLabels: Record<string, string> = {
   no_external_signal: "sin señal externa",
 };
 
+const marketTermTranslations: Record<string, string> = {
+  "NBA Eastern Conference Finals": "las Finales de la Conferencia Este de la NBA",
+  "NBA Western Conference Finals": "las Finales de la Conferencia Oeste de la NBA",
+  "NBA Eastern Conference Finals MVP": "el MVP de las Finales de la Conferencia Este de la NBA",
+  "NBA Western Conference Finals MVP": "el MVP de las Finales de la Conferencia Oeste de la NBA",
+  "Eastern Conference Finals MVP": "el MVP de las Finales de la Conferencia Este",
+  "Western Conference Finals MVP": "el MVP de las Finales de la Conferencia Oeste",
+  "NBA Finals MVP": "el MVP de las Finales de la NBA",
+  "NBA Eastern Conference Champion": "Campeón de la Conferencia Este de la NBA",
+  "NBA Western Conference Champion": "Campeón de la Conferencia Oeste de la NBA",
+  "Eastern Conference Champion": "Campeón de la Conferencia Este",
+  "Western Conference Champion": "Campeón de la Conferencia Oeste",
+  "NBA Championship": "el Campeonato de la NBA",
+  "NBA Finals": "las Finales de la NBA",
+  "WNBA Finals": "las Finales de la WNBA",
+  "NBA Rookie of the Year": "el Novato del Año de la NBA",
+  "NBA MVP": "el MVP de la NBA",
+  "Rookie of the Year": "el Novato del Año",
+  "Super Bowl": "el Super Bowl",
+  "World Series": "la Serie Mundial",
+  "Champions League": "la Champions League",
+  "Kentucky Derby": "el Kentucky Derby",
+  MVP: "el MVP",
+};
+
+const pluralTeamLastWords = new Set([
+  "76ers",
+  "Bucks",
+  "Bulls",
+  "Cavaliers",
+  "Celtics",
+  "Clippers",
+  "Grizzlies",
+  "Hawks",
+  "Heat",
+  "Hornets",
+  "Jazz",
+  "Kings",
+  "Knicks",
+  "Lakers",
+  "Magic",
+  "Mavericks",
+  "Nets",
+  "Nuggets",
+  "Pacers",
+  "Pelicans",
+  "Pistons",
+  "Raptors",
+  "Rockets",
+  "Sixers",
+  "Spurs",
+  "Suns",
+  "Thunder",
+  "Timberwolves",
+  "Trail Blazers",
+  "Warriors",
+  "Wizards",
+]);
+
 function stripScoreSuffix(value: string): string {
   return value.split(":")[0].trim();
 }
 
 function humanizeToken(value: string): string {
   return value.replaceAll("_", " ").replaceAll("-", " ").trim() || value;
+}
+
+function isLikelyPluralTeamName(teamName: string, hadEnglishThe: boolean): boolean {
+  if (hadEnglishThe) {
+    return true;
+  }
+
+  const normalized = teamName.trim();
+  const words = normalized.split(/\s+/);
+  const lastWord = words[words.length - 1] ?? "";
+  return lastWord.endsWith("s") || pluralTeamLastWords.has(lastWord);
+}
+
+function spanishTeamSubject(teamName: string, hadEnglishThe: boolean): string {
+  const cleanName = teamName.trim();
+  if (isLikelyPluralTeamName(cleanName, hadEnglishThe)) {
+    return `los ${cleanName}`;
+  }
+  return cleanName;
+}
+
+function spanishTeamObject(teamName: string, hadEnglishThe: boolean): string {
+  const subject = spanishTeamSubject(teamName, hadEnglishThe);
+  return subject.startsWith("los ") ? `a ${subject}` : `a ${subject}`;
+}
+
+function capitalizeFirst(value: string): string {
+  if (!value) {
+    return value;
+  }
+  return value[0].toUpperCase() + value.slice(1);
+}
+
+function translateCompetitionName(value: string): string {
+  const trimmed = value.trim();
+  const leadingYear = trimmed.match(/^(\d{4})\s+(.+)$/);
+  if (leadingYear) {
+    return `${translateCompetitionName(leadingYear[2])} ${leadingYear[1]}`;
+  }
+
+  const trailingYear = trimmed.match(/^(.+?)\s+(\d{4})$/);
+  if (trailingYear) {
+    return `${translateCompetitionName(trailingYear[1])} ${trailingYear[2]}`;
+  }
+
+  if (marketTermTranslations[trimmed]) {
+    return marketTermTranslations[trimmed];
+  }
+
+  return Object.entries(marketTermTranslations)
+    .sort(([a], [b]) => b.length - a.length)
+    .reduce(
+      (current, [english, spanish]) =>
+        current.replace(new RegExp(`\\b${escapeRegExp(english)}\\b`, "gi"), spanish),
+      trimmed,
+    );
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function ensureSpanishQuestion(value: string): string {
+  const trimmed = value.trim().replace(/^¿+/, "").replace(/\?+$/, "");
+  return `¿${trimmed}?`;
+}
+
+function translateMarketTitleToSpanish(title: string): string {
+  const trimmed = title.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  const playerOver = trimmed.match(/^Will\s+(.+?)\s+score\s+over\s+([0-9]+(?:\.[0-9]+)?)\s+points\?$/i);
+  if (playerOver) {
+    return ensureSpanishQuestion(`${playerOver[1].trim()} anotará más de ${playerOver[2]} puntos`);
+  }
+
+  const playerUnder = trimmed.match(/^Will\s+(.+?)\s+score\s+under\s+([0-9]+(?:\.[0-9]+)?)\s+points\?$/i);
+  if (playerUnder) {
+    return ensureSpanishQuestion(`${playerUnder[1].trim()} anotará menos de ${playerUnder[2]} puntos`);
+  }
+
+  const awardMarket = trimmed.match(/^Will\s+(.+?)\s+win\s+(NBA\s+Rookie of the Year|NBA\s+MVP|Rookie of the Year|MVP)\?$/i);
+  if (awardMarket) {
+    return ensureSpanishQuestion(`${awardMarket[1].trim()} ganará ${translateCompetitionName(awardMarket[2])}`);
+  }
+
+  const matchWinner = trimmed.match(/^Will\s+(the\s+)?(.+?)\s+beat\s+(the\s+)?(.+?)\?$/i);
+  if (matchWinner) {
+    const teamA = matchWinner[2].trim();
+    const teamB = matchWinner[4].trim();
+    const hadTheA = Boolean(matchWinner[1]);
+    const subject = capitalizeFirst(spanishTeamSubject(teamA, hadTheA));
+    const verb = isLikelyPluralTeamName(teamA, hadTheA) ? "vencerán" : "vencerá";
+    const object = spanishTeamObject(teamB, Boolean(matchWinner[3]));
+    return ensureSpanishQuestion(`${subject} ${verb} ${object}`);
+  }
+
+  const winMarket = trimmed.match(/^Will\s+(the\s+)?(.+?)\s+win\s+the\s+(.+?)\?$/i);
+  if (winMarket) {
+    const team = winMarket[2].trim();
+    const subject = spanishTeamSubject(team, Boolean(winMarket[1]));
+    const verb = isLikelyPluralTeamName(team, Boolean(winMarket[1])) ? "Ganarán" : "Ganará";
+    const competition = translateCompetitionName(winMarket[3].trim());
+    return ensureSpanishQuestion(`${verb} ${subject} ${competition}`);
+  }
+
+  return trimmed;
+}
+
+function translateMarketSubtitleToSpanish(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  const yearNbaChampion = trimmed.match(/^(\d{4})\s+NBA\s+Champion$/i);
+  if (yearNbaChampion) {
+    return `Campeón de la NBA ${yearNbaChampion[1]}`;
+  }
+
+  return translateCompetitionName(trimmed);
+}
+
+function humanizeMarketTitle(title: string): string {
+  return translateMarketTitleToSpanish(title);
 }
 
 function formatSportLabel(value: string | null | undefined): string {
@@ -695,6 +881,11 @@ function CandidateCard({
   hasExternalSignal: boolean;
 }) {
   const question = candidate.question || "Mercado sin título";
+  const translatedQuestion = humanizeMarketTitle(question);
+  const questionWasTranslated = translatedQuestion !== question;
+  const translatedEventTitle = candidate.event_title
+    ? translateMarketSubtitleToSpanish(candidate.event_title)
+    : "";
 
   return (
     <article className="candidate-card">
@@ -715,10 +906,13 @@ function CandidateCard({
       <div className="candidate-card-body">
         <div className="candidate-main-copy">
           <CandidateParticipants candidate={candidate} />
-          <h3 title={question}>{question}</h3>
+          <h3 title={question}>{translatedQuestion}</h3>
+          {questionWasTranslated ? (
+            <p className="original-market-title">Original: {question}</p>
+          ) : null}
           <p>
             Mercado #{candidate.market_id}
-            {candidate.event_title ? ` · ${candidate.event_title}` : ""}
+            {translatedEventTitle ? ` · ${translatedEventTitle}` : ""}
           </p>
         </div>
 
@@ -763,7 +957,7 @@ function ExternalSignalCard({
           <div className="badge-row">
             <span className="badge source-badge">{signal.source || "external"}</span>
             <span className="badge muted">
-              {candidate ? `Mercado #${candidate.market_id}` : "Sin vínculo"}
+              {candidate ? `Mercado #${candidate.market_id}` : "Pendiente de vincular"}
             </span>
           </div>
           <h3>{signal.title || signal.source_ticker || "Señal externa de mercado"}</h3>
@@ -776,7 +970,7 @@ function ExternalSignalCard({
 
       {candidate ? (
         <div className="matched-market-note">
-          <strong>{candidate.question}</strong>
+          <strong>{humanizeMarketTitle(candidate.question)}</strong>
           <span>
             Precio SÍ en Polymarket {formatProbability(candidate.market_yes_price)} | Kalshi{" "}
             {formatProbability(signal.yes_probability ?? signal.mid_price)} | Diferencia{" "}
@@ -1168,17 +1362,24 @@ export default function DashboardPage() {
             </a>
           </div>
 
+          <p className="external-summary-help">
+            Las señales externas vienen de fuentes como Kalshi. Si todavía no
+            coinciden con un mercado de Polymarket, aparecen como pendientes de
+            vincular. Estas señales son datos comparativos, no instrucciones de
+            apuesta.
+          </p>
+
           <div className="external-summary-grid">
             <div>
               <span>Total cargadas</span>
               <strong>{state.loading ? "..." : state.externalSignals.length}</strong>
             </div>
             <div>
-              <span>Vinculadas a candidatos</span>
+              <span>Coinciden con Polymarket</span>
               <strong>{matchedExternalSignals.length}</strong>
             </div>
             <div>
-              <span>Sin vínculo</span>
+              <span>Pendientes de vincular</span>
               <strong>{unmatchedExternalSignals.length}</strong>
             </div>
           </div>
@@ -1187,11 +1388,11 @@ export default function DashboardPage() {
             <div className="empty-state">Cargando señales externas...</div>
           ) : state.externalSignals.length === 0 ? (
             <div className="empty-state">
-              <strong>No hay señales externas</strong>
+              <strong>No hay señales externas cargadas todavía.</strong>
               <p>
-                No hay señales externas guardadas todavía. Para cargar una señal
-                Kalshi controlada usa el CLI con límite pequeño y persistencia
-                explícita.
+                Cuando cargues señales de Kalshi de forma controlada, aparecerán
+                aquí. El dashboard no ejecuta fetch remoto ni operaciones de
+                trading.
               </p>
               <code>
                 python -m app.commands.fetch_kalshi_signals --limit 1 --status
@@ -1203,7 +1404,7 @@ export default function DashboardPage() {
             <div className="external-signal-sections">
               {matchedExternalSignals.length > 0 ? (
                 <section>
-                  <h3>Señales vinculadas</h3>
+                  <h3>Señales coincidentes con Polymarket</h3>
                   <div className="external-card-grid">
                     {matchedExternalSignals.map((signal) => (
                       <ExternalSignalCard
@@ -1220,17 +1421,18 @@ export default function DashboardPage() {
                 </section>
               ) : (
                 <div className="empty-state compact">
-                  Hay señales cargadas, pero sin vínculos. Las señales actuales no tienen
-                  `polymarket_market_id` vinculado a los candidatos visibles.
+                  Hay señales cargadas, pero ninguna coincide todavía con los
+                  candidatos visibles de Polymarket.
                 </div>
               )}
 
               {unmatchedExternalSignals.length > 0 ? (
                 <section>
-                  <h3>Señales externas sin vínculo</h3>
+                  <h3>Señales pendientes de vincular</h3>
                   <p className="section-note">
-                    Estas señales aún no están vinculadas a un mercado
-                    Polymarket. No se asume equivalencia por texto parecido.
+                    Estas señales existen en la base de datos, pero todavía no
+                    están conectadas con un mercado específico de Polymarket. No
+                    se asume equivalencia por texto parecido.
                   </p>
                   <div className="external-card-grid">
                     {unmatchedExternalSignals.map((signal) => (

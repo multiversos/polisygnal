@@ -457,6 +457,13 @@ h2 {
   line-height: 1.4;
 }
 
+.candidate-main-copy .original-market-title {
+  max-width: 720px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .candidate-card-insights {
   display: grid;
   gap: 11px;
@@ -922,18 +929,36 @@ h2 {
   gap: 16px;
 }
 
+.external-summary-help {
+  max-width: 820px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
 .external-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+  align-content: flex-start;
 }
 
 .external-summary-grid div {
-  min-height: 84px;
-  padding: 14px;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  flex: 0 1 auto;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  height: auto;
+  min-height: 40px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfdff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
 }
 
 .external-summary-grid span,
@@ -947,8 +972,11 @@ h2 {
 
 .external-summary-grid strong {
   display: block;
-  margin-top: 8px;
-  font-size: 1.65rem;
+  min-width: 1.6ch;
+  color: var(--foreground);
+  font-size: 1.08rem;
+  line-height: 1;
+  text-align: right;
 }
 
 .external-signal-sections {
@@ -1200,11 +1228,20 @@ h2 {
     grid-template-columns: 54px minmax(0, 1fr) 46px;
   }
 
-  .external-summary-grid,
   .external-signal-metrics,
   .candidate-explain-grid,
   .market-depth-row {
     grid-template-columns: 1fr;
+  }
+
+  .external-summary-grid {
+    align-items: stretch;
+  }
+
+  .external-summary-grid div {
+    width: 100%;
+    justify-content: space-between;
+    border-radius: 8px;
   }
 
   .external-signal-header {
