@@ -1552,6 +1552,54 @@ h2 {
   overflow-x: auto;
 }
 
+.command-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.command-card span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.command-card code {
+  display: block;
+  padding: 10px;
+  border-radius: 7px;
+  background: var(--code-background);
+  color: var(--code-foreground);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-x: auto;
+}
+
+.command-card button {
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--foreground);
+  color: var(--button-foreground);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.command-card button:hover {
+  background: var(--muted-strong);
+}
+
 @media (max-width: 980px) {
   .metric-grid,
   .dashboard-grid,
@@ -1624,7 +1672,8 @@ h2 {
 
   .analysis-layout,
   .analysis-chip-columns,
-  .prediction-report-grid {
+  .prediction-report-grid,
+  .command-card {
     grid-template-columns: 1fr;
   }
 

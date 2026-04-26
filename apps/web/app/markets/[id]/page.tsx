@@ -927,6 +927,7 @@ function ResearchRunsPanel({ runs }: { runs: AnalysisResearchRun[] }) {
 export default function MarketAnalysisPage() {
   const params = useParams<{ id: string }>();
   const marketId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const [copiedCommand, setCopiedCommand] = useState<"prepare" | "ingest" | null>(null);
   const [state, setState] = useState<LoadState>({
     analysis: null,
     loading: true,
@@ -950,6 +951,41 @@ export default function MarketAnalysisPage() {
     }
   }, [marketId]);
 
+  const copyCommand = useCallback(async (command: string, key: "prepare" | "ingest") => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
+    try {
+      let copied = false;
+      if (navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(command);
+          copied = true;
+        } catch {
+          copied = false;
+        }
+      }
+      if (!copied) {
+        const textarea = document.createElement("textarea");
+        textarea.value = command;
+        textarea.setAttribute("readonly", "true");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        copied = document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      if (!copied) {
+        return;
+      }
+      setCopiedCommand(key);
+      window.setTimeout(() => setCopiedCommand(null), 1800);
+    } catch {
+      setCopiedCommand(null);
+    }
+  }, []);
+
   useEffect(() => {
     void loadAnalysis();
   }, [loadAnalysis]);
@@ -966,6 +1002,7 @@ export default function MarketAnalysisPage() {
     null;
   const analysisJsonUrl = `${API_BASE_URL}/markets/${marketId}/analysis`;
   const researchPacketCommand = `python -m app.commands.prepare_codex_research --market-id ${marketId}`;
+  const ingestDryRunCommand = "python -m app.commands.ingest_codex_research --run-id <RUN_ID> --dry-run";
 
   const marketBadges = useMemo(() => {
     if (!analysis) {
@@ -1087,11 +1124,46 @@ export default function MarketAnalysisPage() {
               <section className="analysis-section">
                 <h2>Investigar este mercado</h2>
                 <p className="section-note">
-                  Para investigar este mercado, genera un Research Packet desde CLI. El packet debe revisarse con Quality Gate antes de ingestar.
+                  Este mercado todavía puede investigarse con Codex Agent. PolySignal
+                  generará un request JSON y un packet Markdown para que un agente
+                  externo analice fuentes y devuelva evidencia estructurada.
                 </p>
-                <code className="command-block">{researchPacketCommand}</code>
+                {analysis.research_runs.length > 0 ? (
+                  <span className="reason-chip">
+                    Ya existen investigaciones previas para este mercado.
+                  </span>
+                ) : null}
+                <div className="command-card">
+                  <div>
+                    <span>Generar Research Packet</span>
+                    <code>{researchPacketCommand}</code>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void copyCommand(researchPacketCommand, "prepare")}
+                  >
+                    {copiedCommand === "prepare" ? "Copiado" : "Copiar comando"}
+                  </button>
+                </div>
+                <div className="command-card">
+                  <div>
+                    <span>Ingesta segura con Quality Gate</span>
+                    <code>{ingestDryRunCommand}</code>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void copyCommand(ingestDryRunCommand, "ingest")}
+                  >
+                    {copiedCommand === "ingest" ? "Copiado" : "Copiar comando"}
+                  </button>
+                </div>
+                <p className="section-note">
+                  Primero usa <strong>--dry-run</strong> para pasar por Quality Gate
+                  antes de crear predicción.
+                </p>
                 <p className="warning-text">
-                  El packet es para investigación, no para trading ni apuestas automáticas.
+                  No ejecutes apuestas automáticas. El packet es para investigación,
+                  no para trading.
                 </p>
               </section>
 
