@@ -1,0 +1,31 @@
+{
+  "markets": [
+    {
+      "ticker": "KXNBAFINAL-26CELTICS-CELTICS",
+      "event_ticker": "KXNBAFINAL-26CELTICS",
+      "market_type": "binary",
+      "status": "open",
+      "title": "Will the Boston Celtics win the 2026 NBA Finals?",
+      "yes_bid_dollars": "0.4500",
+      "yes_ask_dollars": "0.5500",
+      "no_bid_dollars": "0.4400",
+      "no_ask_dollars": "0.5400",
+      "last_price_dollars": "0.5000",
+      "volume_fp": "10000.00",
+      "open_interest_fp": "5000.00"
+    },
+    {
+      "ticker": "KXNFLTEST-26CHIEFS-CHIEFS",
+      "event_ticker": "KXNFLTEST-26CHIEFS",
+      "market_type": "binary",
+      "status": "open",
+      "title": "Will the Chiefs beat the Bills?",
+      "yes_bid_dollars": "45",
+      "yes_ask_dollars": "55",
+      "last_price_dollars": "50",
+      "volume_fp": "100.00",
+      "open_interest_fp": "25.00"
+    }
+  ],
+  "cursor": "next-cursor"
+}

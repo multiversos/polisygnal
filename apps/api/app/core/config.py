@@ -48,6 +48,14 @@ class Settings(BaseSettings):
         default="PolySignal/0.1",
         alias="POLYSIGNAL_POLYMARKET_USER_AGENT",
     )
+    kalshi_base_url: str = Field(
+        default="https://api.elections.kalshi.com/trade-api/v2",
+        alias="POLYSIGNAL_KALSHI_BASE_URL",
+    )
+    kalshi_timeout_seconds: float = Field(
+        default=20.0,
+        alias="POLYSIGNAL_KALSHI_TIMEOUT_SECONDS",
+    )
     mvp_discovery_scope: str = Field(
         default="nba",
         alias="POLYSIGNAL_MVP_DISCOVERY_SCOPE",

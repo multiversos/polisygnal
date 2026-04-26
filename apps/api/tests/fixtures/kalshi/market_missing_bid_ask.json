@@ -1,0 +1,13 @@
+{
+  "market": {
+    "ticker": "KXNBATEST-MISSING",
+    "event_ticker": "KXNBATEST",
+    "market_type": "binary",
+    "status": "closed",
+    "title": "Will Example Team win?",
+    "last_price_dollars": "0.6200",
+    "volume_fp": "0.00",
+    "open_interest_fp": "0.00",
+    "response_price_units": "usd_cent"
+  }
+}

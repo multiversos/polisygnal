@@ -1,0 +1,23 @@
+{
+  "market": {
+    "ticker": "KXNBAFINAL-26CELTICS-CELTICS",
+    "event_ticker": "KXNBAFINAL-26CELTICS",
+    "market_type": "binary",
+    "yes_sub_title": "Boston Celtics",
+    "no_sub_title": "Field",
+    "status": "open",
+    "title": "Will the Boston Celtics win the 2026 NBA Finals?",
+    "subtitle": "2026 NBA Finals winner",
+    "rules_primary": "This market resolves to Yes if the Boston Celtics win the 2026 NBA Finals.",
+    "close_time": "2026-06-30T00:00:00Z",
+    "yes_bid_dollars": "0.4500",
+    "yes_ask_dollars": "0.5500",
+    "no_bid_dollars": "0.4400",
+    "no_ask_dollars": "0.5400",
+    "last_price_dollars": "0.5000",
+    "volume_fp": "10000.00",
+    "liquidity_dollars": "25000.00",
+    "open_interest_fp": "5000.00",
+    "response_price_units": "usd_cent"
+  }
+}

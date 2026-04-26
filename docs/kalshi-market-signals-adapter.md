@@ -521,3 +521,121 @@ No conviene empezar guardando datos todavía. Primero hay que estabilizar:
 - y matching de mercados.
 
 Una vez validado eso, avanzar a `external_market_signals`.
+
+## 16. Fase A implementada: cliente read-only + CLI dry-run
+
+La primera fase técnica queda limitada a inspección read-only y normalización local. No persiste datos, no crea migraciones y no agrega endpoints FastAPI públicos todavía.
+
+Archivos principales:
+
+```text
+apps/api/app/clients/kalshi.py
+apps/api/app/schemas/kalshi.py
+apps/api/app/services/kalshi_market_signals.py
+apps/api/app/commands/inspect_kalshi_markets.py
+apps/api/tests/fixtures/kalshi/
+apps/api/tests/test_kalshi_market_signals.py
+```
+
+### 16.1 Comando dry-run
+
+Listar mercados abiertos:
+
+```powershell
+cd N:\projects\polimarket\apps\api
+.\.venv\Scripts\python.exe -m app.commands.inspect_kalshi_markets --limit 3 --status open
+```
+
+Salida JSON:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.inspect_kalshi_markets --limit 3 --status open --json
+```
+
+Inspeccionar un ticker específico:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.inspect_kalshi_markets --ticker KALSHI_TICKER --json
+```
+
+Inspeccionar orderbook con profundidad pequeña:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.inspect_kalshi_markets --ticker KALSHI_TICKER --orderbook --depth 3 --json
+```
+
+El CLI imprime explícitamente:
+
+```text
+DRY RUN / READ ONLY - no se guardan datos y no se ejecuta trading.
+```
+
+### 16.2 Qué datos muestra
+
+Cada mercado normalizado puede mostrar:
+
+- `source_ticker`
+- `event_ticker`
+- `title`
+- `status`
+- `yes_probability`
+- `no_probability`
+- `mid_price`
+- `spread`
+- `volume`
+- `open_interest`
+- `source_confidence`
+- `warnings`
+
+### 16.3 Cálculo de probabilidad
+
+Reglas implementadas:
+
+- Si hay `yes_bid` y `yes_ask`, usa:
+
+```text
+mid_price = (yes_bid + yes_ask) / 2
+yes_probability = mid_price
+```
+
+- Si faltan bid/ask, usa `last_price` como fallback.
+- Si los precios vienen como `45`, se interpretan como centavos y se convierten a `0.4500`.
+- Si los precios vienen como `0.4500`, se conservan como decimal y no se dividen dos veces.
+- La probabilidad se limita al rango `0.0000` a `1.0000`.
+
+### 16.4 Source confidence
+
+`source_confidence` mide la calidad operativa de la señal Kalshi, no la probabilidad de que ocurra el evento.
+
+Baja cuando:
+
+- falta bid/ask completo;
+- el spread es alto;
+- falta volumen;
+- el volumen es cero;
+- falta open interest;
+- el open interest es cero;
+- el mercado no está `open` o `active`;
+- se usa `last_price` como fallback.
+
+### 16.5 Garantías de seguridad de Fase A
+
+- No usa credenciales.
+- No lee `.env` con secretos para auth de Kalshi.
+- No llama endpoints de orders, portfolio o account.
+- No ejecuta trades.
+- No crea órdenes.
+- No guarda datos en DB.
+- No crea `research_runs`.
+- No crea `predictions`.
+- No crea tabla `external_market_signals`.
+
+### 16.6 Próximos pasos
+
+Después de validar Fase A con fixtures y pruebas read-only, los siguientes sprints deberían ser:
+
+1. Crear tabla genérica `external_market_signals`.
+2. Implementar matching Polymarket/Kalshi con `match_confidence`.
+3. Exponer señales guardadas en endpoints read-only.
+4. Mostrar comparación Kalshi vs Polymarket en el dashboard.
+5. Evaluar uso opcional en scoring, solo si `source_confidence` y `match_confidence` son altos.

@@ -50,6 +50,12 @@ from app.schemas.market import (
     MarketListItem,
     MarketSnapshotItem,
 )
+from app.schemas.kalshi import (
+    KalshiImpliedProbabilityResult,
+    KalshiMarketSignalPreview,
+    KalshiNormalizedMarket,
+    KalshiOrderbookPreview,
+)
 from app.schemas.overview import (
     MarketOverviewItem,
     MarketOverviewResponse,
@@ -149,6 +155,10 @@ __all__ = [
     "EvaluationSummaryResponse",
     "EventSummary",
     "HealthResponse",
+    "KalshiImpliedProbabilityResult",
+    "KalshiMarketSignalPreview",
+    "KalshiNormalizedMarket",
+    "KalshiOrderbookPreview",
     "LatestPredictionResponse",
     "LatestDiffResponse",
     "MarketOverviewItem",
