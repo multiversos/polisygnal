@@ -358,6 +358,203 @@ h2 {
   font-size: 0.92rem;
 }
 
+.candidate-card-list {
+  display: grid;
+  gap: 14px;
+}
+
+.candidate-card {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.candidate-card-header,
+.candidate-card-body,
+.candidate-explain-grid,
+.candidate-score-heading {
+  display: grid;
+  gap: 12px;
+}
+
+.candidate-card-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.candidate-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.candidate-id {
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.candidate-score-pill {
+  min-width: 64px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 0.92rem;
+  text-align: center;
+}
+
+.candidate-score-pill.high,
+.candidate-score-fill.high {
+  background: var(--accent);
+}
+
+.candidate-score-pill.medium,
+.candidate-score-fill.medium {
+  background: var(--blue);
+}
+
+.candidate-score-pill.low,
+.candidate-score-fill.low {
+  background: var(--amber);
+}
+
+.badge.external-hint {
+  color: #0b4f49;
+  background: var(--accent-soft);
+}
+
+.candidate-card-body {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+  align-items: start;
+}
+
+.candidate-main-copy {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.candidate-main-copy h3 {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 1.08rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.candidate-main-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.candidate-card-insights {
+  display: grid;
+  gap: 11px;
+}
+
+.candidate-score-block {
+  display: grid;
+  gap: 7px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.candidate-score-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.candidate-score-heading span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.candidate-score-heading strong {
+  color: var(--foreground);
+  font-size: 0.96rem;
+}
+
+.candidate-score-track {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #d6dee8;
+}
+
+.candidate-score-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 4px;
+  border-radius: inherit;
+}
+
+.candidate-explain-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.candidate-explain-grid section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.candidate-explain-grid h4 {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.candidate-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reason-chip,
+.warning-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 820;
+  line-height: 1.2;
+}
+
+.reason-chip {
+  color: #0b4f49;
+  background: var(--accent-soft);
+}
+
+.reason-chip.muted {
+  color: var(--muted-strong);
+  background: var(--surface-muted);
+}
+
+.warning-chip {
+  color: #7a3b00;
+  background: var(--amber-soft);
+}
+
 .table-shell {
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -519,8 +716,8 @@ h2 {
 
 .market-price-panel {
   display: grid;
-  min-width: 230px;
-  max-width: 280px;
+  width: 100%;
+  min-width: 0;
   gap: 9px;
   padding: 11px;
   border: 1px solid var(--line);
@@ -970,6 +1167,10 @@ h2 {
   .panel-wide {
     grid-column: 1 / -1;
   }
+
+  .candidate-card-body {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 700px) {
@@ -1000,11 +1201,21 @@ h2 {
   }
 
   .external-summary-grid,
-  .external-signal-metrics {
+  .external-signal-metrics,
+  .candidate-explain-grid,
+  .market-depth-row {
     grid-template-columns: 1fr;
   }
 
   .external-signal-header {
     flex-direction: column;
+  }
+
+  .candidate-card-header {
+    grid-template-columns: 1fr;
+  }
+
+  .candidate-score-pill {
+    width: fit-content;
   }
 }

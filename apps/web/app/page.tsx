@@ -138,15 +138,15 @@ const marketShapeOptions = [
 const limitOptions = [5, 10, 20];
 
 const quickLinks = [
-  { label: "API docs", href: `${API_BASE_URL}/docs` },
-  { label: "Backend panel", href: `${API_BASE_URL}/` },
-  { label: "Health", href: `${API_BASE_URL}/health` },
-  { label: "Markets overview", href: `${API_BASE_URL}/markets/overview` },
+  { label: "Documentación API", href: `${API_BASE_URL}/docs` },
+  { label: "Panel backend", href: `${API_BASE_URL}/` },
+  { label: "Estado API", href: `${API_BASE_URL}/health` },
+  { label: "Resumen de mercados", href: `${API_BASE_URL}/markets/overview` },
   {
-    label: "Research candidates",
+    label: "Candidatos de investigación",
     href: `${API_BASE_URL}/research/candidates?limit=10&vertical=sports`,
   },
-  { label: "External signals", href: `${API_BASE_URL}/external-signals/kalshi?limit=10` },
+  { label: "Señales externas", href: `${API_BASE_URL}/external-signals/kalshi?limit=10` },
 ];
 
 async function fetchJson<T>(path: string): Promise<T> {
@@ -345,18 +345,18 @@ function compareSignalToCandidate(
   const signalProbability = toNumber(signal.yes_probability ?? signal.mid_price);
   const marketPrice = toNumber(candidate?.market_yes_price);
   if (signalProbability === null || marketPrice === null) {
-    return { diff: null, label: "Sin comparacion", tone: "neutral" };
+    return { diff: null, label: "Sin comparación", tone: "neutral" };
   }
 
   const diff = signalProbability - marketPrice;
   const magnitude = Math.abs(diff);
   if (magnitude >= 0.08) {
-    return { diff, label: "High divergence", tone: "high-divergence" };
+    return { diff, label: "Divergencia alta", tone: "high-divergence" };
   }
   if (magnitude >= 0.03) {
-    return { diff, label: "Divergent", tone: "divergent" };
+    return { diff, label: "Divergente", tone: "divergent" };
   }
-  return { diff, label: "Aligned", tone: "aligned" };
+  return { diff, label: "Alineado", tone: "aligned" };
 }
 
 function buildCandidatesPath(filters: DashboardFilters): string {
@@ -374,7 +374,116 @@ function buildCandidatesPath(filters: DashboardFilters): string {
 }
 
 function formatOptionLabel(value: string): string {
-  return value.replaceAll("_", " ");
+  if (value === "all") {
+    return "todos";
+  }
+  return humanizeToken(value);
+}
+
+const sportLabels: Record<string, string> = {
+  all: "todos",
+  nba: "NBA",
+  nfl: "NFL",
+  soccer: "fútbol",
+  horse_racing: "carreras de caballos",
+  mlb: "MLB",
+  tennis: "tenis",
+  mma: "MMA",
+  other: "otro",
+};
+
+const marketShapeLabels: Record<string, string> = {
+  all: "todos",
+  match_winner: "ganador de partido",
+  championship: "campeonato",
+  futures: "futuro/temporada",
+  player_prop: "prop de jugador",
+  team_prop: "prop de equipo",
+  race_winner: "ganador de carrera",
+  yes_no_generic: "sí/no general",
+  other: "otro",
+};
+
+const participantRoleLabels: Record<string, string> = {
+  yes_side: "lado SÍ",
+  no_side: "lado NO",
+  participant: "participante",
+  unknown: "sin rol claro",
+};
+
+const reasonLabels: Record<string, string> = {
+  active: "activo",
+  market_active_open: "activo",
+  valid_snapshot: "precio válido",
+  valid_latest_snapshot: "precio válido",
+  latest_snapshot_valid: "precio válido",
+  supported_sport: "deporte soportado",
+  known_sport: "deporte soportado",
+  clear_market_shape: "mercado claro",
+  known_market_shape: "mercado claro",
+  specific_template: "template específico",
+  generic_sports_template: "template deportivo",
+  has_liquidity: "liquidez disponible",
+  has_volume: "volumen disponible",
+  high_liquidity: "alta liquidez",
+  high_volume: "alto volumen",
+  close_time_future: "cierre futuro",
+  price_in_research_range: "precio investigable",
+  yes_price_in_research_band: "precio SÍ investigable",
+  no_price_in_research_band: "precio NO investigable",
+  not_duplicate: "sin duplicado claro",
+};
+
+const warningLabels: Record<string, string> = {
+  missing_price_data: "faltan datos de precio",
+  low_liquidity: "baja liquidez",
+  ambiguous_market: "mercado ambiguo",
+  metadata_poor: "metadata incompleta",
+  poor_metadata: "metadata incompleta",
+  zero_volume: "volumen cero",
+  zero_open_interest: "interés abierto cero",
+  missing_latest_snapshot: "sin snapshot reciente",
+  market_closed: "mercado cerrado",
+  no_external_signal: "sin señal externa",
+};
+
+function stripScoreSuffix(value: string): string {
+  return value.split(":")[0].trim();
+}
+
+function humanizeToken(value: string): string {
+  return value.replaceAll("_", " ").replaceAll("-", " ").trim() || value;
+}
+
+function formatSportLabel(value: string | null | undefined): string {
+  if (!value) {
+    return "deporte no definido";
+  }
+  return sportLabels[value] ?? humanizeToken(value);
+}
+
+function formatMarketShapeLabel(value: string | null | undefined): string {
+  if (!value) {
+    return "tipo no definido";
+  }
+  return marketShapeLabels[value] ?? humanizeToken(value);
+}
+
+function formatParticipantRole(value: string | null | undefined): string {
+  if (!value) {
+    return "participante";
+  }
+  return participantRoleLabels[value] ?? humanizeToken(value);
+}
+
+function formatReasonLabel(value: string): string {
+  const key = stripScoreSuffix(value);
+  return reasonLabels[key] ?? humanizeToken(key);
+}
+
+function formatWarningLabel(value: string): string {
+  const key = stripScoreSuffix(value);
+  return warningLabels[key] ?? humanizeToken(key);
 }
 
 function participantInitials(value: string): string {
@@ -438,11 +547,11 @@ function CandidateParticipants({ candidate }: { candidate: ResearchCandidate }) 
       <div className="participant-row">
         <span className="participant-chip">
           <VisualAvatar
-            name={candidate.question}
+            name={candidate.question || "Mercado"}
             src={fallbackUrl}
-            abbreviation={participantInitials(candidate.question)}
+            abbreviation={participantInitials(candidate.question || "Mercado")}
           />
-          <span className="participant-name">Market visual</span>
+          <span className="participant-name">Visual del mercado</span>
         </span>
       </div>
     );
@@ -459,7 +568,7 @@ function CandidateParticipants({ candidate }: { candidate: ResearchCandidate }) 
           />
           <span className="participant-copy">
             <span className="participant-name">{participant.name}</span>
-            <span className="participant-role">{participant.role}</span>
+            <span className="participant-role">{formatParticipantRole(participant.role)}</span>
           </span>
         </span>
       ))}
@@ -480,13 +589,13 @@ function MarketPricePanel({ candidate }: { candidate: ResearchCandidate }) {
   return (
     <div className="market-price-panel">
       <div className="market-price-heading">
-        <span>Market price</span>
-        {!hasPriceData ? <strong>Missing price data</strong> : null}
+        <span>Precio del mercado</span>
+        {!hasPriceData ? <strong>Faltan precios</strong> : null}
       </div>
 
       <div className="price-split">
         <div>
-          <span>YES</span>
+          <span>SÍ</span>
           <strong>{formatMarketPercent(yes)}</strong>
         </div>
         <div>
@@ -496,7 +605,7 @@ function MarketPricePanel({ candidate }: { candidate: ResearchCandidate }) {
       </div>
 
       <div
-        aria-label={`YES ${formatMarketPercent(yes)} and NO ${formatMarketPercent(no)}`}
+        aria-label={`SÍ ${formatMarketPercent(yes)} y NO ${formatMarketPercent(no)}`}
         className={`probability-bar ${hasPriceData ? "" : "neutral"}`}
         role="img"
       >
@@ -509,17 +618,127 @@ function MarketPricePanel({ candidate }: { candidate: ResearchCandidate }) {
 
       <div className="market-depth-row">
         <div>
-          <span>Liquidity</span>
+          <span>Liquidez</span>
           <strong>{formatMarketMetric(candidate.liquidity)}</strong>
         </div>
         <div>
-          <span>Volume</span>
+          <span>Volumen</span>
           <strong>{formatMarketMetric(candidate.volume)}</strong>
         </div>
       </div>
 
-      <p className="market-price-note">YES/NO reflejan el precio implicito del mercado.</p>
+      <p className="market-price-note">SÍ/NO reflejan el precio implícito del mercado.</p>
     </div>
+  );
+}
+
+function CandidateScoreBar({ score }: { score: unknown }) {
+  const normalizedScore = Math.max(0, Math.min(100, toNumber(score) ?? 0));
+
+  return (
+    <div className="candidate-score-block" aria-label="Puntaje de candidato">
+      <div className="candidate-score-heading">
+        <span>Puntaje de candidato</span>
+        <strong>{formatScore(normalizedScore)}</strong>
+      </div>
+      <div className="candidate-score-track">
+        <span
+          className={`candidate-score-fill ${scoreTone(normalizedScore)}`}
+          style={{ width: `${normalizedScore}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ReasonChips({ reasons }: { reasons: string[] }) {
+  const visibleReasons = reasons.slice(0, 5);
+  const remaining = Math.max(0, reasons.length - visibleReasons.length);
+
+  if (visibleReasons.length === 0) {
+    return <span className="quiet-text">Sin razones disponibles.</span>;
+  }
+
+  return (
+    <div className="candidate-chip-list">
+      {visibleReasons.map((reason) => (
+        <span className="reason-chip" key={reason}>
+          {formatReasonLabel(reason)}
+        </span>
+      ))}
+      {remaining > 0 ? <span className="reason-chip muted">+{remaining} más</span> : null}
+    </div>
+  );
+}
+
+function WarningChips({ warnings }: { warnings: string[] }) {
+  if (warnings.length === 0) {
+    return <span className="quiet-text">Sin advertencias críticas.</span>;
+  }
+
+  return (
+    <div className="candidate-chip-list">
+      {warnings.slice(0, 4).map((warning) => (
+        <span className="warning-chip" key={warning}>
+          {formatWarningLabel(warning)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CandidateCard({
+  candidate,
+  hasExternalSignal,
+}: {
+  candidate: ResearchCandidate;
+  hasExternalSignal: boolean;
+}) {
+  const question = candidate.question || "Mercado sin título";
+
+  return (
+    <article className="candidate-card">
+      <div className="candidate-card-header">
+        <div className="candidate-card-meta">
+          <span className="candidate-id">#{candidate.market_id}</span>
+          <span className="badge">{formatSportLabel(candidate.sport)}</span>
+          <span className="badge muted">{formatMarketShapeLabel(candidate.market_shape)}</span>
+          {hasExternalSignal ? (
+            <span className="badge external-hint">Señal externa disponible</span>
+          ) : null}
+        </div>
+        <strong className={`candidate-score-pill ${scoreTone(candidate.candidate_score)}`}>
+          {formatScore(candidate.candidate_score)}
+        </strong>
+      </div>
+
+      <div className="candidate-card-body">
+        <div className="candidate-main-copy">
+          <CandidateParticipants candidate={candidate} />
+          <h3 title={question}>{question}</h3>
+          <p>
+            Mercado #{candidate.market_id}
+            {candidate.event_title ? ` · ${candidate.event_title}` : ""}
+          </p>
+        </div>
+
+        <div className="candidate-card-insights">
+          <CandidateScoreBar score={candidate.candidate_score} />
+          <MarketPricePanel candidate={candidate} />
+        </div>
+      </div>
+
+      <div className="candidate-explain-grid">
+        <section>
+          <h4>Por qué aparece arriba</h4>
+          <ReasonChips reasons={candidate.candidate_reasons ?? []} />
+        </section>
+        <section>
+          <h4>Advertencias</h4>
+          <WarningChips warnings={candidate.warnings ?? []} />
+        </section>
+      </div>
+    </article>
   );
 }
 
@@ -544,10 +763,10 @@ function ExternalSignalCard({
           <div className="badge-row">
             <span className="badge source-badge">{signal.source || "external"}</span>
             <span className="badge muted">
-              {candidate ? `Market #${candidate.market_id}` : "Unmatched"}
+              {candidate ? `Mercado #${candidate.market_id}` : "Sin vínculo"}
             </span>
           </div>
-          <h3>{signal.title || signal.source_ticker || "External market signal"}</h3>
+          <h3>{signal.title || signal.source_ticker || "Señal externa de mercado"}</h3>
           <p>{signal.source_ticker || signal.source_market_id || "Ticker no disponible"}</p>
         </div>
         <span className={`comparison-badge ${comparison.tone}`}>
@@ -559,25 +778,25 @@ function ExternalSignalCard({
         <div className="matched-market-note">
           <strong>{candidate.question}</strong>
           <span>
-            Polymarket YES {formatProbability(candidate.market_yes_price)} | Kalshi{" "}
-            {formatProbability(signal.yes_probability ?? signal.mid_price)} | Diff{" "}
+            Precio SÍ en Polymarket {formatProbability(candidate.market_yes_price)} | Kalshi{" "}
+            {formatProbability(signal.yes_probability ?? signal.mid_price)} | Diferencia{" "}
             {formatPercentDelta(comparison.diff)}
           </span>
         </div>
       ) : (
         <p className="unmatched-note">
-          Esta senal aun no esta vinculada a un mercado Polymarket. Se muestra
+          Esta señal aún no está vinculada a un mercado Polymarket. Se muestra
           como contexto externo, no como equivalente.
         </p>
       )}
 
       <div className="external-signal-metrics">
         <div>
-          <span>YES prob.</span>
+          <span>Prob. SÍ</span>
           <strong>{formatProbability(signal.yes_probability)}</strong>
         </div>
         <div>
-          <span>NO prob.</span>
+          <span>Prob. NO</span>
           <strong>{formatProbability(signal.no_probability)}</strong>
         </div>
         <div>
@@ -587,47 +806,47 @@ function ExternalSignalCard({
           </strong>
         </div>
         <div>
-          <span>Spread</span>
+          <span>Diferencial</span>
           <strong>{formatProbability(signal.spread)}</strong>
         </div>
         <div>
-          <span>Volume</span>
+          <span>Volumen</span>
           <strong>{formatCompact(signal.volume)}</strong>
         </div>
         <div>
-          <span>Open interest</span>
+          <span>Interés abierto</span>
           <strong>{formatCompact(signal.open_interest)}</strong>
         </div>
       </div>
 
       <div className="confidence-row">
         <span className={`confidence-pill ${confidenceTone(signal.source_confidence)}`}>
-          Source confidence {formatProbability(signal.source_confidence)}
+          Confianza de fuente {formatProbability(signal.source_confidence)}
         </span>
         <span className={`confidence-pill ${confidenceTone(signal.match_confidence)}`}>
-          Match confidence {formatProbability(signal.match_confidence)}
+          Confianza de coincidencia {formatProbability(signal.match_confidence)}
         </span>
-        <span className="timestamp-pill">Fetched {formatDateTime(signal.fetched_at)}</span>
+        <span className="timestamp-pill">Actualizado {formatDateTime(signal.fetched_at)}</span>
       </div>
 
       {signal.match_reason ? (
-        <p className="match-reason">Match reason: {signal.match_reason}</p>
+        <p className="match-reason">Motivo de coincidencia: {signal.match_reason}</p>
       ) : null}
 
       {lowMatchConfidence ? (
         <p className="warning-text">
-          Match confidence bajo: tratar como comparacion debil.
+          Confianza de coincidencia baja: tratar como comparación débil.
         </p>
       ) : null}
 
       {warnings.length > 0 ? (
         <div className="warning-list">
           {warnings.slice(0, 4).map((warning) => (
-            <span key={`${signal.id}-${warning}`}>{warning}</span>
+            <span key={`${signal.id}-${warning}`}>{formatWarningLabel(warning)}</span>
           ))}
         </div>
       ) : (
-        <span className="quiet-text">Sin warnings de fuente.</span>
+        <span className="quiet-text">Sin advertencias de fuente.</span>
       )}
     </article>
   );
@@ -665,13 +884,13 @@ export default function DashboardPage() {
 
     const errors: string[] = [];
     if (health.status === "rejected") {
-      errors.push("API offline o /health no disponible");
+      errors.push("API desconectada o /health no disponible");
     }
     if (candidates.status === "rejected") {
       errors.push("No se pudieron cargar candidatos");
     }
     if (externalSignals.status === "rejected") {
-      errors.push("No se pudieron cargar external signals");
+      errors.push("No se pudieron cargar señales externas");
     }
 
     setState({
@@ -740,9 +959,15 @@ export default function DashboardPage() {
           signal.polymarket_market_id === null ||
           signal.polymarket_market_id === undefined ||
           !candidatesById.has(signal.polymarket_market_id),
-      ),
+    ),
     [candidatesById, state.externalSignals],
   );
+  const candidateIdsWithExternalSignals = useMemo(() => {
+    const ids = state.externalSignals
+      .map((signal) => signal.polymarket_market_id)
+      .filter((marketId): marketId is number => typeof marketId === "number");
+    return new Set(ids);
+  }, [state.externalSignals]);
 
   return (
     <main className="dashboard-shell">
@@ -751,8 +976,8 @@ export default function DashboardPage() {
           <p className="eyebrow">PolySignal</p>
           <h1>Inteligencia para mercados predictivos</h1>
           <p className="subtitle">
-            Dashboard read-only para revisar estado local, mercados candidatos y
-            rutas utiles sin ejecutar research, ingestar responses ni crear
+            Dashboard de solo lectura para revisar estado local, mercados
+            candidatos y rutas útiles sin ejecutar research, ingestar responses ni crear
             predicciones.
           </p>
         </div>
@@ -761,17 +986,17 @@ export default function DashboardPage() {
           aria-live="polite"
         >
           <span className="status-dot" />
-          {state.loading ? "Cargando API" : apiOnline ? "API online" : "API offline"}
+          {state.loading ? "Cargando API" : apiOnline ? "API en línea" : "API desconectada"}
         </div>
       </header>
 
       <section className="safety-strip">
-        <strong>Read-only:</strong>
+        <strong>Solo lectura:</strong>
         <span>
-          El candidate_score indica prioridad para investigar, no recomendacion
-          de apuesta. PolySignal no ejecuta apuestas automaticas. Las imagenes
-          aparecen cuando Polymarket o los datos locales las proveen; si no hay
-          logo, se usan iniciales o imagen del mercado.
+          El puntaje de candidato prioriza mercados para investigar; no es una
+          recomendación de apuesta. PolySignal no ejecuta apuestas automáticas.
+          Las señales externas son datos comparativos, no instrucciones de
+          apuesta.
         </span>
       </section>
 
@@ -784,24 +1009,24 @@ export default function DashboardPage() {
 
       <section className="metric-grid" aria-label="Estado del sistema">
         <article className="metric-card">
-          <span>Backend status</span>
-          <strong>{state.loading ? "Cargando" : state.health?.status ?? "Offline"}</strong>
+          <span>Estado backend</span>
+          <strong>{state.loading ? "Cargando" : apiOnline ? "en línea" : "desconectado"}</strong>
           <p>{state.health?.environment ?? "Entorno local pendiente"}</p>
         </article>
         <article className="metric-card">
-          <span>Markets overview</span>
+          <span>Resumen de mercados</span>
           <strong>{marketCount === null ? "N/D" : marketCount}</strong>
           <p>{state.overview ? "Endpoint disponible" : "Sin respuesta del endpoint"}</p>
         </article>
         <article className="metric-card">
-          <span>Research candidates</span>
+          <span>Candidatos de investigación</span>
           <strong>{state.loading ? "..." : topCandidates.length}</strong>
-          <p>Lectura read-only del selector</p>
+          <p>Lectura de solo consulta del selector</p>
         </article>
         <article className="metric-card">
-          <span>External signals</span>
+          <span>Señales externas</span>
           <strong>{state.loading ? "..." : state.externalSignals.length}</strong>
-          <p>Senales guardadas localmente; no fetch remoto desde UI</p>
+          <p>Señales guardadas localmente; no fetch remoto desde la UI</p>
         </article>
         <article className="metric-card">
           <span>Actualizacion local</span>
@@ -816,7 +1041,7 @@ export default function DashboardPage() {
 
       <section className="filter-panel" aria-label="Filtros de candidatos">
         <div className="filter-group">
-          <label htmlFor="sport-filter">Sport</label>
+          <label htmlFor="sport-filter">Deporte</label>
           <select
             id="sport-filter"
             value={filters.sport}
@@ -832,7 +1057,7 @@ export default function DashboardPage() {
           </select>
         </div>
         <div className="filter-group">
-          <label htmlFor="shape-filter">Market shape</label>
+          <label htmlFor="shape-filter">Tipo de mercado</label>
           <select
             id="shape-filter"
             value={filters.marketShape}
@@ -851,7 +1076,7 @@ export default function DashboardPage() {
           </select>
         </div>
         <div className="filter-group">
-          <label htmlFor="limit-filter">Limit</label>
+          <label htmlFor="limit-filter">Límite</label>
           <select
             id="limit-filter"
             value={filters.limit}
@@ -875,7 +1100,7 @@ export default function DashboardPage() {
           onClick={() => void loadDashboard()}
           disabled={state.loading}
         >
-          {state.loading ? "Cargando" : "Refresh"}
+          {state.loading ? "Cargando" : "Actualizar"}
         </button>
       </section>
 
@@ -883,10 +1108,12 @@ export default function DashboardPage() {
         <article className="panel panel-wide">
           <div className="panel-heading">
             <div>
-              <h2>Top Research Candidates</h2>
+              <h2>Mercados principales para investigar</h2>
               <p>
-                Mercados priorizados para investigar. El score mide calidad de
-                candidato, no una senal de apuesta.
+                Mercados con mejor calidad de datos para investigar primero.
+                Este puntaje no predice el resultado ni recomienda apostar.
+                El objetivo es ayudarte a decidir qué mercado merece análisis
+                adicional.
               </p>
             </div>
             <a
@@ -899,116 +1126,36 @@ export default function DashboardPage() {
             </a>
           </div>
 
-          <div className="signal-strip" aria-label="Distribucion visual de scores">
-            {topCandidates.length === 0 ? (
-              <span className="empty-inline">Sin candidatos para graficar</span>
-            ) : (
-              topCandidates.map((candidate) => {
-                const score = Math.max(
-                  0,
-                  Math.min(100, toNumber(candidate.candidate_score) ?? 0),
-                );
-                return (
-                  <div className="signal-item" key={candidate.market_id}>
-                    <div className="signal-label">#{candidate.market_id}</div>
-                    <div className="signal-track">
-                      <span
-                        className={`signal-fill ${scoreTone(score)}`}
-                        style={{ width: `${score}%` }}
-                      />
-                    </div>
-                    <div className="signal-score">{formatScore(score)}</div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <div className="table-shell">
-            <table className="candidate-table">
-              <thead>
-                <tr>
-                  <th>Mercado</th>
-                  <th>Clasificacion</th>
-                  <th>Score</th>
-                  <th>Market price</th>
-                  <th>Template</th>
-                  <th>Reasons / warnings</th>
-                </tr>
-              </thead>
-              <tbody>
-                {state.loading ? (
-                  <tr>
-                    <td colSpan={6}>Cargando candidatos...</td>
-                  </tr>
-                ) : topCandidates.length === 0 ? (
-                  <tr>
-                    <td colSpan={6}>
-                      No hay candidatos disponibles para estos filtros. Prueba
-                      con sport all, market shape all o un limit mayor.
-                    </td>
-                  </tr>
-                ) : (
-                  topCandidates.map((candidate) => (
-                    <tr key={candidate.market_id}>
-                      <td>
-                        <div className="market-cell">
-                          <CandidateParticipants candidate={candidate} />
-                          <strong>{candidate.question}</strong>
-                          <span>
-                            Market ID {candidate.market_id}
-                            {candidate.event_title ? ` | ${candidate.event_title}` : ""}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="badge-row">
-                          <span className="badge">{candidate.sport}</span>
-                          <span className="badge muted">{candidate.market_shape}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`score-badge ${scoreTone(candidate.candidate_score)}`}>
-                          {formatScore(candidate.candidate_score)}
-                        </span>
-                      </td>
-                      <td>
-                        <MarketPricePanel candidate={candidate} />
-                      </td>
-                      <td>
-                        <span className="template-chip">
-                          {candidate.research_template_name}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="reason-list">
-                          {candidate.candidate_reasons.length > 0 ? (
-                            <span>{candidate.candidate_reasons.slice(0, 2).join(", ")}</span>
-                          ) : (
-                            <span className="quiet-text">Sin reasons</span>
-                          )}
-                          {candidate.warnings.length > 0 ? (
-                            <strong>{candidate.warnings.slice(0, 2).join(", ")}</strong>
-                          ) : (
-                            <span className="quiet-text">Sin warnings</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          {state.loading ? (
+            <div className="empty-state">Cargando candidatos...</div>
+          ) : topCandidates.length === 0 ? (
+            <div className="empty-state">
+              <strong>No hay candidatos disponibles</strong>
+              <p>
+                Prueba con deporte todos, tipo de mercado todos o un límite
+                mayor. La pantalla sigue en modo solo lectura.
+              </p>
+            </div>
+          ) : (
+            <div className="candidate-card-list">
+              {topCandidates.map((candidate) => (
+                <CandidateCard
+                  candidate={candidate}
+                  hasExternalSignal={candidateIdsWithExternalSignals.has(candidate.market_id)}
+                  key={candidate.market_id}
+                />
+              ))}
+            </div>
+          )}
         </article>
 
         <article className="panel panel-wide external-panel">
           <div className="panel-heading">
             <div>
-              <h2>External Market Signals</h2>
+              <h2>Señales externas de mercado</h2>
               <p>
-                Segunda opinion de mercado usando fuentes externas como Kalshi.
-                Son inputs de comparacion, no recomendaciones de apuesta.
+                Segunda opinión de mercado usando fuentes externas como Kalshi.
+                Son datos comparativos, no instrucciones de apuesta.
               </p>
             </div>
             <a
@@ -1017,46 +1164,46 @@ export default function DashboardPage() {
               target="_blank"
               rel="noreferrer"
             >
-              Ver Kalshi JSON
+              Ver JSON de Kalshi
             </a>
           </div>
 
           <div className="external-summary-grid">
             <div>
-              <span>Total loaded</span>
+              <span>Total cargadas</span>
               <strong>{state.loading ? "..." : state.externalSignals.length}</strong>
             </div>
             <div>
-              <span>Matched to candidates</span>
+              <span>Vinculadas a candidatos</span>
               <strong>{matchedExternalSignals.length}</strong>
             </div>
             <div>
-              <span>Unmatched</span>
+              <span>Sin vínculo</span>
               <strong>{unmatchedExternalSignals.length}</strong>
             </div>
           </div>
 
           {state.loading ? (
-            <div className="empty-state">Loading external signals...</div>
+            <div className="empty-state">Cargando señales externas...</div>
           ) : state.externalSignals.length === 0 ? (
             <div className="empty-state">
-              <strong>No external signals yet</strong>
+              <strong>No hay señales externas</strong>
               <p>
-                No hay senales externas guardadas todavia. Para cargar una senal
-                Kalshi controlada usa el CLI con limite pequeno y persistencia
-                explicita.
+                No hay señales externas guardadas todavía. Para cargar una señal
+                Kalshi controlada usa el CLI con límite pequeño y persistencia
+                explícita.
               </p>
               <code>
                 python -m app.commands.fetch_kalshi_signals --limit 1 --status
                 open --persist --json
               </code>
-              <span>Solo lectura / sin trading / sin ordenes.</span>
+              <span>Solo lectura / sin trading / sin órdenes.</span>
             </div>
           ) : (
             <div className="external-signal-sections">
               {matchedExternalSignals.length > 0 ? (
                 <section>
-                  <h3>Matched signals</h3>
+                  <h3>Señales vinculadas</h3>
                   <div className="external-card-grid">
                     {matchedExternalSignals.map((signal) => (
                       <ExternalSignalCard
@@ -1073,16 +1220,16 @@ export default function DashboardPage() {
                 </section>
               ) : (
                 <div className="empty-state compact">
-                  Signals loaded but no matches. Las senales actuales no tienen
+                  Hay señales cargadas, pero sin vínculos. Las señales actuales no tienen
                   `polymarket_market_id` vinculado a los candidatos visibles.
                 </div>
               )}
 
               {unmatchedExternalSignals.length > 0 ? (
                 <section>
-                  <h3>Unmatched external signals</h3>
+                  <h3>Señales externas sin vínculo</h3>
                   <p className="section-note">
-                    Estas senales aun no estan vinculadas a un mercado
+                    Estas señales aún no están vinculadas a un mercado
                     Polymarket. No se asume equivalencia por texto parecido.
                   </p>
                   <div className="external-card-grid">
@@ -1099,70 +1246,70 @@ export default function DashboardPage() {
         <aside className="panel">
           <div className="panel-heading compact">
             <div>
-              <h2>Como leer PolySignal</h2>
-              <p>Glosario rapido para interpretar la pantalla.</p>
+              <h2>Cómo leer PolySignal</h2>
+              <p>Glosario rápido para interpretar la pantalla.</p>
             </div>
           </div>
           <dl className="definition-list">
             <div>
-              <dt>YES price</dt>
-              <dd>Precio implicito actual de la opcion Yes en Polymarket.</dd>
+              <dt>Precio SÍ</dt>
+              <dd>Precio/probabilidad implícita del lado SÍ en el mercado.</dd>
             </div>
             <div>
-              <dt>NO price</dt>
-              <dd>Precio implicito actual de la opcion No cuando existe snapshot.</dd>
+              <dt>Precio NO</dt>
+              <dd>Precio/probabilidad implícita del lado NO cuando existe snapshot.</dd>
             </div>
             <div>
-              <dt>candidate_score</dt>
-              <dd>Prioridad para investigar. No es recomendacion de apuesta.</dd>
+              <dt>Puntaje de candidato</dt>
+              <dd>Mide qué tan útil es un mercado para investigar primero. No indica probabilidad de ganar.</dd>
             </div>
             <div>
-              <dt>confidence_score</dt>
+              <dt>Confianza de evidencia</dt>
               <dd>Calidad de evidencia cuando existe research, no probabilidad de ganar.</dd>
             </div>
             <div>
-              <dt>edge</dt>
-              <dd>Diferencia entre una estimacion PolySignal y el precio del mercado.</dd>
+              <dt>Diferencia estimada</dt>
+              <dd>Diferencia entre una estimación PolySignal y el precio del mercado.</dd>
             </div>
             <div>
-              <dt>liquidity / volume</dt>
+              <dt>Liquidez / volumen</dt>
               <dd>Profundidad y actividad del mercado usadas como contexto operativo.</dd>
             </div>
             <div>
-              <dt>market_shape</dt>
-              <dd>Forma del mercado: championship, match_winner, futures u otra.</dd>
+              <dt>Tipo de mercado</dt>
+              <dd>Forma del mercado: campeonato, ganador de partido, futuro/temporada u otra.</dd>
             </div>
             <div>
-              <dt>research packet</dt>
+              <dt>Research packet</dt>
               <dd>Paquete read-only para que un agente externo prepare research JSON.</dd>
             </div>
             <div>
               <dt>Quality Gate</dt>
-              <dd>Validacion previa a ingestar findings, report y prediction.</dd>
+              <dd>Validación previa a ingestar findings, report y prediction.</dd>
             </div>
             <div>
-              <dt>Kalshi implied probability</dt>
-              <dd>Probabilidad implicita normalizada desde precios Kalshi.</dd>
+              <dt>Probabilidad implícita de Kalshi</dt>
+              <dd>Probabilidad implícita normalizada desde precios Kalshi.</dd>
             </div>
             <div>
-              <dt>Source confidence</dt>
+              <dt>Confianza de fuente</dt>
               <dd>Calidad operativa de la fuente externa: spread, volumen y datos.</dd>
             </div>
             <div>
-              <dt>Match confidence</dt>
-              <dd>Confianza de que una senal externa corresponde al mercado local.</dd>
+              <dt>Confianza de coincidencia</dt>
+              <dd>Confianza de que una señal externa corresponde al mercado local.</dd>
             </div>
             <div>
-              <dt>Spread</dt>
-              <dd>Diferencia entre bid y ask. Spread alto reduce confiabilidad.</dd>
+              <dt>Diferencial</dt>
+              <dd>Diferencia entre bid y ask. Un diferencial alto reduce confiabilidad.</dd>
             </div>
             <div>
-              <dt>Aligned / divergent</dt>
-              <dd>Comparacion simple entre Kalshi y Polymarket, no senal de apuesta.</dd>
+              <dt>Alineado / divergente</dt>
+              <dd>Comparación simple entre Kalshi y Polymarket, no señal de apuesta.</dd>
             </div>
             <div>
-              <dt>External signal</dt>
-              <dd>Segunda opinion de mercado guardada localmente y mostrada read-only.</dd>
+              <dt>Señal externa</dt>
+              <dd>Segunda opinión de mercado guardada localmente y mostrada read-only.</dd>
             </div>
           </dl>
         </aside>
@@ -1170,15 +1317,15 @@ export default function DashboardPage() {
         <aside className="panel">
           <div className="panel-heading compact">
             <div>
-              <h2>Enlaces rapidos</h2>
-              <p>Atajos locales para inspeccion read-only.</p>
+              <h2>Enlaces rápidos</h2>
+              <p>Atajos locales para inspección read-only.</p>
             </div>
           </div>
-          <nav className="quick-links" aria-label="Enlaces rapidos">
+          <nav className="quick-links" aria-label="Enlaces rápidos">
             {quickLinks.map((link) => (
               <a href={link.href} key={link.href} target="_blank" rel="noreferrer">
                 <span>{link.label}</span>
-                <span aria-hidden="true">Open</span>
+                <span aria-hidden="true">Abrir</span>
               </a>
             ))}
           </nav>
