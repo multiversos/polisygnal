@@ -393,7 +393,7 @@ h2 {
 
 .market-cell {
   display: grid;
-  gap: 5px;
+  gap: 8px;
 }
 
 .market-cell strong {
@@ -409,6 +409,68 @@ h2 {
   color: var(--muted);
   font-size: 0.84rem;
   line-height: 1.35;
+}
+
+.participant-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  max-width: 560px;
+}
+
+.participant-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fbfdff;
+}
+
+.candidate-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-muted);
+}
+
+.candidate-avatar.fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0b4f49;
+  background: var(--accent-soft);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.participant-copy {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.participant-name {
+  max-width: 210px;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participant-role {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .badge-row {

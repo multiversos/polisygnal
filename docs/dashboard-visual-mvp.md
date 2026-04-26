@@ -7,6 +7,7 @@ El Dashboard Visual MVP es la primera pantalla operativa de PolySignal para revi
 - Estado del backend mediante `GET /health`.
 - Disponibilidad del overview de mercados mediante `GET /markets/overview`.
 - Top research candidates mediante `GET /research/candidates`.
+- Participantes inferidos con avatar visual: logo/imagen si existe en datos locales, o iniciales como fallback.
 - Filtros visuales por `sport`, `market_shape` y `limit`.
 - Enlaces rapidos a API docs, backend panel, health, markets overview y candidates JSON.
 - Glosario de conceptos operativos: YES price, NO price, candidate_score, confidence_score, edge, liquidity, volume, market_shape, research packet y Quality Gate.
@@ -63,6 +64,15 @@ Parametros:
 - `market_shape`: `match_winner`, `championship`, `futures`, `player_prop`, `team_prop`, `race_winner`, `yes_no_generic` u otro valor soportado.
 
 El endpoint reutiliza el Research Candidate Selector. No modifica la base de datos y no crea `research_run`, `prediction_report` ni `prediction`.
+
+Cuando la base local expone imagenes de Polymarket, el endpoint puede devolver:
+
+- `market_image_url`
+- `event_image_url`
+- `icon_url`
+- `participants`
+
+`participants` incluye nombre, rol, abreviatura y campos nullable para `logo_url` o `image_url`. Si esos datos no existen en la base local, el dashboard usa iniciales o una imagen de mercado/evento como fallback visual.
 
 ## Como interpretar candidate_score
 

@@ -19,6 +19,14 @@ type DashboardMetaResponse = {
   path?: string | null;
 };
 
+type CandidateParticipant = {
+  name: string;
+  role: string;
+  logo_url?: string | null;
+  image_url?: string | null;
+  abbreviation?: string | null;
+};
+
 type ResearchCandidate = {
   market_id: number;
   question: string;
@@ -35,6 +43,10 @@ type ResearchCandidate = {
   candidate_score: string | number;
   candidate_reasons: string[];
   warnings: string[];
+  market_image_url?: string | null;
+  event_image_url?: string | null;
+  icon_url?: string | null;
+  participants: CandidateParticipant[];
 };
 
 type CandidatesResponse = {
@@ -204,6 +216,96 @@ function formatOptionLabel(value: string): string {
   return value.replaceAll("_", " ");
 }
 
+function participantInitials(value: string): string {
+  const words = value.split(/[^A-Za-z0-9]+/).filter(Boolean);
+  if (words.length === 0) {
+    return "?";
+  }
+  if (words.length === 1) {
+    return words[0].slice(0, 3).toUpperCase();
+  }
+  return words
+    .slice(0, 3)
+    .map((word) => word[0].toUpperCase())
+    .join("");
+}
+
+function visualFallbackUrl(candidate: ResearchCandidate): string | null {
+  return (
+    candidate.market_image_url ||
+    candidate.event_image_url ||
+    candidate.icon_url ||
+    null
+  );
+}
+
+function VisualAvatar({
+  name,
+  src,
+  abbreviation,
+}: {
+  name: string;
+  src: string | null;
+  abbreviation?: string | null;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (src && !failed) {
+    return (
+      <img
+        className="candidate-avatar"
+        src={src}
+        alt={`${name} visual`}
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <span className="candidate-avatar fallback" aria-hidden="true">
+      {abbreviation || participantInitials(name)}
+    </span>
+  );
+}
+
+function CandidateParticipants({ candidate }: { candidate: ResearchCandidate }) {
+  const fallbackUrl = visualFallbackUrl(candidate);
+  const participants = candidate.participants ?? [];
+
+  if (participants.length === 0) {
+    return (
+      <div className="participant-row">
+        <span className="participant-chip">
+          <VisualAvatar
+            name={candidate.question}
+            src={fallbackUrl}
+            abbreviation={participantInitials(candidate.question)}
+          />
+          <span className="participant-name">Market visual</span>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="participant-row">
+      {participants.slice(0, 2).map((participant) => (
+        <span className="participant-chip" key={`${candidate.market_id}-${participant.name}`}>
+          <VisualAvatar
+            name={participant.name}
+            src={participant.logo_url || participant.image_url || fallbackUrl}
+            abbreviation={participant.abbreviation || participantInitials(participant.name)}
+          />
+          <span className="participant-copy">
+            <span className="participant-name">{participant.name}</span>
+            <span className="participant-role">{participant.role}</span>
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [filters, setFilters] = useState<DashboardFilters>({
     sport: "all",
@@ -309,7 +411,9 @@ export default function DashboardPage() {
         <strong>Read-only:</strong>
         <span>
           El candidate_score indica prioridad para investigar, no recomendacion
-          de apuesta. PolySignal no ejecuta apuestas automaticas.
+          de apuesta. PolySignal no ejecuta apuestas automaticas. Las imagenes
+          aparecen cuando Polymarket o los datos locales las proveen; si no hay
+          logo, se usan iniciales o imagen del mercado.
         </span>
       </section>
 
@@ -487,6 +591,7 @@ export default function DashboardPage() {
                     <tr key={candidate.market_id}>
                       <td>
                         <div className="market-cell">
+                          <CandidateParticipants candidate={candidate} />
                           <strong>{candidate.question}</strong>
                           <span>
                             Market ID {candidate.market_id}

@@ -21,12 +21,85 @@ from app.services.research.classification import (
     normalize_sport,
     normalize_vertical,
 )
+from app.services.nba_team_matching import extract_nba_teams
 
 MIN_TRADABLE_PRICE = Decimal("0.0500")
 MAX_TRADABLE_PRICE = Decimal("0.9500")
 DEFAULT_SCAN_LIMIT = 1000
 MAX_CANDIDATE_SCORE = Decimal("100.0000")
 ZERO = Decimal("0")
+
+NBA_TEAM_ABBREVIATIONS = {
+    "Atlanta Hawks": "ATL",
+    "Boston Celtics": "BOS",
+    "Brooklyn Nets": "BKN",
+    "Charlotte Hornets": "CHA",
+    "Chicago Bulls": "CHI",
+    "Cleveland Cavaliers": "CLE",
+    "Dallas Mavericks": "DAL",
+    "Denver Nuggets": "DEN",
+    "Detroit Pistons": "DET",
+    "Golden State Warriors": "GSW",
+    "Houston Rockets": "HOU",
+    "Indiana Pacers": "IND",
+    "Los Angeles Clippers": "LAC",
+    "Los Angeles Lakers": "LAL",
+    "Memphis Grizzlies": "MEM",
+    "Miami Heat": "MIA",
+    "Milwaukee Bucks": "MIL",
+    "Minnesota Timberwolves": "MIN",
+    "New Orleans Pelicans": "NOP",
+    "New York Knicks": "NYK",
+    "Oklahoma City Thunder": "OKC",
+    "Orlando Magic": "ORL",
+    "Philadelphia 76ers": "PHI",
+    "Phoenix Suns": "PHX",
+    "Portland Trail Blazers": "POR",
+    "Sacramento Kings": "SAC",
+    "San Antonio Spurs": "SAS",
+    "Toronto Raptors": "TOR",
+    "Utah Jazz": "UTA",
+    "Washington Wizards": "WAS",
+}
+
+MARKET_IMAGE_FIELDS = (
+    "market_image_url",
+    "image_url",
+    "image",
+    "thumbnail_url",
+    "thumbnail",
+)
+EVENT_IMAGE_FIELDS = (
+    "event_image_url",
+    "image_url",
+    "image",
+    "thumbnail_url",
+    "thumbnail",
+)
+ICON_FIELDS = (
+    "icon_url",
+    "icon",
+    "logo_url",
+    "logo",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ResearchCandidateParticipant:
+    name: str
+    role: str
+    logo_url: str | None
+    image_url: str | None
+    abbreviation: str | None
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "role": self.role,
+            "logo_url": self.logo_url,
+            "image_url": self.image_url,
+            "abbreviation": self.abbreviation,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +119,10 @@ class ResearchCandidate:
     candidate_score: Decimal
     candidate_reasons: list[str]
     warnings: list[str]
+    market_image_url: str | None
+    event_image_url: str | None
+    icon_url: str | None
+    participants: list[ResearchCandidateParticipant]
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -64,6 +141,10 @@ class ResearchCandidate:
             "candidate_score": _decimal_to_string(self.candidate_score),
             "candidate_reasons": list(self.candidate_reasons),
             "warnings": list(self.warnings),
+            "market_image_url": self.market_image_url,
+            "event_image_url": self.event_image_url,
+            "icon_url": self.icon_url,
+            "participants": [participant.to_payload() for participant in self.participants],
         }
 
 
@@ -215,7 +296,135 @@ def build_research_candidate(
         candidate_score=score.quantize(Decimal("0.0001")),
         candidate_reasons=reasons,
         warnings=warnings,
+        market_image_url=_first_text_attr(market, MARKET_IMAGE_FIELDS),
+        event_image_url=(
+            _first_text_attr(market.event, EVENT_IMAGE_FIELDS)
+            if market.event is not None
+            else None
+        ),
+        icon_url=(
+            _first_text_attr(market, ICON_FIELDS)
+            or (_first_text_attr(market.event, ICON_FIELDS) if market.event is not None else None)
+        ),
+        participants=infer_participants_from_market(
+            market=market,
+            classification=resolved_classification,
+        ),
     )
+
+
+def infer_participants_from_market(
+    *,
+    market: Market,
+    classification: ResearchMarketClassification,
+) -> list[ResearchCandidateParticipant]:
+    text = _combined_text(
+        market.question,
+        market.event.title if market.event is not None else None,
+    )
+    if classification.sport == "nba":
+        teams = extract_nba_teams(text)
+        if teams:
+            return [
+                _build_participant(
+                    name=team,
+                    role=_participant_role(index, len(teams), classification.market_shape),
+                    abbreviation=NBA_TEAM_ABBREVIATIONS.get(team),
+                )
+                for index, team in enumerate(teams[:2])
+            ]
+
+    generic_names = _infer_generic_participant_names(
+        question=market.question,
+        market_shape=classification.market_shape,
+    )
+    return [
+        _build_participant(
+            name=name,
+            role=_participant_role(index, len(generic_names), classification.market_shape),
+            abbreviation=None,
+        )
+        for index, name in enumerate(generic_names[:2])
+    ]
+
+
+def _build_participant(
+    *,
+    name: str,
+    role: str,
+    abbreviation: str | None,
+) -> ResearchCandidateParticipant:
+    return ResearchCandidateParticipant(
+        name=name,
+        role=role,
+        logo_url=None,
+        image_url=None,
+        abbreviation=abbreviation or _initials(name),
+    )
+
+
+def _participant_role(index: int, count: int, market_shape: str) -> str:
+    if count == 1 and market_shape in {"championship", "futures", "race_winner"}:
+        return "yes_side"
+    if count >= 2 and market_shape == "match_winner":
+        return "yes_side" if index == 0 else "no_side"
+    return "participant"
+
+
+def _infer_generic_participant_names(
+    *,
+    question: str,
+    market_shape: str,
+) -> list[str]:
+    normalized_question = question.strip().rstrip("?")
+    patterns = (
+        r"^will\s+(?:the\s+)?(.+?)\s+(?:beat|defeat)\s+(?:the\s+)?(.+?)$",
+        r"^(.+?)\s+(?:vs\.?|versus)\s+(.+?)$",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, normalized_question, flags=re.IGNORECASE)
+        if match:
+            return [_clean_participant_name(match.group(1)), _clean_participant_name(match.group(2))]
+
+    single_patterns = (
+        r"^will\s+(?:the\s+)?(.+?)\s+win\s+(?:the\s+)?(?:.+)$",
+        r"^will\s+(?:the\s+)?(.+?)\s+(?:score|record|have)\s+(?:over|under)\s+.+$",
+    )
+    if market_shape in {"championship", "futures", "race_winner", "player_prop"}:
+        for pattern in single_patterns:
+            match = re.search(pattern, normalized_question, flags=re.IGNORECASE)
+            if match:
+                return [_clean_participant_name(match.group(1))]
+    return []
+
+
+def _clean_participant_name(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", value).strip(" .,-")
+    cleaned = re.sub(r"^(?:the|a|an)\s+", "", cleaned, flags=re.IGNORECASE)
+    return cleaned[:96]
+
+
+def _initials(value: str) -> str:
+    words = [part for part in re.split(r"[^A-Za-z0-9]+", value) if part]
+    if not words:
+        return "?"
+    if len(words) == 1:
+        return words[0][:3].upper()
+    return "".join(word[0].upper() for word in words[:3])
+
+
+def _combined_text(*values: str | None) -> str:
+    return " ".join(value.strip() for value in values if value and value.strip())
+
+
+def _first_text_attr(instance: object | None, field_names: tuple[str, ...]) -> str | None:
+    if instance is None:
+        return None
+    for field_name in field_names:
+        value = getattr(instance, field_name, None)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def _load_candidate_markets(

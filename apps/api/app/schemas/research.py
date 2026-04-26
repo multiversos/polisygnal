@@ -89,6 +89,14 @@ class ResearchRunResponse(BaseModel):
     partial_errors: list[str] = Field(default_factory=list)
 
 
+class ResearchCandidateParticipantRead(BaseModel):
+    name: str
+    role: str
+    logo_url: str | None = None
+    image_url: str | None = None
+    abbreviation: str | None = None
+
+
 class ResearchCandidateRead(BaseModel):
     market_id: int
     question: str
@@ -105,6 +113,10 @@ class ResearchCandidateRead(BaseModel):
     candidate_score: Decimal
     candidate_reasons: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    market_image_url: str | None = None
+    event_image_url: str | None = None
+    icon_url: str | None = None
+    participants: list[ResearchCandidateParticipantRead] = Field(default_factory=list)
 
 
 class ResearchCandidatesResponse(BaseModel):

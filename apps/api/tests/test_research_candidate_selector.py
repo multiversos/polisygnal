@@ -115,6 +115,25 @@ def test_research_candidates_endpoint_lists_candidates_without_mutating_db(
     assert payload["candidates"][0]["vertical"] == "sports"
     assert payload["candidates"][0]["market_shape"] == "match_winner"
     assert payload["candidates"][0]["candidate_score"] is not None
+    assert payload["candidates"][0]["market_image_url"] is None
+    assert payload["candidates"][0]["event_image_url"] is None
+    assert payload["candidates"][0]["icon_url"] is None
+    assert payload["candidates"][0]["participants"] == [
+        {
+            "name": "Los Angeles Lakers",
+            "role": "yes_side",
+            "logo_url": None,
+            "image_url": None,
+            "abbreviation": "LAL",
+        },
+        {
+            "name": "Golden State Warriors",
+            "role": "no_side",
+            "logo_url": None,
+            "image_url": None,
+            "abbreviation": "GSW",
+        },
+    ]
     assert len(db_session.new) == before_new
     assert len(db_session.dirty) == before_dirty
     assert len(db_session.deleted) == before_deleted
@@ -150,6 +169,15 @@ def test_research_candidates_endpoint_respects_limit_and_market_shape(
     assert payload["candidates"][0]["market_id"] == finals_market.id
     assert payload["candidates"][0]["market_shape"] == "championship"
     assert payload["candidates"][0]["research_template_name"] == "sports_nba_futures"
+    assert payload["candidates"][0]["participants"] == [
+        {
+            "name": "Boston Celtics",
+            "role": "yes_side",
+            "logo_url": None,
+            "image_url": None,
+            "abbreviation": "BOS",
+        }
+    ]
     assert isinstance(payload["candidates"][0]["candidate_reasons"], list)
     assert isinstance(payload["candidates"][0]["warnings"], list)
 
