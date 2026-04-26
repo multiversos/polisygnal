@@ -23,11 +23,13 @@ from app.services.research.codex_agent_adapter import (
     CODEX_AGENT_PREDICTION_FAMILY,
     ingest_codex_agent_research_response,
     prepare_codex_agent_research_request,
+    validate_codex_agent_research_response_file,
 )
 from app.services.research.codex_agent_packet import (
     render_codex_agent_research_packet,
     write_codex_agent_research_packet,
 )
+from app.services.research.codex_agent_validation import validate_codex_agent_response_text
 
 
 def test_prepare_codex_research_request_writes_safe_json(
@@ -92,6 +94,9 @@ def test_codex_research_packet_contains_operational_instructions(
     assert "Do not include secrets" in packet_text
     assert "Do not execute trades or automatic betting actions" in packet_text
     assert "confidence_score as evidence quality" in packet_text
+    assert "Quality Gate" in packet_text
+    assert "--dry-run" in packet_text
+    assert "research_mode" in packet_text
 
 
 def test_codex_research_packet_render_is_testable_without_io(
@@ -166,6 +171,7 @@ def test_ingest_valid_codex_response_creates_artifacts_and_keeps_families(
     assert result.prediction is not None
     assert result.prediction.prediction_family == CODEX_AGENT_PREDICTION_FAMILY
     assert result.prediction.components_json["research_mode"] == "codex_agent"
+    assert result.prediction.components_json["validation_report"]["recommended_action"] == "ingest"
     assert result.prediction.yes_probability == Decimal("0.5900")
 
     findings = db_session.scalars(select(ResearchFinding)).all()
@@ -223,9 +229,213 @@ def test_ingest_invalid_codex_response_marks_failed_without_prediction(
     assert result.ok is False
     assert result.research_run.status == "failed"
     assert result.error_message is not None
-    assert "Respuesta codex_agent invalida" in result.error_message
+    assert "Codex Agent validation rejected response" in result.error_message
     assert db_session.scalars(select(Prediction)).all() == []
     assert db_session.scalars(select(PredictionReport)).all() == []
+
+
+def test_codex_validation_valid_response_passes() -> None:
+    payload = json.dumps(_valid_response(run_id=10, market_id=20))
+
+    result = validate_codex_agent_response_text(
+        payload,
+        expected_run_id=10,
+        expected_market_id=20,
+    )
+
+    assert result.response is not None
+    assert result.report.is_valid is True
+    assert result.report.severity == "pass"
+    assert result.report.recommended_action == "ingest"
+    assert result.report.source_quality_score == Decimal("1.0000")
+
+
+def test_codex_validation_rejects_adjustment_outside_limit() -> None:
+    payload = _valid_response(run_id=10, market_id=20)
+    payload["recommended_probability_adjustment"] = "0.1300"
+
+    result = validate_codex_agent_response_text(
+        json.dumps(payload),
+        expected_run_id=10,
+        expected_market_id=20,
+    )
+
+    assert result.response is None
+    assert result.report.severity == "failed"
+    assert result.report.recommended_action == "reject"
+    assert result.report.errors[0].code == "schema_validation_failed"
+
+
+def test_codex_validation_without_citations_rejects_or_requires_review() -> None:
+    payload = _valid_response(run_id=10, market_id=20)
+    for item in [*payload["evidence_for_yes"], *payload["evidence_against_yes"]]:
+        item["source_name"] = None
+        item["citation_url"] = None
+
+    result = validate_codex_agent_response_text(
+        json.dumps(payload),
+        expected_run_id=10,
+        expected_market_id=20,
+    )
+
+    assert result.response is not None
+    assert result.report.recommended_action in {"review_required", "reject"}
+    assert any(warning.code == "no_citations" for warning in result.report.warnings)
+
+
+def test_codex_validation_one_sided_evidence_requires_review() -> None:
+    payload = _valid_response(run_id=10, market_id=20)
+    payload["evidence_against_yes"] = []
+
+    result = validate_codex_agent_response_text(
+        json.dumps(payload),
+        expected_run_id=10,
+        expected_market_id=20,
+    )
+
+    assert result.response is not None
+    assert result.report.severity == "warning"
+    assert result.report.recommended_action == "review_required"
+    assert any(
+        warning.code == "missing_evidence_against_yes"
+        for warning in result.report.warnings
+    )
+
+
+def test_codex_validation_accepts_evidence_summary_instead_of_reasoning() -> None:
+    payload = _valid_response(run_id=10, market_id=20)
+    for item in [*payload["evidence_for_yes"], *payload["evidence_against_yes"]]:
+        item["evidence_summary"] = item.pop("reasoning")
+
+    result = validate_codex_agent_response_text(
+        json.dumps(payload),
+        expected_run_id=10,
+        expected_market_id=20,
+    )
+
+    assert result.response is not None
+    assert result.report.recommended_action == "ingest"
+
+
+def test_codex_validation_run_id_mismatch_rejects() -> None:
+    result = validate_codex_agent_response_text(
+        json.dumps(_valid_response(run_id=999, market_id=20)),
+        expected_run_id=10,
+        expected_market_id=20,
+    )
+
+    assert result.report.recommended_action == "reject"
+    assert result.report.errors[0].code == "run_id_mismatch"
+
+
+def test_codex_validation_market_id_mismatch_rejects() -> None:
+    result = validate_codex_agent_response_text(
+        json.dumps(_valid_response(run_id=10, market_id=999)),
+        expected_run_id=10,
+        expected_market_id=20,
+    )
+
+    assert result.report.recommended_action == "reject"
+    assert result.report.errors[0].code == "market_id_mismatch"
+
+
+def test_ingest_mock_structural_requires_allow_review_required(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    market = _create_market_with_context(db_session, suffix="mock-required")
+    prepared = prepare_codex_agent_research_request(
+        db_session,
+        market=market,
+        output_dir=tmp_path / "requests",
+    )
+    response_path = tmp_path / "responses" / f"{prepared.research_run.id}.json"
+    response_path.parent.mkdir(parents=True, exist_ok=True)
+    response = _valid_response(prepared.research_run.id, market.id)
+    response["research_mode"] = "mock_structural"
+    response_path.write_text(json.dumps(response, indent=2), encoding="utf-8")
+
+    result = ingest_codex_agent_research_response(
+        db_session,
+        run_id=prepared.research_run.id,
+        response_path=response_path,
+        validation_dir=tmp_path / "validation",
+    )
+
+    assert result.ok is False
+    assert result.research_run.status == "review_required"
+    assert result.validation_report is not None
+    assert result.validation_report.recommended_action == "review_required"
+    assert db_session.scalars(select(Prediction)).all() == []
+    assert db_session.scalars(select(PredictionReport)).all() == []
+    assert db_session.scalars(select(ResearchFinding)).all() == []
+
+
+def test_ingest_allow_review_required_creates_codex_prediction(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    market = _create_market_with_context(db_session, suffix="allow-review")
+    prepared = prepare_codex_agent_research_request(
+        db_session,
+        market=market,
+        output_dir=tmp_path / "requests",
+    )
+    response_path = tmp_path / "responses" / f"{prepared.research_run.id}.json"
+    response_path.parent.mkdir(parents=True, exist_ok=True)
+    response = _valid_response(prepared.research_run.id, market.id)
+    response["research_mode"] = "mock_structural"
+    response_path.write_text(json.dumps(response, indent=2), encoding="utf-8")
+
+    result = ingest_codex_agent_research_response(
+        db_session,
+        run_id=prepared.research_run.id,
+        response_path=response_path,
+        allow_review_required=True,
+        validation_dir=tmp_path / "validation",
+    )
+
+    assert result.ok is True
+    assert result.research_run.status == "completed"
+    assert result.prediction is not None
+    assert result.prediction.prediction_family == CODEX_AGENT_PREDICTION_FAMILY
+    assert result.prediction.confidence_score <= Decimal("0.3500")
+    assert result.prediction.components_json["allow_review_required"] is True
+
+
+def test_codex_validation_dry_run_does_not_create_prediction(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    market = _create_market_with_context(db_session, suffix="dry-run")
+    prepared = prepare_codex_agent_research_request(
+        db_session,
+        market=market,
+        output_dir=tmp_path / "requests",
+    )
+    response_path = tmp_path / "responses" / f"{prepared.research_run.id}.json"
+    response_path.parent.mkdir(parents=True, exist_ok=True)
+    response_path.write_text(
+        json.dumps(_valid_response(prepared.research_run.id, market.id), indent=2),
+        encoding="utf-8",
+    )
+
+    result = validate_codex_agent_research_response_file(
+        db_session,
+        run_id=prepared.research_run.id,
+        response_path=response_path,
+        validation_dir=tmp_path / "validation",
+    )
+
+    assert result.dry_run is True
+    assert result.validation_report is not None
+    assert result.validation_report.recommended_action == "ingest"
+    assert result.validation_path is not None
+    assert result.validation_path.exists()
+    assert prepared.research_run.status == "pending_agent"
+    assert db_session.scalars(select(Prediction)).all() == []
+    assert db_session.scalars(select(PredictionReport)).all() == []
+    assert db_session.scalars(select(ResearchFinding)).all() == []
 
 
 def test_ingest_codex_response_accepts_utf8_bom(

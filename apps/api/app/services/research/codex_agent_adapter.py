@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.config import REPO_ROOT
@@ -35,6 +34,10 @@ from app.schemas.codex_agent_research import (
     CodexAgentSnapshotPayload,
 )
 from app.services.research.classification import classify_market_research_context
+from app.services.research.codex_agent_validation import (
+    ValidationReport,
+    validate_codex_agent_response_text,
+)
 from app.services.research.prompts import select_research_template
 from app.services.research.scoring import ResearchScoringResult, score_codex_agent_research
 
@@ -43,6 +46,7 @@ CODEX_AGENT_MODEL_VERSION = "research_codex_agent_v1"
 CODEX_AGENT_PREDICTION_FAMILY = "research_v1_codex_agent"
 DEFAULT_REQUEST_DIR = REPO_ROOT / "logs" / "research-agent" / "requests"
 DEFAULT_RESPONSE_DIR = REPO_ROOT / "logs" / "research-agent" / "responses"
+DEFAULT_VALIDATION_DIR = REPO_ROOT / "logs" / "research-agent" / "validation"
 
 
 @dataclass(slots=True)
@@ -62,6 +66,9 @@ class CodexAgentIngestResult:
     report: PredictionReport | None = None
     findings: list[ResearchFinding] = field(default_factory=list)
     error_message: str | None = None
+    validation_report: ValidationReport | None = None
+    validation_path: Path | None = None
+    dry_run: bool = False
 
 
 def prepare_codex_agent_research_request(
@@ -154,6 +161,8 @@ def ingest_codex_agent_research_response(
     *,
     run_id: int,
     response_path: Path | str | None = None,
+    allow_review_required: bool = False,
+    validation_dir: Path | str | None = None,
     finished_at: datetime | None = None,
 ) -> CodexAgentIngestResult:
     current_finished_at = finished_at or datetime.now(tz=UTC)
@@ -166,20 +175,80 @@ def ingest_codex_agent_research_response(
         raise ValueError(f"Research run {run_id} no encontrado.")
 
     try:
-        response = CodexAgentResearchResponse.model_validate_json(
-            resolved_response_path.read_text(encoding="utf-8-sig")
+        raw_response = resolved_response_path.read_text(encoding="utf-8-sig")
+        validation_result = validate_codex_agent_response_text(
+            raw_response,
+            expected_run_id=research_run.id,
+            expected_market_id=research_run.market_id,
         )
-        _validate_response_identity(research_run=research_run, response=response)
+        validation_path = _write_validation_report(
+            validation_result.report,
+            run_id=run_id,
+            validation_dir=validation_dir or DEFAULT_VALIDATION_DIR,
+        )
+        response = validation_result.response
+        if response is None or validation_result.report.recommended_action == "reject":
+            error_message = _validation_error_message(
+                validation_result.report,
+                fallback="Codex Agent validation rejected response.",
+            )
+            _mark_codex_run_failed(
+                research_run=research_run,
+                error_message=error_message,
+                finished_at=current_finished_at,
+                response_path=resolved_response_path,
+                validation_report=validation_result.report,
+                validation_path=validation_path,
+            )
+            db.flush()
+            return CodexAgentIngestResult(
+                ok=False,
+                research_run=research_run,
+                response_path=resolved_response_path,
+                error_message=error_message,
+                validation_report=validation_result.report,
+                validation_path=validation_path,
+            )
+        if (
+            validation_result.report.recommended_action == "review_required"
+            and not allow_review_required
+        ):
+            error_message = _validation_error_message(
+                validation_result.report,
+                fallback=(
+                    "Codex Agent validation requires review; rerun with "
+                    "--allow-review-required to ingest."
+                ),
+            )
+            _mark_codex_run_review_required(
+                research_run=research_run,
+                error_message=error_message,
+                finished_at=current_finished_at,
+                response_path=resolved_response_path,
+                validation_report=validation_result.report,
+                validation_path=validation_path,
+            )
+            db.flush()
+            return CodexAgentIngestResult(
+                ok=False,
+                research_run=research_run,
+                response_path=resolved_response_path,
+                error_message=error_message,
+                validation_report=validation_result.report,
+                validation_path=validation_path,
+            )
         snapshot = get_latest_market_snapshot(db, research_run.market_id)
         if snapshot is None or snapshot.yes_price is None:
             raise ValueError("No existe snapshot usable para ingestar codex_agent.")
-    except (OSError, ValidationError, ValueError) as exc:
+    except (OSError, ValueError) as exc:
         error_message = f"Respuesta codex_agent invalida: {exc}"
         _mark_codex_run_failed(
             research_run=research_run,
             error_message=error_message,
             finished_at=current_finished_at,
             response_path=resolved_response_path,
+            validation_report=None,
+            validation_path=None,
         )
         db.flush()
         return CodexAgentIngestResult(
@@ -200,12 +269,18 @@ def ingest_codex_agent_research_response(
         findings=findings,
         market_summary=response.market_summary,
         participants=response.participants,
-        confidence_score=response.confidence_score,
+        confidence_score=validation_result.report.confidence_adjusted,
         recommended_probability_adjustment=response.recommended_probability_adjustment,
         final_reasoning=response.final_reasoning,
         recommendation=response.recommendation,
         risks=[item.model_dump(mode="json") for item in response.risks],
     )
+    validation_payload = validation_result.report.to_payload()
+    scoring.explanation_json["validation_report"] = validation_payload
+    scoring.components_json["validation_report"] = validation_payload
+    scoring.components_json["response_research_mode"] = response.research_mode
+    scoring.components_json["source_review_required"] = response.source_review_required
+    scoring.components_json["allow_review_required"] = allow_review_required
     prediction = create_prediction(
         db,
         market_id=research_run.market_id,
@@ -241,6 +316,9 @@ def ingest_codex_agent_research_response(
             "adjusted_yes_probability": str(scoring.adjusted_yes_probability),
             "net_adjustment": str(scoring.net_adjustment),
             "adapter": "codex_agent_research",
+            "validation_report": validation_payload,
+            "validation_path": str(validation_path),
+            "response_research_mode": response.research_mode,
         },
     )
 
@@ -261,6 +339,11 @@ def ingest_codex_agent_research_response(
         metadata_json={
             **_metadata_dict(research_run.metadata_json),
             "response_path": str(resolved_response_path),
+            "validation_path": str(validation_path),
+            "validation_report": validation_payload,
+            "allow_review_required": allow_review_required,
+            "response_research_mode": response.research_mode,
+            "source_review_required": response.source_review_required,
             "baseline_yes_probability": str(scoring.baseline_yes_probability),
             "adjusted_yes_probability": str(scoring.adjusted_yes_probability),
             "net_adjustment": str(scoring.net_adjustment),
@@ -274,6 +357,62 @@ def ingest_codex_agent_research_response(
         prediction=prediction,
         report=report,
         findings=findings,
+        validation_report=validation_result.report,
+        validation_path=validation_path,
+    )
+
+
+def validate_codex_agent_research_response_file(
+    db: Session,
+    *,
+    run_id: int,
+    response_path: Path | str | None = None,
+    validation_dir: Path | str | None = None,
+) -> CodexAgentIngestResult:
+    resolved_response_path = _resolve_artifact_path(
+        response_path or DEFAULT_RESPONSE_DIR,
+        f"{run_id}.json",
+    )
+    research_run = get_research_run_by_id(db, run_id)
+    if research_run is None:
+        raise ValueError(f"Research run {run_id} no encontrado.")
+
+    try:
+        raw_response = resolved_response_path.read_text(encoding="utf-8-sig")
+    except OSError as exc:
+        report = ValidationReport(
+            is_valid=False,
+            severity="failed",
+            errors=[],
+            warnings=[],
+            recommended_action="reject",
+        )
+        return CodexAgentIngestResult(
+            ok=False,
+            research_run=research_run,
+            response_path=resolved_response_path,
+            error_message=f"No se pudo leer response JSON: {exc}",
+            validation_report=report,
+            dry_run=True,
+        )
+
+    validation_result = validate_codex_agent_response_text(
+        raw_response,
+        expected_run_id=research_run.id,
+        expected_market_id=research_run.market_id,
+    )
+    validation_path = _write_validation_report(
+        validation_result.report,
+        run_id=run_id,
+        validation_dir=validation_dir or DEFAULT_VALIDATION_DIR,
+    )
+    return CodexAgentIngestResult(
+        ok=validation_result.report.recommended_action == "ingest",
+        research_run=research_run,
+        response_path=resolved_response_path,
+        validation_report=validation_result.report,
+        validation_path=validation_path,
+        dry_run=True,
     )
 
 
@@ -365,7 +504,7 @@ def _finding_from_evidence(
         freshness_score=evidence.freshness_score,
         credibility_score=evidence.credibility_score,
         claim=evidence.claim,
-        evidence_summary=evidence.reasoning,
+        evidence_summary=_evidence_reasoning_text(evidence),
         citation_url=evidence.citation_url,
         source_name=evidence.source_name,
         published_at=evidence.published_at,
@@ -375,6 +514,10 @@ def _finding_from_evidence(
             "output_schema_version": CODEX_AGENT_OUTPUT_SCHEMA_VERSION,
         },
     )
+
+
+def _evidence_reasoning_text(evidence: CodexAgentEvidenceResponse) -> str:
+    return evidence.reasoning or evidence.evidence_summary or evidence.claim
 
 
 def _validate_response_identity(
@@ -399,6 +542,8 @@ def _mark_codex_run_failed(
     error_message: str,
     finished_at: datetime,
     response_path: Path,
+    validation_report: ValidationReport | None,
+    validation_path: Path | None,
 ) -> None:
     finalize_research_run(
         research_run,
@@ -411,8 +556,65 @@ def _mark_codex_run_failed(
         metadata_json={
             **_metadata_dict(research_run.metadata_json),
             "response_path": str(response_path),
+            "validation_path": str(validation_path) if validation_path is not None else None,
+            "validation_report": (
+                validation_report.to_payload() if validation_report is not None else None
+            ),
         },
     )
+
+
+def _mark_codex_run_review_required(
+    *,
+    research_run: ResearchRun,
+    error_message: str,
+    finished_at: datetime,
+    response_path: Path,
+    validation_report: ValidationReport,
+    validation_path: Path,
+) -> None:
+    finalize_research_run(
+        research_run,
+        status="review_required",
+        finished_at=finished_at,
+        total_sources_found=0,
+        total_sources_used=0,
+        confidence_score=validation_report.confidence_adjusted,
+        error_message=error_message,
+        metadata_json={
+            **_metadata_dict(research_run.metadata_json),
+            "response_path": str(response_path),
+            "validation_path": str(validation_path),
+            "validation_report": validation_report.to_payload(),
+        },
+    )
+
+
+def _write_validation_report(
+    validation_report: ValidationReport,
+    *,
+    run_id: int,
+    validation_dir: Path | str,
+) -> Path:
+    validation_path = _resolve_artifact_path(validation_dir, f"{run_id}.json")
+    validation_path.parent.mkdir(parents=True, exist_ok=True)
+    validation_path.write_text(
+        json.dumps(validation_report.to_payload(), indent=2, ensure_ascii=True),
+        encoding="utf-8",
+    )
+    return validation_path
+
+
+def _validation_error_message(
+    validation_report: ValidationReport,
+    *,
+    fallback: str,
+) -> str:
+    issues = validation_report.errors or validation_report.warnings
+    if not issues:
+        return fallback
+    first_issue = issues[0]
+    return f"{fallback} {first_issue.code}: {first_issue.message}"
 
 
 def _resolve_artifact_path(path: Path | str, default_filename: str) -> Path:

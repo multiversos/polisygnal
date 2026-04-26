@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 CODEX_AGENT_OUTPUT_SCHEMA_VERSION = "codex_agent_research_v1"
 
@@ -85,17 +85,32 @@ class CodexAgentEvidenceResponse(BaseModel):
     source_name: str | None = None
     citation_url: str | None = None
     published_at: datetime | None = None
-    reasoning: str
+    reasoning: str | None = None
+    evidence_summary: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("claim", "factor_type", "reasoning")
+    @field_validator("claim", "factor_type")
     @classmethod
     def require_text(cls, value: str) -> str:
         parsed = value.strip()
         if not parsed:
             raise ValueError("El campo de texto no puede estar vacio.")
         return parsed
+
+    @field_validator("reasoning", "evidence_summary")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        parsed = value.strip()
+        return parsed or None
+
+    @model_validator(mode="after")
+    def require_reasoning_or_summary(self) -> "CodexAgentEvidenceResponse":
+        if not self.reasoning and not self.evidence_summary:
+            raise ValueError("Cada evidencia debe incluir reasoning o evidence_summary.")
+        return self
 
 
 class CodexAgentRiskResponse(BaseModel):
@@ -109,6 +124,9 @@ class CodexAgentResearchResponse(BaseModel):
     run_id: int
     market_id: int
     output_schema_version: str = CODEX_AGENT_OUTPUT_SCHEMA_VERSION
+    research_mode: Literal["real_web", "mock_structural", "manual"] = "real_web"
+    source_review_required: bool = False
+    metadata: dict[str, object] = Field(default_factory=dict)
     market_summary: str
     participants: list[str] = Field(default_factory=list)
     evidence_for_yes: list[CodexAgentEvidenceResponse] = Field(default_factory=list)
@@ -140,16 +158,3 @@ class CodexAgentResearchResponse(BaseModel):
         if not parsed:
             raise ValueError("El campo de texto no puede estar vacio.")
         return parsed
-
-    @field_validator("evidence_against_yes")
-    @classmethod
-    def require_two_sided_evidence(
-        cls,
-        value: list[CodexAgentEvidenceResponse],
-        info: object,
-    ) -> list[CodexAgentEvidenceResponse]:
-        data = getattr(info, "data", {})
-        evidence_for = data.get("evidence_for_yes", [])
-        if not evidence_for or not value:
-            raise ValueError("La respuesta debe incluir evidencia a favor y en contra.")
-        return value

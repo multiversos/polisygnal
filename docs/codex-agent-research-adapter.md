@@ -84,10 +84,73 @@ N:\projects\polimarket\logs\research-agent\responses\{run_id}.json
 Antes de ingestar, revisa manualmente que:
 
 - existan `evidence_for_yes` y `evidence_against_yes`
+- el campo `research_mode` sea `real_web`, `mock_structural` o `manual`
+- `source_review_required` este en `true` si las fuentes necesitan revision humana
 - los `citation_url` sean reales cuando el response diga que uso fuentes reales
 - no haya fuentes inventadas
 - `recommended_probability_adjustment` este entre `-0.12` y `0.12`
 - `recommendation` no se interprete como orden de apuesta
+
+## Quality Gate
+
+Antes de crear `research_findings`, `prediction_report` y `prediction`, PolySignal corre
+un Quality Gate sobre el response JSON.
+
+El reporte de validacion incluye:
+
+- `is_valid`
+- `severity`: `pass`, `warning` o `failed`
+- `errors`
+- `warnings`
+- `source_quality_score`
+- `evidence_balance_score`
+- `confidence_adjusted`
+- `recommended_action`: `ingest`, `review_required` o `reject`
+
+Significado operativo:
+
+- `ingest`
+  el JSON puede ingestar normalmente.
+- `review_required`
+  el JSON tiene schema valido, pero necesita revision humana antes de crear prediccion.
+  Por defecto no se ingesta.
+- `reject`
+  el JSON no debe ingestar. El run queda marcado como `failed`.
+
+Casos comunes:
+
+- Sin citas reales en un response `real_web`: `review_required` o `reject`.
+- `mock_structural`: requiere revision explicita; no se trata como investigacion real.
+- `manual`: requiere revision humana.
+- `source_review_required=true`: fuerza `review_required` como minimo.
+- `confidence_score` alto con fuentes debiles: PolySignal puede bajar `confidence_adjusted`.
+
+Validar sin ingestar:
+
+```powershell
+cd N:\projects\polimarket\apps\api
+.\.venv\Scripts\python.exe -m app.commands.ingest_codex_research --run-id 123 --dry-run
+```
+
+Ingestar un response `review_required` solo cuando ya fue revisado:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.ingest_codex_research --run-id 123 --allow-review-required
+```
+
+Si un JSON fue rechazado, corrigelo revisando:
+
+- que `run_id` y `market_id` coincidan con el request
+- que el JSON sea valido
+- que tenga al menos una evidencia
+- que tenga evidencia a favor y en contra cuando sea posible
+- que cada evidencia tenga `reasoning` o `evidence_summary`
+- que los `citation_url` reales tengan formato `http` o `https`
+- que `recommended_probability_adjustment` este dentro de `-0.12` y `0.12`
+- que no haya fuentes, URLs o claims inventados
+
+Este Quality Gate protege la calidad de predicciones. No convierte el resultado en una
+recomendacion de apuesta ni reemplaza la revision humana.
 
 ## Paso 3: ingestar response
 
@@ -96,7 +159,9 @@ cd N:\projects\polimarket\apps\api
 .\.venv\Scripts\python.exe -m app.commands.ingest_codex_research --run-id 123
 ```
 
-Si el JSON es valido y coincide con el `run_id` y `market_id`, PolySignal crea findings, report y prediction. Si el JSON es invalido, el run se marca como `failed` con `error_message`.
+Si el JSON es valido, coincide con el `run_id` y `market_id`, y el Quality Gate recomienda
+`ingest`, PolySignal crea findings, report y prediction. Si el JSON es invalido o el
+Quality Gate recomienda `reject`, el run se marca como `failed` con `error_message`.
 
 ## Archivos creados
 
