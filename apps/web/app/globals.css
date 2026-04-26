@@ -1479,6 +1479,58 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.price-history-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.price-history-chart {
+  min-height: 150px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(15, 118, 110, 0.06), transparent 62%),
+    var(--surface-raised);
+}
+
+.price-history-chart.empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.price-history-chart svg {
+  display: block;
+  width: 100%;
+  height: 128px;
+  overflow: visible;
+}
+
+.price-history-grid-line {
+  stroke: var(--line);
+  stroke-width: 0.7;
+  vector-effect: non-scaling-stroke;
+}
+
+.price-history-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.price-history-point {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
 .evidence-groups {
   display: grid;
   gap: 14px;

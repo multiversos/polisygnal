@@ -50,6 +50,25 @@ type AnalysisSnapshot = {
   liquidity?: string | number | null;
 };
 
+type PriceHistoryPoint = {
+  snapshot_id: number;
+  captured_at: string;
+  yes_price?: string | number | null;
+  no_price?: string | number | null;
+  liquidity?: string | number | null;
+  volume?: string | number | null;
+};
+
+type PriceHistoryResponse = {
+  market_id: number;
+  points: PriceHistoryPoint[];
+  latest?: PriceHistoryPoint | null;
+  first?: PriceHistoryPoint | null;
+  change_yes_abs?: string | number | null;
+  change_yes_pct?: string | number | null;
+  count: number;
+};
+
 type CandidateContext = {
   candidate_score: string | number;
   candidate_reasons: string[];
@@ -192,6 +211,8 @@ type EvidenceDisplayItem = {
 
 type LoadState = {
   analysis: MarketAnalysis | null;
+  priceHistory: PriceHistoryResponse | null;
+  priceHistoryError: string | null;
   loading: boolean;
   error: string | null;
   notFound: boolean;
@@ -319,6 +340,24 @@ function formatProbability(value: unknown): string {
     return "N/D";
   }
   return `${(number * 100).toFixed(1)}%`;
+}
+
+function formatSignedProbabilityPoints(value: unknown): string {
+  const number = toNumber(value);
+  if (number === null) {
+    return "N/D";
+  }
+  const sign = number > 0 ? "+" : "";
+  return `${sign}${(number * 100).toFixed(1)} pts`;
+}
+
+function formatSignedRatio(value: unknown): string {
+  const number = toNumber(value);
+  if (number === null) {
+    return "N/D";
+  }
+  const sign = number > 0 ? "+" : "";
+  return `${sign}${(number * 100).toFixed(1)}%`;
 }
 
 function formatCompact(value: unknown): string {
@@ -612,6 +651,54 @@ function VisualAvatar({
   );
 }
 
+function PriceHistorySparkline({ points }: { points: PriceHistoryPoint[] }) {
+  const validPoints = points
+    .map((point) => ({
+      capturedAt: point.captured_at,
+      value: normalizeProbability(point.yes_price),
+    }))
+    .filter((point): point is { capturedAt: string; value: number } => point.value !== null);
+
+  if (validPoints.length === 0) {
+    return (
+      <div className="price-history-chart empty" aria-hidden="true">
+        Sin puntos de precio válidos
+      </div>
+    );
+  }
+
+  const coordinates = validPoints.map((point, index) => {
+    const x = validPoints.length === 1 ? 50 : (index / (validPoints.length - 1)) * 100;
+    const y = 38 - point.value * 34;
+    return { ...point, x, y };
+  });
+  const path = coordinates.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+
+  return (
+    <div
+      className="price-history-chart"
+      role="img"
+      aria-label={`Historial de precio SÍ con ${validPoints.length} puntos válidos`}
+    >
+      <svg viewBox="0 0 100 42" preserveAspectRatio="none" aria-hidden="true">
+        <line className="price-history-grid-line" x1="0" x2="100" y1="4" y2="4" />
+        <line className="price-history-grid-line" x1="0" x2="100" y1="21" y2="21" />
+        <line className="price-history-grid-line" x1="0" x2="100" y1="38" y2="38" />
+        {coordinates.length > 1 ? <path className="price-history-line" d={path} /> : null}
+        {coordinates.map((point, index) => (
+          <circle
+            className="price-history-point"
+            cx={point.x}
+            cy={point.y}
+            key={`${point.capturedAt}-${index}`}
+            r="1.7"
+          />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 function PricePanel({ snapshot }: { snapshot?: AnalysisSnapshot | null }) {
   const yes = snapshot?.yes_price;
   const no = getNoProbability(snapshot?.yes_price, snapshot?.no_price);
@@ -660,6 +747,83 @@ function PricePanel({ snapshot }: { snapshot?: AnalysisSnapshot | null }) {
             <strong>{formatCompact(snapshot?.volume)}</strong>
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function PriceHistoryPanel({
+  history,
+  error,
+}: {
+  history?: PriceHistoryResponse | null;
+  error?: string | null;
+}) {
+  if (error) {
+    return (
+      <section className="analysis-section">
+        <div className="analysis-section-heading">
+          <div>
+            <span className="section-kicker">Polymarket</span>
+            <h2>Historial del precio</h2>
+          </div>
+        </div>
+        <div className="empty-state">{error}</div>
+      </section>
+    );
+  }
+
+  if (!history || history.points.length === 0) {
+    return (
+      <section className="analysis-section">
+        <div className="analysis-section-heading">
+          <div>
+            <span className="section-kicker">Polymarket</span>
+            <h2>Historial del precio</h2>
+          </div>
+        </div>
+        <div className="empty-state">
+          No hay historial de precio guardado todavía para este mercado.
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="analysis-section">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Polymarket</span>
+          <h2>Historial del precio</h2>
+          <p className="section-note">
+            Evolución del precio SÍ según snapshots guardados por PolySignal.
+          </p>
+        </div>
+        <span className="timestamp-pill">{history.count} snapshots</span>
+      </div>
+      <div className="price-history-summary">
+        <div className="analysis-stat-grid">
+          <div>
+            <span>SÍ actual</span>
+            <strong>{formatProbability(history.latest?.yes_price)}</strong>
+          </div>
+          <div>
+            <span>SÍ inicial</span>
+            <strong>{formatProbability(history.first?.yes_price)}</strong>
+          </div>
+          <div>
+            <span>Cambio absoluto</span>
+            <strong>{formatSignedProbabilityPoints(history.change_yes_abs)}</strong>
+          </div>
+          <div>
+            <span>Cambio porcentual</span>
+            <strong>{formatSignedRatio(history.change_yes_pct)}</strong>
+          </div>
+        </div>
+        <PriceHistorySparkline points={history.points} />
+        <p className="section-note">
+          El historial ayuda a ver movimiento del mercado, no predice el resultado.
+        </p>
       </div>
     </section>
   );
@@ -930,20 +1094,46 @@ export default function MarketAnalysisPage() {
   const [copiedCommand, setCopiedCommand] = useState<"prepare" | "ingest" | null>(null);
   const [state, setState] = useState<LoadState>({
     analysis: null,
+    priceHistory: null,
+    priceHistoryError: null,
     loading: true,
     error: null,
     notFound: false,
   });
 
   const loadAnalysis = useCallback(async () => {
-    setState((current) => ({ ...current, loading: true, error: null, notFound: false }));
+    setState((current) => ({
+      ...current,
+      loading: true,
+      error: null,
+      notFound: false,
+      priceHistoryError: null,
+    }));
     try {
-      const analysis = await fetchJson<MarketAnalysis>(`/markets/${marketId}/analysis`);
-      setState({ analysis, loading: false, error: null, notFound: false });
+      const [analysisResult, historyResult] = await Promise.allSettled([
+        fetchJson<MarketAnalysis>(`/markets/${marketId}/analysis`),
+        fetchJson<PriceHistoryResponse>(`/markets/${marketId}/price-history?limit=50&order=asc`),
+      ]);
+      if (analysisResult.status === "rejected") {
+        throw analysisResult.reason;
+      }
+      setState({
+        analysis: analysisResult.value,
+        priceHistory: historyResult.status === "fulfilled" ? historyResult.value : null,
+        priceHistoryError:
+          historyResult.status === "rejected"
+            ? "No se pudo cargar el historial de precio."
+            : null,
+        loading: false,
+        error: null,
+        notFound: false,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown_error";
       setState({
         analysis: null,
+        priceHistory: null,
+        priceHistoryError: null,
         loading: false,
         error: message === "not_found" ? null : "No se pudo cargar el análisis del mercado.",
         notFound: message === "not_found",
@@ -1100,6 +1290,7 @@ export default function MarketAnalysisPage() {
           <div className="analysis-layout">
             <div className="analysis-main">
               <PricePanel snapshot={analysis.latest_snapshot} />
+              <PriceHistoryPanel history={state.priceHistory} error={state.priceHistoryError} />
               <CandidateContextPanel context={analysis.candidate_context} />
               <ExternalSignalsPanel signals={analysis.external_signals} snapshot={analysis.latest_snapshot} />
               <EvidencePanel analysis={analysis} />

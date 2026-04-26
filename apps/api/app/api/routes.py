@@ -41,6 +41,7 @@ from app.schemas.market import (
     MarketSnapshotItem,
 )
 from app.schemas.market_analysis import MarketAnalysisRead
+from app.schemas.market_price_history import MarketPriceHistoryRead
 from app.schemas.overview import MarketOverviewResponse, OverviewSortBy, PriorityBucket
 from app.schemas.pipeline_artifacts import PipelineArtifactResponse, PipelineRunsResponse
 from app.schemas.prediction import (
@@ -79,6 +80,7 @@ from app.services.diff_artifacts import (
 )
 from app.services.market_overview import build_markets_overview
 from app.services.market_analysis import build_market_analysis
+from app.services.market_price_history import build_market_price_history
 from app.services.evaluation import (
     EVALUATION_HISTORY_DEFAULT_LIMIT,
     build_evaluation_history,
@@ -440,6 +442,26 @@ def get_market_analysis(
 ) -> MarketAnalysisRead:
     market = _require_market(db, market_id)
     return build_market_analysis(db, market)
+
+
+@router.get(
+    "/markets/{market_id}/price-history",
+    response_model=MarketPriceHistoryRead,
+    tags=["markets"],
+)
+def get_market_price_history(
+    market_id: int,
+    limit: int = Query(default=50, ge=1, le=500),
+    order: Literal["asc", "desc"] = Query(default="asc"),
+    db: Session = Depends(get_db),
+) -> MarketPriceHistoryRead:
+    market = _require_market(db, market_id)
+    return build_market_price_history(
+        db,
+        market_id=market.id,
+        limit=limit,
+        order=order,
+    )
 
 
 @router.get("/markets/{market_id}", response_model=MarketDetail, tags=["markets"])
