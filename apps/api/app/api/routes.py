@@ -40,6 +40,7 @@ from app.schemas.market import (
     MarketListItem,
     MarketSnapshotItem,
 )
+from app.schemas.market_analysis import MarketAnalysisRead
 from app.schemas.overview import MarketOverviewResponse, OverviewSortBy, PriorityBucket
 from app.schemas.pipeline_artifacts import PipelineArtifactResponse, PipelineRunsResponse
 from app.schemas.prediction import (
@@ -77,6 +78,7 @@ from app.services.diff_artifacts import (
     read_latest_diff_artifact,
 )
 from app.services.market_overview import build_markets_overview
+from app.services.market_analysis import build_market_analysis
 from app.services.evaluation import (
     EVALUATION_HISTORY_DEFAULT_LIMIT,
     build_evaluation_history,
@@ -425,6 +427,19 @@ def get_markets_overview(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get(
+    "/markets/{market_id}/analysis",
+    response_model=MarketAnalysisRead,
+    tags=["markets"],
+)
+def get_market_analysis(
+    market_id: int,
+    db: Session = Depends(get_db),
+) -> MarketAnalysisRead:
+    market = _require_market(db, market_id)
+    return build_market_analysis(db, market)
 
 
 @router.get("/markets/{market_id}", response_model=MarketDetail, tags=["markets"])

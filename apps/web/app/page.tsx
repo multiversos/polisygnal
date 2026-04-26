@@ -963,6 +963,12 @@ function CandidateCard({
         </div>
       </div>
 
+      <div className="candidate-card-actions">
+        <a className="analysis-link" href={`/markets/${candidate.market_id}`}>
+          Ver análisis
+        </a>
+      </div>
+
       <div className="candidate-explain-grid">
         <section>
           <h4>Por qué aparece arriba</h4>
