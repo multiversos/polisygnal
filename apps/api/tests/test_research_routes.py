@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.evidence_item import EvidenceItem
 from app.models.event import Event
 from app.models.market import Market
@@ -16,6 +17,12 @@ from app.models.prediction_report import PredictionReport
 from app.models.research_finding import ResearchFinding
 from app.models.research_run import ResearchRun
 from app.models.source import Source
+from app.services.research import pipeline as research_pipeline
+from app.services.research.openai_client import (
+    CheapResearchEvidence,
+    CheapResearchOutput,
+    CheapResearchResult,
+)
 
 
 def test_post_market_research_run_local_only_creates_artifacts(
@@ -52,6 +59,136 @@ def test_post_market_research_run_local_only_creates_artifacts(
     assert len(findings) >= 1
     assert len(reports) == 1
     assert len(research_predictions) == 1
+
+
+def test_post_market_research_run_cheap_without_api_key_falls_back_to_local_only(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_RESEARCH_ENABLED", "true")
+    get_settings.cache_clear()
+    market = _create_research_market(db_session, suffix="cheap-no-key")
+
+    response = client.post(
+        f"/markets/{market.id}/research/run",
+        json={"research_mode": "cheap_research"},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["status"] == "completed"
+    assert payload["research_mode"] == "local_only"
+    assert payload["degraded_mode"] is True
+    assert payload["web_search_used"] is False
+    assert "OPENAI_API_KEY ausente" in payload["partial_errors"][0]
+    assert payload["prediction"]["prediction_family"] == "research_v1_local"
+
+    research_run = db_session.scalar(select(ResearchRun))
+    assert research_run is not None
+    assert research_run.error_message is not None
+    assert "OPENAI_API_KEY ausente" in research_run.error_message
+    get_settings.cache_clear()
+
+
+def test_post_market_research_run_cheap_with_openai_mock_creates_llm_artifacts(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_RESEARCH_ENABLED", "true")
+    monkeypatch.setenv("OPENAI_RESEARCH_MODEL", "gpt-test-mini")
+    get_settings.cache_clear()
+    market = _create_research_market(db_session, suffix="cheap-success")
+
+    def fake_run_cheap_research(self, *, market, snapshot, screening) -> CheapResearchResult:
+        return CheapResearchResult(
+            ok=True,
+            model_used="gpt-test-mini",
+            web_search_used=True,
+            request_preview={"model": "gpt-test-mini", "tooling": "mock"},
+            output=_mock_cheap_research_output(),
+        )
+
+    monkeypatch.setattr(
+        research_pipeline.ResearchOpenAIClient,
+        "run_cheap_research",
+        fake_run_cheap_research,
+    )
+
+    response = client.post(
+        f"/markets/{market.id}/research/run",
+        json={"research_mode": "cheap_research"},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["status"] == "completed"
+    assert payload["research_mode"] == "cheap_research"
+    assert payload["degraded_mode"] is False
+    assert payload["web_search_used"] is True
+    assert payload["prediction"]["prediction_family"] == "research_v1_llm"
+    assert payload["prediction"]["components_json"]["recommended_probability_adjustment"] == "0.0800"
+    assert payload["report"]["recommendation"] == "lean_yes"
+
+    findings = db_session.scalars(select(ResearchFinding)).all()
+    reports = db_session.scalars(select(PredictionReport)).all()
+    research_predictions = db_session.scalars(
+        select(Prediction).where(Prediction.prediction_family == "research_v1_llm")
+    ).all()
+
+    assert len(findings) == 2
+    assert {finding.stance for finding in findings} == {"favor", "against"}
+    assert len(reports) == 1
+    assert len(research_predictions) == 1
+    assert research_predictions[0].components_json is not None
+    assert research_predictions[0].yes_probability == Decimal("0.6200")
+    get_settings.cache_clear()
+
+
+def test_post_market_research_run_cheap_openai_failure_does_not_break_endpoint(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_RESEARCH_ENABLED", "true")
+    get_settings.cache_clear()
+    market = _create_research_market(db_session, suffix="cheap-failure")
+
+    def fake_run_cheap_research(self, *, market, snapshot, screening) -> CheapResearchResult:
+        return CheapResearchResult(
+            ok=False,
+            model_used="gpt-test-mini",
+            request_preview={"model": "gpt-test-mini", "tooling": "mock"},
+            error_message="OpenAI cheap_research fallo: rate limit",
+        )
+
+    monkeypatch.setattr(
+        research_pipeline.ResearchOpenAIClient,
+        "run_cheap_research",
+        fake_run_cheap_research,
+    )
+
+    response = client.post(
+        f"/markets/{market.id}/research/run",
+        json={"research_mode": "cheap_research"},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["status"] == "completed"
+    assert payload["research_mode"] == "local_only"
+    assert payload["degraded_mode"] is True
+    assert payload["prediction"]["prediction_family"] == "research_v1_local"
+    assert payload["partial_errors"] == ["OpenAI cheap_research fallo: rate limit"]
+
+    research_run = db_session.scalar(select(ResearchRun))
+    assert research_run is not None
+    assert research_run.error_message == "OpenAI cheap_research fallo: rate limit"
+    get_settings.cache_clear()
 
 
 def test_get_latest_market_research_returns_findings_and_report(
@@ -238,3 +375,44 @@ def _create_research_market(db_session: Session, *, suffix: str) -> Market:
     )
     db_session.commit()
     return market
+
+
+def _mock_cheap_research_output() -> CheapResearchOutput:
+    return CheapResearchOutput(
+        market_summary="Mock research sees a modest Knicks edge with rotation risk.",
+        participants=["Knicks", "Hawks"],
+        evidence_for_yes=[
+            CheapResearchEvidence(
+                claim="Fact: Knicks have the healthier starting rotation in the latest report.",
+                factor_type="injury_context",
+                impact_score=Decimal("0.8000"),
+                freshness_score=Decimal("0.9000"),
+                credibility_score=Decimal("0.8500"),
+                source_name="ESPN",
+                citation_url="https://www.espn.com/nba/mock-injury-report",
+                published_at=datetime(2026, 4, 21, 10, 0, tzinfo=UTC),
+                evidence_summary="Knicks injury context is favorable.",
+                stance="favor",
+            )
+        ],
+        evidence_against_yes=[
+            CheapResearchEvidence(
+                claim="Inference: Hawks transition scoring keeps upset risk meaningful.",
+                factor_type="matchup_context",
+                impact_score=Decimal("0.5500"),
+                freshness_score=Decimal("0.8000"),
+                credibility_score=Decimal("0.7000"),
+                source_name="NBA.com",
+                citation_url="https://www.nba.com/mock-matchup",
+                published_at=datetime(2026, 4, 21, 9, 0, tzinfo=UTC),
+                evidence_summary="Hawks matchup risk matters.",
+                stance="against",
+            )
+        ],
+        risks=[{"code": "playoff_variance", "summary": "Small-sample playoff variance."}],
+        confidence_score=Decimal("0.7400"),
+        recommended_probability_adjustment=Decimal("0.0800"),
+        final_reasoning="Evidence supports a small YES lean, not an automatic bet.",
+        recommendation="lean_yes",
+        raw_json={"mock": True},
+    )

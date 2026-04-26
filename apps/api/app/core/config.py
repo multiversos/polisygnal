@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 API_DIR = Path(__file__).resolve().parents[2]
@@ -136,13 +136,32 @@ class Settings(BaseSettings):
         default="https://api.openai.com/v1",
         alias="POLYSIGNAL_OPENAI_BASE_URL",
     )
-    research_timeout_seconds: float = Field(
-        default=45.0,
-        alias="POLYSIGNAL_RESEARCH_TIMEOUT_SECONDS",
+    openai_research_enabled: bool = Field(
+        default=True,
+        alias="OPENAI_RESEARCH_ENABLED",
     )
-    research_cheap_model: str = Field(
+    openai_research_model: str = Field(
         default="gpt-5-mini",
-        alias="POLYSIGNAL_RESEARCH_CHEAP_MODEL",
+        validation_alias=AliasChoices("OPENAI_RESEARCH_MODEL", "POLYSIGNAL_RESEARCH_CHEAP_MODEL"),
+    )
+    openai_research_timeout_seconds: float = Field(
+        default=45.0,
+        validation_alias=AliasChoices(
+            "OPENAI_RESEARCH_TIMEOUT_SECONDS",
+            "POLYSIGNAL_RESEARCH_TIMEOUT_SECONDS",
+        ),
+    )
+    openai_research_max_sources: int = Field(
+        default=6,
+        alias="OPENAI_RESEARCH_MAX_SOURCES",
+    )
+    openai_research_allowed_domains: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        alias="OPENAI_RESEARCH_ALLOWED_DOMAINS",
+    )
+    openai_research_blocked_domains: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        alias="OPENAI_RESEARCH_BLOCKED_DOMAINS",
     )
     linear_api_url: str = Field(
         default="https://api.linear.app/graphql",
@@ -217,6 +236,27 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
+    @field_validator(
+        "openai_research_allowed_domains",
+        "openai_research_blocked_domains",
+        mode="before",
+    )
+    @classmethod
+    def parse_openai_research_domains(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip().lower() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("openai_research_max_sources", mode="before")
+    @classmethod
+    def parse_openai_research_max_sources(cls, value: object) -> object:
+        if value is None:
+            return value
+        parsed = int(value)
+        if parsed < 1:
+            raise ValueError("OPENAI_RESEARCH_MAX_SOURCES debe ser al menos 1.")
+        return parsed
+
     @field_validator("mvp_discovery_scope", mode="before")
     @classmethod
     def parse_mvp_discovery_scope(cls, value: object) -> str:
@@ -240,6 +280,14 @@ class Settings(BaseSettings):
                 "POLYSIGNAL_LINEAR_OAUTH_ACTOR debe ser uno de: user, app."
             )
         return actor
+
+    @property
+    def research_timeout_seconds(self) -> float:
+        return self.openai_research_timeout_seconds
+
+    @property
+    def research_cheap_model(self) -> str:
+        return self.openai_research_model
 
 
 @lru_cache

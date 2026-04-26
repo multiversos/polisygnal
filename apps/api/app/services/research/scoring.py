@@ -12,6 +12,8 @@ ONE = Decimal("1")
 PROBABILITY_SCALE = Decimal("0.0001")
 MAX_TOTAL_ADJUSTMENT = Decimal("0.1200")
 FINDING_MULTIPLIER = Decimal("0.0800")
+MIN_RESEARCH_PROBABILITY = Decimal("0.0100")
+MAX_RESEARCH_PROBABILITY = Decimal("0.9900")
 
 
 @dataclass(slots=True)
@@ -168,6 +170,114 @@ def score_local_research(
     )
 
 
+def score_llm_research(
+    *,
+    market: Market,
+    snapshot: MarketSnapshot,
+    findings: list[ResearchFinding],
+    market_summary: str,
+    participants: list[str],
+    confidence_score: Decimal,
+    recommended_probability_adjustment: Decimal,
+    final_reasoning: str,
+    recommendation: str,
+    risks: list[dict[str, object]],
+    model_used: str | None,
+) -> ResearchScoringResult:
+    baseline_yes_probability = _quantize_research_probability(snapshot.yes_price or ZERO)
+    net_adjustment = _quantize_signed(
+        max(
+            min(recommended_probability_adjustment, MAX_TOTAL_ADJUSTMENT),
+            ZERO - MAX_TOTAL_ADJUSTMENT,
+        )
+    )
+    adjusted_yes_probability = _quantize_research_probability(
+        baseline_yes_probability + net_adjustment
+    )
+    adjusted_no_probability = _quantize_probability(ONE - adjusted_yes_probability)
+    market_yes_price = _quantize_research_probability(snapshot.yes_price or ZERO)
+    edge_signed = _quantize_signed(adjusted_yes_probability - market_yes_price)
+    edge_magnitude = _quantize_probability(abs(edge_signed))
+    normalized_confidence = _quantize_probability(confidence_score)
+    edge_class = _classify_edge(edge_magnitude)
+    opportunity = edge_magnitude >= Decimal("0.0500") and normalized_confidence >= Decimal("0.4500")
+    review_confidence = normalized_confidence >= Decimal("0.8000")
+    review_edge = edge_magnitude > MAX_TOTAL_ADJUSTMENT
+
+    evidence_for = _serialize_findings([item for item in findings if item.stance == "favor"])
+    evidence_against = _serialize_findings(
+        [item for item in findings if item.stance == "against"]
+    )
+    thesis = (
+        f"{market_summary} Baseline Polymarket {baseline_yes_probability}; "
+        f"research_v1_llm ajusta a {adjusted_yes_probability}."
+    )
+    explanation_json = {
+        "summary": thesis,
+        "mode": "cheap_research",
+        "model_used": model_used,
+        "baseline_yes_probability": str(baseline_yes_probability),
+        "adjusted_yes_probability": str(adjusted_yes_probability),
+        "net_adjustment": str(net_adjustment),
+        "confidence_score": str(normalized_confidence),
+        "recommendation": recommendation,
+        "participants": participants,
+        "counts": {
+            "findings_count": len(findings),
+            "evidence_for_count": len(evidence_for),
+            "evidence_against_count": len(evidence_against),
+        },
+        "risks": risks,
+    }
+    components_json = {
+        "baseline_yes_probability": str(baseline_yes_probability),
+        "market_yes_price": str(market_yes_price),
+        "recommended_probability_adjustment": str(net_adjustment),
+        "adjusted_yes_probability": str(adjusted_yes_probability),
+        "adjusted_no_probability": str(adjusted_no_probability),
+        "edge_signed": str(edge_signed),
+        "edge_magnitude": str(edge_magnitude),
+        "confidence_score": str(normalized_confidence),
+        "confidence_is_evidence_quality": True,
+        "participants": participants,
+        "findings": [
+            {
+                "finding_id": finding.id,
+                "factor_type": finding.factor_type,
+                "stance": finding.stance,
+                "impact_score": str(finding.impact_score),
+                "freshness_score": str(finding.freshness_score),
+                "credibility_score": str(finding.credibility_score),
+                "claim": finding.claim,
+                "citation_url": finding.citation_url,
+            }
+            for finding in findings
+        ],
+    }
+
+    return ResearchScoringResult(
+        baseline_yes_probability=baseline_yes_probability,
+        adjusted_yes_probability=adjusted_yes_probability,
+        adjusted_no_probability=adjusted_no_probability,
+        confidence_score=normalized_confidence,
+        net_adjustment=net_adjustment,
+        edge_signed=edge_signed,
+        edge_magnitude=edge_magnitude,
+        edge_class=edge_class,
+        opportunity=opportunity,
+        review_confidence=review_confidence,
+        review_edge=review_edge,
+        recommendation=recommendation,
+        thesis=thesis,
+        final_reasoning=final_reasoning,
+        evidence_for=evidence_for,
+        evidence_against=evidence_against,
+        risks=risks,
+        explanation_json=explanation_json,
+        components_json=components_json,
+    )
+
+
 def _weighted_strength(finding: ResearchFinding) -> Decimal:
     return _quantize_probability(
         finding.impact_score * finding.freshness_score * finding.credibility_score
@@ -295,6 +405,30 @@ def _serialize_contributions(items: list[dict[str, object]]) -> list[dict[str, o
     ]
 
 
+def _serialize_findings(findings: list[ResearchFinding]) -> list[dict[str, object]]:
+    ordered = sorted(
+        findings,
+        key=lambda finding: finding.impact_score * finding.freshness_score * finding.credibility_score,
+        reverse=True,
+    )
+    return [
+        {
+            "finding_id": finding.id,
+            "factor_type": finding.factor_type,
+            "stance": finding.stance,
+            "claim": finding.claim,
+            "evidence_summary": finding.evidence_summary,
+            "source_name": finding.source_name,
+            "citation_url": finding.citation_url,
+            "published_at": finding.published_at.isoformat() if finding.published_at else None,
+            "impact_score": str(finding.impact_score),
+            "freshness_score": str(finding.freshness_score),
+            "credibility_score": str(finding.credibility_score),
+        }
+        for finding in ordered[:5]
+    ]
+
+
 def _classify_edge(edge_magnitude: Decimal) -> str:
     if edge_magnitude < Decimal("0.0500"):
         return "no_signal"
@@ -317,6 +451,13 @@ def _quantize_probability(value: Decimal | None) -> Decimal:
     if value is None:
         return ZERO
     clamped = max(min(value, ONE), ZERO)
+    return clamped.quantize(PROBABILITY_SCALE, rounding=ROUND_HALF_UP)
+
+
+def _quantize_research_probability(value: Decimal | None) -> Decimal:
+    if value is None:
+        return MIN_RESEARCH_PROBABILITY
+    clamped = max(min(value, MAX_RESEARCH_PROBABILITY), MIN_RESEARCH_PROBABILITY)
     return clamped.quantize(PROBABILITY_SCALE, rounding=ROUND_HALF_UP)
 
 

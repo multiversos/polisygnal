@@ -18,8 +18,12 @@ from app.repositories.prediction_reports import create_prediction_report
 from app.repositories.predictions import create_prediction
 from app.repositories.research_runs import create_research_run, finalize_research_run
 from app.services.external_market import normalize_external_market_payload, parse_external_market_decimal
-from app.services.research.openai_client import ResearchOpenAIClient
-from app.services.research.scoring import ResearchScoringResult, score_local_research
+from app.services.research.openai_client import CheapResearchOutput, ResearchOpenAIClient
+from app.services.research.scoring import (
+    ResearchScoringResult,
+    score_llm_research,
+    score_local_research,
+)
 from app.services.research.screener import ResearchScreeningDecision, screen_market_for_research
 from app.services.structured_context import (
     STRUCTURED_CONTEXT_COMPONENTS,
@@ -29,6 +33,8 @@ from app.services.structured_context import (
 
 RESEARCH_LOCAL_MODEL_VERSION = "research_local_v1"
 RESEARCH_LOCAL_PREDICTION_FAMILY = "research_v1_local"
+RESEARCH_LLM_MODEL_VERSION = "research_llm_v1"
+RESEARCH_LLM_PREDICTION_FAMILY = "research_v1_llm"
 ZERO = Decimal("0")
 
 
@@ -70,26 +76,49 @@ def run_market_research(
     model_used: str | None = None
     web_search_used = False
     request_preview: dict[str, object] | None = None
+    cheap_research_output: CheapResearchOutput | None = None
+    run_error_message: str | None = None
 
     openai_client = ResearchOpenAIClient(settings=settings)
     try:
+        snapshot = get_latest_market_snapshot(db, market.id)
         if research_mode == "cheap_research":
-            if not openai_client.is_configured:
+            if not openai_client.is_enabled:
                 effective_mode = "local_only"
                 degraded_mode = True
-                partial_errors.append(
+                run_error_message = "OPENAI_RESEARCH_ENABLED=false; cheap_research cae a local_only."
+                partial_errors.append(run_error_message)
+            elif not openai_client.is_configured:
+                effective_mode = "local_only"
+                degraded_mode = True
+                run_error_message = (
                     "OPENAI_API_KEY ausente; cheap_research cae automaticamente a local_only."
                 )
-            else:
-                preparation = openai_client.prepare_cheap_research(
+                partial_errors.append(run_error_message)
+            elif snapshot is not None and snapshot.yes_price is not None:
+                research_result = openai_client.run_cheap_research(
                     market=market,
+                    snapshot=snapshot,
                     screening=screening,
                 )
-                model_used = preparation.model_used
-                web_search_used = preparation.web_search_used
+                model_used = research_result.model_used
+                web_search_used = research_result.web_search_used
+                request_preview = research_result.request_preview
+                if research_result.ok and research_result.output is not None:
+                    cheap_research_output = research_result.output
+                    degraded_mode = False
+                else:
+                    effective_mode = "local_only"
+                    degraded_mode = True
+                    run_error_message = research_result.error_message or (
+                        "OpenAI cheap_research fallo sin detalle; fallback local_only."
+                    )
+                    partial_errors.append(run_error_message)
+                    partial_errors.extend(research_result.notes)
+            else:
                 degraded_mode = True
-                request_preview = preparation.request_preview
-                partial_errors.extend(preparation.notes)
+                run_error_message = "No existe snapshot usable para cheap_research."
+                partial_errors.append(run_error_message)
 
         research_run = create_research_run(
             db,
@@ -115,7 +144,6 @@ def run_market_research(
             partial_errors=partial_errors,
         )
 
-        snapshot = get_latest_market_snapshot(db, market.id)
         if snapshot is None or snapshot.yes_price is None:
             finalize_research_run(
                 research_run,
@@ -124,7 +152,7 @@ def run_market_research(
                 total_sources_found=0,
                 total_sources_used=0,
                 confidence_score=None,
-                error_message="No existe snapshot usable para research.",
+                error_message=run_error_message or "No existe snapshot usable para research.",
                 metadata_json=_build_run_metadata(
                     research_run=research_run,
                     partial_errors=partial_errors,
@@ -133,29 +161,59 @@ def run_market_research(
             )
             return result
 
-        evidence_items = (
-            list_market_evidence_items(db, market_id=market.id)
-            if screening.should_research
-            else []
-        )
-        findings = _create_research_findings(
-            db,
-            market=market,
-            research_run=research_run,
-            screening=screening,
-            evidence_items=evidence_items,
-            baseline_yes_price=Decimal(snapshot.yes_price),
-        )
+        evidence_items: list[object] = []
+        if cheap_research_output is not None:
+            findings = _create_research_findings_from_llm(
+                db,
+                market=market,
+                research_run=research_run,
+                output=cheap_research_output,
+            )
+        else:
+            evidence_items = (
+                list_market_evidence_items(db, market_id=market.id)
+                if screening.should_research
+                else []
+            )
+            findings = _create_research_findings(
+                db,
+                market=market,
+                research_run=research_run,
+                screening=screening,
+                evidence_items=evidence_items,
+                baseline_yes_price=Decimal(snapshot.yes_price),
+            )
         result.findings = findings
 
-        scoring = score_local_research(
-            market=market,
-            snapshot=snapshot,
-            findings=findings,
-            degraded_mode=degraded_mode,
-            market_shape=screening.market_shape,
-            screening_skip_reason=screening.skip_reason,
-        )
+        if cheap_research_output is not None:
+            scoring = score_llm_research(
+                market=market,
+                snapshot=snapshot,
+                findings=findings,
+                market_summary=cheap_research_output.market_summary,
+                participants=cheap_research_output.participants,
+                confidence_score=cheap_research_output.confidence_score,
+                recommended_probability_adjustment=(
+                    cheap_research_output.recommended_probability_adjustment
+                ),
+                final_reasoning=cheap_research_output.final_reasoning,
+                recommendation=cheap_research_output.recommendation,
+                risks=cheap_research_output.risks,
+                model_used=model_used,
+            )
+            prediction_model_version = RESEARCH_LLM_MODEL_VERSION
+            prediction_family = RESEARCH_LLM_PREDICTION_FAMILY
+        else:
+            scoring = score_local_research(
+                market=market,
+                snapshot=snapshot,
+                findings=findings,
+                degraded_mode=degraded_mode,
+                market_shape=screening.market_shape,
+                screening_skip_reason=screening.skip_reason,
+            )
+            prediction_model_version = RESEARCH_LOCAL_MODEL_VERSION
+            prediction_family = RESEARCH_LOCAL_PREDICTION_FAMILY
 
         prediction = None
         if create_prediction_record:
@@ -163,8 +221,8 @@ def run_market_research(
                 db,
                 market_id=market.id,
                 run_at=current_run_at,
-                model_version=RESEARCH_LOCAL_MODEL_VERSION,
-                prediction_family=RESEARCH_LOCAL_PREDICTION_FAMILY,
+                model_version=prediction_model_version,
+                prediction_family=prediction_family,
                 research_run_id=research_run.id,
                 yes_probability=scoring.adjusted_yes_probability,
                 no_probability=scoring.adjusted_no_probability,
@@ -200,9 +258,18 @@ def run_market_research(
         result.report = report
 
         total_sources_found = len({item.source_id for item in evidence_items})
-        total_sources_used = len(
-            {finding.source_id for finding in findings if finding.source_id is not None}
-        )
+        if cheap_research_output is not None:
+            source_keys = {
+                finding.citation_url or finding.source_name
+                for finding in findings
+                if finding.citation_url or finding.source_name
+            }
+            total_sources_found = len(source_keys)
+            total_sources_used = len(source_keys)
+        else:
+            total_sources_used = len(
+                {finding.source_id for finding in findings if finding.source_id is not None}
+            )
         finalize_research_run(
             research_run,
             status="completed",
@@ -210,7 +277,7 @@ def run_market_research(
             total_sources_found=total_sources_found,
             total_sources_used=total_sources_used,
             confidence_score=scoring.confidence_score,
-            error_message=None,
+            error_message=run_error_message,
             metadata_json=_build_run_metadata(
                 research_run=research_run,
                 partial_errors=partial_errors,
@@ -303,6 +370,42 @@ def _create_research_findings(
                 "evidence_item_id": evidence_item.id,
                 "evidence_type": evidence_item.evidence_type,
                 "provider": evidence_item.provider,
+            },
+        )
+        db.add(finding)
+        findings.append(finding)
+
+    db.flush()
+    return findings
+
+
+def _create_research_findings_from_llm(
+    db: Session,
+    *,
+    market: Market,
+    research_run: ResearchRun,
+    output: CheapResearchOutput,
+) -> list[ResearchFinding]:
+    findings: list[ResearchFinding] = []
+    for evidence in [*output.evidence_for_yes, *output.evidence_against_yes]:
+        finding = ResearchFinding(
+            research_run_id=research_run.id,
+            market_id=market.id,
+            source_id=None,
+            factor_type=evidence.factor_type,
+            stance=evidence.stance,
+            impact_score=evidence.impact_score,
+            freshness_score=evidence.freshness_score,
+            credibility_score=evidence.credibility_score,
+            claim=evidence.claim,
+            evidence_summary=evidence.evidence_summary,
+            citation_url=evidence.citation_url,
+            source_name=evidence.source_name,
+            published_at=evidence.published_at,
+            metadata_json={
+                "provider": "openai_web_search",
+                "research_mode": "cheap_research",
+                "participants": output.participants,
             },
         )
         db.add(finding)
