@@ -465,13 +465,50 @@ h2 {
 }
 
 .upcoming-main {
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  min-width: 0;
 }
 
 .upcoming-side {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.upcoming-side > * {
+  min-width: 0;
+}
+
+.upcoming-date-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.upcoming-date-row span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.upcoming-date-row strong {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .urgency-pill {
@@ -724,6 +761,11 @@ h2 {
   -webkit-line-clamp: 3;
 }
 
+.upcoming-card .candidate-main-copy h3 {
+  -webkit-line-clamp: 4;
+  overflow-wrap: anywhere;
+}
+
 .candidate-main-copy p {
   margin: 0;
   color: var(--muted);
@@ -919,6 +961,10 @@ h2 {
   max-width: 560px;
 }
 
+.upcoming-card .participant-row {
+  max-width: none;
+}
+
 .participant-chip {
   display: inline-flex;
   align-items: center;
@@ -929,6 +975,11 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface-raised);
+}
+
+.upcoming-card .participant-chip {
+  min-width: 0;
+  border-radius: 8px;
 }
 
 .candidate-avatar {
@@ -965,6 +1016,14 @@ h2 {
   font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.upcoming-card .participant-name {
+  max-width: 260px;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .participant-role {
@@ -2198,9 +2257,12 @@ h2 {
   .dashboard-grid,
   .analysis-layout,
   .match-review-layout,
-  .analysis-hero,
-  .upcoming-main {
+  .analysis-hero {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .upcoming-side {
+    grid-template-columns: 1fr;
   }
 
   .panel-wide {
@@ -2235,6 +2297,8 @@ h2 {
   .filter-panel,
   .upcoming-filter-row,
   .upcoming-main,
+  .upcoming-side,
+  .upcoming-date-row,
   .upcoming-card-footer {
     grid-template-columns: 1fr;
   }

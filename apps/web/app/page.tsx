@@ -1150,15 +1150,21 @@ function UpcomingMarketCard({ market }: { market: UpcomingSportsMarket }) {
             Mercado #{market.market_id}
             {translatedEventTitle ? ` · ${translatedEventTitle}` : ""}
           </p>
-          <p>
-            Cierre: {formatDateTime(market.close_time)} · Evento:{" "}
-            {formatDateTime(market.event_time)}
-          </p>
         </div>
 
         <div className="upcoming-side">
           <UrgencyScoreBar score={score} />
           <MarketPricePanel candidate={market} />
+        </div>
+        <div className="upcoming-date-row" aria-label="Fechas del mercado">
+          <span>
+            <strong>Cierre</strong>
+            {formatDateTime(market.close_time)}
+          </span>
+          <span>
+            <strong>Evento</strong>
+            {formatDateTime(market.event_time)}
+          </span>
         </div>
       </div>
 
