@@ -118,8 +118,13 @@ TEAM_PROP_HINTS = (
 )
 MATCH_WINNER_HINTS = (
     " beat ",
+    " beats ",
     " defeat ",
     " defeats ",
+    " to beat ",
+    " win against ",
+    " wins against ",
+    " v ",
     " vs ",
     " versus ",
     " who will win series",

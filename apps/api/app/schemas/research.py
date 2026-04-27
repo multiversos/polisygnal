@@ -126,3 +126,32 @@ class ResearchCandidatesResponse(BaseModel):
     sport: str | None = None
     market_shape: str | None = None
     candidates: list[ResearchCandidateRead] = Field(default_factory=list)
+
+
+class UpcomingSportsMarketRead(BaseModel):
+    market_id: int
+    question: str
+    event_title: str | None = None
+    vertical: str
+    sport: str
+    market_shape: str
+    research_template_name: str
+    close_time: datetime | None = None
+    event_time: datetime | None = None
+    market_yes_price: Decimal | None = None
+    market_no_price: Decimal | None = None
+    liquidity: Decimal | None = None
+    volume: Decimal | None = None
+    candidate_score: Decimal
+    urgency_score: Decimal
+    reasons: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    participants: list[ResearchCandidateParticipantRead] = Field(default_factory=list)
+
+
+class UpcomingSportsResponse(BaseModel):
+    count: int
+    limit: int
+    items: list[UpcomingSportsMarketRead] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+    filters_applied: dict[str, object] = Field(default_factory=dict)

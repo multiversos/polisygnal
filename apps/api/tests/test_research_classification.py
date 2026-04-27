@@ -20,6 +20,30 @@ from app.services.research.classification import (
             "sports_nba_match_winner",
         ),
         (
+            "Lakers vs Warriors",
+            "nba",
+            "match_winner",
+            "sports_nba_match_winner",
+        ),
+        (
+            "Lakers v Warriors",
+            "nba",
+            "match_winner",
+            "sports_nba_match_winner",
+        ),
+        (
+            "Will Lakers defeat Warriors?",
+            "nba",
+            "match_winner",
+            "sports_nba_match_winner",
+        ),
+        (
+            "Will Lakers win against Warriors?",
+            "nba",
+            "match_winner",
+            "sports_nba_match_winner",
+        ),
+        (
             "Will the Boston Celtics win the NBA Finals?",
             "nba",
             "championship",
@@ -53,6 +77,12 @@ from app.services.research.classification import (
             "Will LeBron James score over 25.5 points?",
             "nba",
             "player_prop",
+            "sports_generic",
+        ),
+        (
+            "World Series winner",
+            "mlb",
+            "championship",
             "sports_generic",
         ),
         (

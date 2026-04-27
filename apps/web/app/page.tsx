@@ -55,6 +55,42 @@ type CandidatesResponse = {
   candidates: ResearchCandidate[];
 };
 
+type UpcomingSportsMarket = {
+  market_id: number;
+  question: string;
+  event_title?: string | null;
+  vertical: string;
+  sport: string;
+  market_shape: string;
+  research_template_name: string;
+  close_time?: string | null;
+  event_time?: string | null;
+  market_yes_price?: string | number | null;
+  market_no_price?: string | number | null;
+  liquidity?: string | number | null;
+  volume?: string | number | null;
+  candidate_score: string | number;
+  urgency_score: string | number;
+  reasons: string[];
+  warnings: string[];
+  participants: CandidateParticipant[];
+};
+
+type UpcomingSportsResponse = {
+  count: number;
+  limit: number;
+  items: UpcomingSportsMarket[];
+  counts: Record<string, number>;
+  filters_applied: Record<string, unknown>;
+};
+
+type MarketPriceLike = {
+  market_yes_price?: string | number | null;
+  market_no_price?: string | number | null;
+  liquidity?: string | number | null;
+  volume?: string | number | null;
+};
+
 type ExternalMarketSignal = {
   id: number;
   source: string;
@@ -97,6 +133,8 @@ type DashboardState = {
   overview: MarketsOverviewResponse | null;
   dashboardMeta: DashboardMetaResponse | null;
   candidates: ResearchCandidate[];
+  upcomingMarkets: UpcomingSportsMarket[];
+  upcomingCounts: Record<string, number> | null;
   externalSignals: ExternalMarketSignal[];
   loading: boolean;
   error: string | null;
@@ -107,6 +145,12 @@ type DashboardFilters = {
   sport: string;
   marketShape: string;
   limit: number;
+};
+
+type UpcomingFilters = {
+  sport: string;
+  days: number;
+  includeFutures: boolean;
 };
 
 type ThemePreference = "light" | "dark";
@@ -149,6 +193,10 @@ const quickLinks = [
   {
     label: "Candidatos de investigación",
     href: `${API_BASE_URL}/research/candidates?limit=10&vertical=sports`,
+  },
+  {
+    label: "Próximos mercados deportivos",
+    href: `${API_BASE_URL}/research/upcoming-sports?limit=10&days=7`,
   },
   { label: "Señales externas", href: `${API_BASE_URL}/external-signals/kalshi?limit=10` },
   { label: "Revisar coincidencias Kalshi", href: "/external-signals/matches" },
@@ -348,6 +396,30 @@ function formatDateTime(value: Date | string | null | undefined): string {
   });
 }
 
+function formatTimeRemaining(value: string | null | undefined): string {
+  if (!value) {
+    return "Fecha no disponible";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Fecha no disponible";
+  }
+
+  const diffMs = date.getTime() - Date.now();
+  if (diffMs < 0) {
+    return "Cierre pasado";
+  }
+
+  const hours = Math.round(diffMs / (1000 * 60 * 60));
+  if (hours < 24) {
+    return `${Math.max(hours, 1)} h restantes`;
+  }
+
+  const days = Math.round(hours / 24);
+  return `${days} d restantes`;
+}
+
 function scoreTone(score: unknown): string {
   const number = toNumber(score) ?? 0;
   if (number >= 80) {
@@ -415,6 +487,18 @@ function buildCandidatesPath(filters: DashboardFilters): string {
   return `/research/candidates?${params.toString()}`;
 }
 
+function buildUpcomingPath(filters: UpcomingFilters): string {
+  const params = new URLSearchParams({
+    limit: "8",
+    days: String(filters.days),
+    include_futures: String(filters.includeFutures),
+  });
+  if (filters.sport !== "all") {
+    params.set("sport", filters.sport);
+  }
+  return `/research/upcoming-sports?${params.toString()}`;
+}
+
 function formatOptionLabel(value: string): string {
   if (value === "all") {
     return "todos";
@@ -474,6 +558,16 @@ const reasonLabels: Record<string, string> = {
   yes_price_in_research_band: "precio SÍ investigable",
   no_price_in_research_band: "precio NO investigable",
   not_duplicate: "sin duplicado claro",
+  closes_within_24h: "cierra en menos de 24h",
+  closes_within_72h: "cierra en menos de 72h",
+  closes_within_7d: "cierra esta semana",
+  match_winner_market: "partido detectado",
+  sports_prop_market: "prop deportivo próximo",
+  valid_price_data: "precio válido",
+  participants_detected: "participantes detectados",
+  participant_detected: "participante detectado",
+  some_liquidity: "liquidez disponible",
+  some_volume: "volumen disponible",
 };
 
 const warningLabels: Record<string, string> = {
@@ -487,6 +581,13 @@ const warningLabels: Record<string, string> = {
   missing_latest_snapshot: "sin snapshot reciente",
   market_closed: "mercado cerrado",
   no_external_signal: "sin señal externa",
+  future_or_championship_market: "mercado futuro/campeonato",
+  ambiguous_or_generic_market: "mercado ambiguo o genérico",
+  outside_upcoming_window: "fuera de ventana próxima",
+  unknown_sport: "deporte no identificado",
+  participants_not_detected: "participantes no detectados",
+  liquidity_unknown: "liquidez desconocida",
+  volume_unknown: "volumen desconocido",
 };
 
 const marketTermTranslations: Record<string, string> = {
@@ -804,7 +905,7 @@ function CandidateParticipants({ candidate }: { candidate: ResearchCandidate }) 
   );
 }
 
-function MarketPricePanel({ candidate }: { candidate: ResearchCandidate }) {
+function MarketPricePanel({ candidate }: { candidate: MarketPriceLike }) {
   const yes = normalizeProbability(candidate.market_yes_price);
   const no = getNoProbability(candidate.market_yes_price, candidate.market_no_price);
   const yesWidth = getProbabilityBarWidth(
@@ -867,6 +968,25 @@ function CandidateScoreBar({ score }: { score: unknown }) {
     <div className="candidate-score-block" aria-label="Puntaje de candidato">
       <div className="candidate-score-heading">
         <span>Puntaje de candidato</span>
+        <strong>{formatScore(normalizedScore)}</strong>
+      </div>
+      <div className="candidate-score-track">
+        <span
+          className={`candidate-score-fill ${scoreTone(normalizedScore)}`}
+          style={{ width: `${normalizedScore}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function UrgencyScoreBar({ score }: { score: unknown }) {
+  const normalizedScore = Math.max(0, Math.min(100, toNumber(score) ?? 0));
+
+  return (
+    <div className="candidate-score-block" aria-label="Puntaje de cercanía">
+      <div className="candidate-score-heading">
+        <span>Puntaje de cercanía</span>
         <strong>{formatScore(normalizedScore)}</strong>
       </div>
       <div className="candidate-score-track">
@@ -979,6 +1099,81 @@ function CandidateCard({
           <h4>Advertencias</h4>
           <WarningChips warnings={candidate.warnings ?? []} />
         </section>
+      </div>
+    </article>
+  );
+}
+
+function UpcomingMarketCard({ market }: { market: UpcomingSportsMarket }) {
+  const question = market.question || "Mercado sin título";
+  const translatedQuestion = humanizeMarketTitle(question);
+  const translatedEventTitle = market.event_title
+    ? translateMarketSubtitleToSpanish(market.event_title)
+    : "";
+  const score = Math.max(0, Math.min(100, toNumber(market.urgency_score) ?? 0));
+  const timeReference = market.close_time ?? market.event_time ?? null;
+  const participants = market.participants ?? [];
+
+  return (
+    <article className="upcoming-card">
+      <div className="upcoming-card-header">
+        <div className="badge-row">
+          <span className="candidate-id">#{market.market_id}</span>
+          <span className="badge">{formatSportLabel(market.sport)}</span>
+          <span className="badge muted">{formatMarketShapeLabel(market.market_shape)}</span>
+          <span className="badge time-badge">{formatTimeRemaining(timeReference)}</span>
+        </div>
+        <strong className={`urgency-pill ${scoreTone(score)}`}>{formatScore(score)}</strong>
+      </div>
+
+      <div className="upcoming-main">
+        <div className="candidate-main-copy">
+          {participants.length > 0 ? (
+            <div className="participant-row">
+              {participants.slice(0, 2).map((participant) => (
+                <span className="participant-chip" key={`${market.market_id}-${participant.name}`}>
+                  <VisualAvatar
+                    name={participant.name}
+                    src={participant.logo_url || participant.image_url || null}
+                    abbreviation={participant.abbreviation || participantInitials(participant.name)}
+                  />
+                  <span className="participant-copy">
+                    <span className="participant-name">{participant.name}</span>
+                    <span className="participant-role">{formatParticipantRole(participant.role)}</span>
+                  </span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <h3 title={question}>{translatedQuestion}</h3>
+          <p>
+            Mercado #{market.market_id}
+            {translatedEventTitle ? ` · ${translatedEventTitle}` : ""}
+          </p>
+          <p>
+            Cierre: {formatDateTime(market.close_time)} · Evento:{" "}
+            {formatDateTime(market.event_time)}
+          </p>
+        </div>
+
+        <div className="upcoming-side">
+          <UrgencyScoreBar score={score} />
+          <MarketPricePanel candidate={market} />
+        </div>
+      </div>
+
+      <div className="upcoming-card-footer">
+        <div>
+          <h4>Por qué aparece aquí</h4>
+          <ReasonChips reasons={market.reasons ?? []} />
+        </div>
+        <div>
+          <h4>Advertencias</h4>
+          <WarningChips warnings={market.warnings ?? []} />
+        </div>
+        <a className="analysis-link" href={`/markets/${market.market_id}`}>
+          Ver análisis
+        </a>
       </div>
     </article>
   );
@@ -1101,11 +1296,18 @@ export default function DashboardPage() {
     marketShape: "all",
     limit: 10,
   });
+  const [upcomingFilters, setUpcomingFilters] = useState<UpcomingFilters>({
+    sport: "all",
+    days: 7,
+    includeFutures: false,
+  });
   const [state, setState] = useState<DashboardState>({
     health: null,
     overview: null,
     dashboardMeta: null,
     candidates: [],
+    upcomingMarkets: [],
+    upcomingCounts: null,
     externalSignals: [],
     loading: true,
     error: null,
@@ -1157,11 +1359,13 @@ export default function DashboardPage() {
     setState((current) => ({ ...current, loading: true, error: null }));
 
     const candidatesPath = buildCandidatesPath(filters);
-    const [health, overview, candidates, dashboardMeta, externalSignals] =
+    const upcomingPath = buildUpcomingPath(upcomingFilters);
+    const [health, overview, candidates, upcomingSports, dashboardMeta, externalSignals] =
       await Promise.allSettled([
         fetchJson<HealthResponse>("/health"),
         fetchJson<MarketsOverviewResponse>("/markets/overview"),
         fetchJson<CandidatesResponse>(candidatesPath),
+        fetchJson<UpcomingSportsResponse>(upcomingPath),
         fetchJson<DashboardMetaResponse>("/dashboard/latest/meta"),
         fetchJson<ExternalSignalsResponse>("/external-signals/kalshi?limit=10"),
       ]);
@@ -1172,6 +1376,9 @@ export default function DashboardPage() {
     }
     if (candidates.status === "rejected") {
       errors.push("No se pudieron cargar candidatos");
+    }
+    if (upcomingSports.status === "rejected") {
+      errors.push("No se pudieron cargar mercados próximos");
     }
     if (externalSignals.status === "rejected") {
       errors.push("No se pudieron cargar señales externas");
@@ -1184,13 +1391,17 @@ export default function DashboardPage() {
         dashboardMeta.status === "fulfilled" ? dashboardMeta.value : null,
       candidates:
         candidates.status === "fulfilled" ? candidates.value.candidates : [],
+      upcomingMarkets:
+        upcomingSports.status === "fulfilled" ? upcomingSports.value.items : [],
+      upcomingCounts:
+        upcomingSports.status === "fulfilled" ? upcomingSports.value.counts : null,
       externalSignals:
         externalSignals.status === "fulfilled" ? externalSignals.value.signals : [],
       loading: false,
       error: errors.length > 0 ? errors.join(". ") : null,
       updatedAt: new Date(),
     });
-  }, [filters]);
+  }, [filters, upcomingFilters]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1222,6 +1433,8 @@ export default function DashboardPage() {
 
   const topCandidates = state.candidates.slice(0, filters.limit);
   const candidatesPath = buildCandidatesPath(filters);
+  const upcomingPath = buildUpcomingPath(upcomingFilters);
+  const topUpcomingMarkets = state.upcomingMarkets.slice(0, 8);
   const candidatesById = useMemo(() => {
     const entries = state.candidates.map((candidate) => [candidate.market_id, candidate] as const);
     return new Map(entries);
@@ -1399,6 +1612,104 @@ export default function DashboardPage() {
         >
           {state.loading ? "Cargando" : "Actualizar"}
         </button>
+      </section>
+
+      <section className="panel upcoming-panel" aria-label="Próximos partidos y mercados cercanos">
+        <div className="panel-heading">
+          <div>
+            <h2>Próximos partidos / mercados cercanos</h2>
+            <p>
+              Mercados deportivos próximos por fecha de cierre o evento. Esta
+              sección ayuda a encontrar partidos para investigar; no es
+              recomendación de apuesta.
+            </p>
+          </div>
+          <a
+            className="text-link"
+            href={`${API_BASE_URL}${upcomingPath}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ver JSON
+          </a>
+        </div>
+
+        <div className="upcoming-filter-row" aria-label="Filtros de próximos mercados">
+          <div className="filter-group">
+            <label htmlFor="upcoming-sport-filter">Deporte</label>
+            <select
+              id="upcoming-sport-filter"
+              value={upcomingFilters.sport}
+              onChange={(event) =>
+                setUpcomingFilters((current) => ({ ...current, sport: event.target.value }))
+              }
+            >
+              {sportOptions.map((option) => (
+                <option key={option} value={option}>
+                  {formatOptionLabel(option)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-group">
+            <label htmlFor="upcoming-days-filter">Ventana</label>
+            <select
+              id="upcoming-days-filter"
+              value={upcomingFilters.days}
+              onChange={(event) =>
+                setUpcomingFilters((current) => ({
+                  ...current,
+                  days: Number(event.target.value),
+                }))
+              }
+            >
+              {[1, 3, 7].map((option) => (
+                <option key={option} value={option}>
+                  Próximos {option} {option === 1 ? "día" : "días"}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="toggle-control" htmlFor="include-futures-filter">
+            <input
+              checked={upcomingFilters.includeFutures}
+              id="include-futures-filter"
+              onChange={(event) =>
+                setUpcomingFilters((current) => ({
+                  ...current,
+                  includeFutures: event.target.checked,
+                }))
+              }
+              type="checkbox"
+            />
+            Incluir futuros
+          </label>
+        </div>
+
+        <div className="upcoming-summary-row">
+          <span>Total filtrados: {state.loading ? "..." : state.upcomingCounts?.matched_filters ?? 0}</span>
+          <span>Ganador de partido: {state.loading ? "..." : state.upcomingCounts?.match_winner ?? 0}</span>
+          <span>Futuros/campeonatos: {state.loading ? "..." : state.upcomingCounts?.championship_futures ?? 0}</span>
+        </div>
+
+        {state.loading ? (
+          <div className="empty-state">Cargando próximos mercados...</div>
+        ) : topUpcomingMarkets.length === 0 ? (
+          <div className="empty-state">
+            <strong>No se encontraron mercados de partidos próximos con los filtros actuales.</strong>
+            <p>
+              Puede que Polymarket no tenga mercados diarios disponibles o que
+              falte sincronizar datos recientes. Esta sección solo lee datos ya
+              guardados localmente.
+            </p>
+          </div>
+        ) : (
+          <div className="upcoming-card-grid">
+            {topUpcomingMarkets.map((market) => (
+              <UpcomingMarketCard key={market.market_id} market={market} />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="dashboard-grid">

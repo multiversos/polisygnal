@@ -378,8 +378,10 @@ def _infer_generic_participant_names(
 ) -> list[str]:
     normalized_question = question.strip().rstrip("?")
     patterns = (
-        r"^will\s+(?:the\s+)?(.+?)\s+(?:beat|defeat)\s+(?:the\s+)?(.+?)$",
-        r"^(.+?)\s+(?:vs\.?|versus)\s+(.+?)$",
+        r"^will\s+(?:the\s+)?(.+?)\s+(?:beat|beats|defeat|defeats|win\s+against)\s+(?:the\s+)?(.+?)$",
+        r"^(?:will\s+)?(?:the\s+)?(.+?)\s+to\s+beat\s+(?:the\s+)?(.+?)$",
+        r"^(?:the\s+)?(.+?)\s+(?:beats|defeats)\s+(?:the\s+)?(.+?)$",
+        r"^(.+?)\s+(?:v|vs\.?|versus)\s+(.+?)$",
     )
     for pattern in patterns:
         match = re.search(pattern, normalized_question, flags=re.IGNORECASE)

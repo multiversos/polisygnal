@@ -20,9 +20,11 @@ from app.schemas.research import (
     ResearchRunRead,
     ResearchRunRequest,
     ResearchRunResponse,
+    UpcomingSportsResponse,
 )
 from app.services.research.candidate_selector import list_research_candidates
 from app.services.research.pipeline import run_market_research
+from app.services.research.upcoming_market_selector import list_upcoming_sports_markets
 
 router = APIRouter()
 
@@ -53,6 +55,36 @@ def get_research_candidates(
         sport=sport,
         market_shape=market_shape,
         candidates=[candidate.to_payload() for candidate in candidates],
+    )
+
+
+@router.get(
+    "/research/upcoming-sports",
+    response_model=UpcomingSportsResponse,
+    tags=["research"],
+)
+def get_upcoming_sports_markets(
+    sport: str | None = Query(default=None),
+    limit: int = Query(default=10, ge=1, le=50),
+    days: int = Query(default=7, ge=1, le=30),
+    include_futures: bool = Query(default=False),
+    market_shape: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> UpcomingSportsResponse:
+    selection = list_upcoming_sports_markets(
+        db,
+        sport=sport,
+        limit=limit,
+        days=days,
+        include_futures=include_futures,
+        market_shape=market_shape,
+    )
+    return UpcomingSportsResponse(
+        count=len(selection.items),
+        limit=limit,
+        items=[item.to_payload() for item in selection.items],
+        counts=selection.counts,
+        filters_applied=selection.filters_applied,
     )
 
 
