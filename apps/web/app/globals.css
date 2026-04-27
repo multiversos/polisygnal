@@ -1720,27 +1720,60 @@ h2 {
 }
 
 .price-history-chart {
-  min-height: 150px;
-  padding: 12px;
+  position: relative;
+  min-height: 300px;
+  padding: 16px;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
   background:
-    linear-gradient(180deg, rgba(15, 118, 110, 0.06), transparent 62%),
+    radial-gradient(circle at 16% 10%, var(--accent-soft), transparent 34%),
+    linear-gradient(180deg, rgba(15, 118, 110, 0.08), transparent 58%),
     var(--surface-raised);
 }
 
 .price-history-chart.empty {
   display: grid;
   place-items: center;
+  min-height: 150px;
   color: var(--muted);
   font-size: 0.88rem;
   font-weight: 750;
 }
 
+.price-history-chart.single {
+  display: grid;
+  place-items: center;
+  min-height: 190px;
+}
+
+.price-history-single-card {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 340px);
+  padding: 16px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.price-history-single-card span,
+.price-history-single-card small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.price-history-single-card strong {
+  color: var(--accent-ink);
+  font-size: 1.5rem;
+}
+
 .price-history-chart svg {
   display: block;
   width: 100%;
-  height: 128px;
+  height: 260px;
   overflow: visible;
 }
 
@@ -1750,20 +1783,88 @@ h2 {
   vector-effect: non-scaling-stroke;
 }
 
+.price-history-axis-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.price-history-axis-label.x {
+  fill: var(--muted-strong);
+}
+
+.price-history-area {
+  fill: var(--accent-soft);
+  opacity: 0.55;
+}
+
 .price-history-line {
   fill: none;
   stroke: var(--accent);
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.4;
+  stroke-width: 3;
+  filter: drop-shadow(0 6px 12px rgba(15, 118, 110, 0.18));
   vector-effect: non-scaling-stroke;
 }
 
 .price-history-point {
   fill: var(--surface);
   stroke: var(--accent);
-  stroke-width: 1.8;
+  stroke-width: 2.2;
+  outline: none;
   vector-effect: non-scaling-stroke;
+}
+
+.price-history-point.active,
+.price-history-point:focus-visible {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2.8;
+}
+
+.price-history-hover-line {
+  stroke: var(--accent);
+  stroke-dasharray: 4 5;
+  stroke-width: 1.2;
+  opacity: 0.65;
+  vector-effect: non-scaling-stroke;
+}
+
+.price-history-interaction-zone {
+  cursor: crosshair;
+  fill: transparent;
+}
+
+.price-history-tooltip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  min-width: 188px;
+  padding: 10px 12px;
+  color: var(--foreground);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 12px));
+}
+
+.price-history-tooltip.below {
+  transform: translate(-50%, 12px);
+}
+
+.price-history-tooltip strong {
+  color: var(--foreground);
+  font-size: 0.78rem;
+}
+
+.price-history-tooltip span {
+  color: var(--muted-strong);
+  font-size: 0.76rem;
+  font-weight: 750;
 }
 
 .evidence-groups {

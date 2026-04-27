@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+  type TouchEvent,
+} from "react";
 
 type JsonPayload = Record<string, unknown> | unknown[];
 
@@ -67,6 +74,32 @@ type PriceHistoryResponse = {
   change_yes_abs?: string | number | null;
   change_yes_pct?: string | number | null;
   count: number;
+};
+
+type ValidPriceHistoryPoint = PriceHistoryPoint & {
+  originalIndex: number;
+  timestamp: number;
+  yes: number;
+  no: number | null;
+};
+
+type PriceHistoryChartPoint = ValidPriceHistoryPoint & {
+  index: number;
+  x: number;
+  y: number;
+};
+
+type PriceHistoryChartModel = {
+  areaPath: string;
+  coordinates: PriceHistoryChartPoint[];
+  height: number;
+  highlighted: Set<number>;
+  linePath: string;
+  padding: { top: number; right: number; bottom: number; left: number };
+  validPoints: ValidPriceHistoryPoint[];
+  width: number;
+  xLabels: Array<{ x: number; label: string }>;
+  yTicks: Array<{ value: number; label: string; y: number }>;
 };
 
 type CandidateContext = {
@@ -392,6 +425,32 @@ function formatDateTime(value?: string | null): string {
   });
 }
 
+function formatShortDateLabel(value?: string | null): string {
+  if (!value) {
+    return "N/D";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "N/D";
+  }
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === now.toDateString()) {
+    return `Hoy ${date.toLocaleTimeString("es-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    })}`;
+  }
+  if (date.toDateString() === yesterday.toDateString()) {
+    return "Ayer";
+  }
+  return date.toLocaleDateString("es-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function humanizeToken(value?: string | null): string {
   return value?.replaceAll("_", " ").replaceAll("-", " ").trim() || "N/D";
 }
@@ -690,15 +749,129 @@ function VisualAvatar({
   );
 }
 
-function PriceHistorySparkline({ points }: { points: PriceHistoryPoint[] }) {
-  const validPoints = points
-    .map((point) => ({
-      capturedAt: point.captured_at,
-      value: normalizeProbability(point.yes_price),
-    }))
-    .filter((point): point is { capturedAt: string; value: number } => point.value !== null);
+function PriceHistoryChart({ points }: { points: PriceHistoryPoint[] }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const chart = useMemo<PriceHistoryChartModel>(() => {
+    const width = 640;
+    const height = 260;
+    const padding = { top: 22, right: 18, bottom: 40, left: 50 };
+    const validPoints = points
+      .map((point, originalIndex) => {
+        const yes = normalizeProbability(point.yes_price);
+        if (yes === null) {
+          return null;
+        }
+        const parsedDate = new Date(point.captured_at);
+        const timestamp = Number.isNaN(parsedDate.getTime())
+          ? originalIndex
+          : parsedDate.getTime();
+        return {
+          ...point,
+          originalIndex,
+          timestamp,
+          yes,
+          no: getNoProbability(point.yes_price, point.no_price),
+        };
+      })
+      .filter(
+        (
+          point,
+        ): point is PriceHistoryPoint & {
+          originalIndex: number;
+          timestamp: number;
+          yes: number;
+          no: number | null;
+        } => point !== null,
+      )
+      .sort((first, second) => first.timestamp - second.timestamp || first.originalIndex - second.originalIndex);
 
-  if (validPoints.length === 0) {
+    if (validPoints.length === 0) {
+      return {
+        areaPath: "",
+        coordinates: [],
+        height,
+        highlighted: new Set<number>(),
+        linePath: "",
+        padding,
+        validPoints: [],
+        width,
+        xLabels: [],
+        yTicks: [],
+      };
+    }
+
+    const plotWidth = width - padding.left - padding.right;
+    const plotHeight = height - padding.top - padding.bottom;
+    const values = validPoints.map((point) => point.yes);
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    const rangePadding = Math.max((rawMax - rawMin) * 0.18, 0.025);
+    const yMin = Math.max(0, rawMin - rangePadding);
+    const yMax = Math.min(1, rawMax + rangePadding);
+    const safeRange = Math.max(0.01, yMax - yMin);
+    const firstTimestamp = validPoints[0]?.timestamp ?? 0;
+    const lastTimestamp = validPoints.at(-1)?.timestamp ?? firstTimestamp;
+    const timeRange = Math.max(1, lastTimestamp - firstTimestamp);
+    const coordinates = validPoints.map((point, index) => {
+      const x =
+        validPoints.length === 1
+          ? padding.left + plotWidth / 2
+          : padding.left + ((point.timestamp - firstTimestamp) / timeRange) * plotWidth;
+      const y = padding.top + ((yMax - point.yes) / safeRange) * plotHeight;
+      return { ...point, index, x, y };
+    });
+    const linePath = coordinates
+      .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+      .join(" ");
+    const baseline = padding.top + plotHeight;
+    const lastCoordinate = coordinates.at(-1);
+    const areaPath =
+      coordinates.length > 1 && lastCoordinate
+        ? `${linePath} L ${lastCoordinate.x.toFixed(1)} ${baseline} L ${coordinates[0].x.toFixed(1)} ${baseline} Z`
+        : "";
+    const minIndex = coordinates.reduce(
+      (bestIndex, point, index) => (point.yes < coordinates[bestIndex].yes ? index : bestIndex),
+      0,
+    );
+    const maxIndex = coordinates.reduce(
+      (bestIndex, point, index) => (point.yes > coordinates[bestIndex].yes ? index : bestIndex),
+      0,
+    );
+    const highlighted = new Set<number>([0, coordinates.length - 1, minIndex, maxIndex]);
+    if (coordinates.length <= 8) {
+      coordinates.forEach((_, index) => highlighted.add(index));
+    }
+    if (activeIndex !== null) {
+      highlighted.add(activeIndex);
+    }
+    const yTicks = [yMax, yMin + safeRange / 2, yMin].map((value) => ({
+      value,
+      label: `${(value * 100).toFixed(0)}%`,
+      y: padding.top + ((yMax - value) / safeRange) * plotHeight,
+    }));
+    const labelIndexes = Array.from(
+      new Set([0, Math.floor((coordinates.length - 1) / 2), coordinates.length - 1]),
+    );
+    const xLabels = labelIndexes.map((index) => ({
+      x: coordinates[index].x,
+      label: formatShortDateLabel(coordinates[index].captured_at),
+    }));
+
+    return {
+      areaPath,
+      coordinates,
+      height,
+      highlighted,
+      linePath,
+      padding,
+      validPoints,
+      width,
+      xLabels,
+      yTicks,
+    };
+  }, [activeIndex, points]);
+
+  if (chart.validPoints.length === 0 || chart.coordinates.length === 0) {
     return (
       <div className="price-history-chart empty" aria-hidden="true">
         Sin puntos de precio válidos
@@ -706,34 +879,128 @@ function PriceHistorySparkline({ points }: { points: PriceHistoryPoint[] }) {
     );
   }
 
-  const coordinates = validPoints.map((point, index) => {
-    const x = validPoints.length === 1 ? 50 : (index / (validPoints.length - 1)) * 100;
-    const y = 38 - point.value * 34;
-    return { ...point, x, y };
-  });
-  const path = coordinates.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+  const { coordinates, height, width } = chart;
+  const activePoint =
+    activeIndex !== null && coordinates[activeIndex] ? coordinates[activeIndex] : null;
+  const updateActivePoint = (clientX: number, target: SVGRectElement) => {
+    const bounds = target.getBoundingClientRect();
+    const relativeX = ((clientX - bounds.left) / Math.max(bounds.width, 1)) * width;
+    const nearestIndex = coordinates.reduce((bestIndex, point, index) => {
+      const bestDistance = Math.abs(coordinates[bestIndex].x - relativeX);
+      const currentDistance = Math.abs(point.x - relativeX);
+      return currentDistance < bestDistance ? index : bestIndex;
+    }, 0);
+    setActiveIndex(nearestIndex);
+  };
+  const handleMouseMove = (event: MouseEvent<SVGRectElement>) => {
+    updateActivePoint(event.clientX, event.currentTarget);
+  };
+  const handleTouchMove = (event: TouchEvent<SVGRectElement>) => {
+    const touch = event.touches[0];
+    if (touch) {
+      updateActivePoint(touch.clientX, event.currentTarget);
+    }
+  };
+
+  if (coordinates.length === 1) {
+    const onlyPoint = coordinates[0];
+    return (
+      <div className="price-history-chart single">
+        <div className="price-history-single-card">
+          <span>Solo hay un snapshot disponible</span>
+          <strong>{formatProbability(onlyPoint.yes)}</strong>
+          <small>{formatDateTime(onlyPoint.captured_at)}</small>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       className="price-history-chart"
       role="img"
-      aria-label={`Historial de precio SÍ con ${validPoints.length} puntos válidos`}
+      aria-label={`Historial de precio SÍ con ${coordinates.length} puntos válidos`}
     >
-      <svg viewBox="0 0 100 42" preserveAspectRatio="none" aria-hidden="true">
-        <line className="price-history-grid-line" x1="0" x2="100" y1="4" y2="4" />
-        <line className="price-history-grid-line" x1="0" x2="100" y1="21" y2="21" />
-        <line className="price-history-grid-line" x1="0" x2="100" y1="38" y2="38" />
-        {coordinates.length > 1 ? <path className="price-history-line" d={path} /> : null}
-        {coordinates.map((point, index) => (
-          <circle
-            className="price-history-point"
-            cx={point.x}
-            cy={point.y}
-            key={`${point.capturedAt}-${index}`}
-            r="1.7"
-          />
+      <svg viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+        {chart.yTicks.map((tick) => (
+          <g key={tick.label}>
+            <line
+              className="price-history-grid-line"
+              x1={chart.padding.left}
+              x2={width - chart.padding.right}
+              y1={tick.y}
+              y2={tick.y}
+            />
+            <text className="price-history-axis-label y" x="12" y={tick.y + 4}>
+              {tick.label}
+            </text>
+          </g>
         ))}
+        <path className="price-history-area" d={chart.areaPath} />
+        <path className="price-history-line" d={chart.linePath} />
+        {activePoint ? (
+          <line
+            className="price-history-hover-line"
+            x1={activePoint.x}
+            x2={activePoint.x}
+            y1={chart.padding.top}
+            y2={height - chart.padding.bottom}
+          />
+        ) : null}
+        {coordinates.map((point) =>
+          chart.highlighted.has(point.index) ? (
+            <circle
+              className={`price-history-point ${activeIndex === point.index ? "active" : ""}`}
+              cx={point.x}
+              cy={point.y}
+              key={`point-${point.snapshot_id}-${point.index}`}
+              onBlur={() => setActiveIndex(null)}
+              onFocus={() => setActiveIndex(point.index)}
+              r={activeIndex === point.index ? 5 : 3.8}
+              tabIndex={0}
+            />
+          ) : null,
+        )}
+        {chart.xLabels.map((label) => (
+          <text
+            className="price-history-axis-label x"
+            key={`${label.label}-${label.x}`}
+            textAnchor={label.x < width / 3 ? "start" : label.x > (width * 2) / 3 ? "end" : "middle"}
+            x={label.x}
+            y={height - 12}
+          >
+            {label.label}
+          </text>
+        ))}
+        <rect
+          className="price-history-interaction-zone"
+          height={height - chart.padding.bottom - chart.padding.top}
+          onClick={handleMouseMove}
+          onMouseLeave={() => setActiveIndex(null)}
+          onMouseMove={handleMouseMove}
+          onTouchEnd={() => setActiveIndex(null)}
+          onTouchMove={handleTouchMove}
+          onTouchStart={handleTouchMove}
+          width={width - chart.padding.left - chart.padding.right}
+          x={chart.padding.left}
+          y={chart.padding.top}
+        />
       </svg>
+      {activePoint ? (
+        <div
+          className={`price-history-tooltip ${activePoint.y < 92 ? "below" : ""}`}
+          style={{
+            left: `min(max(${(activePoint.x / width) * 100}%, 94px), calc(100% - 94px))`,
+            top: `${activePoint.y + 16}px`,
+          }}
+        >
+          <strong>{formatDateTime(activePoint.captured_at)}</strong>
+          <span>SÍ {formatProbability(activePoint.yes)}</span>
+          <span>NO {formatProbability(activePoint.no)}</span>
+          <span>Liquidez {formatCompact(activePoint.liquidity)}</span>
+          <span>Volumen {formatCompact(activePoint.volume)}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -828,6 +1095,12 @@ function PriceHistoryPanel({
     );
   }
 
+  const validYesPrices = history.points
+    .map((point) => normalizeProbability(point.yes_price))
+    .filter((value): value is number => value !== null);
+  const maxYesPrice = validYesPrices.length > 0 ? Math.max(...validYesPrices) : null;
+  const minYesPrice = validYesPrices.length > 0 ? Math.min(...validYesPrices) : null;
+
   return (
     <section className="analysis-section">
       <div className="analysis-section-heading">
@@ -858,10 +1131,18 @@ function PriceHistoryPanel({
             <span>Cambio porcentual</span>
             <strong>{formatSignedRatio(history.change_yes_pct)}</strong>
           </div>
+          <div>
+            <span>Máximo del rango</span>
+            <strong>{formatProbability(maxYesPrice)}</strong>
+          </div>
+          <div>
+            <span>Mínimo del rango</span>
+            <strong>{formatProbability(minYesPrice)}</strong>
+          </div>
         </div>
-        <PriceHistorySparkline points={history.points} />
+        <PriceHistoryChart points={history.points} />
         <p className="section-note">
-          El historial ayuda a ver movimiento del mercado, no predice el resultado.
+          El historial muestra cómo se ha movido el precio SÍ con el tiempo. No predice el resultado ni recomienda apostar.
         </p>
       </div>
     </section>
