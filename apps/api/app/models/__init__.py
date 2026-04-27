@@ -9,6 +9,7 @@ from app.models.prediction import Prediction
 from app.models.research_finding import ResearchFinding
 from app.models.research_run import ResearchRun
 from app.models.source import Source
+from app.models.watchlist_item import WatchlistItem
 
 __all__ = [
     "EvidenceItem",
@@ -22,4 +23,5 @@ __all__ = [
     "ResearchFinding",
     "ResearchRun",
     "Source",
+    "WatchlistItem",
 ]

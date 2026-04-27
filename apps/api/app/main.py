@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 from app.api.routes_external_signals import router as external_signals_router
 from app.api.routes_research import router as research_router
+from app.api.routes_watchlist import router as watchlist_router
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -27,6 +28,7 @@ if settings.cors_origins:
 app.include_router(router)
 app.include_router(research_router)
 app.include_router(external_signals_router)
+app.include_router(watchlist_router)
 
 
 @app.get("/", tags=["meta"])

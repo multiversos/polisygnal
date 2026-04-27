@@ -23,6 +23,7 @@ from app.models import (
     ResearchFinding,
     ResearchRun,
     Source,
+    WatchlistItem,
 )
 
 
@@ -40,6 +41,7 @@ def db_session() -> Generator[Session, None, None]:
         ResearchFinding,
         ResearchRun,
         Source,
+        WatchlistItem,
     )
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
