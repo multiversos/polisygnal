@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -89,3 +90,28 @@ class ExternalMarketSignalsResponse(BaseModel):
     ticker: str | None = None
     market_id: int | None = None
     signals: list[ExternalMarketSignalRead] = Field(default_factory=list)
+
+
+class ExternalSignalMatchThresholds(BaseModel):
+    auto_link: Decimal
+    review_min: Decimal
+
+
+class ExternalSignalMatchCandidateRead(BaseModel):
+    market_id: int
+    market_question: str
+    sport: str | None = None
+    market_shape: str | None = None
+    match_confidence: Decimal
+    match_reason: str
+    warnings: list[str] = Field(default_factory=list)
+    action: Literal["would_link", "review_required", "no_match"]
+
+
+class ExternalSignalMatchCandidatesResponse(BaseModel):
+    signal_id: int
+    source: str
+    source_ticker: str | None = None
+    signal_title: str | None = None
+    thresholds: ExternalSignalMatchThresholds
+    candidates: list[ExternalSignalMatchCandidateRead] = Field(default_factory=list)

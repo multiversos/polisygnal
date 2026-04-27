@@ -186,6 +186,139 @@ def test_external_signal_routes_return_stable_empty_state(
     assert after == before
 
 
+def test_unmatched_external_signals_route_returns_only_unlinked_signals(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(db_session, suffix="unmatched-route")
+    linked = _create_signal(
+        db_session,
+        market_id=market.id,
+        source="kalshi",
+        ticker="KXNBAFINAL-26CELTICS-CELTICS",
+    )
+    unlinked = _create_signal(
+        db_session,
+        market_id=None,
+        source="kalshi",
+        ticker="KXNBAFINAL-26KNICKS-KNICKS",
+        title="New York Knicks NBA Championship 2026",
+    )
+    _create_signal(
+        db_session,
+        market_id=None,
+        source="other_source",
+        ticker="OTHER",
+    )
+    db_session.commit()
+
+    response = client.get("/external-signals/unmatched?source=kalshi&limit=10")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "kalshi"
+    assert payload["count"] == 1
+    assert payload["signals"][0]["id"] == unlinked.id
+    assert payload["signals"][0]["id"] != linked.id
+
+
+def test_external_signal_match_candidates_route_returns_thresholds_and_actions(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(
+        db_session,
+        suffix="match-candidates",
+        question="Will the Boston Celtics win the 2026 NBA Finals?",
+    )
+    signal = _create_signal(
+        db_session,
+        market_id=None,
+        source="kalshi",
+        ticker="KXNBAFINAL-26CELTICS-CELTICS",
+        title="Boston Celtics NBA Championship 2026",
+    )
+    db_session.commit()
+    before_signal_count = db_session.scalar(select(func.count()).select_from(ExternalMarketSignal))
+
+    response = client.get(f"/external-signals/{signal.id}/match-candidates?limit=3")
+    db_session.refresh(signal)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["signal_id"] == signal.id
+    assert payload["source"] == "kalshi"
+    assert Decimal(payload["thresholds"]["auto_link"]) == Decimal("0.8000")
+    assert Decimal(payload["thresholds"]["review_min"]) == Decimal("0.6000")
+    assert payload["candidates"][0]["market_id"] == market.id
+    assert payload["candidates"][0]["action"] == "would_link"
+    assert Decimal(payload["candidates"][0]["match_confidence"]) >= Decimal("0.8000")
+    assert payload["candidates"][0]["sport"] == "nba"
+    assert payload["candidates"][0]["market_shape"] == "championship"
+    assert signal.polymarket_market_id is None
+    assert signal.match_confidence is None
+    assert db_session.scalar(select(func.count()).select_from(ExternalMarketSignal)) == before_signal_count
+    assert db_session.scalar(select(func.count()).select_from(Prediction)) == 0
+    assert db_session.scalar(select(func.count()).select_from(ResearchRun)) == 0
+
+
+def test_external_signal_match_candidates_route_classifies_review_and_no_match(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    _create_market(
+        db_session,
+        suffix="review-candidates",
+        question="Will the Boston Celtics win the 2026 NBA Finals?",
+    )
+    good_signal = _create_signal(
+        db_session,
+        market_id=None,
+        source="kalshi",
+        ticker="KXNBAFINAL-26CELTICS-CELTICS",
+        title="Boston Celtics NBA Championship 2026",
+    )
+    weak_signal = _create_signal(
+        db_session,
+        market_id=None,
+        source="kalshi",
+        ticker="KXNBAGAME-LAL-GSW",
+        title="Lakers vs Warriors",
+    )
+    db_session.commit()
+
+    review_response = client.get(
+        f"/external-signals/{good_signal.id}/match-candidates?limit=1&min_confidence=0.95"
+    )
+    no_match_response = client.get(f"/external-signals/{weak_signal.id}/match-candidates?limit=1")
+
+    assert review_response.status_code == 200
+    assert review_response.json()["candidates"][0]["action"] == "review_required"
+    assert no_match_response.status_code == 200
+    assert no_match_response.json()["candidates"][0]["action"] == "no_match"
+
+
+def test_external_signal_match_candidates_route_handles_missing_signal_and_no_candidates(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    signal = _create_signal(
+        db_session,
+        market_id=None,
+        source="kalshi",
+        ticker="KXNBAFINAL-26CELTICS-CELTICS",
+        title="Boston Celtics NBA Championship 2026",
+    )
+    db_session.commit()
+
+    missing_response = client.get("/external-signals/999999/match-candidates")
+    empty_response = client.get(f"/external-signals/{signal.id}/match-candidates")
+
+    assert missing_response.status_code == 404
+    assert empty_response.status_code == 200
+    assert empty_response.json()["candidates"] == []
+
+
 def test_fetch_kalshi_signals_parser_imports_and_defaults_to_dry_run() -> None:
     parser = build_parser()
 
@@ -228,24 +361,30 @@ def _fixture(name: str) -> dict[str, object]:
     return json.loads((FIXTURES_DIR / name).read_text(encoding="utf-8"))
 
 
-def _create_market(db_session: Session) -> Market:
+def _create_market(
+    db_session: Session,
+    *,
+    suffix: str = "external-signal",
+    question: str = "Will the Boston Celtics win the 2026 NBA Finals?",
+    market_type: str = "championship",
+) -> Market:
     event = Event(
-        polymarket_event_id="event-external-signal",
+        polymarket_event_id=f"event-{suffix}",
         title="NBA Finals",
         category="sports",
-        slug="event-external-signal",
+        slug=f"event-{suffix}",
         active=True,
         closed=False,
     )
     db_session.add(event)
     db_session.flush()
     market = Market(
-        polymarket_market_id="market-external-signal",
+        polymarket_market_id=f"market-{suffix}",
         event_id=event.id,
-        question="Will the Boston Celtics win the 2026 NBA Finals?",
-        slug="market-external-signal",
+        question=question,
+        slug=f"market-{suffix}",
         sport_type="nba",
-        market_type="championship",
+        market_type=market_type,
         active=True,
         closed=False,
     )
@@ -260,6 +399,7 @@ def _create_signal(
     market_id: int | None,
     source: str,
     ticker: str,
+    title: str | None = None,
 ) -> ExternalMarketSignal:
     signal = create_external_market_signal(
         db_session,
@@ -268,7 +408,7 @@ def _create_signal(
             source_ticker=ticker,
             source_market_id=ticker,
             polymarket_market_id=market_id,
-            title=f"{ticker} title",
+            title=title or f"{ticker} title",
             yes_probability=Decimal("0.5000"),
             no_probability=Decimal("0.5000"),
             best_yes_bid=Decimal("0.4500"),

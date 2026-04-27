@@ -151,6 +151,7 @@ const quickLinks = [
     href: `${API_BASE_URL}/research/candidates?limit=10&vertical=sports`,
   },
   { label: "Señales externas", href: `${API_BASE_URL}/external-signals/kalshi?limit=10` },
+  { label: "Revisar coincidencias Kalshi", href: "/external-signals/matches" },
 ];
 
 async function fetchJson<T>(path: string): Promise<T> {
@@ -1454,14 +1455,19 @@ export default function DashboardPage() {
                 Son datos comparativos, no instrucciones de apuesta.
               </p>
             </div>
-            <a
-              className="text-link"
-              href={`${API_BASE_URL}/external-signals/kalshi?limit=10`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Ver JSON de Kalshi
-            </a>
+            <div className="panel-action-links">
+              <a className="text-link" href="/external-signals/matches">
+                Revisar coincidencias Kalshi
+              </a>
+              <a
+                className="text-link"
+                href={`${API_BASE_URL}/external-signals/kalshi?limit=10`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ver JSON de Kalshi
+              </a>
+            </div>
           </div>
 
           <p className="external-summary-help">
@@ -1627,7 +1633,12 @@ export default function DashboardPage() {
           </div>
           <nav className="quick-links" aria-label="Enlaces rápidos">
             {quickLinks.map((link) => (
-              <a href={link.href} key={link.href} target="_blank" rel="noreferrer">
+              <a
+                href={link.href}
+                key={link.href}
+                rel={link.href.startsWith("http") ? "noreferrer" : undefined}
+                target={link.href.startsWith("http") ? "_blank" : undefined}
+              >
                 <span>{link.label}</span>
                 <span aria-hidden="true">Abrir</span>
               </a>
