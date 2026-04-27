@@ -2,22 +2,42 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import REPO_ROOT
+from app.models.external_market_signal import ExternalMarketSignal
+from app.models.prediction import Prediction
+from app.models.prediction_report import PredictionReport
+from app.models.research_finding import ResearchFinding
+from app.models.research_run import ResearchRun
 from app.schemas.briefing import (
     BriefingFilters,
     BriefingFreshness,
     BriefingMarketItem,
     BriefingOperationalCounts,
     BriefingReviewItem,
+    DailyBriefingCounts,
+    DailyBriefingExternalSignal,
+    DailyBriefingPriceMover,
+    DailyBriefingRead,
+    DailyBriefingResearchGap,
+    DailyBriefingSummary,
+    DailyBriefingWatchlistItem,
     OperationalBriefingResponse,
 )
 from app.schemas.overview import MarketOverviewItem
+from app.schemas.watchlist import WatchlistItemRead
+from app.services.external_market_signal_matching import list_unlinked_external_signals
+from app.services.market_price_history import build_market_price_history
 from app.services.market_overview import build_markets_overview
+from app.services.research.candidate_selector import list_research_candidates
+from app.services.research.upcoming_market_selector import UpcomingSportsMarket, list_upcoming_sports_markets
+from app.services.watchlist import list_watchlist_items
 
 BRIEFING_OVERVIEW_LIMIT = 10_000
 
@@ -85,6 +105,94 @@ def build_operational_briefing(
             items,
             repo_root=repo_root or REPO_ROOT,
         ),
+    )
+
+
+def build_daily_briefing(
+    db: Session,
+    *,
+    sport: str | None = None,
+    days: int = 3,
+    limit: int = 10,
+) -> DailyBriefingRead:
+    safe_days = max(days, 1)
+    safe_limit = max(limit, 1)
+    generated_at = datetime.now(tz=UTC)
+
+    upcoming_selection = list_upcoming_sports_markets(
+        db,
+        sport=sport,
+        days=safe_days,
+        limit=safe_limit,
+    )
+    watchlist_items = _filter_watchlist_by_sport(list_watchlist_items(db), sport)[:safe_limit]
+    unmatched_signals = list_unlinked_external_signals(db, source="kalshi", limit=safe_limit)
+    candidates = list_research_candidates(
+        db,
+        limit=safe_limit,
+        vertical="sports",
+        sport=sport,
+    )
+
+    market_context = _build_market_context(upcoming_selection.items, watchlist_items)
+    research_gaps = _build_research_gaps(db, market_context, limit=safe_limit)
+    price_movers = _build_price_movers(db, market_context, limit=safe_limit)
+
+    return DailyBriefingRead(
+        summary=DailyBriefingSummary(
+            generated_at=generated_at,
+            sport=sport,
+            days=safe_days,
+            limit=safe_limit,
+            counts=DailyBriefingCounts(
+                upcoming_count=upcoming_selection.counts.get(
+                    "matched_filters",
+                    len(upcoming_selection.items),
+                ),
+                watchlist_count=len(watchlist_items),
+                unmatched_external_signals_count=_count_unmatched_external_signals(db),
+                candidates_count=len(candidates),
+                research_gaps_count=len(research_gaps),
+                price_movers_count=len(price_movers),
+            ),
+            warnings=[],
+        ),
+        upcoming_markets=[item.to_payload() for item in upcoming_selection.items],
+        watchlist=[
+            DailyBriefingWatchlistItem(
+                id=item.id,
+                market_id=item.market_id,
+                question=item.market_question,
+                status=item.status,
+                note=item.note,
+                sport=item.sport,
+                market_shape=item.market_shape,
+                close_time=item.close_time,
+                latest_yes_price=item.latest_yes_price,
+                latest_no_price=item.latest_no_price,
+                liquidity=item.liquidity,
+                volume=item.volume,
+                updated_at=item.updated_at,
+            )
+            for item in watchlist_items
+        ],
+        unmatched_external_signals=[
+            DailyBriefingExternalSignal(
+                id=signal.id,
+                source=signal.source,
+                source_ticker=signal.source_ticker,
+                title=signal.title,
+                yes_probability=signal.yes_probability,
+                no_probability=signal.no_probability,
+                source_confidence=signal.source_confidence,
+                match_confidence=signal.match_confidence,
+                warnings=signal.warnings,
+                fetched_at=signal.fetched_at,
+            )
+            for signal in unmatched_signals
+        ],
+        research_gaps=research_gaps,
+        price_movers=price_movers,
     )
 
 
@@ -164,6 +272,145 @@ def render_operational_briefing_text(briefing: OperationalBriefingResponse) -> s
         ]
     )
     return "\n".join(lines)
+
+
+def _filter_watchlist_by_sport(
+    items: list[WatchlistItemRead],
+    sport: str | None,
+) -> list[WatchlistItemRead]:
+    if not sport:
+        return items
+    normalized_sport = sport.lower()
+    return [item for item in items if (getattr(item, "sport", None) or "").lower() == normalized_sport]
+
+
+def _build_market_context(
+    upcoming_items: list[UpcomingSportsMarket],
+    watchlist_items: list[WatchlistItemRead],
+) -> dict[int, dict[str, object]]:
+    context: dict[int, dict[str, object]] = {}
+    for item in upcoming_items:
+        context.setdefault(
+            item.market_id,
+            {
+                "market_id": item.market_id,
+                "question": item.question,
+                "sport": item.sport,
+                "market_shape": item.market_shape,
+                "source_section": "upcoming_markets",
+            },
+        )
+    for item in watchlist_items:
+        market_id = item.market_id
+        context.setdefault(
+            market_id,
+            {
+                "market_id": market_id,
+                "question": item.market_question,
+                "sport": item.sport,
+                "market_shape": item.market_shape,
+                "source_section": "watchlist",
+            },
+        )
+    return context
+
+
+def _build_research_gaps(
+    db: Session,
+    market_context: dict[int, dict[str, object]],
+    *,
+    limit: int,
+) -> list[DailyBriefingResearchGap]:
+    market_ids = list(market_context.keys())
+    if not market_ids:
+        return []
+
+    runs_market_ids = _existing_market_ids(db, ResearchRun.market_id, market_ids)
+    findings_market_ids = _existing_market_ids(db, ResearchFinding.market_id, market_ids)
+    reports_market_ids = _existing_market_ids(db, PredictionReport.market_id, market_ids)
+
+    gaps: list[DailyBriefingResearchGap] = []
+    for market_id, context in market_context.items():
+        reasons: list[str] = []
+        if market_id not in runs_market_ids:
+            reasons.append("sin_research_runs")
+        if market_id not in findings_market_ids:
+            reasons.append("sin_evidencia_guardada")
+        if market_id not in reports_market_ids:
+            reasons.append("sin_reporte_de_prediccion")
+        if not reasons:
+            continue
+        gaps.append(
+            DailyBriefingResearchGap(
+                market_id=market_id,
+                question=str(context["question"]),
+                sport=context.get("sport") if isinstance(context.get("sport"), str) else None,
+                market_shape=(
+                    context.get("market_shape")
+                    if isinstance(context.get("market_shape"), str)
+                    else None
+                ),
+                source_section=str(context["source_section"]),
+                reasons=reasons,
+            )
+        )
+    return gaps[:limit]
+
+
+def _build_price_movers(
+    db: Session,
+    market_context: dict[int, dict[str, object]],
+    *,
+    limit: int,
+) -> list[DailyBriefingPriceMover]:
+    movers: list[DailyBriefingPriceMover] = []
+    for market_id, context in market_context.items():
+        history = build_market_price_history(db, market_id=market_id, limit=50, order="asc")
+        if history.first is None or history.latest is None or history.change_yes_abs is None:
+            continue
+        if history.first.snapshot_id == history.latest.snapshot_id:
+            continue
+        if history.change_yes_abs == Decimal("0"):
+            continue
+        movers.append(
+            DailyBriefingPriceMover(
+                market_id=market_id,
+                question=str(context["question"]),
+                sport=context.get("sport") if isinstance(context.get("sport"), str) else None,
+                market_shape=(
+                    context.get("market_shape")
+                    if isinstance(context.get("market_shape"), str)
+                    else None
+                ),
+                first_yes_price=history.first.yes_price,
+                latest_yes_price=history.latest.yes_price,
+                change_yes_abs=history.change_yes_abs,
+                change_yes_pct=history.change_yes_pct,
+                snapshots_count=history.count,
+                start_time=history.first.captured_at,
+                end_time=history.latest.captured_at,
+            )
+        )
+    movers.sort(key=lambda item: abs(item.change_yes_abs or Decimal("0")), reverse=True)
+    return movers[:limit]
+
+
+def _count_unmatched_external_signals(db: Session) -> int:
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(ExternalMarketSignal)
+            .where(
+                ExternalMarketSignal.source == "kalshi",
+                ExternalMarketSignal.polymarket_market_id.is_(None),
+            )
+        )
+        or 0
+    )
+
+
+def _existing_market_ids(db: Session, column, market_ids: list[int]) -> set[int]:
+    return set(db.scalars(select(column).where(column.in_(market_ids))).all())
 
 
 def _build_operational_counts(items: list[MarketOverviewItem]) -> BriefingOperationalCounts:

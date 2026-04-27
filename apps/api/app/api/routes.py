@@ -20,6 +20,7 @@ from app.repositories.predictions import get_latest_prediction_for_market, list_
 from app.schemas.briefing import (
     BriefingArtifactResponse,
     BriefingRunsResponse,
+    DailyBriefingRead,
     OperationalBriefingResponse,
 )
 from app.schemas.dashboard_artifacts import AppMetaResponse, DashboardLatestMetaResponse
@@ -60,7 +61,7 @@ from app.schemas.status import (
     StatusHistoryComponent,
 )
 from app.schemas.stage_artifacts import StageArtifactResponse, StageRunsResponse
-from app.services.briefing import build_operational_briefing
+from app.services.briefing import build_daily_briefing, build_operational_briefing
 from app.services.briefing_artifacts import (
     BriefingRunNotFoundError,
     list_briefing_runs,
@@ -213,6 +214,21 @@ def get_operational_briefing(
         top_limit=top_limit,
         watchlist_limit=watchlist_limit,
         review_limit=review_limit,
+    )
+
+
+@router.get("/briefing/daily", response_model=DailyBriefingRead, tags=["briefing"])
+def get_daily_briefing(
+    sport: str | None = Query(default=None),
+    days: int = Query(default=3, ge=1, le=14),
+    limit: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+) -> DailyBriefingRead:
+    return build_daily_briefing(
+        db,
+        sport=sport,
+        days=days,
+        limit=limit,
     )
 
 
