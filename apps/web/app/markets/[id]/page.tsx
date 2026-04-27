@@ -274,6 +274,9 @@ const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
 
+const UPCOMING_MATCH_WINDOW_DAYS = 7;
+const PAUSED_FUTURE_SHAPES = new Set(["championship", "futures"]);
+
 const marketShapeLabels: Record<string, string> = {
   match_winner: "ganador de partido",
   championship: "campeonato",
@@ -494,6 +497,36 @@ function formatSportLabel(value?: string | null): string {
 
 function formatMarketShapeLabel(value?: string | null): string {
   return value ? marketShapeLabels[value] ?? humanizeToken(value) : "tipo no definido";
+}
+
+function getFocusMarketShape(analysis: MarketAnalysis): string | null {
+  return (
+    analysis.candidate_context?.market_shape ||
+    analysis.market.evidence_shape ||
+    analysis.market.market_type ||
+    null
+  );
+}
+
+function isPausedFutureMarket(analysis: MarketAnalysis): boolean {
+  const shape = getFocusMarketShape(analysis)?.toLowerCase();
+  return Boolean(shape && PAUSED_FUTURE_SHAPES.has(shape));
+}
+
+function isUpcomingMatchMarket(analysis: MarketAnalysis): boolean {
+  if (getFocusMarketShape(analysis)?.toLowerCase() !== "match_winner") {
+    return false;
+  }
+  if (!analysis.market.active || analysis.market.closed || !analysis.market.end_date) {
+    return false;
+  }
+  const closeTime = new Date(analysis.market.end_date).getTime();
+  if (!Number.isFinite(closeTime)) {
+    return false;
+  }
+  const now = Date.now();
+  const windowEnd = now + UPCOMING_MATCH_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  return closeTime >= now && closeTime <= windowEnd;
 }
 
 function formatParticipantRole(value?: string | null): string {
@@ -1788,16 +1821,24 @@ export default function MarketAnalysisPage() {
   const analysisJsonUrl = `${API_BASE_URL}/markets/${marketId}/analysis`;
   const researchPacketCommand = `python -m app.commands.prepare_codex_research --market-id ${marketId}`;
   const ingestDryRunCommand = "python -m app.commands.ingest_codex_research --run-id <RUN_ID> --dry-run";
+  const pausedFutureMarket = analysis ? isPausedFutureMarket(analysis) : false;
+  const upcomingMatchMarket = analysis ? isUpcomingMatchMarket(analysis) : false;
 
   const marketBadges = useMemo(() => {
     if (!analysis) {
       return [];
     }
-    return [
+    const badges = [
       analysis.market.active && !analysis.market.closed ? "Activo" : "Inactivo/cerrado",
       formatSportLabel(analysis.candidate_context?.sport || analysis.market.sport_type),
       formatMarketShapeLabel(analysis.candidate_context?.market_shape || analysis.market.evidence_shape),
     ];
+    if (isPausedFutureMarket(analysis)) {
+      badges.push("Mercado a futuro");
+    } else if (isUpcomingMatchMarket(analysis)) {
+      badges.push("Partido próximo");
+    }
+    return badges;
   }, [analysis]);
 
   return (
@@ -1881,6 +1922,26 @@ export default function MarketAnalysisPage() {
               Esta página no ejecuta research, no consulta Kalshi en vivo, no crea predicciones y no ejecuta apuestas automáticas.
             </span>
           </section>
+
+          {pausedFutureMarket ? (
+            <section className="focus-notice paused">
+              <strong>Mercado a futuro</strong>
+              <span>
+                Actualmente PolySignal está priorizando partidos de los próximos 7 días.
+                Este mercado queda para análisis posterior.
+              </span>
+            </section>
+          ) : null}
+
+          {upcomingMatchMarket ? (
+            <section className="focus-notice active">
+              <strong>Partido próximo</strong>
+              <span>
+                Este mercado entra en el foco actual: partidos deportivos cercanos para
+                revisión manual.
+              </span>
+            </section>
+          ) : null}
 
           <div className="analysis-layout">
             <div className="analysis-main">

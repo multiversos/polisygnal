@@ -69,6 +69,7 @@ def get_upcoming_sports_markets(
     days: int = Query(default=7, ge=1, le=30),
     include_futures: bool = Query(default=False),
     market_shape: str | None = Query(default=None),
+    focus: str | None = Query(default="match_winner"),
     db: Session = Depends(get_db),
 ) -> UpcomingSportsResponse:
     selection = list_upcoming_sports_markets(
@@ -78,6 +79,7 @@ def get_upcoming_sports_markets(
         days=days,
         include_futures=include_futures,
         market_shape=market_shape,
+        focus=focus,
     )
     return UpcomingSportsResponse(
         count=len(selection.items),

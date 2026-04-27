@@ -220,7 +220,7 @@ def get_operational_briefing(
 @router.get("/briefing/daily", response_model=DailyBriefingRead, tags=["briefing"])
 def get_daily_briefing(
     sport: str | None = Query(default=None),
-    days: int = Query(default=3, ge=1, le=14),
+    days: int = Query(default=7, ge=1, le=14),
     limit: int = Query(default=10, ge=1, le=50),
     db: Session = Depends(get_db),
 ) -> DailyBriefingRead:

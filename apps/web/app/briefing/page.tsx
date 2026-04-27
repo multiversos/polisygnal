@@ -265,7 +265,7 @@ async function fetchDailyBriefing(params: URLSearchParams): Promise<DailyBriefin
 export default function DailyBriefingPage() {
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [sport, setSport] = useState("all");
-  const [days, setDays] = useState(3);
+  const [days, setDays] = useState(7);
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -303,7 +303,7 @@ export default function DailyBriefingPage() {
   const summaryCards = useMemo(() => {
     const counts = briefing?.summary.counts;
     return [
-      ["Próximos mercados", counts?.upcoming_count ?? 0],
+      ["Próximos partidos", counts?.upcoming_count ?? 0],
       ["En seguimiento", counts?.watchlist_count ?? 0],
       ["Señales pendientes", counts?.unmatched_external_signals_count ?? 0],
       ["Faltan evidencias", counts?.research_gaps_count ?? 0],
@@ -328,8 +328,9 @@ export default function DailyBriefingPage() {
           <p className="eyebrow">PolySignal</p>
           <h1>Briefing diario</h1>
           <p className="subtitle">
-            Resumen operativo para decidir qué mercados revisar. No es recomendación de
-            apuesta.
+            Resumen operativo centrado en partidos deportivos de los próximos 7
+            días. Los campeonatos y futuros quedan fuera del flujo principal por
+            ahora; no es recomendación de apuesta.
           </p>
         </div>
         <div className="topbar-actions">
@@ -375,6 +376,14 @@ export default function DailyBriefingPage() {
         </button>
       </section>
 
+      <section className="safety-strip briefing-focus-note">
+        <strong>Enfoque temporal:</strong>
+        <span>
+          El briefing se enfoca en partidos próximos. Mercados de campeonato y
+          futuros quedan fuera del flujo principal por ahora.
+        </span>
+      </section>
+
       {error ? <div className="alert-panel error">{error}</div> : null}
 
       <section className="briefing-summary-grid" aria-label="Resumen del briefing">
@@ -393,10 +402,10 @@ export default function DailyBriefingPage() {
 
       <div className="briefing-grid">
         <BriefingSection
-          emptyCopy="No hay próximos mercados con los filtros actuales."
+          emptyCopy="No hay partidos próximos con los filtros actuales."
           items={briefing?.upcoming_markets ?? []}
           loading={loading}
-          title="Próximos partidos / mercados cercanos"
+          title="Próximos partidos para analizar"
         >
           {(item) => (
             <BriefingMarketCard

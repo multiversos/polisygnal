@@ -23,6 +23,29 @@ from app.services.research.classification import (
 ZERO = Decimal("0")
 MAX_URGENCY_SCORE = Decimal("100.0000")
 FUTURE_SHAPES = {"championship", "futures"}
+DEFAULT_UPCOMING_FOCUS = "match_winner"
+SUPPORTED_UPCOMING_FOCUS = {"match_winner", "all"}
+PAUSED_FOCUS_TITLE_TERMS = (
+    "set 1 winner",
+    "set 2 winner",
+    "set winner",
+    "who will win series",
+    "win series",
+    "win the series",
+    "series winner",
+    "who wins the toss",
+    "toss match",
+    "most sixes",
+    "team top batter",
+    "completed match",
+    "both teams to score",
+    "end in a draw",
+    "nba finals",
+    "conference finals",
+    "world series",
+    "championship",
+    "champion",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +107,7 @@ def list_upcoming_sports_markets(
     days: int = 7,
     include_futures: bool = False,
     market_shape: str | None = None,
+    focus: str | None = DEFAULT_UPCOMING_FOCUS,
     now: datetime | None = None,
 ) -> UpcomingSportsSelection:
     current_time = _normalize_datetime(now or datetime.now(tz=UTC))
@@ -91,6 +115,7 @@ def list_upcoming_sports_markets(
     window_end = current_time + timedelta(days=safe_days)
     normalized_sport = normalize_sport(sport) if sport else None
     normalized_shape = normalize_market_shape(market_shape) if market_shape else None
+    normalized_focus = _normalize_focus(focus)
 
     markets = _load_time_window_markets(
         db,
@@ -107,6 +132,7 @@ def list_upcoming_sports_markets(
         "past_close_time": 0,
         "match_winner": 0,
         "championship_futures": 0,
+        "focus_skipped": 0,
     }
 
     upcoming: list[UpcomingSportsMarket] = []
@@ -122,6 +148,23 @@ def list_upcoming_sports_markets(
             counts["match_winner"] += 1
         if classification.market_shape in FUTURE_SHAPES:
             counts["championship_futures"] += 1
+        if (
+            normalized_shape is None
+            and normalized_focus == "match_winner"
+            and classification.market_shape != "match_winner"
+        ):
+            if classification.market_shape not in FUTURE_SHAPES or not include_futures:
+                counts["focus_skipped"] += 1
+                continue
+        if (
+            normalized_shape is None
+            and normalized_focus == "match_winner"
+            and not include_futures
+            and _looks_like_paused_future_title(market)
+        ):
+            counts["focus_skipped"] += 1
+            continue
+        if classification.market_shape in FUTURE_SHAPES:
             if not include_futures:
                 continue
 
@@ -196,10 +239,26 @@ def list_upcoming_sports_markets(
             "days": safe_days,
             "include_futures": include_futures,
             "market_shape": normalized_shape,
+            "focus": normalized_focus,
             "window_start": current_time.isoformat(),
             "window_end": window_end.isoformat(),
         },
     )
+
+
+def _normalize_focus(value: str | None) -> str:
+    if not value:
+        return DEFAULT_UPCOMING_FOCUS
+    normalized = value.strip().lower().replace("-", "_")
+    if normalized in SUPPORTED_UPCOMING_FOCUS:
+        return normalized
+    return DEFAULT_UPCOMING_FOCUS
+
+
+def _looks_like_paused_future_title(market: Market) -> bool:
+    event_title = market.event.title if market.event is not None else ""
+    text = f"{market.question} {event_title}".lower()
+    return any(term in text for term in PAUSED_FOCUS_TITLE_TERMS)
 
 
 def _load_time_window_markets(

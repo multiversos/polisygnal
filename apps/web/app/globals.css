@@ -283,6 +283,34 @@ h2 {
   line-height: 1.45;
 }
 
+.focus-notice {
+  display: grid;
+  gap: 4px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--muted-strong);
+  line-height: 1.45;
+}
+
+.focus-notice strong {
+  color: var(--foreground);
+}
+
+.focus-notice.active {
+  border-color: rgba(15, 118, 110, 0.24);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.focus-notice.paused {
+  border-color: rgba(180, 83, 9, 0.28);
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -405,6 +433,13 @@ h2 {
   display: grid;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+.primary-focus-panel {
+  border-color: var(--line-strong);
+  background:
+    linear-gradient(180deg, var(--panel-gradient-start), var(--panel-gradient-end)),
+    var(--surface);
 }
 
 .upcoming-filter-row {

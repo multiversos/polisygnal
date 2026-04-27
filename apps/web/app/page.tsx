@@ -205,8 +205,8 @@ const quickLinks = [
     href: `${API_BASE_URL}/research/candidates?limit=10&vertical=sports`,
   },
   {
-    label: "Próximos mercados deportivos",
-    href: `${API_BASE_URL}/research/upcoming-sports?limit=10&days=7`,
+    label: "Próximos partidos",
+    href: `${API_BASE_URL}/research/upcoming-sports?limit=10&days=7&focus=match_winner`,
   },
   { label: "Señales externas", href: `${API_BASE_URL}/external-signals/kalshi?limit=10` },
   { label: "Revisar coincidencias Kalshi", href: "/external-signals/matches" },
@@ -502,6 +502,7 @@ function buildUpcomingPath(filters: UpcomingFilters): string {
     limit: "8",
     days: String(filters.days),
     include_futures: String(filters.includeFutures),
+    focus: "match_winner",
   });
   if (filters.sport !== "all") {
     params.set("sport", filters.sport);
@@ -1676,9 +1677,9 @@ export default function DashboardPage() {
           <p className="eyebrow">PolySignal</p>
           <h1>Inteligencia para mercados predictivos</h1>
           <p className="subtitle">
-            Dashboard de solo lectura para revisar estado local, mercados
-            candidatos y rutas útiles sin ejecutar research, ingestar responses ni crear
-            predicciones.
+            Dashboard de solo lectura enfocado temporalmente en partidos
+            deportivos de los próximos 7 días. Los campeonatos, premios y
+            futuros largos quedan pausados por ahora.
           </p>
         </div>
         <div className="topbar-actions">
@@ -1705,10 +1706,9 @@ export default function DashboardPage() {
       <section className="safety-strip">
         <strong>Solo lectura:</strong>
         <span>
-          El puntaje de candidato prioriza mercados para investigar; no es una
-          recomendación de apuesta. PolySignal no ejecuta apuestas automáticas.
-          Las señales externas son datos comparativos, no instrucciones de
-          apuesta.
+          PolySignal prioriza partidos cercanos para revisión manual; no es una
+          recomendación de apuesta. No ejecuta apuestas automáticas, research ni
+          predicciones desde esta UI.
         </span>
       </section>
 
@@ -1816,22 +1816,14 @@ export default function DashboardPage() {
         </button>
       </section>
 
-      <WatchlistPanel
-        busyItemId={watchlistActionItemId}
-        error={watchlistError}
-        items={state.watchlistItems}
-        loading={state.loading}
-        onRemove={handleRemoveWatchlistItem}
-      />
-
-      <section className="panel upcoming-panel" aria-label="Próximos partidos y mercados cercanos">
+      <section className="panel upcoming-panel primary-focus-panel" aria-label="Próximos partidos para analizar">
         <div className="panel-heading">
           <div>
-            <h2>Próximos partidos / mercados cercanos</h2>
+            <h2>Próximos partidos para analizar</h2>
             <p>
-              Mercados deportivos próximos por fecha de cierre o evento. Esta
-              sección ayuda a encontrar partidos para investigar; no es
-              recomendación de apuesta.
+              Mercados deportivos de los próximos 7 días enfocados en
+              ganador/perdedor del partido. Los campeonatos y futuros quedan
+              pausados por ahora.
             </p>
           </div>
           <a
@@ -1892,11 +1884,13 @@ export default function DashboardPage() {
               }
               type="checkbox"
             />
-            Incluir futuros
+            Incluir futuros pausados
           </label>
         </div>
 
         <div className="upcoming-summary-row">
+          <span>Enfoque: ganador/perdedor del partido</span>
+          <span>Ventana principal: próximos 7 días</span>
           <span>Total filtrados: {state.loading ? "..." : state.upcomingCounts?.matched_filters ?? 0}</span>
           <span>Ganador de partido: {state.loading ? "..." : state.upcomingCounts?.match_winner ?? 0}</span>
           <span>Futuros/campeonatos: {state.loading ? "..." : state.upcomingCounts?.championship_futures ?? 0}</span>
@@ -1928,16 +1922,23 @@ export default function DashboardPage() {
         )}
       </section>
 
+      <WatchlistPanel
+        busyItemId={watchlistActionItemId}
+        error={watchlistError}
+        items={state.watchlistItems}
+        loading={state.loading}
+        onRemove={handleRemoveWatchlistItem}
+      />
+
       <section className="dashboard-grid">
         <article className="panel panel-wide">
           <div className="panel-heading">
             <div>
-              <h2>Mercados principales para investigar</h2>
+              <h2>Otros mercados para más adelante</h2>
               <p>
-                Mercados con mejor calidad de datos para investigar primero.
-                Este puntaje no predice el resultado ni recomienda apostar.
-                El objetivo es ayudarte a decidir qué mercado merece análisis
-                adicional.
+                Candidatos generales, incluidos campeonatos y futuros, quedan
+                como referencia secundaria. No son prioridad en esta etapa;
+                volveremos a analizarlos más adelante.
               </p>
             </div>
             <a

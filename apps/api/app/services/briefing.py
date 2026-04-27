@@ -112,7 +112,7 @@ def build_daily_briefing(
     db: Session,
     *,
     sport: str | None = None,
-    days: int = 3,
+    days: int = 7,
     limit: int = 10,
 ) -> DailyBriefingRead:
     safe_days = max(days, 1)

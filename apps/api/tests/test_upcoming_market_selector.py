@@ -89,6 +89,119 @@ def test_upcoming_selector_can_include_futures(db_session: Session) -> None:
     assert "future_or_championship_market" in selection.items[0].warnings
 
 
+def test_upcoming_selector_defaults_to_match_winner_focus(db_session: Session) -> None:
+    match = _create_market(
+        db_session,
+        suffix="focus-match",
+        question="Lakers vs Warriors",
+        end_date=NOW + timedelta(days=2),
+    )
+    player_prop = _create_market(
+        db_session,
+        suffix="focus-prop",
+        question="Will LeBron James score over 25 points?",
+        end_date=NOW + timedelta(hours=8),
+        market_type="player_prop",
+    )
+    _add_snapshot(db_session, market=match)
+    _add_snapshot(db_session, market=player_prop)
+
+    selection = list_upcoming_sports_markets(
+        db_session,
+        limit=10,
+        days=7,
+        now=NOW,
+    )
+
+    assert [item.market_id for item in selection.items] == [match.id]
+    assert selection.filters_applied["focus"] == "match_winner"
+    assert selection.counts["focus_skipped"] == 1
+
+
+def test_upcoming_selector_skips_series_markets_by_default(db_session: Session) -> None:
+    match = _create_market(
+        db_session,
+        suffix="single-game-focus",
+        question="Lakers vs Warriors",
+        end_date=NOW + timedelta(days=2),
+    )
+    series = _create_market(
+        db_session,
+        suffix="series-focus",
+        question="NBA Playoffs: Who Will Win Series? - Lakers vs. Rockets",
+        end_date=NOW + timedelta(days=2),
+    )
+    _add_snapshot(db_session, market=match)
+    _add_snapshot(db_session, market=series)
+
+    selection = list_upcoming_sports_markets(
+        db_session,
+        limit=10,
+        days=7,
+        now=NOW,
+    )
+
+    assert [item.market_id for item in selection.items] == [match.id]
+    assert selection.counts["focus_skipped"] == 1
+
+
+def test_upcoming_selector_skips_prop_like_matchups_by_default(db_session: Session) -> None:
+    match = _create_market(
+        db_session,
+        suffix="real-match-focus",
+        question="T20 BIFA Cup: Dragon Xi vs Bodoland",
+        end_date=NOW + timedelta(hours=20),
+    )
+    toss = _create_market(
+        db_session,
+        suffix="toss-focus",
+        question="T20 BIFA Cup: Dragon Xi vs Bodoland - Who wins the toss?",
+        end_date=NOW + timedelta(hours=20),
+    )
+    most_sixes = _create_market(
+        db_session,
+        suffix="sixes-focus",
+        question="T20 BIFA Cup: Dragon Xi vs Bodoland - Most Sixes Dragon Xi Winner",
+        end_date=NOW + timedelta(hours=20),
+    )
+    _add_snapshot(db_session, market=match)
+    _add_snapshot(db_session, market=toss)
+    _add_snapshot(db_session, market=most_sixes)
+
+    selection = list_upcoming_sports_markets(
+        db_session,
+        limit=10,
+        days=7,
+        now=NOW,
+    )
+
+    assert [item.market_id for item in selection.items] == [match.id]
+    assert selection.counts["focus_skipped"] == 2
+
+
+def test_upcoming_selector_all_focus_can_include_sports_props(db_session: Session) -> None:
+    player_prop = _create_market(
+        db_session,
+        suffix="all-focus-prop",
+        question="Will LeBron James score over 25 points?",
+        end_date=NOW + timedelta(hours=8),
+        market_type="player_prop",
+    )
+    _add_snapshot(db_session, market=player_prop)
+
+    selection = list_upcoming_sports_markets(
+        db_session,
+        limit=10,
+        days=7,
+        focus="all",
+        now=NOW,
+    )
+
+    assert [item.market_id for item in selection.items] == [player_prop.id]
+    assert selection.items[0].market_shape == "player_prop"
+    assert selection.filters_applied["focus"] == "all"
+
+
 def test_upcoming_selector_respects_days_and_past_close_time(db_session: Session) -> None:
     near = _create_market(
         db_session,
@@ -177,6 +290,8 @@ def test_upcoming_sports_endpoint_lists_items_without_mutating_db(
     assert payload["items"][0]["urgency_score"] is not None
     assert payload["counts"]["returned"] == 1
     assert payload["filters_applied"]["sport"] == "nba"
+    assert payload["filters_applied"]["days"] == 1
+    assert payload["filters_applied"]["focus"] == "match_winner"
     assert db_session.scalar(select(func.count()).select_from(Prediction)) == before_predictions
     assert db_session.scalar(select(func.count()).select_from(ResearchRun)) == before_runs
     assert len(db_session.new) == before_new
@@ -207,6 +322,72 @@ def test_upcoming_sports_endpoint_respects_limit(client: TestClient, db_session:
     payload = response.json()
     assert payload["count"] == 1
     assert len(payload["items"]) == 1
+
+
+def test_upcoming_sports_endpoint_defaults_to_seven_days_and_match_winner_focus(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    match = _create_market(
+        db_session,
+        suffix="endpoint-default-match",
+        question="Lakers vs Warriors",
+        end_date=datetime.now(tz=UTC) + timedelta(days=6),
+    )
+    future = _create_market(
+        db_session,
+        suffix="endpoint-default-future",
+        question="Will the Boston Celtics win the NBA Finals?",
+        end_date=datetime.now(tz=UTC) + timedelta(days=2),
+    )
+    closed = _create_market(
+        db_session,
+        suffix="endpoint-default-closed",
+        question="Will the Celtics beat the Knicks?",
+        end_date=datetime.now(tz=UTC) + timedelta(hours=4),
+        closed=True,
+    )
+    player_prop = _create_market(
+        db_session,
+        suffix="endpoint-default-prop",
+        question="Will LeBron James score over 25 points?",
+        end_date=datetime.now(tz=UTC) + timedelta(hours=4),
+        market_type="player_prop",
+    )
+    series = _create_market(
+        db_session,
+        suffix="endpoint-default-series",
+        question="NBA Playoffs: Who Will Win Series? - Lakers vs. Rockets",
+        end_date=datetime.now(tz=UTC) + timedelta(days=2),
+    )
+    toss = _create_market(
+        db_session,
+        suffix="endpoint-default-toss",
+        question="T20 BIFA Cup: Dragon Xi vs Bodoland - Who wins the toss?",
+        end_date=datetime.now(tz=UTC) + timedelta(days=2),
+    )
+    _add_snapshot(db_session, market=match)
+    _add_snapshot(db_session, market=future)
+    _add_snapshot(db_session, market=closed)
+    _add_snapshot(db_session, market=player_prop)
+    _add_snapshot(db_session, market=series)
+    _add_snapshot(db_session, market=toss)
+    db_session.commit()
+
+    response = client.get("/research/upcoming-sports?limit=10")
+
+    assert response.status_code == 200
+    payload = response.json()
+    returned_ids = [item["market_id"] for item in payload["items"]]
+    assert match.id in returned_ids
+    assert future.id not in returned_ids
+    assert closed.id not in returned_ids
+    assert player_prop.id not in returned_ids
+    assert series.id not in returned_ids
+    assert toss.id not in returned_ids
+    assert payload["filters_applied"]["days"] == 7
+    assert payload["filters_applied"]["include_futures"] is False
+    assert payload["filters_applied"]["focus"] == "match_winner"
 
 
 def test_upcoming_sports_endpoint_is_documented_in_openapi(client: TestClient) -> None:

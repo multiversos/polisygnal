@@ -24,6 +24,7 @@ def test_daily_briefing_empty_state_is_stable(client: TestClient, db_session: Se
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["summary"]["days"] == 7
     assert payload["summary"]["counts"]["upcoming_count"] == 0
     assert payload["summary"]["counts"]["watchlist_count"] == 0
     assert payload["upcoming_markets"] == []
@@ -141,6 +142,28 @@ def test_daily_briefing_respects_limit_days_and_sport(
     assert payload["upcoming_markets"][0]["market_id"] == nba.id
     assert mlb.id not in [item["market_id"] for item in payload["upcoming_markets"]]
     assert far.id not in [item["market_id"] for item in payload["upcoming_markets"]]
+
+
+def test_daily_briefing_default_window_is_seven_days(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(
+        db_session,
+        suffix="briefing-default-window",
+        question="Lakers vs Warriors",
+        sport_type="nba",
+        end_date=datetime.now(tz=UTC) + timedelta(days=6),
+    )
+    _add_snapshots(db_session, market=market, prices=[Decimal("0.5000")])
+    db_session.commit()
+
+    response = client.get("/briefing/daily?limit=5&sport=nba")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["days"] == 7
+    assert market.id in [item["market_id"] for item in payload["upcoming_markets"]]
 
 
 def test_daily_briefing_endpoint_is_documented_in_openapi(client: TestClient) -> None:
