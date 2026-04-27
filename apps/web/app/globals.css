@@ -832,6 +832,8 @@ h2 {
 
 .candidate-card-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
 }
 
@@ -851,6 +853,151 @@ h2 {
 
 .analysis-link:hover {
   background: var(--muted-strong);
+}
+
+.watchlist-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.watchlist-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.watchlist-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.watchlist-card-header,
+.watchlist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.watchlist-card h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.watchlist-market-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.watchlist-market-metrics span {
+  min-height: 25px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.watchlist-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.watchlist-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--foreground);
+  font-size: 0.82rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.watchlist-button:hover:not(:disabled),
+.watchlist-button.active {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.watchlist-button.danger:hover:not(:disabled) {
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+
+.watchlist-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.upcoming-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.watchlist-detail-panel {
+  gap: 12px;
+}
+
+.watchlist-form {
+  display: grid;
+  gap: 10px;
+}
+
+.watchlist-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted-strong);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.watchlist-form select,
+.watchlist-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.watchlist-form select {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.watchlist-form textarea {
+  min-height: 110px;
+  padding: 10px;
+  resize: vertical;
 }
 
 .candidate-explain-grid section {

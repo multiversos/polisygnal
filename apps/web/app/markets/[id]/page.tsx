@@ -11,6 +11,16 @@ import {
   type TouchEvent,
 } from "react";
 
+import {
+  WATCHLIST_STATUS_LABELS,
+  createWatchlistItem,
+  fetchMarketWatchlistStatus,
+  removeWatchlistItem,
+  updateWatchlistItem,
+  type WatchlistItem,
+  type WatchlistStatus,
+} from "../../lib/watchlist";
+
 type JsonPayload = Record<string, unknown> | unknown[];
 
 type AnalysisParticipant = {
@@ -249,6 +259,15 @@ type LoadState = {
   loading: boolean;
   error: string | null;
   notFound: boolean;
+};
+
+type WatchlistPanelState = {
+  item: WatchlistItem | null;
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  statusDraft: WatchlistStatus;
+  noteDraft: string;
 };
 
 const API_BASE_URL = (
@@ -1446,6 +1465,114 @@ function ResearchRunsPanel({ runs }: { runs: AnalysisResearchRun[] }) {
   );
 }
 
+function WatchlistDetailPanel({
+  onAdd,
+  onRemove,
+  onSave,
+  onStatusChange,
+  onNoteChange,
+  state,
+}: {
+  onAdd: () => void;
+  onRemove: () => void;
+  onSave: () => void;
+  onStatusChange: (status: WatchlistStatus) => void;
+  onNoteChange: (note: string) => void;
+  state: WatchlistPanelState;
+}) {
+  return (
+    <section className="analysis-section watchlist-detail-panel">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Organización</span>
+          <h2>Lista de seguimiento</h2>
+        </div>
+        {state.item ? <span className="badge external-hint">En seguimiento</span> : null}
+      </div>
+      <p className="section-note">
+        La lista de seguimiento es solo para organizar análisis. No representa
+        una recomendación de apuesta.
+      </p>
+
+      {state.loading ? <div className="empty-state compact">Cargando seguimiento...</div> : null}
+      {state.error ? (
+        <div className="alert-panel compact" role="status">
+          <strong>No se pudo actualizar seguimiento</strong>
+          <span>{state.error}</span>
+        </div>
+      ) : null}
+
+      {!state.loading ? (
+        <>
+          <button
+            className={`watchlist-button ${state.item ? "active" : ""}`}
+            disabled={state.saving || Boolean(state.item)}
+            onClick={onAdd}
+            type="button"
+          >
+            {state.saving
+              ? "Guardando..."
+              : state.item
+                ? "En seguimiento"
+                : "Agregar a seguimiento"}
+          </button>
+
+          {state.item ? (
+            <div className="watchlist-form">
+              <label>
+                Estado
+                <select
+                  disabled={state.saving}
+                  onChange={(event) => onStatusChange(event.target.value as WatchlistStatus)}
+                  value={state.statusDraft}
+                >
+                  {Object.entries(WATCHLIST_STATUS_LABELS).map(([status, label]) => (
+                    <option key={status} value={status}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Nota personal
+                <textarea
+                  disabled={state.saving}
+                  maxLength={4000}
+                  onChange={(event) => onNoteChange(event.target.value)}
+                  placeholder="Escribe una nota breve para revisarlo después."
+                  value={state.noteDraft}
+                />
+              </label>
+              <div className="watchlist-actions">
+                <button
+                  className="watchlist-button"
+                  disabled={state.saving}
+                  onClick={onSave}
+                  type="button"
+                >
+                  Guardar nota
+                </button>
+                <button
+                  className="watchlist-button danger"
+                  disabled={state.saving}
+                  onClick={onRemove}
+                  type="button"
+                >
+                  Quitar de seguimiento
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="quiet-text">
+              Agrega este mercado para verlo luego en el dashboard.
+            </span>
+          )}
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 export default function MarketAnalysisPage() {
   const params = useParams<{ id: string }>();
   const marketId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -1457,6 +1584,14 @@ export default function MarketAnalysisPage() {
     loading: true,
     error: null,
     notFound: false,
+  });
+  const [watchlistState, setWatchlistState] = useState<WatchlistPanelState>({
+    item: null,
+    loading: true,
+    saving: false,
+    error: null,
+    statusDraft: "watching",
+    noteDraft: "",
   });
 
   const loadAnalysis = useCallback(async () => {
@@ -1499,6 +1634,104 @@ export default function MarketAnalysisPage() {
     }
   }, [marketId]);
 
+  const loadWatchlistStatus = useCallback(async () => {
+    setWatchlistState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const item = await fetchMarketWatchlistStatus(marketId);
+      setWatchlistState((current) => ({
+        ...current,
+        item,
+        loading: false,
+        error: null,
+        statusDraft: item?.status ?? "watching",
+        noteDraft: item?.note ?? "",
+      }));
+    } catch {
+      setWatchlistState((current) => ({
+        ...current,
+        loading: false,
+        error: "No se pudo cargar el estado de seguimiento.",
+      }));
+    }
+  }, [marketId]);
+
+  const addToWatchlist = useCallback(async () => {
+    setWatchlistState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      const item = await createWatchlistItem(marketId, {
+        status: "watching",
+        note: watchlistState.noteDraft || null,
+      });
+      setWatchlistState((current) => ({
+        ...current,
+        item,
+        saving: false,
+        error: null,
+        statusDraft: item.status,
+        noteDraft: item.note ?? "",
+      }));
+    } catch {
+      setWatchlistState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo agregar este mercado a seguimiento.",
+      }));
+    }
+  }, [marketId, watchlistState.noteDraft]);
+
+  const saveWatchlistItem = useCallback(async () => {
+    setWatchlistState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      const item = watchlistState.item
+        ? await updateWatchlistItem(watchlistState.item.id, {
+            status: watchlistState.statusDraft,
+            note: watchlistState.noteDraft || null,
+          })
+        : await createWatchlistItem(marketId, {
+            status: watchlistState.statusDraft,
+            note: watchlistState.noteDraft || null,
+          });
+      setWatchlistState((current) => ({
+        ...current,
+        item,
+        saving: false,
+        error: null,
+        statusDraft: item.status,
+        noteDraft: item.note ?? "",
+      }));
+    } catch {
+      setWatchlistState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo guardar la nota o el estado.",
+      }));
+    }
+  }, [marketId, watchlistState.item, watchlistState.noteDraft, watchlistState.statusDraft]);
+
+  const removeFromWatchlist = useCallback(async () => {
+    if (!watchlistState.item) {
+      return;
+    }
+    setWatchlistState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      await removeWatchlistItem(watchlistState.item.id);
+      setWatchlistState((current) => ({
+        ...current,
+        item: null,
+        saving: false,
+        error: null,
+        statusDraft: "watching",
+        noteDraft: "",
+      }));
+    } catch {
+      setWatchlistState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo quitar este mercado de seguimiento.",
+      }));
+    }
+  }, [watchlistState.item]);
+
   const copyCommand = useCallback(async (command: string, key: "prepare" | "ingest") => {
     if (typeof window === "undefined" || typeof document === "undefined") {
       return;
@@ -1537,6 +1770,10 @@ export default function MarketAnalysisPage() {
   useEffect(() => {
     void loadAnalysis();
   }, [loadAnalysis]);
+
+  useEffect(() => {
+    void loadWatchlistStatus();
+  }, [loadWatchlistStatus]);
 
   const analysis = state.analysis;
   const translatedTitle = analysis ? translateMarketTitleToSpanish(analysis.market.question) : "";
@@ -1657,6 +1894,19 @@ export default function MarketAnalysisPage() {
             </div>
 
             <aside className="analysis-side">
+              <WatchlistDetailPanel
+                onAdd={addToWatchlist}
+                onNoteChange={(note) =>
+                  setWatchlistState((current) => ({ ...current, noteDraft: note }))
+                }
+                onRemove={removeFromWatchlist}
+                onSave={saveWatchlistItem}
+                onStatusChange={(status) =>
+                  setWatchlistState((current) => ({ ...current, statusDraft: status }))
+                }
+                state={watchlistState}
+              />
+
               <section className="analysis-section">
                 <h2>Qué falta por investigar</h2>
                 <div className="candidate-chip-list">

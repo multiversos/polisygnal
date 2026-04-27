@@ -2,6 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  WATCHLIST_STATUS_LABELS,
+  fetchWatchlistItems,
+  removeWatchlistItem,
+  toggleWatchlistMarket,
+  type WatchlistItem,
+} from "./lib/watchlist";
+
 type HealthResponse = {
   status?: string;
   environment?: string;
@@ -136,6 +144,7 @@ type DashboardState = {
   upcomingMarkets: UpcomingSportsMarket[];
   upcomingCounts: Record<string, number> | null;
   externalSignals: ExternalMarketSignal[];
+  watchlistItems: WatchlistItem[];
   loading: boolean;
   error: string | null;
   updatedAt: Date | null;
@@ -1035,12 +1044,125 @@ function WarningChips({ warnings }: { warnings: string[] }) {
   );
 }
 
+function WatchlistToggleButton({
+  busy,
+  isWatchlisted,
+  onClick,
+}: {
+  busy: boolean;
+  isWatchlisted: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={`watchlist-button ${isWatchlisted ? "active" : ""}`}
+      disabled={busy}
+      onClick={onClick}
+      type="button"
+    >
+      {busy
+        ? "Actualizando..."
+        : isWatchlisted
+          ? "En seguimiento"
+          : "Agregar a seguimiento"}
+    </button>
+  );
+}
+
+function WatchlistPanel({
+  busyItemId,
+  error,
+  items,
+  loading,
+  onRemove,
+}: {
+  busyItemId: number | null;
+  error: string | null;
+  items: WatchlistItem[];
+  loading: boolean;
+  onRemove: (itemId: number) => void;
+}) {
+  return (
+    <section className="panel watchlist-panel" aria-label="Mi lista de seguimiento">
+      <div className="panel-heading">
+        <div>
+          <h2>Mi lista de seguimiento</h2>
+          <p>
+            Mercados guardados manualmente para revisar después. No es una
+            recomendación de apuesta.
+          </p>
+        </div>
+      </div>
+
+      {error ? (
+        <div className="alert-panel compact" role="status">
+          <strong>No se pudo actualizar seguimiento</strong>
+          <span>{error}</span>
+        </div>
+      ) : null}
+
+      {loading ? (
+        <div className="empty-state compact">Cargando lista de seguimiento...</div>
+      ) : items.length === 0 ? (
+        <div className="empty-state compact">No tienes mercados en seguimiento todavía.</div>
+      ) : (
+        <div className="watchlist-card-grid">
+          {items.map((item) => {
+            const translatedTitle = humanizeMarketTitle(item.market_question);
+            return (
+              <article className="watchlist-card" key={item.id}>
+                <div className="watchlist-card-header">
+                  <div className="badge-row">
+                    <span className="candidate-id">#{item.market_id}</span>
+                    <span className="badge">{formatSportLabel(item.sport)}</span>
+                    <span className="badge muted">{formatMarketShapeLabel(item.market_shape)}</span>
+                    <span className="badge external-hint">
+                      {WATCHLIST_STATUS_LABELS[item.status]}
+                    </span>
+                  </div>
+                </div>
+                <h3 title={item.market_question}>{translatedTitle}</h3>
+                <div className="watchlist-market-metrics">
+                  <span>SÍ {formatMarketPercent(item.latest_yes_price)}</span>
+                  <span>NO {formatMarketPercent(getNoProbability(item.latest_yes_price, item.latest_no_price))}</span>
+                  <span>Liquidez {formatMarketMetric(item.liquidity)}</span>
+                  <span>Volumen {formatMarketMetric(item.volume)}</span>
+                </div>
+                {item.note ? <p className="watchlist-note">{item.note}</p> : null}
+                <div className="watchlist-actions">
+                  <a className="analysis-link" href={`/markets/${item.market_id}`}>
+                    Ver análisis
+                  </a>
+                  <button
+                    className="watchlist-button danger"
+                    disabled={busyItemId === item.id}
+                    onClick={() => onRemove(item.id)}
+                    type="button"
+                  >
+                    {busyItemId === item.id ? "Quitando..." : "Quitar"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function CandidateCard({
   candidate,
   hasExternalSignal,
+  isWatchlisted,
+  onToggleWatchlist,
+  watchlistBusy,
 }: {
   candidate: ResearchCandidate;
   hasExternalSignal: boolean;
+  isWatchlisted: boolean;
+  onToggleWatchlist: (marketId: number) => void;
+  watchlistBusy: boolean;
 }) {
   const question = candidate.question || "Mercado sin título";
   const translatedQuestion = humanizeMarketTitle(question);
@@ -1085,6 +1207,11 @@ function CandidateCard({
       </div>
 
       <div className="candidate-card-actions">
+        <WatchlistToggleButton
+          busy={watchlistBusy}
+          isWatchlisted={isWatchlisted}
+          onClick={() => onToggleWatchlist(candidate.market_id)}
+        />
         <a className="analysis-link" href={`/markets/${candidate.market_id}`}>
           Ver análisis
         </a>
@@ -1104,7 +1231,17 @@ function CandidateCard({
   );
 }
 
-function UpcomingMarketCard({ market }: { market: UpcomingSportsMarket }) {
+function UpcomingMarketCard({
+  isWatchlisted,
+  market,
+  onToggleWatchlist,
+  watchlistBusy,
+}: {
+  isWatchlisted: boolean;
+  market: UpcomingSportsMarket;
+  onToggleWatchlist: (marketId: number) => void;
+  watchlistBusy: boolean;
+}) {
   const question = market.question || "Mercado sin título";
   const translatedQuestion = humanizeMarketTitle(question);
   const translatedEventTitle = market.event_title
@@ -1177,9 +1314,16 @@ function UpcomingMarketCard({ market }: { market: UpcomingSportsMarket }) {
           <h4>Advertencias</h4>
           <WarningChips warnings={market.warnings ?? []} />
         </div>
-        <a className="analysis-link" href={`/markets/${market.market_id}`}>
-          Ver análisis
-        </a>
+        <div className="upcoming-card-actions">
+          <WatchlistToggleButton
+            busy={watchlistBusy}
+            isWatchlisted={isWatchlisted}
+            onClick={() => onToggleWatchlist(market.market_id)}
+          />
+          <a className="analysis-link" href={`/markets/${market.market_id}`}>
+            Ver análisis
+          </a>
+        </div>
       </div>
     </article>
   );
@@ -1307,6 +1451,9 @@ export default function DashboardPage() {
     days: 7,
     includeFutures: false,
   });
+  const [watchlistActionMarketId, setWatchlistActionMarketId] = useState<number | null>(null);
+  const [watchlistActionItemId, setWatchlistActionItemId] = useState<number | null>(null);
+  const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const [state, setState] = useState<DashboardState>({
     health: null,
     overview: null,
@@ -1315,6 +1462,7 @@ export default function DashboardPage() {
     upcomingMarkets: [],
     upcomingCounts: null,
     externalSignals: [],
+    watchlistItems: [],
     loading: true,
     error: null,
     updatedAt: null,
@@ -1366,7 +1514,7 @@ export default function DashboardPage() {
 
     const candidatesPath = buildCandidatesPath(filters);
     const upcomingPath = buildUpcomingPath(upcomingFilters);
-    const [health, overview, candidates, upcomingSports, dashboardMeta, externalSignals] =
+    const [health, overview, candidates, upcomingSports, dashboardMeta, externalSignals, watchlist] =
       await Promise.allSettled([
         fetchJson<HealthResponse>("/health"),
         fetchJson<MarketsOverviewResponse>("/markets/overview"),
@@ -1374,6 +1522,7 @@ export default function DashboardPage() {
         fetchJson<UpcomingSportsResponse>(upcomingPath),
         fetchJson<DashboardMetaResponse>("/dashboard/latest/meta"),
         fetchJson<ExternalSignalsResponse>("/external-signals/kalshi?limit=10"),
+        fetchWatchlistItems(),
       ]);
 
     const errors: string[] = [];
@@ -1390,6 +1539,10 @@ export default function DashboardPage() {
       errors.push("No se pudieron cargar señales externas");
     }
 
+    if (watchlist.status === "rejected") {
+      errors.push("No se pudo cargar lista de seguimiento");
+    }
+
     setState({
       health: health.status === "fulfilled" ? health.value : null,
       overview: overview.status === "fulfilled" ? overview.value : null,
@@ -1403,6 +1556,7 @@ export default function DashboardPage() {
         upcomingSports.status === "fulfilled" ? upcomingSports.value.counts : null,
       externalSignals:
         externalSignals.status === "fulfilled" ? externalSignals.value.signals : [],
+      watchlistItems: watchlist.status === "fulfilled" ? watchlist.value : [],
       loading: false,
       error: errors.length > 0 ? errors.join(". ") : null,
       updatedAt: new Date(),
@@ -1441,6 +1595,10 @@ export default function DashboardPage() {
   const candidatesPath = buildCandidatesPath(filters);
   const upcomingPath = buildUpcomingPath(upcomingFilters);
   const topUpcomingMarkets = state.upcomingMarkets.slice(0, 8);
+  const watchlistByMarketId = useMemo(() => {
+    const entries = state.watchlistItems.map((item) => [item.market_id, item] as const);
+    return new Map(entries);
+  }, [state.watchlistItems]);
   const candidatesById = useMemo(() => {
     const entries = state.candidates.map((candidate) => [candidate.market_id, candidate] as const);
     return new Map(entries);
@@ -1472,6 +1630,43 @@ export default function DashboardPage() {
     return new Set(ids);
   }, [state.externalSignals]);
   const nextThemeLabel = theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+
+  const handleToggleWatchlist = useCallback(async (marketId: number) => {
+    setWatchlistActionMarketId(marketId);
+    setWatchlistError(null);
+    try {
+      const item = await toggleWatchlistMarket(marketId);
+      setState((current) => {
+        const withoutMarket = current.watchlistItems.filter(
+          (watchlistItem) => watchlistItem.market_id !== marketId,
+        );
+        return {
+          ...current,
+          watchlistItems: item ? [item, ...withoutMarket] : withoutMarket,
+        };
+      });
+    } catch {
+      setWatchlistError("No se pudo actualizar la lista. Revisa que la API esté en línea.");
+    } finally {
+      setWatchlistActionMarketId(null);
+    }
+  }, []);
+
+  const handleRemoveWatchlistItem = useCallback(async (itemId: number) => {
+    setWatchlistActionItemId(itemId);
+    setWatchlistError(null);
+    try {
+      await removeWatchlistItem(itemId);
+      setState((current) => ({
+        ...current,
+        watchlistItems: current.watchlistItems.filter((item) => item.id !== itemId),
+      }));
+    } catch {
+      setWatchlistError("No se pudo quitar el mercado de seguimiento.");
+    } finally {
+      setWatchlistActionItemId(null);
+    }
+  }, []);
 
   return (
     <main className="dashboard-shell">
@@ -1620,6 +1815,14 @@ export default function DashboardPage() {
         </button>
       </section>
 
+      <WatchlistPanel
+        busyItemId={watchlistActionItemId}
+        error={watchlistError}
+        items={state.watchlistItems}
+        loading={state.loading}
+        onRemove={handleRemoveWatchlistItem}
+      />
+
       <section className="panel upcoming-panel" aria-label="Próximos partidos y mercados cercanos">
         <div className="panel-heading">
           <div>
@@ -1712,7 +1915,13 @@ export default function DashboardPage() {
         ) : (
           <div className="upcoming-card-grid">
             {topUpcomingMarkets.map((market) => (
-              <UpcomingMarketCard key={market.market_id} market={market} />
+              <UpcomingMarketCard
+                isWatchlisted={watchlistByMarketId.has(market.market_id)}
+                key={market.market_id}
+                market={market}
+                onToggleWatchlist={handleToggleWatchlist}
+                watchlistBusy={watchlistActionMarketId === market.market_id}
+              />
             ))}
           </div>
         )}
@@ -1756,7 +1965,10 @@ export default function DashboardPage() {
                 <CandidateCard
                   candidate={candidate}
                   hasExternalSignal={candidateIdsWithExternalSignals.has(candidate.market_id)}
+                  isWatchlisted={watchlistByMarketId.has(candidate.market_id)}
                   key={candidate.market_id}
+                  onToggleWatchlist={handleToggleWatchlist}
+                  watchlistBusy={watchlistActionMarketId === candidate.market_id}
                 />
               ))}
             </div>
