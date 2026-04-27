@@ -322,8 +322,8 @@ export default function DailyBriefingPage() {
   };
 
   return (
-    <main className="dashboard-shell briefing-shell">
-      <header className="topbar">
+    <main className="briefing-page">
+      <header className="topbar briefing-header">
         <div>
           <p className="eyebrow">PolySignal</p>
           <h1>Briefing diario</h1>
@@ -377,9 +377,9 @@ export default function DailyBriefingPage() {
 
       {error ? <div className="alert-panel error">{error}</div> : null}
 
-      <section className="metric-grid" aria-label="Resumen del briefing">
+      <section className="briefing-summary-grid" aria-label="Resumen del briefing">
         {summaryCards.map(([label, value]) => (
-          <div className="metric-card" key={label}>
+          <div className="briefing-summary-card" key={label}>
             <span>{label}</span>
             <strong>{value}</strong>
             <p>Para revisar hoy</p>
@@ -458,7 +458,7 @@ export default function DailyBriefingPage() {
               <EmptyState copy="No hay señales pendientes de vincular." />
             ) : null}
             {briefing?.unmatched_external_signals.map((signal) => (
-              <article className="briefing-item-card" key={signal.id}>
+              <article className="briefing-card" key={signal.id}>
                 <div className="badge-row">
                   <span className="badge">{signal.source.toUpperCase()}</span>
                   <span className="badge muted">{signal.source_ticker ?? "Sin ticker"}</span>
@@ -582,7 +582,7 @@ function BriefingMarketCard({
   warnings?: string[];
 }) {
   return (
-    <article className="briefing-item-card">
+    <article className="briefing-card">
       <div className="badge-row">
         <span className="badge">#{marketId}</span>
         <span className="badge">{formatSport(sport)}</span>
@@ -623,7 +623,7 @@ function ChipList({ items }: { items: string[] }) {
 
 function EmptyState({ copy }: { copy: string }) {
   return (
-    <div className="empty-state compact">
+    <div className="empty-state compact briefing-empty">
       <strong>{copy}</strong>
     </div>
   );
