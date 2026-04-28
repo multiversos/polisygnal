@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { SportsSelectorBar, getSportApiFilter } from "../components/SportsSelectorBar";
 import { WATCHLIST_STATUS_LABELS, type WatchlistStatus } from "../lib/watchlist";
 
 type ThemePreference = "light" | "dark";
@@ -105,16 +106,18 @@ const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
 
-const sportOptions = ["all", "nba", "nfl", "mlb", "soccer", "tennis", "mma"];
 const dayOptions = [1, 3, 7];
 
 const sportLabels: Record<string, string> = {
   nba: "NBA",
   nfl: "NFL",
-  mlb: "MLB",
+  nhl: "NHL",
+  mlb: "Béisbol",
   soccer: "Fútbol",
   tennis: "Tenis",
-  mma: "MMA",
+  cricket: "Cricket",
+  mma: "UFC",
+  basketball: "Baloncesto",
 };
 
 const marketShapeLabels: Record<string, string> = {
@@ -283,8 +286,9 @@ export default function DailyBriefingPage() {
       days: String(days),
       limit: "10",
     });
-    if (sport !== "all") {
-      params.set("sport", sport);
+    const apiSport = getSportApiFilter(sport);
+    if (apiSport) {
+      params.set("sport", apiSport);
     }
     try {
       setBriefing(await fetchDailyBriefing(params));
@@ -350,17 +354,14 @@ export default function DailyBriefingPage() {
         </div>
       </header>
 
+      <SportsSelectorBar
+        activeLabel="Activo"
+        description="Selecciona un deporte para filtrar el briefing diario."
+        onSelect={setSport}
+        selectedSport={sport}
+      />
+
       <section className="filter-panel briefing-filter-panel" aria-label="Filtros del briefing">
-        <label>
-          Deporte
-          <select value={sport} onChange={(event) => setSport(event.target.value)}>
-            {sportOptions.map((option) => (
-              <option key={option} value={option}>
-                {option === "all" ? "Todos" : formatSport(option)}
-              </option>
-            ))}
-          </select>
-        </label>
         <label>
           Ventana
           <select value={days} onChange={(event) => setDays(Number(event.target.value))}>

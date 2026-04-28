@@ -3,6 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  SportsSelectorBar,
+  getSportApiFilter,
+  getSportSelectorOption,
+  matchesSelectedSport,
+  sportsSelectorOptions,
+} from "./components/SportsSelectorBar";
+import {
   WATCHLIST_STATUS_LABELS,
   fetchWatchlistItems,
   removeWatchlistItem,
@@ -224,89 +231,6 @@ const THEME_STORAGE_KEY = "polysignal-theme";
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
-
-const sportsSelectorOptions = [
-  {
-    id: "all",
-    apiValue: null,
-    label: "Todos",
-    icon: "✦",
-    tone: "all",
-    backendSupported: true,
-  },
-  {
-    id: "nba",
-    apiValue: "nba",
-    label: "NBA",
-    icon: "🏀",
-    tone: "nba",
-    backendSupported: true,
-  },
-  {
-    id: "nfl",
-    apiValue: "nfl",
-    label: "NFL",
-    icon: "🏈",
-    tone: "nfl",
-    backendSupported: true,
-  },
-  {
-    id: "soccer",
-    apiValue: "soccer",
-    label: "Fútbol",
-    icon: "⚽",
-    tone: "soccer",
-    backendSupported: true,
-  },
-  {
-    id: "nhl",
-    apiValue: "nhl",
-    label: "NHL",
-    icon: "🏒",
-    tone: "nhl",
-    backendSupported: true,
-  },
-  {
-    id: "mma",
-    apiValue: "mma",
-    label: "UFC",
-    icon: "🥊",
-    tone: "mma",
-    backendSupported: true,
-  },
-  {
-    id: "tennis",
-    apiValue: "tennis",
-    label: "Tenis",
-    icon: "🎾",
-    tone: "tennis",
-    backendSupported: true,
-  },
-  {
-    id: "cricket",
-    apiValue: "cricket",
-    label: "Cricket",
-    icon: "🏏",
-    tone: "cricket",
-    backendSupported: true,
-  },
-  {
-    id: "basketball",
-    apiValue: "nba",
-    label: "Baloncesto",
-    icon: "🏀",
-    tone: "basketball",
-    backendSupported: true,
-  },
-  {
-    id: "mlb",
-    apiValue: "mlb",
-    label: "Béisbol",
-    icon: "⚾",
-    tone: "mlb",
-    backendSupported: true,
-  },
-] as const;
 
 const marketShapeOptions = [
   "all",
@@ -658,26 +582,6 @@ function buildUpcomingDataQualityPath(filters: UpcomingFilters): string {
     params.set("sport", apiSport);
   }
   return `/research/upcoming-sports/data-quality?${params.toString()}`;
-}
-
-function getSportSelectorOption(value: string) {
-  return sportsSelectorOptions.find((option) => option.id === value) ?? sportsSelectorOptions[0];
-}
-
-function getSportApiFilter(value: string): string | null {
-  const option = getSportSelectorOption(value);
-  if (!option.backendSupported || !option.apiValue) {
-    return null;
-  }
-  return option.apiValue;
-}
-
-function matchesSelectedSport(sport: string | null | undefined, selectedSport: string): boolean {
-  if (selectedSport === "all") {
-    return true;
-  }
-  const option = getSportSelectorOption(selectedSport);
-  return sport === option.apiValue;
 }
 
 function formatOptionLabel(value: string): string {
@@ -1767,50 +1671,6 @@ function ExternalSignalCard({
         <span className="quiet-text">Sin advertencias de fuente.</span>
       )}
     </article>
-  );
-}
-
-function SportsSelectorBar({
-  selectedSport,
-  onSelect,
-}: {
-  selectedSport: string;
-  onSelect: (sport: string) => void;
-}) {
-  const activeOption = getSportSelectorOption(selectedSport);
-
-  return (
-    <section className="sports-selector-panel" aria-label="Deportes en PolySignal">
-      <div className="sports-selector-heading">
-        <div>
-          <span className="section-kicker">Filtro principal</span>
-          <h2>Deportes en PolySignal</h2>
-          <p>Selecciona un deporte para filtrar los mercados próximos.</p>
-        </div>
-        <span className="sports-selector-active">
-          Activo: {activeOption.label}
-        </span>
-      </div>
-      <div className="sports-selector-scroll" role="list">
-        {sportsSelectorOptions.map((option) => {
-          const selected = option.id === selectedSport;
-          return (
-            <button
-              aria-pressed={selected}
-              className={`sport-selector-chip tone-${option.tone} ${selected ? "selected" : ""}`}
-              key={option.id}
-              onClick={() => onSelect(option.id)}
-              type="button"
-            >
-              <span className="sport-selector-icon" aria-hidden="true">
-                {option.icon}
-              </span>
-              <span>{option.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
