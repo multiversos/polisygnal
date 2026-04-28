@@ -36,6 +36,10 @@ import {
   removeMarketTag,
   type MarketTag,
 } from "../../lib/marketTags";
+import {
+  fetchMarketOutcome,
+  type MarketOutcome,
+} from "../../lib/backtesting";
 
 type JsonPayload = Record<string, unknown> | unknown[];
 
@@ -359,6 +363,12 @@ type MarkdownExportState = {
   fallback: string | null;
 };
 
+type MarketOutcomePanelState = {
+  item: MarketOutcome | null;
+  loading: boolean;
+  error: string | null;
+};
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -610,6 +620,16 @@ function formatSportLabel(value?: string | null): string {
 
 function formatMarketShapeLabel(value?: string | null): string {
   return value ? marketShapeLabels[value] ?? humanizeToken(value) : "tipo no definido";
+}
+
+function formatOutcomeLabel(value: MarketOutcome["resolved_outcome"]): string {
+  if (value === "yes") {
+    return "SÍ";
+  }
+  if (value === "no") {
+    return "NO";
+  }
+  return "Cancelado";
 }
 
 function getFocusMarketShape(analysis: MarketAnalysis): string | null {
@@ -2085,6 +2105,53 @@ function MarketTagsDetailPanel({
   );
 }
 
+function MarketOutcomeDetailPanel({ state }: { state: MarketOutcomePanelState }) {
+  return (
+    <section className="analysis-section watchlist-detail-panel">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Backtesting</span>
+          <h2>Outcome del mercado</h2>
+        </div>
+      </div>
+      <p className="section-note">
+        Outcome manual guardado para comparar predicciones cuando el mercado se
+        resuelve. No mide dinero ni ejecuta trading.
+      </p>
+      {state.loading ? <div className="empty-state compact">Cargando outcome...</div> : null}
+      {state.error ? (
+        <div className="alert-panel compact" role="status">
+          <strong>Outcome no disponible</strong>
+          <span>{state.error}</span>
+        </div>
+      ) : null}
+      {!state.loading && !state.item ? (
+        <span className="reason-chip muted">Sin outcome manual guardado.</span>
+      ) : null}
+      {state.item ? (
+        <dl className="source-quality-metrics">
+          <div>
+            <dt>Resultado</dt>
+            <dd>{formatOutcomeLabel(state.item.resolved_outcome)}</dd>
+          </div>
+          <div>
+            <dt>Fuente</dt>
+            <dd>{state.item.source}</dd>
+          </div>
+          <div>
+            <dt>Resuelto</dt>
+            <dd>{formatDateTime(state.item.resolved_at)}</dd>
+          </div>
+          <div>
+            <dt>Notas</dt>
+            <dd>{state.item.notes || "N/D"}</dd>
+          </div>
+        </dl>
+      ) : null}
+    </section>
+  );
+}
+
 export default function MarketAnalysisPage() {
   const params = useParams<{ id: string }>();
   const marketId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -2127,6 +2194,11 @@ export default function MarketAnalysisPage() {
     saving: false,
     error: null,
     draft: "",
+  });
+  const [marketOutcomeState, setMarketOutcomeState] = useState<MarketOutcomePanelState>({
+    item: null,
+    loading: true,
+    error: null,
   });
 
   const loadAnalysis = useCallback(async () => {
@@ -2230,6 +2302,20 @@ export default function MarketAnalysisPage() {
         loading: false,
         error: "No se pudieron cargar etiquetas.",
       }));
+    }
+  }, [marketId]);
+
+  const loadMarketOutcome = useCallback(async () => {
+    setMarketOutcomeState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const item = await fetchMarketOutcome(marketId);
+      setMarketOutcomeState({ item, loading: false, error: null });
+    } catch {
+      setMarketOutcomeState({
+        item: null,
+        loading: false,
+        error: "No se pudo cargar outcome.",
+      });
     }
   }, [marketId]);
 
@@ -2533,6 +2619,10 @@ export default function MarketAnalysisPage() {
     void loadMarketTags();
   }, [loadMarketTags]);
 
+  useEffect(() => {
+    void loadMarketOutcome();
+  }, [loadMarketOutcome]);
+
   const analysis = state.analysis;
   const translatedTitle = analysis ? translateMarketTitleToSpanish(analysis.market.question) : "";
   const originalChanged = Boolean(analysis && translatedTitle !== analysis.market.question);
@@ -2721,6 +2811,8 @@ export default function MarketAnalysisPage() {
                 onRemove={removeTagFromMarket}
                 state={marketTagsState}
               />
+
+              <MarketOutcomeDetailPanel state={marketOutcomeState} />
 
               <section className="analysis-section">
                 <h2>Qué falta por investigar</h2>

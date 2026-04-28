@@ -2882,6 +2882,11 @@ h2 {
   gap: 12px;
 }
 
+.backtesting-outcome-list {
+  display: grid;
+  gap: 12px;
+}
+
 .source-quality-card {
   display: grid;
   gap: 10px;
