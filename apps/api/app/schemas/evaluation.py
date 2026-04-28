@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-ResolutionOutcome = Literal["yes", "no", "cancelled"]
+ResolutionOutcome = Literal["yes", "no", "cancelled", "invalid", "unknown"]
 
 
 class MarketResolveRequest(BaseModel):

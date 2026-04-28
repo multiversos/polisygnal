@@ -1,11 +1,20 @@
 "use client";
 
+export type ResolvedOutcome = "yes" | "no" | "cancelled" | "invalid" | "unknown";
+
 export type MarketOutcome = {
   market_id: number;
   question: string;
-  resolved_outcome: "yes" | "no" | "cancelled";
+  resolved_outcome: ResolvedOutcome;
   resolved_at: string;
   source: string;
+  notes?: string | null;
+};
+
+export type MarketOutcomePayload = {
+  resolved_outcome: ResolvedOutcome;
+  resolved_at?: string | null;
+  source?: string | null;
   notes?: string | null;
 };
 
@@ -77,4 +86,30 @@ export async function fetchMarketOutcome(
     }
     throw error;
   }
+}
+
+export function upsertMarketOutcome(
+  marketId: number | string,
+  payload: MarketOutcomePayload,
+): Promise<MarketOutcome> {
+  return requestBacktesting<MarketOutcome>(`/markets/${marketId}/outcome`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateMarketOutcome(
+  marketId: number | string,
+  payload: Partial<MarketOutcomePayload>,
+): Promise<MarketOutcome> {
+  return requestBacktesting<MarketOutcome>(`/markets/${marketId}/outcome`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteMarketOutcome(marketId: number | string): Promise<null> {
+  return requestBacktesting<null>(`/markets/${marketId}/outcome`, {
+    method: "DELETE",
+  });
 }

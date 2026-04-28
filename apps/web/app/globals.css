@@ -1542,6 +1542,53 @@ h2 {
   resize: vertical;
 }
 
+.outcome-management-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.watchlist-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted-strong);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.watchlist-field input,
+.watchlist-field select,
+.watchlist-field textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.watchlist-field input,
+.watchlist-field select {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.watchlist-field textarea {
+  min-height: 96px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.outcome-notes-field,
+.outcome-management-form .watchlist-actions {
+  grid-column: 1 / -1;
+}
+
 .candidate-explain-grid section {
   display: grid;
   gap: 8px;
@@ -3422,6 +3469,7 @@ h2 {
   .metric-grid,
   .dashboard-grid,
   .filter-panel,
+  .outcome-management-form,
   .upcoming-filter-row,
   .upcoming-main,
   .upcoming-side,

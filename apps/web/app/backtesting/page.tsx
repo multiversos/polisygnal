@@ -53,6 +53,12 @@ function formatOutcome(value: MarketOutcome["resolved_outcome"]): string {
   if (value === "no") {
     return "NO";
   }
+  if (value === "invalid") {
+    return "Inválido";
+  }
+  if (value === "unknown") {
+    return "Desconocido";
+  }
   return "Cancelado";
 }
 

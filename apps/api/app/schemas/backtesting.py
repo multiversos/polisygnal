@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-ResolvedOutcome = Literal["yes", "no", "cancelled"]
+ResolvedOutcome = Literal["yes", "no", "cancelled", "invalid", "unknown"]
 
 
 class MarketOutcomeCreate(BaseModel):

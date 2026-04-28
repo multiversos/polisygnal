@@ -12,7 +12,7 @@ class MarketOutcome(Base):
     __tablename__ = "market_outcomes"
     __table_args__ = (
         CheckConstraint(
-            "resolved_outcome IN ('yes', 'no', 'cancelled')",
+            "resolved_outcome IN ('yes', 'no', 'cancelled', 'invalid', 'unknown')",
             name="ck_market_outcomes_resolved_outcome",
         ),
     )

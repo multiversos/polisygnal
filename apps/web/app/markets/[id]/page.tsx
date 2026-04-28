@@ -38,8 +38,12 @@ import {
   type MarketTag,
 } from "../../lib/marketTags";
 import {
+  deleteMarketOutcome,
   fetchMarketOutcome,
+  updateMarketOutcome,
+  upsertMarketOutcome,
   type MarketOutcome,
+  type ResolvedOutcome,
 } from "../../lib/backtesting";
 
 type JsonPayload = Record<string, unknown> | unknown[];
@@ -367,7 +371,12 @@ type MarkdownExportState = {
 type MarketOutcomePanelState = {
   item: MarketOutcome | null;
   loading: boolean;
+  saving: boolean;
   error: string | null;
+  outcomeDraft: ResolvedOutcome;
+  sourceDraft: string;
+  notesDraft: string;
+  resolvedAtDraft: string;
 };
 
 const API_BASE_URL = (
@@ -376,6 +385,13 @@ const API_BASE_URL = (
 
 const UPCOMING_MATCH_WINDOW_DAYS = 7;
 const PAUSED_FUTURE_SHAPES = new Set(["championship", "futures"]);
+
+const outcomeOptions: Array<{ value: ResolvedOutcome; label: string }> = [
+  { value: "yes", label: "Sí" },
+  { value: "no", label: "No" },
+  { value: "invalid", label: "Inválido" },
+  { value: "unknown", label: "Desconocido" },
+];
 
 const marketShapeLabels: Record<string, string> = {
   match_winner: "ganador de partido",
@@ -630,7 +646,37 @@ function formatOutcomeLabel(value: MarketOutcome["resolved_outcome"]): string {
   if (value === "no") {
     return "NO";
   }
+  if (value === "invalid") {
+    return "Inválido";
+  }
+  if (value === "unknown") {
+    return "Desconocido";
+  }
   return "Cancelado";
+}
+
+function formatOutcomeDateInput(value?: string | null): string {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function parseOutcomeDateInput(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString();
 }
 
 function getFocusMarketShape(analysis: MarketAnalysis): string | null {
@@ -2106,18 +2152,34 @@ function MarketTagsDetailPanel({
   );
 }
 
-function MarketOutcomeDetailPanel({ state }: { state: MarketOutcomePanelState }) {
+function MarketOutcomeDetailPanel({
+  onDelete,
+  onNotesChange,
+  onResolvedAtChange,
+  onSave,
+  onSourceChange,
+  onOutcomeChange,
+  state,
+}: {
+  onDelete: () => void;
+  onNotesChange: (notes: string) => void;
+  onResolvedAtChange: (resolvedAt: string) => void;
+  onSave: () => void;
+  onSourceChange: (source: string) => void;
+  onOutcomeChange: (outcome: ResolvedOutcome) => void;
+  state: MarketOutcomePanelState;
+}) {
   return (
     <section className="analysis-section watchlist-detail-panel">
       <div className="analysis-section-heading">
         <div>
           <span className="section-kicker">Backtesting</span>
-          <h2>Outcome del mercado</h2>
+          <h2>Resultado del mercado</h2>
         </div>
       </div>
       <p className="section-note">
-        Outcome manual guardado para comparar predicciones cuando el mercado se
-        resuelve. No mide dinero ni ejecuta trading.
+        Este resultado se registra manualmente para backtesting. No ejecuta
+        apuestas ni trading.
       </p>
       {state.loading ? <div className="empty-state compact">Cargando outcome...</div> : null}
       {state.error ? (
@@ -2127,7 +2189,7 @@ function MarketOutcomeDetailPanel({ state }: { state: MarketOutcomePanelState })
         </div>
       ) : null}
       {!state.loading && !state.item ? (
-        <span className="reason-chip muted">Sin outcome manual guardado.</span>
+        <span className="reason-chip muted">Sin resultado manual guardado.</span>
       ) : null}
       {state.item ? (
         <dl className="source-quality-metrics">
@@ -2149,6 +2211,70 @@ function MarketOutcomeDetailPanel({ state }: { state: MarketOutcomePanelState })
           </div>
         </dl>
       ) : null}
+      <div className="outcome-management-form">
+        <label className="watchlist-field">
+          Resultado
+          <select
+            disabled={state.saving}
+            onChange={(event) => onOutcomeChange(event.target.value as ResolvedOutcome)}
+            value={state.outcomeDraft}
+          >
+            {outcomeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="watchlist-field">
+          Fecha de resolución
+          <input
+            disabled={state.saving}
+            onChange={(event) => onResolvedAtChange(event.target.value)}
+            type="datetime-local"
+            value={state.resolvedAtDraft}
+          />
+        </label>
+        <label className="watchlist-field">
+          Fuente
+          <input
+            disabled={state.saving}
+            onChange={(event) => onSourceChange(event.target.value)}
+            placeholder="manual"
+            value={state.sourceDraft}
+          />
+        </label>
+        <label className="watchlist-field outcome-notes-field">
+          Nota
+          <textarea
+            disabled={state.saving}
+            onChange={(event) => onNotesChange(event.target.value)}
+            placeholder="Notas internas sobre el resultado"
+            rows={3}
+            value={state.notesDraft}
+          />
+        </label>
+        <div className="watchlist-actions">
+          <button
+            className="watchlist-button"
+            disabled={state.loading || state.saving}
+            onClick={onSave}
+            type="button"
+          >
+            {state.saving ? "Guardando..." : "Guardar resultado"}
+          </button>
+          {state.item ? (
+            <button
+              className="watchlist-button secondary"
+              disabled={state.loading || state.saving}
+              onClick={onDelete}
+              type="button"
+            >
+              Eliminar resultado
+            </button>
+          ) : null}
+        </div>
+      </div>
     </section>
   );
 }
@@ -2199,7 +2325,12 @@ export default function MarketAnalysisPage() {
   const [marketOutcomeState, setMarketOutcomeState] = useState<MarketOutcomePanelState>({
     item: null,
     loading: true,
+    saving: false,
     error: null,
+    outcomeDraft: "unknown",
+    sourceDraft: "manual",
+    notesDraft: "",
+    resolvedAtDraft: "",
   });
 
   const loadAnalysis = useCallback(async () => {
@@ -2310,15 +2441,93 @@ export default function MarketAnalysisPage() {
     setMarketOutcomeState((current) => ({ ...current, loading: true, error: null }));
     try {
       const item = await fetchMarketOutcome(marketId);
-      setMarketOutcomeState({ item, loading: false, error: null });
+      setMarketOutcomeState({
+        item,
+        loading: false,
+        saving: false,
+        error: null,
+        outcomeDraft: item?.resolved_outcome ?? "unknown",
+        sourceDraft: item?.source ?? "manual",
+        notesDraft: item?.notes ?? "",
+        resolvedAtDraft: formatOutcomeDateInput(item?.resolved_at),
+      });
     } catch {
       setMarketOutcomeState({
         item: null,
         loading: false,
+        saving: false,
         error: "No se pudo cargar outcome.",
+        outcomeDraft: "unknown",
+        sourceDraft: "manual",
+        notesDraft: "",
+        resolvedAtDraft: "",
       });
     }
   }, [marketId]);
+
+  const saveMarketOutcome = useCallback(async () => {
+    setMarketOutcomeState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      const payload = {
+        resolved_outcome: marketOutcomeState.outcomeDraft,
+        source: marketOutcomeState.sourceDraft.trim() || "manual",
+        notes: marketOutcomeState.notesDraft.trim() || null,
+        resolved_at: parseOutcomeDateInput(marketOutcomeState.resolvedAtDraft),
+      };
+      const item = marketOutcomeState.item
+        ? await updateMarketOutcome(marketId, payload)
+        : await upsertMarketOutcome(marketId, payload);
+      setMarketOutcomeState((current) => ({
+        ...current,
+        item,
+        saving: false,
+        error: null,
+        outcomeDraft: item.resolved_outcome,
+        sourceDraft: item.source,
+        notesDraft: item.notes ?? "",
+        resolvedAtDraft: formatOutcomeDateInput(item.resolved_at),
+      }));
+    } catch {
+      setMarketOutcomeState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo guardar el resultado manual.",
+      }));
+    }
+  }, [
+    marketId,
+    marketOutcomeState.item,
+    marketOutcomeState.notesDraft,
+    marketOutcomeState.outcomeDraft,
+    marketOutcomeState.resolvedAtDraft,
+    marketOutcomeState.sourceDraft,
+  ]);
+
+  const removeMarketOutcome = useCallback(async () => {
+    if (!marketOutcomeState.item) {
+      return;
+    }
+    setMarketOutcomeState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      await deleteMarketOutcome(marketId);
+      setMarketOutcomeState({
+        item: null,
+        loading: false,
+        saving: false,
+        error: null,
+        outcomeDraft: "unknown",
+        sourceDraft: "manual",
+        notesDraft: "",
+        resolvedAtDraft: "",
+      });
+    } catch {
+      setMarketOutcomeState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo eliminar el resultado manual.",
+      }));
+    }
+  }, [marketId, marketOutcomeState.item]);
 
   const addToWatchlist = useCallback(async () => {
     setWatchlistState((current) => ({ ...current, saving: true, error: null }));
@@ -2814,7 +3023,26 @@ export default function MarketAnalysisPage() {
                 state={marketTagsState}
               />
 
-              <MarketOutcomeDetailPanel state={marketOutcomeState} />
+              <MarketOutcomeDetailPanel
+                onDelete={removeMarketOutcome}
+                onNotesChange={(notes) =>
+                  setMarketOutcomeState((current) => ({ ...current, notesDraft: notes }))
+                }
+                onOutcomeChange={(outcome) =>
+                  setMarketOutcomeState((current) => ({ ...current, outcomeDraft: outcome }))
+                }
+                onResolvedAtChange={(resolvedAt) =>
+                  setMarketOutcomeState((current) => ({
+                    ...current,
+                    resolvedAtDraft: resolvedAt,
+                  }))
+                }
+                onSave={saveMarketOutcome}
+                onSourceChange={(source) =>
+                  setMarketOutcomeState((current) => ({ ...current, sourceDraft: source }))
+                }
+                state={marketOutcomeState}
+              />
 
               <section className="analysis-section">
                 <h2>Qué falta por investigar</h2>

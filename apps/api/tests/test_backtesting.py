@@ -67,6 +67,44 @@ def test_market_outcome_crud_endpoints(client: TestClient, db_session: Session) 
     assert after_delete.status_code == 404
 
 
+def test_market_outcome_allows_manual_invalid_and_unknown_states(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(db_session, suffix="manual-state")
+    _add_prediction(
+        db_session,
+        market.id,
+        family="research_v1_local",
+        yes_probability=Decimal("0.7200"),
+    )
+    db_session.commit()
+
+    create_response = client.post(
+        f"/markets/{market.id}/outcome",
+        json={
+            "resolved_outcome": "unknown",
+            "source": "manual_test",
+            "notes": "Outcome not resolved yet.",
+        },
+    )
+    patch_response = client.patch(
+        f"/markets/{market.id}/outcome",
+        json={
+            "resolved_outcome": "invalid",
+            "notes": "Market resolved invalid.",
+        },
+    )
+    summary_response = client.get("/backtesting/summary")
+
+    assert create_response.status_code == 201
+    assert create_response.json()["resolved_outcome"] == "unknown"
+    assert patch_response.status_code == 200
+    assert patch_response.json()["resolved_outcome"] == "invalid"
+    assert summary_response.status_code == 200
+    assert summary_response.json()["total_resolved_with_predictions"] == 0
+
+
 def test_backtesting_summary_compares_predictions_to_outcomes(
     client: TestClient,
     db_session: Session,
