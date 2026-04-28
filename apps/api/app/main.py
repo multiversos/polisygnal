@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.api.routes_backtesting import router as backtesting_router
+from app.api.routes_data_health import router as data_health_router
 from app.api.routes_external_signals import router as external_signals_router
 from app.api.routes_investigation_status import router as investigation_status_router
 from app.api.routes_research import router as research_router
@@ -32,6 +33,7 @@ if settings.cors_origins:
 
 app.include_router(router)
 app.include_router(backtesting_router)
+app.include_router(data_health_router)
 app.include_router(research_router)
 app.include_router(external_signals_router)
 app.include_router(watchlist_router)

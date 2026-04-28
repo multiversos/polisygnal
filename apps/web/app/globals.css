@@ -3113,6 +3113,12 @@ h2 {
   color: var(--accent-ink);
 }
 
+.data-health-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .source-quality-card {
   display: grid;
   gap: 10px;

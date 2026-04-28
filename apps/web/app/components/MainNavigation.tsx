@@ -15,6 +15,7 @@ const navigationItems = [
   { label: "Alertas", href: "/alerts" },
   { label: "Coincidencias Kalshi", href: "/external-signals/matches" },
   { label: "Calidad de fuentes", href: "/sources" },
+  { label: "Salud de datos", href: "/data-health" },
   { label: "Backtesting", href: "/backtesting" },
 ];
 
