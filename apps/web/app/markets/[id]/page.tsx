@@ -223,9 +223,34 @@ type AnalysisExternalSignal = {
   fetched_at: string;
 };
 
+type PolySignalScoreComponent = {
+  name: string;
+  probability?: string | number | null;
+  weight?: string | number | null;
+  adjustment?: string | number | null;
+  confidence?: string | number | null;
+  note: string;
+};
+
+type PolySignalScore = {
+  score_probability?: string | number | null;
+  score_percent?: string | number | null;
+  market_yes_price?: string | number | null;
+  edge_signed?: string | number | null;
+  edge_percent_points?: string | number | null;
+  confidence: string | number;
+  confidence_label: string;
+  source: string;
+  components: PolySignalScoreComponent[];
+  warnings: string[];
+  label: string;
+  color_hint: "positive" | "negative" | "neutral" | "warning" | string;
+};
+
 type MarketAnalysis = {
   market: AnalysisMarket;
   latest_snapshot?: AnalysisSnapshot | null;
+  polysignal_score?: PolySignalScore | null;
   candidate_context?: CandidateContext | null;
   latest_prediction?: AnalysisPrediction | null;
   prediction_history: AnalysisPrediction[];
@@ -313,6 +338,13 @@ const warningLabels: Record<string, string> = {
   no_prediction_found: "sin predicción investigada",
   missing_yes_price: "falta precio SÍ",
   missing_price_data: "faltan datos de precio",
+  preliminary_score: "score preliminar",
+  missing_market_yes_price: "falta precio SÍ",
+  external_signal_low_match_confidence: "señal externa con baja coincidencia",
+  external_signal_missing_probability: "señal externa sin probabilidad",
+  few_price_history_points: "pocos snapshots",
+  low_confidence: "confianza baja",
+  insufficient_data: "datos insuficientes",
   low_liquidity: "baja liquidez",
   low_volume: "bajo volumen",
   market_inactive_or_closed: "mercado inactivo o cerrado",
@@ -404,6 +436,15 @@ function formatSignedProbabilityPoints(value: unknown): string {
   }
   const sign = number > 0 ? "+" : "";
   return `${sign}${(number * 100).toFixed(1)} pts`;
+}
+
+function formatPercentPoints(value: unknown): string {
+  const number = toNumber(value);
+  if (number === null) {
+    return "N/D";
+  }
+  const sign = number > 0 ? "+" : "";
+  return `${sign}${number.toFixed(1)} pts`;
 }
 
 function formatSignedRatio(value: unknown): string {
@@ -1106,6 +1147,87 @@ function PricePanel({ snapshot }: { snapshot?: AnalysisSnapshot | null }) {
           </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+function PolySignalScorePanel({ score }: { score?: PolySignalScore | null }) {
+  const hasScore = score?.score_probability !== null && score?.score_probability !== undefined;
+
+  return (
+    <section className={`analysis-section polysignal-detail-section ${score?.color_hint || "warning"}`}>
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Estimación informativa</span>
+          <h2>Puntaje PolySignal</h2>
+          <p className="section-note">
+            PolySignal Score es una estimación informativa basada en señales disponibles. No es recomendación de apuesta.
+          </p>
+        </div>
+        <span className="timestamp-pill">
+          {score?.source === "latest_prediction" ? "Predicción guardada" : "Score preliminar"}
+        </span>
+      </div>
+
+      {!score || !hasScore ? (
+        <div className="empty-state">
+          <strong>PolySignal SÍ: pendiente</strong>
+          <p>Faltan datos suficientes para estimar.</p>
+        </div>
+      ) : (
+        <div className="polysignal-detail-grid">
+          <div className={`polysignal-score-card hero ${score.color_hint || "neutral"}`}>
+            <div className="polysignal-score-heading">
+              <span>PolySignal SÍ</span>
+              <strong>{formatProbability(score.score_probability)}</strong>
+            </div>
+            <p>{score.label}</p>
+          </div>
+
+          <div className="analysis-stat-grid">
+            <div><span>Mercado SÍ</span><strong>{formatProbability(score.market_yes_price)}</strong></div>
+            <div><span>Diferencia</span><strong>{formatPercentPoints(score.edge_percent_points)}</strong></div>
+            <div><span>Confianza</span><strong>{score.confidence_label}</strong></div>
+            <div><span>Fuente</span><strong>{humanizeToken(score.source)}</strong></div>
+          </div>
+
+          <div className="polysignal-components">
+            <h3>Componentes usados</h3>
+            {score.components.length > 0 ? (
+              score.components.map((component) => (
+                <article className="polysignal-component" key={`${component.name}-${component.note}`}>
+                  <strong>{humanizeToken(component.name)}</strong>
+                  <span>
+                    {component.probability !== null && component.probability !== undefined
+                      ? `Prob. ${formatProbability(component.probability)}`
+                      : component.adjustment !== null && component.adjustment !== undefined
+                        ? `Ajuste ${formatSignedProbabilityPoints(component.adjustment)}`
+                        : "Confianza operativa"}
+                  </span>
+                  <p>{component.note}</p>
+                </article>
+              ))
+            ) : (
+              <p className="quiet-text">Sin componentes disponibles.</p>
+            )}
+          </div>
+
+          <div>
+            <h3>Advertencias</h3>
+            {score.warnings.length > 0 ? (
+              <div className="candidate-chip-list">
+                {score.warnings.map((warning) => (
+                  <span className="warning-chip" key={warning}>
+                    {formatWarningLabel(warning)}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="quiet-text">Sin advertencias críticas.</p>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -1946,6 +2068,7 @@ export default function MarketAnalysisPage() {
           <div className="analysis-layout">
             <div className="analysis-main">
               <PricePanel snapshot={analysis.latest_snapshot} />
+              <PolySignalScorePanel score={analysis.polysignal_score} />
               <PriceHistoryPanel history={state.priceHistory} error={state.priceHistoryError} />
               <CandidateContextPanel context={analysis.candidate_context} />
               <ExternalSignalsPanel signals={analysis.external_signals} snapshot={analysis.latest_snapshot} />

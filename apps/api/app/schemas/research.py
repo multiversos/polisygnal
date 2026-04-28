@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.prediction import PredictionItemResponse
+from app.schemas.polysignal_score import PolySignalScoreRead
 
 ResearchMode = Literal["local_only", "cheap_research"]
 
@@ -117,6 +118,7 @@ class ResearchCandidateRead(BaseModel):
     event_image_url: str | None = None
     icon_url: str | None = None
     participants: list[ResearchCandidateParticipantRead] = Field(default_factory=list)
+    polysignal_score: PolySignalScoreRead | None = None
 
 
 class ResearchCandidatesResponse(BaseModel):
@@ -147,6 +149,7 @@ class UpcomingSportsMarketRead(BaseModel):
     reasons: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     participants: list[ResearchCandidateParticipantRead] = Field(default_factory=list)
+    polysignal_score: PolySignalScoreRead | None = None
 
 
 class UpcomingSportsResponse(BaseModel):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.event import Event
 from app.models.market import Market
 from app.repositories.market_snapshots import list_latest_market_snapshots_for_markets
+from app.schemas.polysignal_score import PolySignalScoreRead
+from app.services.polysignal_score import build_polysignal_score
 from app.services.research.candidate_selector import (
     ResearchCandidateParticipant,
     build_research_candidate,
@@ -68,6 +70,7 @@ class UpcomingSportsMarket:
     reasons: list[str]
     warnings: list[str]
     participants: list[ResearchCandidateParticipant]
+    polysignal_score: PolySignalScoreRead | None = None
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -89,6 +92,11 @@ class UpcomingSportsMarket:
             "reasons": list(self.reasons),
             "warnings": list(self.warnings),
             "participants": [participant.to_payload() for participant in self.participants],
+            "polysignal_score": (
+                self.polysignal_score.model_dump()
+                if self.polysignal_score is not None
+                else None
+            ),
         }
 
 
@@ -229,6 +237,17 @@ def list_upcoming_sports_markets(
         reverse=True,
     )
     selected = upcoming[: max(limit, 0)]
+    markets_by_id = {market.id: market for market in markets}
+    selected = [
+        _with_polysignal_score(
+            db,
+            item=item,
+            market=markets_by_id[item.market_id],
+            latest_snapshot=snapshots.get(item.market_id),
+        )
+        for item in selected
+        if item.market_id in markets_by_id
+    ]
     counts["returned"] = len(selected)
     return UpcomingSportsSelection(
         items=selected,
@@ -243,6 +262,24 @@ def list_upcoming_sports_markets(
             "window_start": current_time.isoformat(),
             "window_end": window_end.isoformat(),
         },
+    )
+
+
+def _with_polysignal_score(
+    db: Session,
+    *,
+    item: UpcomingSportsMarket,
+    market: Market,
+    latest_snapshot,
+) -> UpcomingSportsMarket:
+    return replace(
+        item,
+        polysignal_score=build_polysignal_score(
+            db,
+            market=market,
+            latest_snapshot=latest_snapshot,
+            candidate_score=item.candidate_score,
+        ),
     )
 
 

@@ -1082,6 +1082,91 @@ h2 {
   border-radius: inherit;
 }
 
+.polysignal-score-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, var(--panel-gradient-start), var(--panel-gradient-end)),
+    var(--surface-elevated);
+}
+
+.polysignal-score-card.positive {
+  border-left-color: var(--accent);
+}
+
+.polysignal-score-card.negative {
+  border-left-color: var(--red);
+}
+
+.polysignal-score-card.neutral {
+  border-left-color: var(--blue);
+}
+
+.polysignal-score-card.warning {
+  border-left-color: var(--amber);
+}
+
+.polysignal-score-card.compact {
+  gap: 6px;
+}
+
+.polysignal-score-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.polysignal-score-heading span {
+  color: var(--muted-strong);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.polysignal-score-heading strong {
+  color: var(--foreground);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.polysignal-score-card.compact .polysignal-score-heading strong {
+  font-size: 1.08rem;
+}
+
+.polysignal-score-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.polysignal-score-meta span,
+.polysignal-score-warning {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.polysignal-score-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .candidate-explain-grid {
   grid-template-columns: 1fr 1fr;
 }
@@ -2133,6 +2218,71 @@ h2 {
 .analysis-price-panel {
   max-width: none;
   box-shadow: none;
+}
+
+.polysignal-detail-section {
+  border-left: 4px solid var(--blue);
+}
+
+.polysignal-detail-section.positive {
+  border-left-color: var(--accent);
+}
+
+.polysignal-detail-section.negative {
+  border-left-color: var(--red);
+}
+
+.polysignal-detail-section.neutral {
+  border-left-color: var(--blue);
+}
+
+.polysignal-detail-section.warning {
+  border-left-color: var(--amber);
+}
+
+.polysignal-detail-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.polysignal-score-card.hero {
+  padding: 16px;
+}
+
+.polysignal-score-card.hero .polysignal-score-heading strong {
+  font-size: clamp(2rem, 6vw, 3.2rem);
+}
+
+.polysignal-components {
+  display: grid;
+  gap: 8px;
+}
+
+.polysignal-component {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.polysignal-component strong {
+  color: var(--foreground);
+  font-size: 0.9rem;
+}
+
+.polysignal-component span {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.polysignal-component p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .analysis-chip-columns,

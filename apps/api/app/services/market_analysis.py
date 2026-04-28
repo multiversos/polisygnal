@@ -28,6 +28,7 @@ from app.schemas.market_analysis import (
     MarketAnalysisSnapshot,
 )
 from app.services.external_market_signals import list_external_market_signals
+from app.services.polysignal_score import build_polysignal_score
 from app.services.research.candidate_selector import build_research_candidate
 from app.services.research.classification import classify_market_research_context
 
@@ -59,6 +60,14 @@ def build_market_analysis(db: Session, market: Market) -> MarketAnalysisRead:
     research_findings = _list_research_findings(db, market.id, limit=100)
     evidence_items = list_market_evidence_items(db, market_id=market.id)
     external_signals = list_external_market_signals(db, market_id=market.id, limit=50)
+    polysignal_score = build_polysignal_score(
+        db,
+        market=market,
+        latest_snapshot=latest_snapshot,
+        latest_prediction=latest_prediction,
+        external_signals=external_signals,
+        candidate_score=candidate.candidate_score,
+    )
 
     warnings: list[str] = []
     if latest_snapshot is None:
@@ -77,6 +86,7 @@ def build_market_analysis(db: Session, market: Market) -> MarketAnalysisRead:
             if latest_snapshot is not None
             else None
         ),
+        polysignal_score=polysignal_score,
         candidate_context=MarketAnalysisCandidateContext(
             candidate_score=candidate.candidate_score,
             candidate_reasons=list(candidate.candidate_reasons),

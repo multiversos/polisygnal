@@ -25,6 +25,7 @@ from app.schemas.research import (
 from app.services.research.candidate_selector import list_research_candidates
 from app.services.research.pipeline import run_market_research
 from app.services.research.upcoming_market_selector import list_upcoming_sports_markets
+from app.services.polysignal_score import build_polysignal_score
 
 router = APIRouter()
 
@@ -48,13 +49,25 @@ def get_research_candidates(
         sport=sport,
         market_shape=market_shape,
     )
+    candidate_payloads = []
+    for candidate in candidates:
+        payload = candidate.to_payload()
+        market = get_market_by_id(db, candidate.market_id)
+        if market is not None:
+            payload["polysignal_score"] = build_polysignal_score(
+                db,
+                market=market,
+                candidate_score=candidate.candidate_score,
+            ).model_dump()
+        candidate_payloads.append(payload)
+
     return ResearchCandidatesResponse(
         count=len(candidates),
         limit=limit,
         vertical=vertical,
         sport=sport,
         market_shape=market_shape,
-        candidates=[candidate.to_payload() for candidate in candidates],
+        candidates=candidate_payloads,
     )
 
 

@@ -35,6 +35,30 @@ type CandidateParticipant = {
   abbreviation?: string | null;
 };
 
+type PolySignalScoreComponent = {
+  name: string;
+  probability?: string | number | null;
+  weight?: string | number | null;
+  adjustment?: string | number | null;
+  confidence?: string | number | null;
+  note: string;
+};
+
+type PolySignalScore = {
+  score_probability?: string | number | null;
+  score_percent?: string | number | null;
+  market_yes_price?: string | number | null;
+  edge_signed?: string | number | null;
+  edge_percent_points?: string | number | null;
+  confidence: string | number;
+  confidence_label: string;
+  source: string;
+  components: PolySignalScoreComponent[];
+  warnings: string[];
+  label: string;
+  color_hint: "positive" | "negative" | "neutral" | "warning" | string;
+};
+
 type ResearchCandidate = {
   market_id: number;
   question: string;
@@ -55,6 +79,7 @@ type ResearchCandidate = {
   event_image_url?: string | null;
   icon_url?: string | null;
   participants: CandidateParticipant[];
+  polysignal_score?: PolySignalScore | null;
 };
 
 type CandidatesResponse = {
@@ -82,6 +107,7 @@ type UpcomingSportsMarket = {
   reasons: string[];
   warnings: string[];
   participants: CandidateParticipant[];
+  polysignal_score?: PolySignalScore | null;
 };
 
 type UpcomingSportsResponse = {
@@ -411,6 +437,15 @@ function formatMarketMetric(value: unknown): string {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(number);
+}
+
+function formatPercentPoints(value: unknown): string {
+  const number = toNumber(value);
+  if (number === null) {
+    return "--";
+  }
+  const prefix = number > 0 ? "+" : "";
+  return `${prefix}${number.toFixed(1)} pts`;
 }
 
 function getNoProbability(yesValue: unknown, noValue: unknown): number | null {
@@ -1107,6 +1142,48 @@ function UrgencyScoreBar({ score }: { score: unknown }) {
   );
 }
 
+function PolySignalScoreCard({
+  compact = false,
+  score,
+}: {
+  compact?: boolean;
+  score?: PolySignalScore | null;
+}) {
+  if (!score || score.score_probability === null || score.score_probability === undefined) {
+    return (
+      <div className="polysignal-score-card warning">
+        <div className="polysignal-score-heading">
+          <span>PolySignal SÍ</span>
+          <strong>pendiente</strong>
+        </div>
+        <p>Faltan datos suficientes para estimar.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`polysignal-score-card ${score.color_hint || "neutral"} ${compact ? "compact" : ""}`}>
+      <div className="polysignal-score-heading">
+        <span>PolySignal SÍ</span>
+        <strong>{formatMarketPercent(score.score_probability)}</strong>
+      </div>
+      <div className="polysignal-score-meta">
+        <span>Mercado SÍ: {formatMarketPercent(score.market_yes_price)}</span>
+        <span>Diferencia: {formatPercentPoints(score.edge_percent_points)}</span>
+        <span>Confianza: {score.confidence_label}</span>
+      </div>
+      {!compact ? <p>{score.label}</p> : null}
+      {score.warnings?.length ? (
+        <span className="polysignal-score-warning">
+          {score.warnings.includes("low_confidence") || score.confidence_label === "Baja"
+            ? "Score preliminar"
+            : "Estimación informativa"}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function ReasonChips({ reasons }: { reasons: string[] }) {
   const visibleReasons = reasons.slice(0, 5);
   const remaining = Math.max(0, reasons.length - visibleReasons.length);
@@ -1301,6 +1378,7 @@ function CandidateCard({
 
         <div className="candidate-card-insights">
           <CandidateScoreBar score={candidate.candidate_score} />
+          <PolySignalScoreCard compact score={candidate.polysignal_score} />
           <MarketPricePanel candidate={candidate} />
         </div>
       </div>
@@ -1390,6 +1468,7 @@ function UpcomingMarketCard({
 
         <div className="upcoming-side">
           <UrgencyScoreBar score={score} />
+          <PolySignalScoreCard score={market.polysignal_score} />
           <MarketPricePanel candidate={market} />
         </div>
         <div className="upcoming-date-row" aria-label="Fechas del mercado">

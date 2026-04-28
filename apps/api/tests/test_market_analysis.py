@@ -36,6 +36,9 @@ def test_get_market_analysis_returns_consolidated_read_only_payload(
     assert payload["market"]["question"] == "Will the Boston Celtics win the NBA Finals?"
     assert payload["market"]["event_title"] == "NBA Finals"
     assert payload["latest_snapshot"]["yes_price"] == "0.5200"
+    assert payload["polysignal_score"]["source"] == "latest_prediction"
+    assert payload["polysignal_score"]["score_probability"] == "0.5400"
+    assert payload["polysignal_score"]["label"]
     assert payload["candidate_context"]["candidate_score"] is not None
     assert payload["candidate_context"]["research_template_name"]
     assert payload["external_signals"][0]["source"] == "kalshi"
@@ -83,6 +86,8 @@ def test_get_market_analysis_returns_empty_sections_for_market_without_evidence(
     assert response.status_code == 200
     payload = response.json()
     assert payload["latest_snapshot"] is None
+    assert payload["polysignal_score"]["source"] == "insufficient_data"
+    assert payload["polysignal_score"]["score_probability"] is None
     assert payload["candidate_context"] is not None
     assert payload["prediction_history"] == []
     assert payload["research_runs"] == []

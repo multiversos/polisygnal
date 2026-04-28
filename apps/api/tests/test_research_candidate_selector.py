@@ -115,6 +115,8 @@ def test_research_candidates_endpoint_lists_candidates_without_mutating_db(
     assert payload["candidates"][0]["vertical"] == "sports"
     assert payload["candidates"][0]["market_shape"] == "match_winner"
     assert payload["candidates"][0]["candidate_score"] is not None
+    assert payload["candidates"][0]["polysignal_score"]["score_probability"] == "0.5500"
+    assert payload["candidates"][0]["polysignal_score"]["source"] == "preliminary_composite"
     assert payload["candidates"][0]["market_image_url"] is None
     assert payload["candidates"][0]["event_image_url"] is None
     assert payload["candidates"][0]["icon_url"] is None

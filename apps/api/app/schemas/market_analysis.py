@@ -5,6 +5,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.polysignal_score import PolySignalScoreRead
+
 
 JsonPayload = dict[str, object] | list[object]
 
@@ -183,6 +185,7 @@ class MarketAnalysisExternalSignal(BaseModel):
 class MarketAnalysisRead(BaseModel):
     market: MarketAnalysisMarket
     latest_snapshot: MarketAnalysisSnapshot | None = None
+    polysignal_score: PolySignalScoreRead | None = None
     candidate_context: MarketAnalysisCandidateContext | None = None
     latest_prediction: MarketAnalysisPrediction | None = None
     prediction_history: list[MarketAnalysisPrediction] = Field(default_factory=list)
