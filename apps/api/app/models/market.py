@@ -100,6 +100,11 @@ class Market(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    tag_links = relationship(
+        "MarketTagLink",
+        back_populates="market",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def latest_yes_price(self) -> Decimal | None:

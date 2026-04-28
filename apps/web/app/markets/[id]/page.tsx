@@ -30,6 +30,12 @@ import {
   type InvestigationStatus,
   type InvestigationStatusItem,
 } from "../../lib/investigationStatus";
+import {
+  addMarketTag,
+  fetchMarketTags,
+  removeMarketTag,
+  type MarketTag,
+} from "../../lib/marketTags";
 
 type JsonPayload = Record<string, unknown> | unknown[];
 
@@ -335,6 +341,15 @@ type InvestigationStatusPanelState = {
   statusDraft: InvestigationStatus;
   noteDraft: string;
   priorityDraft: string;
+};
+
+type MarketTagsPanelState = {
+  tags: MarketTag[];
+  suggestedTags: MarketTag[];
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  draft: string;
 };
 
 const API_BASE_URL = (
@@ -1975,6 +1990,94 @@ function InvestigationStatusDetailPanel({
   );
 }
 
+function MarketTagsDetailPanel({
+  onAdd,
+  onDraftChange,
+  onRemove,
+  state,
+}: {
+  onAdd: () => void;
+  onDraftChange: (value: string) => void;
+  onRemove: (tagId: number) => void;
+  state: MarketTagsPanelState;
+}) {
+  return (
+    <section className="analysis-section watchlist-detail-panel">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Organización</span>
+          <h2>Etiquetas</h2>
+        </div>
+      </div>
+      <p className="section-note">
+        Etiquetas manuales y sugerencias del sistema para ordenar mercados. No
+        modifican análisis ni crean predicciones.
+      </p>
+
+      {state.loading ? <div className="empty-state compact">Cargando etiquetas...</div> : null}
+      {state.error ? (
+        <div className="alert-panel compact" role="status">
+          <strong>No se pudieron actualizar etiquetas</strong>
+          <span>{state.error}</span>
+        </div>
+      ) : null}
+
+      {!state.loading ? (
+        <>
+          <div className="tag-chip-list">
+            {state.tags.length === 0 ? (
+              <span className="quiet-text">Sin etiquetas manuales.</span>
+            ) : (
+              state.tags.map((tag) => (
+                <span className="tag-chip manual" key={tag.slug}>
+                  {tag.name}
+                  {tag.id ? (
+                    <button
+                      aria-label={`Quitar etiqueta ${tag.name}`}
+                      disabled={state.saving}
+                      onClick={() => onRemove(tag.id as number)}
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </span>
+              ))
+            )}
+          </div>
+          {state.suggestedTags.length > 0 ? (
+            <div className="tag-chip-list">
+              {state.suggestedTags.map((tag) => (
+                <span className="tag-chip system" key={tag.slug}>{tag.name}</span>
+              ))}
+            </div>
+          ) : null}
+          <div className="watchlist-form">
+            <label>
+              Nueva etiqueta manual
+              <input
+                disabled={state.saving}
+                maxLength={120}
+                onChange={(event) => onDraftChange(event.target.value)}
+                placeholder="Ej. Alta prioridad"
+                value={state.draft}
+              />
+            </label>
+            <button
+              className="watchlist-button"
+              disabled={state.saving || state.draft.trim().length === 0}
+              onClick={onAdd}
+              type="button"
+            >
+              {state.saving ? "Guardando..." : "Agregar etiqueta"}
+            </button>
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 export default function MarketAnalysisPage() {
   const params = useParams<{ id: string }>();
   const marketId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -2003,6 +2106,14 @@ export default function MarketAnalysisPage() {
     statusDraft: "pending_review",
     noteDraft: "",
     priorityDraft: "",
+  });
+  const [marketTagsState, setMarketTagsState] = useState<MarketTagsPanelState>({
+    tags: [],
+    suggestedTags: [],
+    loading: true,
+    saving: false,
+    error: null,
+    draft: "",
   });
 
   const loadAnalysis = useCallback(async () => {
@@ -2085,6 +2196,26 @@ export default function MarketAnalysisPage() {
         ...current,
         loading: false,
         error: "No se pudo cargar el estado de investigación.",
+      }));
+    }
+  }, [marketId]);
+
+  const loadMarketTags = useCallback(async () => {
+    setMarketTagsState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const response = await fetchMarketTags(marketId);
+      setMarketTagsState((current) => ({
+        ...current,
+        tags: response.tags,
+        suggestedTags: response.suggested_tags,
+        loading: false,
+        error: null,
+      }));
+    } catch {
+      setMarketTagsState((current) => ({
+        ...current,
+        loading: false,
+        error: "No se pudieron cargar etiquetas.",
       }));
     }
   }, [marketId]);
@@ -2231,6 +2362,52 @@ export default function MarketAnalysisPage() {
     }
   }, [investigationState.item, marketId]);
 
+  const addTagToMarket = useCallback(async () => {
+    const name = marketTagsState.draft.trim();
+    if (!name) {
+      return;
+    }
+    setMarketTagsState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      const response = await addMarketTag(marketId, { name });
+      setMarketTagsState((current) => ({
+        ...current,
+        tags: response.tags,
+        suggestedTags: response.suggested_tags,
+        saving: false,
+        error: null,
+        draft: "",
+      }));
+    } catch {
+      setMarketTagsState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo agregar la etiqueta.",
+      }));
+    }
+  }, [marketId, marketTagsState.draft]);
+
+  const removeTagFromMarket = useCallback(async (tagId: number) => {
+    setMarketTagsState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      await removeMarketTag(marketId, tagId);
+      const response = await fetchMarketTags(marketId);
+      setMarketTagsState((current) => ({
+        ...current,
+        tags: response.tags,
+        suggestedTags: response.suggested_tags,
+        saving: false,
+        error: null,
+      }));
+    } catch {
+      setMarketTagsState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo quitar la etiqueta.",
+      }));
+    }
+  }, [marketId]);
+
   const copyCommand = useCallback(async (command: string, key: "prepare" | "ingest") => {
     if (typeof window === "undefined" || typeof document === "undefined") {
       return;
@@ -2277,6 +2454,10 @@ export default function MarketAnalysisPage() {
   useEffect(() => {
     void loadInvestigationStatus();
   }, [loadInvestigationStatus]);
+
+  useEffect(() => {
+    void loadMarketTags();
+  }, [loadMarketTags]);
 
   const analysis = state.analysis;
   const translatedTitle = analysis ? translateMarketTitleToSpanish(analysis.market.question) : "";
@@ -2456,6 +2637,15 @@ export default function MarketAnalysisPage() {
                   setInvestigationState((current) => ({ ...current, statusDraft: status }))
                 }
                 state={investigationState}
+              />
+
+              <MarketTagsDetailPanel
+                onAdd={addTagToMarket}
+                onDraftChange={(draft) =>
+                  setMarketTagsState((current) => ({ ...current, draft }))
+                }
+                onRemove={removeTagFromMarket}
+                state={marketTagsState}
               />
 
               <section className="analysis-section">

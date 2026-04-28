@@ -1532,6 +1532,66 @@ h2 {
   background: var(--amber-soft);
 }
 
+.tag-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  max-width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.tag-chip.manual {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.tag-chip.system {
+  border-style: dashed;
+  background: var(--surface-raised);
+  color: var(--muted-strong);
+}
+
+.tag-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-ink) 14%, transparent);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+
+.tag-chip button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-ink) 22%, transparent);
+}
+
+.tag-chip button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .table-shell {
   overflow-x: auto;
   border: 1px solid var(--line);

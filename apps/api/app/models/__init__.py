@@ -4,6 +4,7 @@ from app.models.external_market_signal import ExternalMarketSignal
 from app.models.market import Market
 from app.models.market_investigation_status import MarketInvestigationStatus
 from app.models.market_outcome import MarketOutcome
+from app.models.market_tag import MarketTag, MarketTagLink
 from app.models.market_snapshot import MarketSnapshot
 from app.models.prediction_report import PredictionReport
 from app.models.prediction import Prediction
@@ -19,6 +20,8 @@ __all__ = [
     "Market",
     "MarketInvestigationStatus",
     "MarketOutcome",
+    "MarketTag",
+    "MarketTagLink",
     "MarketSnapshot",
     "PredictionReport",
     "Prediction",
