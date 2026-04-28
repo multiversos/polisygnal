@@ -3,19 +3,28 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.market import Market
 from app.models.market_outcome import MarketOutcome
 from app.models.prediction import Prediction
 from app.schemas.backtesting import (
+    BacktestingConfidenceBucket,
     BacktestingFamilySummary,
     BacktestingSummaryResponse,
     MarketOutcomeCreate,
     MarketOutcomeRead,
     MarketOutcomesResponse,
     MarketOutcomeUpdate,
+)
+
+CONFIDENCE_BUCKETS = (
+    ("0-50", Decimal("0.0000"), Decimal("0.5000")),
+    ("50-60", Decimal("0.5000"), Decimal("0.6000")),
+    ("60-70", Decimal("0.6000"), Decimal("0.7000")),
+    ("70-80", Decimal("0.7000"), Decimal("0.8000")),
+    ("80-100", Decimal("0.8000"), Decimal("1.0000")),
 )
 
 
@@ -95,6 +104,8 @@ def delete_market_outcome(db: Session, market: Market) -> bool:
 
 
 def build_backtesting_summary(db: Session) -> BacktestingSummaryResponse:
+    total_outcomes = db.scalar(select(func.count()).select_from(MarketOutcome)) or 0
+    total_predictions = db.scalar(select(func.count()).select_from(Prediction)) or 0
     rows = db.execute(
         select(
             Prediction.prediction_family,
@@ -108,21 +119,38 @@ def build_backtesting_summary(db: Session) -> BacktestingSummaryResponse:
     ).all()
 
     family_rows: dict[str, list[tuple[Decimal, Decimal, str]]] = {}
+    bucket_rows: dict[str, list[tuple[Decimal, Decimal, str]]] = {
+        label: [] for label, _, _ in CONFIDENCE_BUCKETS
+    }
     all_rows: list[tuple[Decimal, Decimal, str]] = []
     for row in rows:
         item = (row.yes_probability, row.confidence_score, row.resolved_outcome)
         all_rows.append(item)
         family_rows.setdefault(row.prediction_family, []).append(item)
+        bucket_rows[_confidence_bucket_label(row.confidence_score)].append(item)
 
+    summary = _summarize_rows(all_rows)
     return BacktestingSummaryResponse(
         generated_at=datetime.now(tz=UTC),
-        **_summarize_rows(all_rows),
+        total_outcomes=total_outcomes,
+        total_predictions=total_predictions,
+        resolved_with_predictions=int(summary["total_resolved_with_predictions"]),
+        **summary,
         by_prediction_family=[
             BacktestingFamilySummary(
                 prediction_family=family,
                 **_summarize_rows(items),
             )
             for family, items in sorted(family_rows.items())
+        ],
+        by_confidence_bucket=[
+            BacktestingConfidenceBucket(
+                bucket=label,
+                min_confidence=min_confidence,
+                max_confidence=max_confidence,
+                **_summarize_rows(bucket_rows[label]),
+            )
+            for label, min_confidence, max_confidence in CONFIDENCE_BUCKETS
         ],
     )
 
@@ -173,3 +201,15 @@ def _summarize_rows(rows: list[tuple[Decimal, Decimal, str]]) -> dict[str, objec
 
 def _quantize(value: Decimal) -> Decimal:
     return value.quantize(Decimal("0.0001"))
+
+
+def _confidence_bucket_label(confidence_score: Decimal) -> str:
+    if confidence_score < Decimal("0.5000"):
+        return "0-50"
+    if confidence_score < Decimal("0.6000"):
+        return "50-60"
+    if confidence_score < Decimal("0.7000"):
+        return "60-70"
+    if confidence_score < Decimal("0.8000"):
+        return "70-80"
+    return "80-100"

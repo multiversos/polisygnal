@@ -30,6 +30,22 @@ function formatNumber(value?: string | number | null): string {
   return Number.isFinite(numeric) ? numeric.toFixed(4) : "N/D";
 }
 
+function formatCount(value?: number | null): string {
+  return value === null || value === undefined ? "0" : String(value);
+}
+
+function getBarWidth(value?: string | number | null): string {
+  if (value === null || value === undefined) {
+    return "0%";
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "0%";
+  }
+  const percent = Math.max(0, Math.min(100, Math.abs(numeric) <= 1 ? numeric * 100 : numeric));
+  return `${percent.toFixed(1)}%`;
+}
+
 function formatDate(value?: string | null): string {
   if (!value) {
     return "N/D";
@@ -139,9 +155,19 @@ export default function BacktestingPage() {
 
       <section className="metric-grid" aria-label="Resumen de backtesting">
         <article className="metric-card">
-          <span>Predicciones evaluables</span>
-          <strong>{state.loading ? "..." : summary?.total_resolved_with_predictions ?? 0}</strong>
-          <p>Con outcome yes/no manual</p>
+          <span>Outcomes manuales</span>
+          <strong>{state.loading ? "..." : formatCount(summary?.total_outcomes)}</strong>
+          <p>Registrados localmente</p>
+        </article>
+        <article className="metric-card">
+          <span>Predicciones guardadas</span>
+          <strong>{state.loading ? "..." : formatCount(summary?.total_predictions)}</strong>
+          <p>Historial disponible</p>
+        </article>
+        <article className="metric-card">
+          <span>Evaluables</span>
+          <strong>{state.loading ? "..." : formatCount(summary?.resolved_with_predictions)}</strong>
+          <p>Con outcome SÍ/NO manual</p>
         </article>
         <article className="metric-card">
           <span>Aciertos dirección</span>
@@ -201,6 +227,42 @@ export default function BacktestingPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </section>
+
+      <section className="dashboard-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Calibración</p>
+            <h2>Resultados por bucket de confianza</h2>
+          </div>
+          <span className="badge muted">
+            {summary?.by_confidence_bucket.length ?? 0} buckets
+          </span>
+        </div>
+
+        {state.loading ? (
+          <div className="empty-state">Cargando calibración...</div>
+        ) : !summary ? (
+          <div className="empty-state">No hay resumen de backtesting disponible.</div>
+        ) : (
+          <div className="backtesting-bucket-grid">
+            {summary.by_confidence_bucket.map((bucket) => (
+              <article className="backtesting-bucket-card" key={bucket.bucket}>
+                <div className="backtesting-bucket-heading">
+                  <strong>{bucket.bucket}%</strong>
+                  <span>{bucket.total_resolved_with_predictions} evaluables</span>
+                </div>
+                <div className="backtesting-bucket-bar" aria-hidden="true">
+                  <span style={{ width: getBarWidth(bucket.accuracy_direction) }} />
+                </div>
+                <p>
+                  Accuracy {formatPercent(bucket.accuracy_direction)} · Brier{" "}
+                  {formatNumber(bucket.brier_score)}
+                </p>
+              </article>
+            ))}
           </div>
         )}
       </section>

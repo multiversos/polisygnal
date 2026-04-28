@@ -46,11 +46,26 @@ class BacktestingFamilySummary(BaseModel):
     brier_score: Decimal | None = None
 
 
+class BacktestingConfidenceBucket(BaseModel):
+    bucket: str
+    min_confidence: Decimal
+    max_confidence: Decimal
+    total_resolved_with_predictions: int = 0
+    correct_direction_count: int = 0
+    accuracy_direction: Decimal | None = None
+    avg_confidence: Decimal | None = None
+    brier_score: Decimal | None = None
+
+
 class BacktestingSummaryResponse(BaseModel):
     generated_at: datetime
+    total_outcomes: int = 0
+    total_predictions: int = 0
+    resolved_with_predictions: int = 0
     total_resolved_with_predictions: int = 0
     correct_direction_count: int = 0
     accuracy_direction: Decimal | None = None
     avg_confidence: Decimal | None = None
     brier_score: Decimal | None = None
     by_prediction_family: list[BacktestingFamilySummary] = Field(default_factory=list)
+    by_confidence_bucket: list[BacktestingConfidenceBucket] = Field(default_factory=list)

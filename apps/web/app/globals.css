@@ -2992,6 +2992,56 @@ h2 {
   gap: 12px;
 }
 
+.backtesting-bucket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.backtesting-bucket-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.backtesting-bucket-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.backtesting-bucket-heading strong {
+  color: var(--foreground);
+  font-size: 1rem;
+}
+
+.backtesting-bucket-heading span,
+.backtesting-bucket-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.backtesting-bucket-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-elevated);
+}
+
+.backtesting-bucket-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
 .source-quality-card {
   display: grid;
   gap: 10px;

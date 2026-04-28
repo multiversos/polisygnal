@@ -32,14 +32,29 @@ export type BacktestingFamilySummary = {
   brier_score?: string | number | null;
 };
 
+export type BacktestingConfidenceBucket = {
+  bucket: string;
+  min_confidence: string | number;
+  max_confidence: string | number;
+  total_resolved_with_predictions: number;
+  correct_direction_count: number;
+  accuracy_direction?: string | number | null;
+  avg_confidence?: string | number | null;
+  brier_score?: string | number | null;
+};
+
 export type BacktestingSummary = {
   generated_at: string;
+  total_outcomes: number;
+  total_predictions: number;
+  resolved_with_predictions: number;
   total_resolved_with_predictions: number;
   correct_direction_count: number;
   accuracy_direction?: string | number | null;
   avg_confidence?: string | number | null;
   brier_score?: string | number | null;
   by_prediction_family: BacktestingFamilySummary[];
+  by_confidence_bucket: BacktestingConfidenceBucket[];
 };
 
 const API_BASE_URL = (

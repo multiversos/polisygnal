@@ -25,10 +25,20 @@ def test_backtesting_summary_empty_state_is_stable(
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["total_outcomes"] == 0
+    assert payload["total_predictions"] == 0
+    assert payload["resolved_with_predictions"] == 0
     assert payload["total_resolved_with_predictions"] == 0
     assert payload["correct_direction_count"] == 0
     assert payload["accuracy_direction"] is None
     assert payload["by_prediction_family"] == []
+    assert [item["bucket"] for item in payload["by_confidence_bucket"]] == [
+        "0-50",
+        "50-60",
+        "60-70",
+        "70-80",
+        "80-100",
+    ]
     assert db_session.scalar(select(func.count()).select_from(Prediction)) == before_predictions
     assert db_session.scalar(select(func.count()).select_from(ResearchRun)) == before_runs
 
@@ -102,6 +112,9 @@ def test_market_outcome_allows_manual_invalid_and_unknown_states(
     assert patch_response.status_code == 200
     assert patch_response.json()["resolved_outcome"] == "invalid"
     assert summary_response.status_code == 200
+    assert summary_response.json()["total_outcomes"] == 1
+    assert summary_response.json()["total_predictions"] == 1
+    assert summary_response.json()["resolved_with_predictions"] == 0
     assert summary_response.json()["total_resolved_with_predictions"] == 0
 
 
@@ -135,12 +148,20 @@ def test_backtesting_summary_compares_predictions_to_outcomes(
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["total_outcomes"] == 2
+    assert payload["total_predictions"] == 2
+    assert payload["resolved_with_predictions"] == 2
     assert payload["total_resolved_with_predictions"] == 2
     assert payload["correct_direction_count"] == 1
     assert payload["accuracy_direction"] == "0.5000"
     assert payload["avg_confidence"] == "0.7000"
     assert payload["by_prediction_family"][0]["prediction_family"] == "research_v1_local"
     assert payload["by_prediction_family"][0]["brier_score"] == "0.2562"
+    confidence_bucket = next(
+        item for item in payload["by_confidence_bucket"] if item["bucket"] == "70-80"
+    )
+    assert confidence_bucket["total_resolved_with_predictions"] == 2
+    assert confidence_bucket["accuracy_direction"] == "0.5000"
 
 
 def test_backtesting_openapi_includes_endpoints(client: TestClient) -> None:
