@@ -352,6 +352,13 @@ type MarketTagsPanelState = {
   draft: string;
 };
 
+type MarkdownExportState = {
+  loading: boolean;
+  copied: boolean;
+  error: string | null;
+  fallback: string | null;
+};
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -2082,6 +2089,12 @@ export default function MarketAnalysisPage() {
   const params = useParams<{ id: string }>();
   const marketId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [copiedCommand, setCopiedCommand] = useState<"prepare" | "ingest" | null>(null);
+  const [markdownExportState, setMarkdownExportState] = useState<MarkdownExportState>({
+    loading: false,
+    copied: false,
+    error: null,
+    fallback: null,
+  });
   const [state, setState] = useState<LoadState>({
     analysis: null,
     priceHistory: null,
@@ -2408,6 +2421,67 @@ export default function MarketAnalysisPage() {
     }
   }, [marketId]);
 
+  const copyMarkdownAnalysis = useCallback(async () => {
+    setMarkdownExportState({
+      loading: true,
+      copied: false,
+      error: null,
+      fallback: null,
+    });
+    try {
+      const response = await fetchJson<{ markdown: string }>(
+        `/markets/${marketId}/analysis/markdown`,
+      );
+      const markdown = response.markdown;
+      let copied = false;
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(markdown);
+          copied = true;
+        } catch {
+          copied = false;
+        }
+      }
+      if (!copied && typeof document !== "undefined") {
+        const textarea = document.createElement("textarea");
+        textarea.value = markdown;
+        textarea.setAttribute("readonly", "true");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        copied = document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      if (!copied) {
+        setMarkdownExportState({
+          loading: false,
+          copied: false,
+          error: "No se pudo copiar automáticamente. Usa el texto de respaldo.",
+          fallback: markdown,
+        });
+        return;
+      }
+      setMarkdownExportState({
+        loading: false,
+        copied: true,
+        error: null,
+        fallback: null,
+      });
+      window.setTimeout(
+        () => setMarkdownExportState((current) => ({ ...current, copied: false })),
+        1800,
+      );
+    } catch {
+      setMarkdownExportState({
+        loading: false,
+        copied: false,
+        error: "No se pudo generar el Markdown del análisis.",
+        fallback: null,
+      });
+    }
+  }, [marketId]);
+
   const copyCommand = useCallback(async (command: string, key: "prepare" | "ingest") => {
     if (typeof window === "undefined" || typeof document === "undefined") {
       return;
@@ -2672,6 +2746,37 @@ export default function MarketAnalysisPage() {
                   <span className="reason-chip">
                     Ya existen investigaciones previas para este mercado.
                   </span>
+                ) : null}
+                <div className="command-card">
+                  <div>
+                    <span>Exportar análisis</span>
+                    <code>GET /markets/{marketId}/analysis/markdown</code>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void copyMarkdownAnalysis()}
+                    disabled={markdownExportState.loading}
+                  >
+                    {markdownExportState.loading
+                      ? "Generando..."
+                      : markdownExportState.copied
+                        ? "Copiado"
+                        : "Copiar análisis Markdown"}
+                  </button>
+                </div>
+                {markdownExportState.error ? (
+                  <div className="alert-panel compact" role="status">
+                    <strong>Export Markdown</strong>
+                    <span>{markdownExportState.error}</span>
+                  </div>
+                ) : null}
+                {markdownExportState.fallback ? (
+                  <div className="markdown-export-fallback">
+                    <label>
+                      Copia manual
+                      <textarea readOnly value={markdownExportState.fallback} />
+                    </label>
+                  </div>
                 ) : null}
                 <div className="command-card">
                   <div>

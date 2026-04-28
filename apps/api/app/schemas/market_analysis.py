@@ -197,3 +197,7 @@ class MarketAnalysisRead(BaseModel):
     evidence_items: list[MarketAnalysisEvidenceItem] = Field(default_factory=list)
     external_signals: list[MarketAnalysisExternalSignal] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class MarketAnalysisMarkdownResponse(BaseModel):
+    markdown: str

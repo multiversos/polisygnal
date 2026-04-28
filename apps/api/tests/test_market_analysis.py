@@ -11,12 +11,15 @@ from app.models.evidence_item import EvidenceItem
 from app.models.event import Event
 from app.models.external_market_signal import ExternalMarketSignal
 from app.models.market import Market
+from app.models.market_investigation_status import MarketInvestigationStatus
 from app.models.market_snapshot import MarketSnapshot
+from app.models.market_tag import MarketTag, MarketTagLink
 from app.models.prediction import Prediction
 from app.models.prediction_report import PredictionReport
 from app.models.research_finding import ResearchFinding
 from app.models.research_run import ResearchRun
 from app.models.source import Source
+from app.models.watchlist_item import WatchlistItem
 
 
 def test_get_market_analysis_returns_consolidated_read_only_payload(
@@ -122,6 +125,67 @@ def test_market_analysis_endpoint_is_in_openapi(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert "/markets/{market_id}/analysis" in response.json()["paths"]
+
+
+def test_market_analysis_markdown_endpoint_returns_sections_and_is_read_only(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_analysis_market(db_session, suffix="markdown")
+    tag = MarketTag(name="Alta prioridad", slug="alta-prioridad", tag_type="manual")
+    db_session.add(tag)
+    db_session.flush()
+    db_session.add(MarketTagLink(market_id=market.id, tag_id=tag.id))
+    db_session.add(
+        WatchlistItem(
+            market_id=market.id,
+            status="investigating",
+            note="Revisar contexto antes de cierre.",
+        )
+    )
+    db_session.add(
+        MarketInvestigationStatus(
+            market_id=market.id,
+            status="has_evidence",
+            note="Tiene evidencia inicial.",
+            priority=15,
+        )
+    )
+    db_session.commit()
+    before_predictions = db_session.scalar(select(func.count()).select_from(Prediction))
+    before_research_runs = db_session.scalar(select(func.count()).select_from(ResearchRun))
+
+    response = client.get(f"/markets/{market.id}/analysis/markdown")
+
+    assert response.status_code == 200
+    markdown = response.json()["markdown"]
+    assert f"# Analisis de mercado #{market.id}" in markdown
+    assert "## PolySignal Score" in markdown
+    assert "## Calidad de datos" in markdown
+    assert "## Historial de precio" in markdown
+    assert "## Watchlist" in markdown
+    assert "investigating" in markdown
+    assert "## Estado de investigacion" in markdown
+    assert "has_evidence" in markdown
+    assert "## Etiquetas" in markdown
+    assert "Alta prioridad" in markdown
+    assert "## Research packet" in markdown
+    assert "No es recomendacion de apuesta" in markdown
+    assert db_session.scalar(select(func.count()).select_from(Prediction)) == before_predictions
+    assert db_session.scalar(select(func.count()).select_from(ResearchRun)) == before_research_runs
+
+
+def test_market_analysis_markdown_returns_404_for_unknown_market(client: TestClient) -> None:
+    response = client.get("/markets/999999/analysis/markdown")
+
+    assert response.status_code == 404
+
+
+def test_market_analysis_markdown_endpoint_is_in_openapi(client: TestClient) -> None:
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    assert "/markets/{market_id}/analysis/markdown" in response.json()["paths"]
 
 
 def _create_analysis_market(db_session: Session, *, suffix: str) -> Market:

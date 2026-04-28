@@ -42,7 +42,7 @@ from app.schemas.market import (
     MarketListItem,
     MarketSnapshotItem,
 )
-from app.schemas.market_analysis import MarketAnalysisRead
+from app.schemas.market_analysis import MarketAnalysisMarkdownResponse, MarketAnalysisRead
 from app.schemas.market_price_history import MarketPriceHistoryRead
 from app.schemas.overview import MarketOverviewResponse, OverviewSortBy, PriorityBucket
 from app.schemas.pipeline_artifacts import PipelineArtifactResponse, PipelineRunsResponse
@@ -86,6 +86,7 @@ from app.services.diff_artifacts import (
 )
 from app.services.market_overview import build_markets_overview
 from app.services.market_analysis import build_market_analysis
+from app.services.market_analysis_markdown import render_market_analysis_markdown
 from app.services.market_price_history import build_market_price_history
 from app.services.evaluation import (
     EVALUATION_HISTORY_DEFAULT_LIMIT,
@@ -483,6 +484,22 @@ def get_market_analysis(
 ) -> MarketAnalysisRead:
     market = _require_market(db, market_id)
     return build_market_analysis(db, market)
+
+
+@router.get(
+    "/markets/{market_id}/analysis/markdown",
+    response_model=MarketAnalysisMarkdownResponse,
+    tags=["markets"],
+)
+def get_market_analysis_markdown(
+    market_id: int,
+    db: Session = Depends(get_db),
+) -> MarketAnalysisMarkdownResponse:
+    market = _require_market(db, market_id)
+    analysis = build_market_analysis(db, market)
+    return MarketAnalysisMarkdownResponse(
+        markdown=render_market_analysis_markdown(db, market, analysis=analysis)
+    )
 
 
 @router.get(
