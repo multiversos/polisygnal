@@ -370,6 +370,222 @@ h2 {
   box-shadow: var(--shadow);
 }
 
+.sports-selector-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, var(--panel-gradient-start), var(--panel-gradient-end)),
+    var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.sports-selector-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sports-selector-heading h2 {
+  margin: 4px 0 0;
+  font-size: 1.35rem;
+}
+
+.sports-selector-heading p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.sports-selector-active {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.sports-selector-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  touch-action: pan-x pan-y;
+}
+
+.sport-selector-chip {
+  --sport-accent: var(--accent);
+  --sport-soft: var(--accent-soft);
+  --sport-ink: var(--accent-ink);
+
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 13px 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--sport-soft);
+  color: var(--sport-ink);
+  font-size: 0.92rem;
+  font-weight: 850;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+  white-space: nowrap;
+}
+
+.sport-selector-chip:hover {
+  border-color: var(--sport-accent);
+  transform: translateY(-1px);
+}
+
+.sport-selector-chip:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.sport-selector-chip.selected {
+  border-color: var(--sport-accent);
+  background: var(--sport-accent);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.16);
+}
+
+.sport-selector-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  line-height: 1;
+}
+
+.sport-selector-chip.selected .sport-selector-icon {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.tone-all {
+  --sport-accent: #475467;
+  --sport-soft: #eef2f6;
+  --sport-ink: #344054;
+}
+
+.tone-nba,
+.tone-basketball {
+  --sport-accent: #f97316;
+  --sport-soft: #fff2e5;
+  --sport-ink: #9a3412;
+}
+
+.tone-nfl {
+  --sport-accent: #1d4ed8;
+  --sport-soft: #e7efff;
+  --sport-ink: #1e3a8a;
+}
+
+.tone-soccer {
+  --sport-accent: #16a34a;
+  --sport-soft: #e8f8ed;
+  --sport-ink: #166534;
+}
+
+.tone-nhl {
+  --sport-accent: #0284c7;
+  --sport-soft: #e5f6ff;
+  --sport-ink: #075985;
+}
+
+.tone-mma {
+  --sport-accent: #dc2626;
+  --sport-soft: #feeceb;
+  --sport-ink: #991b1b;
+}
+
+.tone-tennis {
+  --sport-accent: #65a30d;
+  --sport-soft: #effad1;
+  --sport-ink: #3f6212;
+}
+
+.tone-cricket {
+  --sport-accent: #e11d48;
+  --sport-soft: #ffe8ee;
+  --sport-ink: #9f1239;
+}
+
+.tone-mlb {
+  --sport-accent: #be123c;
+  --sport-soft: #fce7f0;
+  --sport-ink: #881337;
+}
+
+[data-theme="dark"] .tone-all {
+  --sport-soft: rgba(148, 163, 184, 0.14);
+  --sport-ink: #d7deea;
+}
+
+[data-theme="dark"] .tone-nba,
+[data-theme="dark"] .tone-basketball {
+  --sport-soft: rgba(249, 115, 22, 0.16);
+  --sport-ink: #fed7aa;
+}
+
+[data-theme="dark"] .tone-nfl {
+  --sport-soft: rgba(96, 165, 250, 0.16);
+  --sport-ink: #bfdbfe;
+}
+
+[data-theme="dark"] .tone-soccer {
+  --sport-soft: rgba(34, 197, 94, 0.14);
+  --sport-ink: #bbf7d0;
+}
+
+[data-theme="dark"] .tone-nhl {
+  --sport-soft: rgba(56, 189, 248, 0.14);
+  --sport-ink: #bae6fd;
+}
+
+[data-theme="dark"] .tone-mma {
+  --sport-soft: rgba(248, 113, 113, 0.15);
+  --sport-ink: #fecaca;
+}
+
+[data-theme="dark"] .tone-tennis {
+  --sport-soft: rgba(132, 204, 22, 0.14);
+  --sport-ink: #d9f99d;
+}
+
+[data-theme="dark"] .tone-cricket {
+  --sport-soft: rgba(244, 63, 94, 0.15);
+  --sport-ink: #fecdd3;
+}
+
+[data-theme="dark"] .tone-mlb {
+  --sport-soft: rgba(244, 63, 94, 0.15);
+  --sport-ink: #fecdd3;
+}
+
+.dashboard-filter-panel {
+  grid-template-columns: repeat(2, minmax(160px, 1fr)) auto;
+}
+
 .filter-group {
   display: grid;
   gap: 6px;
@@ -449,7 +665,7 @@ h2 {
 
 .upcoming-filter-row {
   display: grid;
-  grid-template-columns: minmax(150px, 220px) minmax(150px, 220px) auto;
+  grid-template-columns: minmax(150px, 220px) auto;
   gap: 10px;
   align-items: end;
   padding: 12px;
@@ -2597,11 +2813,20 @@ h2 {
   }
 
   .topbar,
+  .sports-selector-heading,
   .panel-heading,
   .safety-strip,
   .alert-panel,
   .panel-action-links {
     flex-direction: column;
+  }
+
+  .sports-selector-heading {
+    align-items: flex-start;
+  }
+
+  .sports-selector-active {
+    align-self: flex-start;
   }
 
   h1 {

@@ -170,16 +170,88 @@ const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
 
-const sportOptions = [
-  "all",
-  "nba",
-  "nfl",
-  "soccer",
-  "horse_racing",
-  "mlb",
-  "tennis",
-  "mma",
-];
+const sportsSelectorOptions = [
+  {
+    id: "all",
+    apiValue: null,
+    label: "Todos",
+    icon: "✦",
+    tone: "all",
+    backendSupported: true,
+  },
+  {
+    id: "nba",
+    apiValue: "nba",
+    label: "NBA",
+    icon: "🏀",
+    tone: "nba",
+    backendSupported: true,
+  },
+  {
+    id: "nfl",
+    apiValue: "nfl",
+    label: "NFL",
+    icon: "🏈",
+    tone: "nfl",
+    backendSupported: true,
+  },
+  {
+    id: "soccer",
+    apiValue: "soccer",
+    label: "Fútbol",
+    icon: "⚽",
+    tone: "soccer",
+    backendSupported: true,
+  },
+  {
+    id: "nhl",
+    apiValue: "nhl",
+    label: "NHL",
+    icon: "🏒",
+    tone: "nhl",
+    backendSupported: false,
+  },
+  {
+    id: "mma",
+    apiValue: "mma",
+    label: "UFC",
+    icon: "🥊",
+    tone: "mma",
+    backendSupported: true,
+  },
+  {
+    id: "tennis",
+    apiValue: "tennis",
+    label: "Tenis",
+    icon: "🎾",
+    tone: "tennis",
+    backendSupported: true,
+  },
+  {
+    id: "cricket",
+    apiValue: "cricket",
+    label: "Cricket",
+    icon: "🏏",
+    tone: "cricket",
+    backendSupported: false,
+  },
+  {
+    id: "basketball",
+    apiValue: "nba",
+    label: "Baloncesto",
+    icon: "🏀",
+    tone: "basketball",
+    backendSupported: true,
+  },
+  {
+    id: "mlb",
+    apiValue: "mlb",
+    label: "Béisbol",
+    icon: "⚾",
+    tone: "mlb",
+    backendSupported: true,
+  },
+] as const;
 
 const marketShapeOptions = [
   "all",
@@ -488,8 +560,9 @@ function buildCandidatesPath(filters: DashboardFilters): string {
     vertical: "sports",
     limit: String(filters.limit),
   });
-  if (filters.sport !== "all") {
-    params.set("sport", filters.sport);
+  const apiSport = getSportApiFilter(filters.sport);
+  if (apiSport) {
+    params.set("sport", apiSport);
   }
   if (filters.marketShape !== "all") {
     params.set("market_shape", filters.marketShape);
@@ -504,10 +577,31 @@ function buildUpcomingPath(filters: UpcomingFilters): string {
     include_futures: String(filters.includeFutures),
     focus: "match_winner",
   });
-  if (filters.sport !== "all") {
-    params.set("sport", filters.sport);
+  const apiSport = getSportApiFilter(filters.sport);
+  if (apiSport) {
+    params.set("sport", apiSport);
   }
   return `/research/upcoming-sports?${params.toString()}`;
+}
+
+function getSportSelectorOption(value: string) {
+  return sportsSelectorOptions.find((option) => option.id === value) ?? sportsSelectorOptions[0];
+}
+
+function getSportApiFilter(value: string): string | null {
+  const option = getSportSelectorOption(value);
+  if (!option.backendSupported || !option.apiValue) {
+    return null;
+  }
+  return option.apiValue;
+}
+
+function matchesSelectedSport(sport: string | null | undefined, selectedSport: string): boolean {
+  if (selectedSport === "all") {
+    return true;
+  }
+  const option = getSportSelectorOption(selectedSport);
+  return sport === option.apiValue;
 }
 
 function formatOptionLabel(value: string): string {
@@ -799,7 +893,10 @@ function formatSportLabel(value: string | null | undefined): string {
   if (!value) {
     return "deporte no definido";
   }
-  return sportLabels[value] ?? humanizeToken(value);
+  const selectorOption = sportsSelectorOptions.find(
+    (option) => option.id === value || option.apiValue === value,
+  );
+  return selectorOption?.label ?? sportLabels[value] ?? humanizeToken(value);
 }
 
 function formatMarketShapeLabel(value: string | null | undefined): string {
@@ -1441,6 +1538,50 @@ function ExternalSignalCard({
   );
 }
 
+function SportsSelectorBar({
+  selectedSport,
+  onSelect,
+}: {
+  selectedSport: string;
+  onSelect: (sport: string) => void;
+}) {
+  const activeOption = getSportSelectorOption(selectedSport);
+
+  return (
+    <section className="sports-selector-panel" aria-label="Deportes en PolySignal">
+      <div className="sports-selector-heading">
+        <div>
+          <span className="section-kicker">Filtro principal</span>
+          <h2>Deportes en PolySignal</h2>
+          <p>Selecciona un deporte para filtrar los mercados próximos.</p>
+        </div>
+        <span className="sports-selector-active">
+          Activo: {activeOption.label}
+        </span>
+      </div>
+      <div className="sports-selector-scroll" role="list">
+        {sportsSelectorOptions.map((option) => {
+          const selected = option.id === selectedSport;
+          return (
+            <button
+              aria-pressed={selected}
+              className={`sport-selector-chip tone-${option.tone} ${selected ? "selected" : ""}`}
+              key={option.id}
+              onClick={() => onSelect(option.id)}
+              type="button"
+            >
+              <span className="sport-selector-icon" aria-hidden="true">
+                {option.icon}
+              </span>
+              <span>{option.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function DashboardPage() {
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [filters, setFilters] = useState<DashboardFilters>({
@@ -1593,10 +1734,16 @@ export default function DashboardPage() {
     return null;
   }, [state.overview]);
 
-  const topCandidates = state.candidates.slice(0, filters.limit);
+  const filteredCandidates = state.candidates.filter((candidate) =>
+    matchesSelectedSport(candidate.sport, filters.sport),
+  );
+  const topCandidates = filteredCandidates.slice(0, filters.limit);
   const candidatesPath = buildCandidatesPath(filters);
   const upcomingPath = buildUpcomingPath(upcomingFilters);
-  const topUpcomingMarkets = state.upcomingMarkets.slice(0, 8);
+  const filteredUpcomingMarkets = state.upcomingMarkets.filter((market) =>
+    matchesSelectedSport(market.sport, upcomingFilters.sport),
+  );
+  const topUpcomingMarkets = filteredUpcomingMarkets.slice(0, 8);
   const watchlistByMarketId = useMemo(() => {
     const entries = state.watchlistItems.map((item) => [item.market_id, item] as const);
     return new Map(entries);
@@ -1632,6 +1779,11 @@ export default function DashboardPage() {
     return new Set(ids);
   }, [state.externalSignals]);
   const nextThemeLabel = theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+
+  const handleSelectSport = useCallback((sport: string) => {
+    setFilters((current) => ({ ...current, sport }));
+    setUpcomingFilters((current) => ({ ...current, sport }));
+  }, []);
 
   const handleToggleWatchlist = useCallback(async (marketId: number) => {
     setWatchlistActionMarketId(marketId);
@@ -1751,23 +1903,12 @@ export default function DashboardPage() {
         </article>
       </section>
 
-      <section className="filter-panel" aria-label="Filtros de candidatos">
-        <div className="filter-group">
-          <label htmlFor="sport-filter">Deporte</label>
-          <select
-            id="sport-filter"
-            value={filters.sport}
-            onChange={(event) =>
-              setFilters((current) => ({ ...current, sport: event.target.value }))
-            }
-          >
-            {sportOptions.map((option) => (
-              <option key={option} value={option}>
-                {formatOptionLabel(option)}
-              </option>
-            ))}
-          </select>
-        </div>
+      <SportsSelectorBar
+        selectedSport={upcomingFilters.sport}
+        onSelect={handleSelectSport}
+      />
+
+      <section className="filter-panel dashboard-filter-panel" aria-label="Filtros de candidatos">
         <div className="filter-group">
           <label htmlFor="shape-filter">Tipo de mercado</label>
           <select
@@ -1838,22 +1979,6 @@ export default function DashboardPage() {
 
         <div className="upcoming-filter-row" aria-label="Filtros de próximos mercados">
           <div className="filter-group">
-            <label htmlFor="upcoming-sport-filter">Deporte</label>
-            <select
-              id="upcoming-sport-filter"
-              value={upcomingFilters.sport}
-              onChange={(event) =>
-                setUpcomingFilters((current) => ({ ...current, sport: event.target.value }))
-              }
-            >
-              {sportOptions.map((option) => (
-                <option key={option} value={option}>
-                  {formatOptionLabel(option)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="filter-group">
             <label htmlFor="upcoming-days-filter">Ventana</label>
             <select
               id="upcoming-days-filter"
@@ -1900,7 +2025,11 @@ export default function DashboardPage() {
           <div className="empty-state">Cargando próximos mercados...</div>
         ) : topUpcomingMarkets.length === 0 ? (
           <div className="empty-state">
-            <strong>No se encontraron mercados de partidos próximos con los filtros actuales.</strong>
+            <strong>
+              {upcomingFilters.sport === "all"
+                ? "No se encontraron mercados de partidos próximos con los filtros actuales."
+                : `No se encontraron mercados próximos para ${getSportSelectorOption(upcomingFilters.sport).label} con los filtros actuales.`}
+            </strong>
             <p>
               Puede que Polymarket no tenga mercados diarios disponibles o que
               falte sincronizar datos recientes. Esta sección solo lee datos ya
@@ -1957,8 +2086,8 @@ export default function DashboardPage() {
             <div className="empty-state">
               <strong>No hay candidatos disponibles</strong>
               <p>
-                Prueba con deporte todos, tipo de mercado todos o un límite
-                mayor. La pantalla sigue en modo solo lectura.
+                Prueba con Todos en la barra de deportes, tipo de mercado todos
+                o un límite mayor. La pantalla sigue en modo solo lectura.
               </p>
             </div>
           ) : (
