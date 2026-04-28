@@ -22,6 +22,10 @@ import {
   fetchInvestigationStatuses,
   type InvestigationStatusItem,
 } from "./lib/investigationStatus";
+import {
+  fetchSmartAlerts,
+  type SmartAlert,
+} from "./lib/smartAlerts";
 
 type HealthResponse = {
   status?: string;
@@ -214,6 +218,8 @@ type DashboardState = {
   externalSignals: ExternalMarketSignal[];
   watchlistItems: WatchlistItem[];
   investigationStatuses: InvestigationStatusItem[];
+  smartAlerts: SmartAlert[];
+  smartAlertCounts: Record<string, number> | null;
   loading: boolean;
   error: string | null;
   updatedAt: Date | null;
@@ -921,6 +927,16 @@ function formatWarningLabel(value: string): string {
   return warningLabels[key] ?? humanizeToken(key);
 }
 
+function formatSmartAlertSeverity(value: string): string {
+  if (value === "critical") {
+    return "Crítica";
+  }
+  if (value === "warning") {
+    return "Warning";
+  }
+  return "Info";
+}
+
 function participantInitials(value: string): string {
   const words = value.split(/[^A-Za-z0-9]+/).filter(Boolean);
   if (words.length === 0) {
@@ -1340,6 +1356,57 @@ function InvestigationStatusSummary({
   );
 }
 
+function SmartAlertsPanel({
+  alerts,
+  counts,
+  loading,
+}: {
+  alerts: SmartAlert[];
+  counts: Record<string, number> | null;
+  loading: boolean;
+}) {
+  return (
+    <section className="panel smart-alerts-panel" aria-label="Alertas inteligentes">
+      <div className="panel-heading">
+        <div>
+          <h2>Alertas inteligentes</h2>
+          <p>
+            Recordatorios operativos calculados desde datos existentes. No son
+            recomendaciones de apuesta.
+          </p>
+        </div>
+      </div>
+      <div className="smart-alert-counts">
+        <span>Info {loading ? "..." : counts?.info ?? 0}</span>
+        <span>Warning {loading ? "..." : counts?.warning ?? 0}</span>
+        <span>Críticas {loading ? "..." : counts?.critical ?? 0}</span>
+      </div>
+      {loading ? (
+        <div className="empty-state compact">Cargando alertas...</div>
+      ) : alerts.length === 0 ? (
+        <div className="empty-state compact">No hay alertas operativas con los filtros actuales.</div>
+      ) : (
+        <div className="smart-alert-list">
+          {alerts.slice(0, 6).map((alert) => (
+            <article className={`smart-alert-card ${alert.severity}`} key={alert.id}>
+              <div>
+                <span className="badge muted">{formatSmartAlertSeverity(alert.severity)}</span>
+                <h3>{alert.title}</h3>
+                <p>{alert.description}</p>
+              </div>
+              {alert.action_url ? (
+                <a className="analysis-link" href={alert.action_url}>
+                  {alert.action_label ?? "Revisar"}
+                </a>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function WatchlistPanel({
   busyItemId,
   error,
@@ -1742,6 +1809,8 @@ export default function DashboardPage() {
     externalSignals: [],
     watchlistItems: [],
     investigationStatuses: [],
+    smartAlerts: [],
+    smartAlertCounts: null,
     loading: true,
     error: null,
     updatedAt: null,
@@ -1794,6 +1863,7 @@ export default function DashboardPage() {
     const candidatesPath = buildCandidatesPath(filters);
     const upcomingPath = buildUpcomingPath(upcomingFilters);
     const upcomingDataQualityPath = buildUpcomingDataQualityPath(upcomingFilters);
+    const alertSport = getSportApiFilter(upcomingFilters.sport);
     const [
       health,
       overview,
@@ -1804,6 +1874,7 @@ export default function DashboardPage() {
       externalSignals,
       watchlist,
       investigationStatuses,
+      smartAlerts,
     ] =
       await Promise.allSettled([
         fetchJson<HealthResponse>("/health"),
@@ -1815,6 +1886,7 @@ export default function DashboardPage() {
         fetchJson<ExternalSignalsResponse>("/external-signals/kalshi?limit=10"),
         fetchWatchlistItems(),
         fetchInvestigationStatuses(),
+        fetchSmartAlerts({ limit: 8, sport: alertSport }),
       ]);
 
     const errors: string[] = [];
@@ -1840,6 +1912,9 @@ export default function DashboardPage() {
     if (investigationStatuses.status === "rejected") {
       errors.push("No se pudo cargar estado de investigaciÃ³n");
     }
+    if (smartAlerts.status === "rejected") {
+      errors.push("No se pudieron cargar alertas inteligentes");
+    }
 
     setState({
       health: health.status === "fulfilled" ? health.value : null,
@@ -1861,6 +1936,8 @@ export default function DashboardPage() {
       watchlistItems: watchlist.status === "fulfilled" ? watchlist.value : [],
       investigationStatuses:
         investigationStatuses.status === "fulfilled" ? investigationStatuses.value : [],
+      smartAlerts: smartAlerts.status === "fulfilled" ? smartAlerts.value.alerts : [],
+      smartAlertCounts: smartAlerts.status === "fulfilled" ? smartAlerts.value.counts : null,
       loading: false,
       error: errors.length > 0 ? errors.join(". ") : null,
       updatedAt: new Date(),
@@ -2067,6 +2144,12 @@ export default function DashboardPage() {
           </p>
         </article>
       </section>
+
+      <SmartAlertsPanel
+        alerts={state.smartAlerts}
+        counts={state.smartAlertCounts}
+        loading={state.loading}
+      />
 
       <SportsSelectorBar
         selectedSport={upcomingFilters.sport}

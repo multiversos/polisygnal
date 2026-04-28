@@ -1279,6 +1279,69 @@ h2 {
   font-size: 1.55rem;
 }
 
+.smart-alerts-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.smart-alert-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.smart-alert-counts span {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.smart-alert-list {
+  display: grid;
+  gap: 10px;
+}
+
+.smart-alert-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.smart-alert-card.info {
+  border-left-color: var(--accent);
+}
+
+.smart-alert-card.warning {
+  border-left-color: #f59e0b;
+}
+
+.smart-alert-card.critical {
+  border-left-color: #ef4444;
+}
+
+.smart-alert-card h3 {
+  margin: 7px 0 4px;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.smart-alert-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .watchlist-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -2994,6 +3057,22 @@ h2 {
   border-radius: 8px;
   background: var(--surface-raised);
   min-width: 0;
+}
+
+.briefing-page .briefing-alert-card {
+  border-left-width: 4px;
+}
+
+.briefing-page .briefing-alert-card.info {
+  border-left-color: var(--accent);
+}
+
+.briefing-page .briefing-alert-card.warning {
+  border-left-color: #f59e0b;
+}
+
+.briefing-page .briefing-alert-card.critical {
+  border-left-color: #ef4444;
 }
 
 .briefing-page .briefing-card h3 {

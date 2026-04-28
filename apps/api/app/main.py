@@ -7,6 +7,7 @@ from app.api.routes import router
 from app.api.routes_external_signals import router as external_signals_router
 from app.api.routes_investigation_status import router as investigation_status_router
 from app.api.routes_research import router as research_router
+from app.api.routes_smart_alerts import router as smart_alerts_router
 from app.api.routes_watchlist import router as watchlist_router
 from app.core.config import get_settings
 
@@ -31,6 +32,7 @@ app.include_router(research_router)
 app.include_router(external_signals_router)
 app.include_router(watchlist_router)
 app.include_router(investigation_status_router)
+app.include_router(smart_alerts_router)
 
 
 @app.get("/", tags=["meta"])

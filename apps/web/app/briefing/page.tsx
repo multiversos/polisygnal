@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { SportsSelectorBar, getSportApiFilter } from "../components/SportsSelectorBar";
+import { fetchSmartAlerts, type SmartAlert } from "../lib/smartAlerts";
 import { WATCHLIST_STATUS_LABELS, type WatchlistStatus } from "../lib/watchlist";
 
 type ThemePreference = "light" | "dark";
@@ -234,6 +235,16 @@ function formatMarketShape(value?: string | null): string {
   return marketShapeLabels[value] ?? value.replace(/_/g, " ");
 }
 
+function formatSmartAlertSeverity(value: string): string {
+  if (value === "critical") {
+    return "Crítica";
+  }
+  if (value === "warning") {
+    return "Warning";
+  }
+  return "Info";
+}
+
 function formatWarningList(value: BriefingExternalSignal["warnings"]): string[] {
   if (!value) {
     return [];
@@ -299,6 +310,7 @@ export default function DailyBriefingPage() {
   const [sport, setSport] = useState("all");
   const [days, setDays] = useState(7);
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
+  const [smartAlerts, setSmartAlerts] = useState<SmartAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [markdownCopyStatus, setMarkdownCopyStatus] = useState<MarkdownCopyStatus>("idle");
@@ -315,8 +327,17 @@ export default function DailyBriefingPage() {
     setError(null);
     setMarkdownFallback(null);
     const params = buildDailyBriefingParams(days, sport);
+    const alertSport = getSportApiFilter(sport);
     try {
-      setBriefing(await fetchDailyBriefing(params));
+      const [briefingResult, alertsResult] = await Promise.allSettled([
+        fetchDailyBriefing(params),
+        fetchSmartAlerts({ limit: 5, sport: alertSport }),
+      ]);
+      if (briefingResult.status === "rejected") {
+        throw briefingResult.reason;
+      }
+      setBriefing(briefingResult.value);
+      setSmartAlerts(alertsResult.status === "fulfilled" ? alertsResult.value.alerts : []);
     } catch {
       setError("No se pudo cargar el briefing. Revisa que la API esté en línea.");
     } finally {
@@ -469,6 +490,38 @@ export default function DailyBriefingPage() {
       <p className="briefing-generated">
         Generado: {briefing ? formatDateTime(briefing.summary.generated_at) : "cargando"}
       </p>
+
+      <section className="panel briefing-section">
+        <div className="panel-heading compact">
+          <div>
+            <h2>Alertas del día</h2>
+            <p>Recordatorios operativos; no son recomendaciones de apuesta.</p>
+          </div>
+        </div>
+        <div className="briefing-list">
+          {loading ? <EmptyState copy="Cargando alertas..." /> : null}
+          {!loading && smartAlerts.length === 0 ? (
+            <EmptyState copy="No hay alertas operativas con los filtros actuales." />
+          ) : null}
+          {smartAlerts.map((alert) => (
+            <article className={`briefing-card briefing-alert-card ${alert.severity}`} key={alert.id}>
+              <div className="badge-row">
+                <span className="badge muted">{formatSmartAlertSeverity(alert.severity)}</span>
+                <span className="badge">{alert.type.replace(/_/g, " ")}</span>
+              </div>
+              <h3>{alert.title}</h3>
+              <p className="briefing-note">{alert.description}</p>
+              {alert.action_url ? (
+                <div className="briefing-card-actions">
+                  <Link className="analysis-link" href={alert.action_url}>
+                    {alert.action_label ?? "Revisar"}
+                  </Link>
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      </section>
 
       <div className="briefing-grid">
         <BriefingSection
