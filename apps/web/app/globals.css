@@ -2872,6 +2872,71 @@ h2 {
   text-transform: none;
 }
 
+.sources-filter-panel {
+  grid-template-columns: minmax(180px, 280px);
+}
+
+.source-quality-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.source-quality-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.source-quality-card > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.source-quality-card h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.source-quality-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.source-quality-metrics div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.source-quality-metrics dt {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.source-quality-metrics dd {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.98rem;
+  font-weight: 900;
+}
+
 .match-review-shell {
   max-width: 1280px;
 }

@@ -260,6 +260,7 @@ const limitOptions = [5, 10, 20];
 
 const quickLinks = [
   { label: "Briefing diario", href: "/briefing" },
+  { label: "Calidad de fuentes", href: "/sources" },
   { label: "Documentación API", href: `${API_BASE_URL}/docs` },
   { label: "Panel backend", href: `${API_BASE_URL}/` },
   { label: "Estado API", href: `${API_BASE_URL}/health` },
