@@ -20,10 +20,12 @@ from app.schemas.research import (
     ResearchRunRead,
     ResearchRunRequest,
     ResearchRunResponse,
+    UpcomingDataQualityResponse,
     UpcomingSportsResponse,
 )
 from app.services.research.candidate_selector import list_research_candidates
 from app.services.research.pipeline import run_market_research
+from app.services.research.upcoming_data_quality import list_upcoming_data_quality
 from app.services.research.upcoming_market_selector import list_upcoming_sports_markets
 from app.services.polysignal_score import build_polysignal_score
 
@@ -99,6 +101,30 @@ def get_upcoming_sports_markets(
         limit=limit,
         items=[item.to_payload() for item in selection.items],
         counts=selection.counts,
+        filters_applied=selection.filters_applied,
+    )
+
+
+@router.get(
+    "/research/upcoming-sports/data-quality",
+    response_model=UpcomingDataQualityResponse,
+    tags=["research"],
+)
+def get_upcoming_sports_data_quality(
+    sport: str | None = Query(default=None),
+    days: int = Query(default=7, ge=1, le=30),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> UpcomingDataQualityResponse:
+    selection = list_upcoming_data_quality(
+        db,
+        sport=sport,
+        days=days,
+        limit=limit,
+    )
+    return UpcomingDataQualityResponse(
+        summary=selection.summary,
+        items=[item.to_payload() for item in selection.items],
         filters_applied=selection.filters_applied,
     )
 

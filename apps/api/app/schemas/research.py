@@ -158,3 +158,30 @@ class UpcomingSportsResponse(BaseModel):
     items: list[UpcomingSportsMarketRead] = Field(default_factory=list)
     counts: dict[str, int] = Field(default_factory=dict)
     filters_applied: dict[str, object] = Field(default_factory=dict)
+
+
+class UpcomingDataQualityItemRead(BaseModel):
+    market_id: int
+    question: str
+    sport: str
+    market_shape: str
+    close_time: datetime | None = None
+    has_snapshot: bool
+    has_yes_price: bool
+    has_no_price: bool
+    has_liquidity: bool
+    has_volume: bool
+    has_external_signal: bool
+    has_prediction: bool
+    has_research: bool
+    has_polysignal_score: bool
+    missing_fields: list[str] = Field(default_factory=list)
+    quality_score: int
+    quality_label: str
+    warnings: list[str] = Field(default_factory=list)
+
+
+class UpcomingDataQualityResponse(BaseModel):
+    summary: dict[str, int] = Field(default_factory=dict)
+    items: list[UpcomingDataQualityItemRead] = Field(default_factory=list)
+    filters_applied: dict[str, object] = Field(default_factory=dict)
