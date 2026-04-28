@@ -3119,6 +3119,127 @@ h2 {
   gap: 8px;
 }
 
+.workflow-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.workflow-column {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.workflow-column-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.workflow-column-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.workflow-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.workflow-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.workflow-card h3,
+.workflow-card p {
+  margin: 0;
+}
+
+.workflow-card h3 {
+  color: var(--foreground);
+  font-size: 0.95rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.workflow-card p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.workflow-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.workflow-card-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.workflow-card-metrics div {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+}
+
+.workflow-card-metrics dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.workflow-card-metrics dd {
+  margin: 0;
+  color: var(--foreground);
+  font-weight: 900;
+}
+
+.workflow-status-select {
+  display: grid;
+  gap: 6px;
+  color: var(--muted-strong);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.workflow-status-select select {
+  min-height: 38px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.86rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .source-quality-card {
   display: grid;
   gap: 10px;
@@ -3539,6 +3660,7 @@ h2 {
   .dashboard-grid,
   .analysis-layout,
   .match-review-layout,
+  .workflow-board,
   .analysis-hero {
     grid-template-columns: 1fr 1fr;
   }
@@ -3598,6 +3720,7 @@ h2 {
   .filter-panel,
   .outcome-management-form,
   .upcoming-filter-row,
+  .workflow-board,
   .upcoming-main,
   .upcoming-side,
   .upcoming-date-row,
