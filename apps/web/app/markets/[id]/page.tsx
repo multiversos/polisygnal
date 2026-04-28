@@ -20,6 +20,16 @@ import {
   type WatchlistItem,
   type WatchlistStatus,
 } from "../../lib/watchlist";
+import {
+  INVESTIGATION_STATUS_LABELS,
+  INVESTIGATION_STATUS_ORDER,
+  fetchMarketInvestigationStatus,
+  removeMarketInvestigationStatus,
+  updateMarketInvestigationStatus,
+  upsertMarketInvestigationStatus,
+  type InvestigationStatus,
+  type InvestigationStatusItem,
+} from "../../lib/investigationStatus";
 
 type JsonPayload = Record<string, unknown> | unknown[];
 
@@ -315,6 +325,16 @@ type WatchlistPanelState = {
   error: string | null;
   statusDraft: WatchlistStatus;
   noteDraft: string;
+};
+
+type InvestigationStatusPanelState = {
+  item: InvestigationStatusItem | null;
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  statusDraft: InvestigationStatus;
+  noteDraft: string;
+  priorityDraft: string;
 };
 
 const API_BASE_URL = (
@@ -1849,6 +1869,112 @@ function WatchlistDetailPanel({
   );
 }
 
+function InvestigationStatusDetailPanel({
+  onDelete,
+  onNoteChange,
+  onPriorityChange,
+  onSave,
+  onStatusChange,
+  state,
+}: {
+  onDelete: () => void;
+  onNoteChange: (note: string) => void;
+  onPriorityChange: (priority: string) => void;
+  onSave: () => void;
+  onStatusChange: (status: InvestigationStatus) => void;
+  state: InvestigationStatusPanelState;
+}) {
+  return (
+    <section className="analysis-section watchlist-detail-panel">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Flujo de análisis</span>
+          <h2>Estado de investigación</h2>
+        </div>
+        {state.item ? (
+          <span className="badge external-hint">
+            {INVESTIGATION_STATUS_LABELS[state.item.status]}
+          </span>
+        ) : null}
+      </div>
+      <p className="section-note">
+        Este estado organiza el flujo de análisis. No representa una
+        recomendación de apuesta.
+      </p>
+
+      {state.loading ? <div className="empty-state compact">Cargando estado...</div> : null}
+      {state.error ? (
+        <div className="alert-panel compact" role="status">
+          <strong>No se pudo actualizar investigación</strong>
+          <span>{state.error}</span>
+        </div>
+      ) : null}
+
+      {!state.loading ? (
+        <div className="watchlist-form">
+          <label>
+            Estado
+            <select
+              disabled={state.saving}
+              onChange={(event) => onStatusChange(event.target.value as InvestigationStatus)}
+              value={state.statusDraft}
+            >
+              {INVESTIGATION_STATUS_ORDER.map((status) => (
+                <option key={status} value={status}>
+                  {INVESTIGATION_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Prioridad
+            <input
+              disabled={state.saving}
+              inputMode="numeric"
+              max={100}
+              min={0}
+              onChange={(event) => onPriorityChange(event.target.value)}
+              placeholder="0-100 opcional"
+              type="number"
+              value={state.priorityDraft}
+            />
+          </label>
+          <label>
+            Nota de investigación
+            <textarea
+              disabled={state.saving}
+              maxLength={4000}
+              onChange={(event) => onNoteChange(event.target.value)}
+              placeholder="Ej. revisar lesiones, mercado externo o movimiento de precio."
+              value={state.noteDraft}
+            />
+          </label>
+          <div className="watchlist-actions">
+            <button
+              className="watchlist-button"
+              disabled={state.saving}
+              onClick={onSave}
+              type="button"
+            >
+              {state.saving ? "Guardando..." : state.item ? "Actualizar estado" : "Crear estado"}
+            </button>
+            {state.item ? (
+              <button
+                className="watchlist-button danger"
+                disabled={state.saving}
+                onClick={onDelete}
+                type="button"
+              >
+                Borrar estado
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export default function MarketAnalysisPage() {
   const params = useParams<{ id: string }>();
   const marketId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -1868,6 +1994,15 @@ export default function MarketAnalysisPage() {
     error: null,
     statusDraft: "watching",
     noteDraft: "",
+  });
+  const [investigationState, setInvestigationState] = useState<InvestigationStatusPanelState>({
+    item: null,
+    loading: true,
+    saving: false,
+    error: null,
+    statusDraft: "pending_review",
+    noteDraft: "",
+    priorityDraft: "",
   });
 
   const loadAnalysis = useCallback(async () => {
@@ -1927,6 +2062,29 @@ export default function MarketAnalysisPage() {
         ...current,
         loading: false,
         error: "No se pudo cargar el estado de seguimiento.",
+      }));
+    }
+  }, [marketId]);
+
+  const loadInvestigationStatus = useCallback(async () => {
+    setInvestigationState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const item = await fetchMarketInvestigationStatus(marketId);
+      setInvestigationState((current) => ({
+        ...current,
+        item,
+        loading: false,
+        error: null,
+        statusDraft: item?.status ?? "pending_review",
+        noteDraft: item?.note ?? "",
+        priorityDraft:
+          item?.priority === null || item?.priority === undefined ? "" : String(item.priority),
+      }));
+    } catch {
+      setInvestigationState((current) => ({
+        ...current,
+        loading: false,
+        error: "No se pudo cargar el estado de investigación.",
       }));
     }
   }, [marketId]);
@@ -2008,6 +2166,71 @@ export default function MarketAnalysisPage() {
     }
   }, [watchlistState.item]);
 
+  const saveInvestigationStatus = useCallback(async () => {
+    setInvestigationState((current) => ({ ...current, saving: true, error: null }));
+    const priority =
+      investigationState.priorityDraft.trim() === ""
+        ? null
+        : Math.max(0, Math.min(100, Number(investigationState.priorityDraft)));
+    try {
+      const payload = {
+        status: investigationState.statusDraft,
+        note: investigationState.noteDraft || null,
+        priority: Number.isFinite(priority) ? priority : null,
+      };
+      const item = investigationState.item
+        ? await updateMarketInvestigationStatus(marketId, payload)
+        : await upsertMarketInvestigationStatus(marketId, payload);
+      setInvestigationState((current) => ({
+        ...current,
+        item,
+        saving: false,
+        error: null,
+        statusDraft: item.status,
+        noteDraft: item.note ?? "",
+        priorityDraft:
+          item.priority === null || item.priority === undefined ? "" : String(item.priority),
+      }));
+    } catch {
+      setInvestigationState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo guardar el estado de investigación.",
+      }));
+    }
+  }, [
+    investigationState.item,
+    investigationState.noteDraft,
+    investigationState.priorityDraft,
+    investigationState.statusDraft,
+    marketId,
+  ]);
+
+  const deleteInvestigationStatus = useCallback(async () => {
+    if (!investigationState.item) {
+      return;
+    }
+    setInvestigationState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      await removeMarketInvestigationStatus(marketId);
+      setInvestigationState((current) => ({
+        ...current,
+        item: null,
+        saving: false,
+        error: null,
+        statusDraft: "pending_review",
+        noteDraft: "",
+        priorityDraft: "",
+      }));
+    } catch {
+      setInvestigationState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo borrar el estado de investigación.",
+      }));
+    }
+  }, [investigationState.item, marketId]);
+
   const copyCommand = useCallback(async (command: string, key: "prepare" | "ingest") => {
     if (typeof window === "undefined" || typeof document === "undefined") {
       return;
@@ -2050,6 +2273,10 @@ export default function MarketAnalysisPage() {
   useEffect(() => {
     void loadWatchlistStatus();
   }, [loadWatchlistStatus]);
+
+  useEffect(() => {
+    void loadInvestigationStatus();
+  }, [loadInvestigationStatus]);
 
   const analysis = state.analysis;
   const translatedTitle = analysis ? translateMarketTitleToSpanish(analysis.market.question) : "";
@@ -2214,6 +2441,21 @@ export default function MarketAnalysisPage() {
                   setWatchlistState((current) => ({ ...current, statusDraft: status }))
                 }
                 state={watchlistState}
+              />
+
+              <InvestigationStatusDetailPanel
+                onDelete={deleteInvestigationStatus}
+                onNoteChange={(note) =>
+                  setInvestigationState((current) => ({ ...current, noteDraft: note }))
+                }
+                onPriorityChange={(priority) =>
+                  setInvestigationState((current) => ({ ...current, priorityDraft: priority }))
+                }
+                onSave={saveInvestigationStatus}
+                onStatusChange={(status) =>
+                  setInvestigationState((current) => ({ ...current, statusDraft: status }))
+                }
+                state={investigationState}
               />
 
               <section className="analysis-section">

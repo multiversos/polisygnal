@@ -16,6 +16,12 @@ import {
   toggleWatchlistMarket,
   type WatchlistItem,
 } from "./lib/watchlist";
+import {
+  INVESTIGATION_STATUS_LABELS,
+  INVESTIGATION_STATUS_ORDER,
+  fetchInvestigationStatuses,
+  type InvestigationStatusItem,
+} from "./lib/investigationStatus";
 
 type HealthResponse = {
   status?: string;
@@ -207,6 +213,7 @@ type DashboardState = {
   upcomingDataQualityItems: UpcomingDataQualityItem[];
   externalSignals: ExternalMarketSignal[];
   watchlistItems: WatchlistItem[];
+  investigationStatuses: InvestigationStatusItem[];
   loading: boolean;
   error: string | null;
   updatedAt: Date | null;
@@ -1299,6 +1306,40 @@ function WatchlistToggleButton({
   );
 }
 
+function InvestigationStatusSummary({
+  items,
+  loading,
+}: {
+  items: InvestigationStatusItem[];
+  loading: boolean;
+}) {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    counts.set(item.status, (counts.get(item.status) ?? 0) + 1);
+  }
+  return (
+    <section className="panel investigation-status-panel" aria-label="Estado de investigación">
+      <div className="panel-heading">
+        <div>
+          <h2>Estado de investigación</h2>
+          <p>
+            Kanban operativo para saber en qué etapa de análisis está cada mercado.
+            No representa una recomendación de apuesta.
+          </p>
+        </div>
+      </div>
+      <div className="investigation-status-grid">
+        {INVESTIGATION_STATUS_ORDER.map((status) => (
+          <div className="investigation-status-card" key={status}>
+            <span>{INVESTIGATION_STATUS_LABELS[status]}</span>
+            <strong>{loading ? "..." : counts.get(status) ?? 0}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function WatchlistPanel({
   busyItemId,
   error,
@@ -1700,6 +1741,7 @@ export default function DashboardPage() {
     upcomingDataQualityItems: [],
     externalSignals: [],
     watchlistItems: [],
+    investigationStatuses: [],
     loading: true,
     error: null,
     updatedAt: null,
@@ -1761,6 +1803,7 @@ export default function DashboardPage() {
       dashboardMeta,
       externalSignals,
       watchlist,
+      investigationStatuses,
     ] =
       await Promise.allSettled([
         fetchJson<HealthResponse>("/health"),
@@ -1771,6 +1814,7 @@ export default function DashboardPage() {
         fetchJson<DashboardMetaResponse>("/dashboard/latest/meta"),
         fetchJson<ExternalSignalsResponse>("/external-signals/kalshi?limit=10"),
         fetchWatchlistItems(),
+        fetchInvestigationStatuses(),
       ]);
 
     const errors: string[] = [];
@@ -1793,6 +1837,9 @@ export default function DashboardPage() {
     if (watchlist.status === "rejected") {
       errors.push("No se pudo cargar lista de seguimiento");
     }
+    if (investigationStatuses.status === "rejected") {
+      errors.push("No se pudo cargar estado de investigaciÃ³n");
+    }
 
     setState({
       health: health.status === "fulfilled" ? health.value : null,
@@ -1812,6 +1859,8 @@ export default function DashboardPage() {
       externalSignals:
         externalSignals.status === "fulfilled" ? externalSignals.value.signals : [],
       watchlistItems: watchlist.status === "fulfilled" ? watchlist.value : [],
+      investigationStatuses:
+        investigationStatuses.status === "fulfilled" ? investigationStatuses.value : [],
       loading: false,
       error: errors.length > 0 ? errors.join(". ") : null,
       updatedAt: new Date(),
@@ -2171,6 +2220,11 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+
+      <InvestigationStatusSummary
+        items={state.investigationStatuses}
+        loading={state.loading}
+      />
 
       <WatchlistPanel
         busyItemId={watchlistActionItemId}

@@ -1246,6 +1246,39 @@ h2 {
   gap: 14px;
 }
 
+.investigation-status-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.investigation-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.investigation-status-card {
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.investigation-status-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.investigation-status-card strong {
+  display: block;
+  margin-top: 10px;
+  color: var(--foreground);
+  font-size: 1.55rem;
+}
+
 .watchlist-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1362,6 +1395,7 @@ h2 {
   text-transform: uppercase;
 }
 
+.watchlist-form input,
 .watchlist-form select,
 .watchlist-form textarea {
   width: 100%;
@@ -1375,6 +1409,7 @@ h2 {
   text-transform: none;
 }
 
+.watchlist-form input,
 .watchlist-form select {
   min-height: 38px;
   padding: 8px 10px;

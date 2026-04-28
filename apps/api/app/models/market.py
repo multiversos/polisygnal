@@ -94,6 +94,12 @@ class Market(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    investigation_status = relationship(
+        "MarketInvestigationStatus",
+        back_populates="market",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
     @property
     def latest_yes_price(self) -> Decimal | None:
