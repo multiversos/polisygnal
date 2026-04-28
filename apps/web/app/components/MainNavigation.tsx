@@ -12,6 +12,7 @@ const navigationItems = [
   { label: "Dashboard", href: "/" },
   { label: "Briefing diario", href: "/briefing" },
   { label: "Mi seguimiento", href: "/#mi-seguimiento" },
+  { label: "Alertas", href: "/alerts" },
   { label: "Coincidencias Kalshi", href: "/external-signals/matches" },
   { label: "Calidad de fuentes", href: "/sources" },
   { label: "Backtesting", href: "/backtesting" },
