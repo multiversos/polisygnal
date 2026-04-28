@@ -146,6 +146,64 @@ select {
   padding: 28px 0 56px;
 }
 
+.main-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.main-navigation-brand {
+  flex-shrink: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--foreground);
+  font-size: 0.92rem;
+  font-weight: 950;
+  text-decoration: none;
+}
+
+.main-navigation-links {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: thin;
+}
+
+.main-navigation-links a {
+  flex-shrink: 0;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.main-navigation-links a:hover,
+.main-navigation-links a.active {
+  border-color: var(--line-strong);
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.main-navigation-theme {
+  flex-shrink: 0;
+}
+
 .topbar {
   display: flex;
   align-items: flex-start;
@@ -3340,6 +3398,7 @@ h2 {
   }
 
   .topbar,
+  .main-navigation,
   .sports-selector-heading,
   .panel-heading,
   .safety-strip,
@@ -3441,6 +3500,20 @@ h2 {
 
   .topbar-actions {
     justify-content: flex-start;
+    width: 100%;
+  }
+
+  .main-navigation {
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .main-navigation-links {
+    width: 100%;
+  }
+
+  .main-navigation-theme {
+    justify-content: center;
     width: 100%;
   }
 }

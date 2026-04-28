@@ -20,6 +20,7 @@ import {
   type WatchlistItem,
   type WatchlistStatus,
 } from "../../lib/watchlist";
+import { MainNavigation } from "../../components/MainNavigation";
 import {
   INVESTIGATION_STATUS_LABELS,
   INVESTIGATION_STATUS_ORDER,
@@ -2658,6 +2659,7 @@ export default function MarketAnalysisPage() {
 
   return (
     <main className="dashboard-shell analysis-shell">
+      <MainNavigation />
       <header className="analysis-topbar">
         <Link className="text-link" href="/">
           Volver al dashboard

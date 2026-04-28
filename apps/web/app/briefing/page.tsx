@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { MainNavigation } from "../components/MainNavigation";
 import { SportsSelectorBar, getSportApiFilter } from "../components/SportsSelectorBar";
 import { fetchSmartAlerts, type SmartAlert } from "../lib/smartAlerts";
 import { WATCHLIST_STATUS_LABELS, type WatchlistStatus } from "../lib/watchlist";
-
-type ThemePreference = "light" | "dark";
 
 type BriefingCounts = {
   upcoming_count: number;
@@ -108,7 +107,6 @@ type DailyBriefingMarkdownResponse = {
 
 type MarkdownCopyStatus = "idle" | "copying" | "copied" | "error";
 
-const THEME_STORAGE_KEY = "polysignal-theme";
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -141,29 +139,6 @@ const gapLabels: Record<string, string> = {
   sin_evidencia_guardada: "Sin evidencia guardada",
   sin_reporte_de_prediccion: "Sin reporte de predicción",
 };
-
-function applyThemePreference(theme: ThemePreference) {
-  if (typeof document === "undefined") {
-    return;
-  }
-  document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme;
-}
-
-function resolveThemePreference(): ThemePreference {
-  if (typeof window === "undefined") {
-    return "light";
-  }
-  try {
-    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (storedTheme === "dark" || storedTheme === "light") {
-      return storedTheme;
-    }
-  } catch {
-    return "light";
-  }
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
 
 function toNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -306,7 +281,6 @@ function buildDailyBriefingParams(days: number, sport: string): URLSearchParams 
 }
 
 export default function DailyBriefingPage() {
-  const [theme, setTheme] = useState<ThemePreference>("light");
   const [sport, setSport] = useState("all");
   const [days, setDays] = useState(7);
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
@@ -315,12 +289,6 @@ export default function DailyBriefingPage() {
   const [error, setError] = useState<string | null>(null);
   const [markdownCopyStatus, setMarkdownCopyStatus] = useState<MarkdownCopyStatus>("idle");
   const [markdownFallback, setMarkdownFallback] = useState<string | null>(null);
-
-  useEffect(() => {
-    const resolvedTheme = resolveThemePreference();
-    setTheme(resolvedTheme);
-    applyThemePreference(resolvedTheme);
-  }, []);
 
   const loadBriefing = useCallback(async () => {
     setLoading(true);
@@ -349,7 +317,6 @@ export default function DailyBriefingPage() {
     void loadBriefing();
   }, [loadBriefing]);
 
-  const nextThemeLabel = theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
   const summaryCards = useMemo(() => {
     const counts = briefing?.summary.counts;
     return [
@@ -359,17 +326,6 @@ export default function DailyBriefingPage() {
       ["Faltan evidencias", counts?.research_gaps_count ?? 0],
     ] as const;
   }, [briefing]);
-
-  const toggleTheme = () => {
-    setTheme((currentTheme) => {
-      const nextTheme = currentTheme === "dark" ? "light" : "dark";
-      applyThemePreference(nextTheme);
-      try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
-      } catch {}
-      return nextTheme;
-    });
-  };
 
   const copyMarkdown = useCallback(async () => {
     setMarkdownCopyStatus("copying");
@@ -393,6 +349,7 @@ export default function DailyBriefingPage() {
 
   return (
     <main className="briefing-page">
+      <MainNavigation />
       <header className="topbar briefing-header">
         <div>
           <p className="eyebrow">PolySignal</p>
@@ -402,21 +359,6 @@ export default function DailyBriefingPage() {
             días. Los campeonatos y futuros quedan fuera del flujo principal por
             ahora; no es recomendación de apuesta.
           </p>
-        </div>
-        <div className="topbar-actions">
-          <Link className="analysis-link secondary" href="/">
-            Volver al dashboard
-          </Link>
-          <button
-            aria-label={nextThemeLabel}
-            className="theme-toggle"
-            onClick={toggleTheme}
-            title={nextThemeLabel}
-            type="button"
-          >
-            <span aria-hidden="true">{theme === "dark" ? "☀️" : "🌙"}</span>
-            {theme === "dark" ? "Modo claro" : "Modo oscuro"}
-          </button>
         </div>
       </header>
 

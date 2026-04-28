@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { MainNavigation } from "../../components/MainNavigation";
+
 type ExternalMarketSignal = {
   id: number;
   source: string;
@@ -421,10 +423,8 @@ export default function ExternalSignalMatchReviewPage() {
 
   return (
     <main className="dashboard-shell analysis-shell match-review-shell">
+      <MainNavigation />
       <header className="analysis-topbar">
-        <Link className="text-link" href="/">
-          Volver al dashboard
-        </Link>
         <div className="topbar-actions">
           <a className="text-link" href={`${API_BASE_URL}/external-signals/unmatched?source=kalshi&limit=10`} target="_blank" rel="noreferrer">
             Ver JSON pendientes

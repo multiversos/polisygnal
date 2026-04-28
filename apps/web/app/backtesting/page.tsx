@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { MainNavigation } from "../components/MainNavigation";
 import {
   fetchBacktestingSummary,
   fetchMarketOutcomes,
@@ -98,6 +99,7 @@ export default function BacktestingPage() {
 
   return (
     <main className="dashboard-shell backtesting-page">
+      <MainNavigation />
       <header className="topbar">
         <div>
           <p className="eyebrow">PolySignal</p>
@@ -108,9 +110,6 @@ export default function BacktestingPage() {
           </p>
         </div>
         <div className="topbar-actions">
-          <a className="analysis-link" href="/">
-            Volver al dashboard
-          </a>
           <button className="theme-toggle" onClick={() => void loadBacktesting()} type="button">
             Actualizar
           </button>

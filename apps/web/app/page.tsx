@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  MainNavigation,
+} from "./components/MainNavigation";
+import {
   SportsSelectorBar,
   getSportApiFilter,
   getSportSelectorOption,
@@ -237,10 +240,6 @@ type UpcomingFilters = {
   includeFutures: boolean;
 };
 
-type ThemePreference = "light" | "dark";
-
-const THEME_STORAGE_KEY = "polysignal-theme";
-
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -288,43 +287,6 @@ async function fetchJson<T>(path: string): Promise<T> {
   }
 
   return response.json() as Promise<T>;
-}
-
-function applyThemePreference(theme: ThemePreference) {
-  if (typeof document === "undefined") {
-    return;
-  }
-
-  document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme;
-}
-
-function getStoredThemePreference(): ThemePreference | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return storedTheme === "dark" || storedTheme === "light" ? storedTheme : null;
-  } catch {
-    return null;
-  }
-}
-
-function getSystemThemePreference(): ThemePreference {
-  if (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-  ) {
-    return "dark";
-  }
-
-  return "light";
-}
-
-function resolveThemePreference(): ThemePreference {
-  return getStoredThemePreference() ?? getSystemThemePreference();
 }
 
 function toNumber(value: unknown): number | null {
@@ -1423,7 +1385,7 @@ function WatchlistPanel({
   onRemove: (itemId: number) => void;
 }) {
   return (
-    <section className="panel watchlist-panel" aria-label="Mi lista de seguimiento">
+    <section className="panel watchlist-panel" id="mi-seguimiento" aria-label="Mi lista de seguimiento">
       <div className="panel-heading">
         <div>
           <h2>Mi lista de seguimiento</h2>
@@ -1785,7 +1747,6 @@ function ExternalSignalCard({
 }
 
 export default function DashboardPage() {
-  const [theme, setTheme] = useState<ThemePreference>("light");
   const [filters, setFilters] = useState<DashboardFilters>({
     sport: "all",
     marketShape: "all",
@@ -1817,47 +1778,6 @@ export default function DashboardPage() {
     error: null,
     updatedAt: null,
   });
-
-  useEffect(() => {
-    const resolvedTheme = resolveThemePreference();
-    setTheme(resolvedTheme);
-    applyThemePreference(resolvedTheme);
-
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleSystemThemeChange = (event: MediaQueryListEvent) => {
-      if (getStoredThemePreference()) {
-        return;
-      }
-
-      const nextTheme = event.matches ? "dark" : "light";
-      setTheme(nextTheme);
-      applyThemePreference(nextTheme);
-    };
-
-    mediaQuery.addEventListener("change", handleSystemThemeChange);
-    return () => {
-      mediaQuery.removeEventListener("change", handleSystemThemeChange);
-    };
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    setTheme((currentTheme) => {
-      const nextTheme = currentTheme === "dark" ? "light" : "dark";
-      applyThemePreference(nextTheme);
-
-      try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
-      } catch {
-        // The visual theme can still switch even if localStorage is unavailable.
-      }
-
-      return nextTheme;
-    });
-  }, []);
 
   const loadDashboard = useCallback(async () => {
     setState((current) => ({ ...current, loading: true, error: null }));
@@ -2022,8 +1942,6 @@ export default function DashboardPage() {
       .filter((marketId): marketId is number => typeof marketId === "number");
     return new Set(ids);
   }, [state.externalSignals]);
-  const nextThemeLabel = theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
-
   const handleSelectSport = useCallback((sport: string) => {
     setFilters((current) => ({ ...current, sport }));
     setUpcomingFilters((current) => ({ ...current, sport }));
@@ -2068,6 +1986,7 @@ export default function DashboardPage() {
 
   return (
     <main className="dashboard-shell">
+      <MainNavigation />
       <header className="topbar">
         <div>
           <p className="eyebrow">PolySignal</p>
@@ -2079,16 +1998,6 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="topbar-actions">
-          <button
-            aria-label={nextThemeLabel}
-            className="theme-toggle"
-            onClick={toggleTheme}
-            title={nextThemeLabel}
-            type="button"
-          >
-            <span aria-hidden="true">{theme === "dark" ? "☀️" : "🌙"}</span>
-            {theme === "dark" ? "Modo claro" : "Modo oscuro"}
-          </button>
           <div
             className={`status-pill ${apiOnline ? "status-online" : "status-offline"}`}
             aria-live="polite"

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { MainNavigation } from "../components/MainNavigation";
+
 type SourceQualityItem = {
   source_id: number;
   source_name: string;
@@ -114,6 +116,7 @@ export default function SourcesQualityPage() {
 
   return (
     <main className="dashboard-shell sources-page">
+      <MainNavigation />
       <header className="topbar">
         <div>
           <p className="eyebrow">PolySignal</p>
@@ -124,9 +127,6 @@ export default function SourcesQualityPage() {
           </p>
         </div>
         <div className="topbar-actions">
-          <a className="analysis-link" href="/">
-            Volver al dashboard
-          </a>
           <button className="theme-toggle" onClick={() => void loadSources()} type="button">
             Actualizar
           </button>
