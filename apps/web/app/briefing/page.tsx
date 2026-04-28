@@ -101,6 +101,12 @@ type DailyBriefing = {
   price_movers: BriefingPriceMover[];
 };
 
+type DailyBriefingMarkdownResponse = {
+  markdown: string;
+};
+
+type MarkdownCopyStatus = "idle" | "copying" | "copied" | "error";
+
 const THEME_STORAGE_KEY = "polysignal-theme";
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
@@ -265,6 +271,29 @@ async function fetchDailyBriefing(params: URLSearchParams): Promise<DailyBriefin
   return response.json() as Promise<DailyBriefing>;
 }
 
+async function fetchDailyBriefingMarkdown(params: URLSearchParams): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/briefing/daily/markdown?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`/briefing/daily/markdown responded ${response.status}`);
+  }
+  const payload = (await response.json()) as DailyBriefingMarkdownResponse;
+  return payload.markdown;
+}
+
+function buildDailyBriefingParams(days: number, sport: string): URLSearchParams {
+  const params = new URLSearchParams({
+    days: String(days),
+    limit: "10",
+  });
+  const apiSport = getSportApiFilter(sport);
+  if (apiSport) {
+    params.set("sport", apiSport);
+  }
+  return params;
+}
+
 export default function DailyBriefingPage() {
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [sport, setSport] = useState("all");
@@ -272,6 +301,8 @@ export default function DailyBriefingPage() {
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [markdownCopyStatus, setMarkdownCopyStatus] = useState<MarkdownCopyStatus>("idle");
+  const [markdownFallback, setMarkdownFallback] = useState<string | null>(null);
 
   useEffect(() => {
     const resolvedTheme = resolveThemePreference();
@@ -282,14 +313,8 @@ export default function DailyBriefingPage() {
   const loadBriefing = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams({
-      days: String(days),
-      limit: "10",
-    });
-    const apiSport = getSportApiFilter(sport);
-    if (apiSport) {
-      params.set("sport", apiSport);
-    }
+    setMarkdownFallback(null);
+    const params = buildDailyBriefingParams(days, sport);
     try {
       setBriefing(await fetchDailyBriefing(params));
     } catch {
@@ -324,6 +349,26 @@ export default function DailyBriefingPage() {
       return nextTheme;
     });
   };
+
+  const copyMarkdown = useCallback(async () => {
+    setMarkdownCopyStatus("copying");
+    setMarkdownFallback(null);
+    setError(null);
+    try {
+      const markdown = await fetchDailyBriefingMarkdown(buildDailyBriefingParams(days, sport));
+      try {
+        await navigator.clipboard.writeText(markdown);
+        setMarkdownCopyStatus("copied");
+        window.setTimeout(() => setMarkdownCopyStatus("idle"), 2200);
+      } catch {
+        setMarkdownFallback(markdown);
+        setMarkdownCopyStatus("error");
+      }
+    } catch {
+      setMarkdownCopyStatus("error");
+      setError("No se pudo generar el Markdown. Revisa que la API este en linea.");
+    }
+  }, [days, sport]);
 
   return (
     <main className="briefing-page">
@@ -375,6 +420,18 @@ export default function DailyBriefingPage() {
         <button className="refresh-button" disabled={loading} onClick={loadBriefing} type="button">
           {loading ? "Actualizando..." : "Actualizar"}
         </button>
+        <button
+          className="refresh-button briefing-copy-button"
+          disabled={loading || markdownCopyStatus === "copying"}
+          onClick={copyMarkdown}
+          type="button"
+        >
+          {markdownCopyStatus === "copying"
+            ? "Copiando..."
+            : markdownCopyStatus === "copied"
+              ? "Copiado"
+              : "Copiar Markdown"}
+        </button>
       </section>
 
       <section className="safety-strip briefing-focus-note">
@@ -386,6 +443,18 @@ export default function DailyBriefingPage() {
       </section>
 
       {error ? <div className="alert-panel error">{error}</div> : null}
+
+      {markdownFallback ? (
+        <section className="panel briefing-markdown-fallback" aria-label="Markdown del briefing">
+          <div className="panel-heading compact">
+            <div>
+              <h2>Copia manual del Markdown</h2>
+              <p>El portapapeles no estuvo disponible. Puedes seleccionar el texto.</p>
+            </div>
+          </div>
+          <textarea readOnly value={markdownFallback} />
+        </section>
+      ) : null}
 
       <section className="briefing-summary-grid" aria-label="Resumen del briefing">
         {summaryCards.map(([label, value]) => (

@@ -274,6 +274,73 @@ def render_operational_briefing_text(briefing: OperationalBriefingResponse) -> s
     return "\n".join(lines)
 
 
+def render_daily_briefing_markdown(briefing: DailyBriefingRead) -> str:
+    summary = briefing.summary
+    counts = summary.counts
+    lines = [
+        "# Briefing diario PolySignal",
+        "",
+        f"Generado: {_format_datetime(summary.generated_at)}",
+        f"Deporte: {_format_filter_value(summary.sport)}",
+        f"Ventana: {summary.days} dias",
+        f"Limite: {summary.limit}",
+        "",
+        "> No es recomendacion de apuesta. Este briefing solo reorganiza datos guardados para revision manual.",
+        "",
+        "## Resumen",
+        f"- Proximos mercados: {counts.upcoming_count}",
+        f"- En seguimiento: {counts.watchlist_count}",
+        f"- Senales externas pendientes: {counts.unmatched_external_signals_count}",
+        f"- Gaps de investigacion: {counts.research_gaps_count}",
+        f"- Movimientos de precio: {counts.price_movers_count}",
+    ]
+
+    _append_markdown_section(
+        lines,
+        "Proximos mercados",
+        briefing.upcoming_markets,
+        "No hay proximos mercados con los filtros actuales.",
+        _render_daily_upcoming_market_markdown,
+    )
+    _append_markdown_section(
+        lines,
+        "Watchlist",
+        briefing.watchlist,
+        "No hay mercados en seguimiento.",
+        _render_daily_watchlist_markdown,
+    )
+    _append_markdown_section(
+        lines,
+        "Senales externas pendientes",
+        briefing.unmatched_external_signals,
+        "No hay senales externas pendientes.",
+        _render_daily_external_signal_markdown,
+    )
+    _append_markdown_section(
+        lines,
+        "Gaps de investigacion",
+        briefing.research_gaps,
+        "No hay gaps detectados en los mercados destacados.",
+        _render_daily_research_gap_markdown,
+    )
+    _append_markdown_section(
+        lines,
+        "Movimientos de precio",
+        briefing.price_movers,
+        "No hay movimientos relevantes de precio.",
+        _render_daily_price_mover_markdown,
+    )
+
+    lines.extend(
+        [
+            "",
+            "## Aviso",
+            "PolySignal no ejecuta trading, no crea ordenes y no inventa probabilidades cuando faltan datos.",
+        ]
+    )
+    return "\n".join(lines).strip() + "\n"
+
+
 def _filter_watchlist_by_sport(
     items: list[WatchlistItemRead],
     sport: str | None,
@@ -612,6 +679,102 @@ def _render_review_lines(
         )
         for item in items
     ]
+
+
+def _append_markdown_section(
+    lines: list[str],
+    title: str,
+    items: list[Any],
+    empty_message: str,
+    renderer,
+) -> None:
+    lines.extend(["", f"## {title}"])
+    if not items:
+        lines.append(f"- {empty_message}")
+        return
+    lines.extend(renderer(item) for item in items)
+
+
+def _render_daily_upcoming_market_markdown(item: Any) -> str:
+    return (
+        f"- #{item.market_id} | {item.sport or 'sport=n/a'} | "
+        f"{item.market_shape or 'shape=n/a'} | SI {_format_percent(item.market_yes_price)} | "
+        f"NO {_format_percent(item.market_no_price)} | cierre {_format_datetime(item.close_time)} | "
+        f"{_markdown_text(item.question)}"
+    )
+
+
+def _render_daily_watchlist_markdown(item: DailyBriefingWatchlistItem) -> str:
+    status = getattr(item.status, "value", item.status)
+    return (
+        f"- #{item.market_id} | {status} | SI {_format_percent(item.latest_yes_price)} | "
+        f"cierre {_format_datetime(item.close_time)} | {_markdown_text(item.question)}"
+        f"{_format_note_suffix(item.note)}"
+    )
+
+
+def _render_daily_external_signal_markdown(item: DailyBriefingExternalSignal) -> str:
+    title = item.title or "Senal externa sin titulo"
+    return (
+        f"- {item.source.upper()} {item.source_ticker or 'sin ticker'} | "
+        f"SI {_format_percent(item.yes_probability)} | "
+        f"confianza fuente {_format_percent(item.source_confidence)} | "
+        f"{_markdown_text(title)}"
+    )
+
+
+def _render_daily_research_gap_markdown(item: DailyBriefingResearchGap) -> str:
+    reasons = ", ".join(item.reasons) if item.reasons else "sin detalle"
+    return (
+        f"- #{item.market_id} | {item.source_section} | faltan: {reasons} | "
+        f"{_markdown_text(item.question)}"
+    )
+
+
+def _render_daily_price_mover_markdown(item: DailyBriefingPriceMover) -> str:
+    return (
+        f"- #{item.market_id} | SI {_format_percent(item.first_yes_price)} -> "
+        f"{_format_percent(item.latest_yes_price)} | cambio {_format_points(item.change_yes_abs)} | "
+        f"{item.snapshots_count} snapshots | {_markdown_text(item.question)}"
+    )
+
+
+def _format_note_suffix(note: str | None) -> str:
+    if not note:
+        return ""
+    return f" | nota: {_markdown_text(note)}"
+
+
+def _markdown_text(value: str) -> str:
+    return " ".join(value.replace("|", "/").split())
+
+
+def _format_percent(value: object | None) -> str:
+    decimal_value = _to_decimal(value)
+    if decimal_value is None:
+        return "N/D"
+    percent = decimal_value * Decimal("100") if abs(decimal_value) <= Decimal("1") else decimal_value
+    return f"{percent:.1f}%"
+
+
+def _format_points(value: object | None) -> str:
+    decimal_value = _to_decimal(value)
+    if decimal_value is None:
+        return "N/D"
+    points = decimal_value * Decimal("100") if abs(decimal_value) <= Decimal("1") else decimal_value
+    prefix = "+" if points >= 0 else ""
+    return f"{prefix}{points:.1f} pts"
+
+
+def _to_decimal(value: object | None) -> Decimal | None:
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return value
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return None
 
 
 def _read_json_payload(path: Path) -> dict[str, Any] | None:

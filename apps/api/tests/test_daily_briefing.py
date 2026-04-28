@@ -166,11 +166,43 @@ def test_daily_briefing_default_window_is_seven_days(
     assert market.id in [item["market_id"] for item in payload["upcoming_markets"]]
 
 
+def test_daily_briefing_markdown_endpoint_returns_markdown_and_does_not_mutate_db(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(
+        db_session,
+        suffix="briefing-markdown",
+        question="Will the Lakers beat the Warriors?",
+        sport_type="nba",
+        end_date=datetime.now(tz=UTC) + timedelta(hours=8),
+    )
+    _add_snapshots(db_session, market=market, prices=[Decimal("0.5200")])
+    db_session.commit()
+    before_predictions = db_session.scalar(select(func.count()).select_from(Prediction))
+    before_runs = db_session.scalar(select(func.count()).select_from(ResearchRun))
+
+    response = client.get("/briefing/daily/markdown?limit=5&days=3&sport=nba")
+
+    assert response.status_code == 200
+    markdown = response.json()["markdown"]
+    assert "# Briefing diario PolySignal" in markdown
+    assert "## Resumen" in markdown
+    assert "## Proximos mercados" in markdown
+    assert "## Watchlist" in markdown
+    assert "No es recomendacion de apuesta" in markdown
+    assert f"#{market.id}" in markdown
+    assert "Will the Lakers beat the Warriors?" in markdown
+    assert db_session.scalar(select(func.count()).select_from(Prediction)) == before_predictions
+    assert db_session.scalar(select(func.count()).select_from(ResearchRun)) == before_runs
+
+
 def test_daily_briefing_endpoint_is_documented_in_openapi(client: TestClient) -> None:
     response = client.get("/openapi.json")
 
     assert response.status_code == 200
     assert "/briefing/daily" in response.json()["paths"]
+    assert "/briefing/daily/markdown" in response.json()["paths"]
 
 
 def _create_market(

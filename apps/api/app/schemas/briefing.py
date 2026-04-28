@@ -199,3 +199,7 @@ class DailyBriefingRead(BaseModel):
     unmatched_external_signals: list[DailyBriefingExternalSignal] = Field(default_factory=list)
     research_gaps: list[DailyBriefingResearchGap] = Field(default_factory=list)
     price_movers: list[DailyBriefingPriceMover] = Field(default_factory=list)
+
+
+class DailyBriefingMarkdownResponse(BaseModel):
+    markdown: str
