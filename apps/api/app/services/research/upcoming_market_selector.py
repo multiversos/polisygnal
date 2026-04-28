@@ -31,6 +31,7 @@ PAUSED_FOCUS_TITLE_TERMS = (
     "set 1 winner",
     "set 2 winner",
     "set winner",
+    "set handicap",
     "who will win series",
     "win series",
     "win the series",
@@ -42,6 +43,10 @@ PAUSED_FOCUS_TITLE_TERMS = (
     "completed match",
     "both teams to score",
     "end in a draw",
+    "will there be a run scored",
+    "first inning",
+    "spread:",
+    " o/u ",
     "nba finals",
     "conference finals",
     "world series",
@@ -318,20 +323,15 @@ def _load_time_window_markets(
         )
         .order_by(Market.end_date.asc().nulls_last(), Event.start_at.asc().nulls_last(), Market.id.asc())
     )
-    if sport and sport != "other":
-        stmt = stmt.where(
-            or_(
-                Market.sport_type == sport,
-                Market.question.ilike(f"%{sport}%"),
-            )
+    # Keep the sport filter in Python after classification. Many synced events
+    # have sport_type unset and titles like "Real Madrid vs Barcelona" that do
+    # not contain the internal token "soccer"; pre-filtering here hides them.
+    stmt = stmt.where(
+        or_(
+            Market.sport_type.is_not(None),
+            Event.category == "sports",
         )
-    else:
-        stmt = stmt.where(
-            or_(
-                Market.sport_type.is_not(None),
-                Event.category == "sports",
-            )
-        )
+    )
     return list(db.scalars(stmt).unique().all())
 
 
@@ -393,7 +393,7 @@ def _score_urgency(
         score += Decimal("8.0000") if len(candidate.participants) >= 2 else Decimal("3.0000")
         reasons.append("participants_detected:+8" if len(candidate.participants) >= 2 else "participant_detected:+3")
     else:
-        warnings.append("participants_not_detected")
+        warnings.append("participants_uncertain")
 
     return max(ZERO, min(score, MAX_URGENCY_SCORE)).quantize(Decimal("0.0001")), reasons, warnings
 

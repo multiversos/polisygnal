@@ -68,6 +68,108 @@ from app.services.research.classification import (
             "sports_generic",
         ),
         (
+            "Real Madrid vs Barcelona",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Manchester City vs Liverpool",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Inter Miami vs LAFC",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Champions League: Arsenal vs Bayern",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "UFC 300: Jones vs. Aspinall",
+            "mma",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "UFC Fight Night main event: Pereira vs Ankalaev",
+            "mma",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "NHL: Rangers vs Bruins",
+            "nhl",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Alcaraz vs Djokovic",
+            "tennis",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "WTA: Swiatek vs Sabalenka",
+            "tennis",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "T20 World Cup: India vs Australia",
+            "cricket",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "IPL: Mumbai Indians vs Chennai Super Kings",
+            "cricket",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "KBO: SSG Landers vs. Samsung Lions",
+            "mlb",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "AFC Wimbledon vs Huddersfield Town AFC",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Pohang Steelers FC vs Ulsan HD FC",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Club Alianza Atlético vs CSyD Macará",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Yankees vs Dodgers",
+            "mlb",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "New York Yankees vs. Boston Red Sox",
+            "mlb",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
             "Will Secretariat win the Kentucky Derby?",
             "horse_racing",
             "race_winner",
@@ -123,6 +225,14 @@ def test_classify_ambiguous_sports_yes_no_market() -> None:
 def test_public_inference_helpers() -> None:
     assert infer_sport(question="Will the Chiefs beat the Bills?") == "nfl"
     assert (
+        infer_sport(
+            question="Will Pohang Steelers FC win?",
+            event_title="Pohang Steelers FC vs Ulsan HD FC",
+            sport_type="nba",
+        )
+        == "soccer"
+    )
+    assert (
         infer_market_shape(question="Will Real Madrid beat Barcelona?", sport="soccer")
         == "match_winner"
     )
@@ -133,4 +243,28 @@ def test_public_inference_helpers() -> None:
             market_shape="championship",
         )
         == "sports_nba_futures"
+    )
+
+
+def test_non_winner_sports_markets_are_not_match_winner_focus() -> None:
+    assert (
+        infer_market_shape(
+            question="Pakistan Super League: Lahore Qalandars vs Quetta Gladiators - Who wins the toss?",
+            sport="cricket",
+        )
+        == "team_prop"
+    )
+    assert (
+        infer_market_shape(
+            question="JEF United Ichihara Chiba vs. Yokohama F. Marinos: Both Teams to Score",
+            sport="soccer",
+        )
+        == "yes_no_generic"
+    )
+    assert (
+        infer_market_shape(
+            question="Will Jack Della Maddalena win by KO or TKO?",
+            sport="mma",
+        )
+        == "team_prop"
     )

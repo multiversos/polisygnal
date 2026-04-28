@@ -179,6 +179,131 @@ def test_upcoming_selector_skips_prop_like_matchups_by_default(db_session: Sessi
     assert selection.counts["focus_skipped"] == 2
 
 
+def test_upcoming_selector_sport_filter_uses_classification_not_metadata(
+    db_session: Session,
+) -> None:
+    soccer = _create_market(
+        db_session,
+        suffix="soccer-no-metadata",
+        question="Real Madrid vs Barcelona",
+        end_date=NOW + timedelta(days=2),
+        sport_type=None,
+    )
+    _add_snapshot(db_session, market=soccer)
+
+    selection = list_upcoming_sports_markets(
+        db_session,
+        sport="soccer",
+        limit=10,
+        days=7,
+        now=NOW,
+    )
+
+    assert [item.market_id for item in selection.items] == [soccer.id]
+    assert selection.items[0].sport == "soccer"
+    assert selection.items[0].market_shape == "match_winner"
+
+
+def test_upcoming_selector_supports_mma_filter_without_metadata(db_session: Session) -> None:
+    fight = _create_market(
+        db_session,
+        suffix="mma-no-metadata",
+        question="UFC 300: Jones vs. Aspinall",
+        end_date=NOW + timedelta(days=2),
+        sport_type=None,
+    )
+    _add_snapshot(db_session, market=fight)
+
+    selection = list_upcoming_sports_markets(
+        db_session,
+        sport="mma",
+        limit=10,
+        days=7,
+        now=NOW,
+    )
+
+    assert [item.market_id for item in selection.items] == [fight.id]
+    assert selection.items[0].sport == "mma"
+
+
+def test_upcoming_selector_supports_cricket_filter_without_metadata(db_session: Session) -> None:
+    match = _create_market(
+        db_session,
+        suffix="cricket-no-metadata",
+        question="T20 World Cup: India vs Australia",
+        end_date=NOW + timedelta(days=2),
+        sport_type=None,
+    )
+    _add_snapshot(db_session, market=match)
+
+    selection = list_upcoming_sports_markets(
+        db_session,
+        sport="cricket",
+        limit=10,
+        days=7,
+        now=NOW,
+    )
+
+    assert [item.market_id for item in selection.items] == [match.id]
+    assert selection.items[0].sport == "cricket"
+
+
+def test_upcoming_selector_does_not_require_non_nba_participants(
+    db_session: Session,
+) -> None:
+    fight = _create_market(
+        db_session,
+        suffix="mma-event-title",
+        question="Will Pereira win?",
+        event_title="UFC Fight Night: Pereira vs Ankalaev",
+        end_date=NOW + timedelta(days=2),
+        sport_type=None,
+    )
+    _add_snapshot(db_session, market=fight)
+
+    selection = list_upcoming_sports_markets(
+        db_session,
+        sport="mma",
+        limit=10,
+        days=7,
+        now=NOW,
+    )
+
+    assert [item.market_id for item in selection.items] == [fight.id]
+    assert selection.items[0].participants == []
+    assert "participants_uncertain" in selection.items[0].warnings
+
+
+def test_upcoming_selector_excludes_cricket_props_by_default(db_session: Session) -> None:
+    match = _create_market(
+        db_session,
+        suffix="cricket-main-match",
+        question="Pakistan Super League: Lahore Qalandars vs Quetta Gladiators",
+        end_date=NOW + timedelta(hours=20),
+        sport_type=None,
+    )
+    toss = _create_market(
+        db_session,
+        suffix="cricket-toss",
+        question="Pakistan Super League: Lahore Qalandars vs Quetta Gladiators - Who wins the toss?",
+        end_date=NOW + timedelta(hours=20),
+        sport_type=None,
+    )
+    _add_snapshot(db_session, market=match)
+    _add_snapshot(db_session, market=toss)
+
+    selection = list_upcoming_sports_markets(
+        db_session,
+        sport="cricket",
+        limit=10,
+        days=7,
+        now=NOW,
+    )
+
+    assert [item.market_id for item in selection.items] == [match.id]
+    assert selection.counts["focus_skipped"] == 1
+
+
 def test_upcoming_selector_all_focus_can_include_sports_props(db_session: Session) -> None:
     player_prop = _create_market(
         db_session,
@@ -405,6 +530,7 @@ def _create_market(
     suffix: str,
     question: str,
     end_date: datetime | None,
+    event_title: str | None = None,
     event_start_at: datetime | None = None,
     event_category: str = "sports",
     sport_type: str | None = "nba",
@@ -414,7 +540,7 @@ def _create_market(
 ) -> Market:
     event = Event(
         polymarket_event_id=f"upcoming-event-{suffix}",
-        title=f"Upcoming Event {suffix}",
+        title=event_title or f"Upcoming Event {suffix}",
         category=event_category,
         slug=f"upcoming-event-{suffix}",
         active=active,

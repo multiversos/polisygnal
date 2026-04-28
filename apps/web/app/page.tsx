@@ -235,7 +235,7 @@ const sportsSelectorOptions = [
     label: "NHL",
     icon: "🏒",
     tone: "nhl",
-    backendSupported: false,
+    backendSupported: true,
   },
   {
     id: "mma",
@@ -259,7 +259,7 @@ const sportsSelectorOptions = [
     label: "Cricket",
     icon: "🏏",
     tone: "cricket",
-    backendSupported: false,
+    backendSupported: true,
   },
   {
     id: "basketball",
@@ -652,9 +652,11 @@ const sportLabels: Record<string, string> = {
   nfl: "NFL",
   soccer: "fútbol",
   horse_racing: "carreras de caballos",
-  mlb: "MLB",
+  nhl: "NHL",
+  mlb: "béisbol",
   tennis: "tenis",
-  mma: "MMA",
+  cricket: "cricket",
+  mma: "UFC",
   other: "otro",
 };
 
@@ -726,6 +728,7 @@ const warningLabels: Record<string, string> = {
   outside_upcoming_window: "fuera de ventana próxima",
   unknown_sport: "deporte no identificado",
   participants_not_detected: "participantes no detectados",
+  participants_uncertain: "participantes por confirmar",
   liquidity_unknown: "liquidez desconocida",
   volume_unknown: "volumen desconocido",
 };

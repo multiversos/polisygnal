@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import re
+import unicodedata
 
 from app.models.market import Market
 from app.services.nba_team_matching import extract_nba_teams
@@ -11,9 +12,11 @@ SUPPORTED_SPORTS = {
     "nba",
     "nfl",
     "soccer",
+    "nhl",
     "horse_racing",
     "mlb",
     "tennis",
+    "cricket",
     "mma",
     "other",
 }
@@ -38,6 +41,13 @@ SPORT_KEYWORDS: dict[str, tuple[str, ...]] = {
         "nuggets",
         "knicks",
         "hawks",
+        "thunder",
+        "mavericks",
+        "timberwolves",
+        "bucks",
+        "heat",
+        "suns",
+        "clippers",
         "lebron",
         "nikola jokic",
     ),
@@ -46,19 +56,71 @@ SPORT_KEYWORDS: dict[str, tuple[str, ...]] = {
         "super bowl",
         "chiefs",
         "bills",
-        "eagles",
+        "philadelphia eagles",
         "cowboys",
         "ravens",
         "49ers",
+        "bengals",
+        "packers",
+        "pittsburgh steelers",
+        "detroit lions",
+        "minnesota vikings",
+        "patriots",
     ),
     "soccer": (
         "soccer",
+        "football club",
         "real madrid",
         "barcelona",
+        "atletico",
+        "manchester city",
+        "manchester united",
+        "arsenal",
+        "liverpool",
+        "chelsea",
+        "tottenham",
+        "psg",
+        "paris saint germain",
+        "bayern",
+        "borussia dortmund",
+        "dortmund",
+        "inter miami",
+        "inter milan",
+        "ac milan",
+        "juventus",
+        "lafc",
+        "mls",
         "premier league",
         "champions league",
+        "europa league",
         "la liga",
+        "serie a",
+        "bundesliga",
+        "copa",
+        "club world cup",
+        "world cup qualifier",
+        "world cup qualifying",
         "fc ",
+        "cf ",
+        "fk ",
+        "afc ",
+        "sc ",
+    ),
+    "nhl": (
+        "nhl",
+        "hockey",
+        "stanley cup",
+        "new york rangers",
+        "boston bruins",
+        "maple leafs",
+        "edmonton oilers",
+        "florida panthers",
+        "avalanche",
+        "dallas stars",
+        "montreal canadiens",
+        "tampa bay lightning",
+        "carolina hurricanes",
+        "golden knights",
     ),
     "horse_racing": (
         "horse racing",
@@ -76,6 +138,17 @@ SPORT_KEYWORDS: dict[str, tuple[str, ...]] = {
         "yankees",
         "mets",
         "red sox",
+        "cubs",
+        "phillies",
+        "padres",
+        "braves",
+        "giants",
+        "twins",
+        "nationals",
+        "rockies",
+        "kbo",
+        "lotte giants",
+        "doosan bears",
     ),
     "tennis": (
         "tennis",
@@ -83,14 +156,51 @@ SPORT_KEYWORDS: dict[str, tuple[str, ...]] = {
         "us open",
         "australian open",
         "french open",
+        "roland garros",
         "atp",
         "wta",
+        "alcaraz",
+        "djokovic",
+        "sinner",
+        "nadal",
+        "swiatek",
+        "sabalenka",
+        "gauff",
+        "set handicap",
+    ),
+    "cricket": (
+        "cricket",
+        "indian premier league",
+        "ipl",
+        "t20",
+        "odi",
+        "test match",
+        "test series",
+        "wicket",
+        "innings",
+        "toss",
+        "runs",
+        "sixes",
+        "boundary",
+        "pakistan super league",
+        "psl",
+        "bifa cup",
     ),
     "mma": (
         "mma",
         "ufc",
         "mixed martial arts",
         "fight night",
+        "main event",
+        "bout",
+        "win by ko",
+        "knockout",
+        "submission",
+        "decision",
+        "lightweight",
+        "welterweight",
+        "middleweight",
+        "heavyweight",
     ),
 }
 
@@ -125,10 +235,46 @@ MATCH_WINNER_HINTS = (
     " win against ",
     " wins against ",
     " v ",
+    " v. ",
     " vs ",
+    " vs. ",
     " versus ",
     " who will win series",
     " win series",
+)
+NON_WINNER_YES_NO_HINTS = (
+    "both teams to score",
+    "end in a draw",
+    "draw at halftime",
+    "draw at half time",
+    "draw at full time",
+    "completed match",
+    "will there be a run scored",
+    "go the distance",
+    "fight to go the distance",
+)
+NON_WINNER_PROP_HINTS = (
+    "who wins the toss",
+    "toss match",
+    "most sixes",
+    "team top batter",
+    "set handicap",
+    "spread",
+    " o/u ",
+    "win by ko",
+    "ko or tko",
+    "win by submission",
+    "fight be won",
+)
+SPORT_INFERENCE_ORDER = (
+    "cricket",
+    "mma",
+    "mlb",
+    "nhl",
+    "nfl",
+    "soccer",
+    "tennis",
+    "horse_racing",
 )
 CHAMPIONSHIP_HINTS = (
     "nba finals",
@@ -328,6 +474,8 @@ def normalize_sport(value: str | None) -> str:
         "football": "soccer",
         "ufc": "mma",
         "mixed_martial_arts": "mma",
+        "hockey": "nhl",
+        "ice_hockey": "nhl",
         "horse": "horse_racing",
         "horse_race": "horse_racing",
         "horse_racing": "horse_racing",
@@ -389,18 +537,33 @@ def _infer_sport_with_reason(
     if sport_override:
         sport = normalize_sport(sport_override)
         return sport, f"sport={sport} from explicit override"
+
+    normalized_text = f" {_normalize_text(text)} "
+    text_sport, text_reason = _infer_sport_from_text(text=text, normalized_text=normalized_text)
     if sport_type:
         sport = normalize_sport(sport_type)
+        if text_sport != "other" and text_sport != sport:
+            return text_sport, f"{text_reason} overriding market sport_type={sport}"
         return sport, f"sport={sport} from market sport_type"
+
+    if text_sport != "other":
+        return text_sport, text_reason
+
+    return "other", "sport=other because no sport-specific keywords matched"
+
+
+def _infer_sport_from_text(*, text: str, normalized_text: str) -> tuple[str, str]:
+    for sport in SPORT_INFERENCE_ORDER:
+        keywords = SPORT_KEYWORDS[sport]
+        if _contains_any(normalized_text, keywords):
+            return sport, f"sport={sport} from keyword match"
 
     nba_teams = extract_nba_teams(text)
     if nba_teams:
         return "nba", "sport=nba from NBA team names"
 
-    normalized_text = f" {_normalize_text(text)} "
-    for sport, keywords in SPORT_KEYWORDS.items():
-        if _contains_any(normalized_text, keywords):
-            return sport, f"sport={sport} from keyword match"
+    if _contains_any(normalized_text, SPORT_KEYWORDS["nba"]):
+        return "nba", "sport=nba from keyword match"
     return "other", "sport=other because no sport-specific keywords matched"
 
 
@@ -425,8 +588,14 @@ def _infer_market_shape_with_reason(
     if _contains_any(normalized_text, TEAM_PROP_HINTS):
         return "team_prop", "market_shape=team_prop from team prop hints"
 
+    if _contains_any(normalized_text, NON_WINNER_PROP_HINTS):
+        return "team_prop", "market_shape=team_prop from non-winner sports prop hints"
+
+    if _contains_any(normalized_text, NON_WINNER_YES_NO_HINTS):
+        return "yes_no_generic", "market_shape=yes_no_generic from non-winner yes/no sports hints"
+
     nba_teams = extract_nba_teams(text)
-    if _contains_any(normalized_text, MATCH_WINNER_HINTS) or len(nba_teams) >= 2:
+    if _contains_any(normalized_text, MATCH_WINNER_HINTS) or _looks_like_head_to_head(text) or len(nba_teams) >= 2:
         return "match_winner", "market_shape=match_winner from head-to-head wording"
 
     if _contains_any(normalized_text, CHAMPIONSHIP_HINTS):
@@ -450,6 +619,10 @@ def _looks_like_player_prop(normalized_text: str) -> bool:
     return _contains_any(normalized_text, PLAYER_PROP_HINTS)
 
 
+def _looks_like_head_to_head(text: str) -> bool:
+    return bool(re.search(r"\b(?:v|vs|versus)\.?\b", text, flags=re.IGNORECASE))
+
+
 def _combined_text(*values: str | None) -> str:
     return " ".join(value.strip() for value in values if value and value.strip())
 
@@ -459,7 +632,8 @@ def _normalize_key(value: str | None) -> str:
 
 
 def _normalize_text(value: str) -> str:
-    lowered = value.lower()
+    ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    lowered = ascii_value.lower()
     normalized = re.sub(r"[^a-z0-9.]+", " ", lowered)
     return " ".join(normalized.split())
 
