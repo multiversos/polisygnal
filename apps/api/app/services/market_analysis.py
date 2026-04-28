@@ -31,6 +31,7 @@ from app.services.external_market_signals import list_external_market_signals
 from app.services.polysignal_score import build_polysignal_score
 from app.services.research.candidate_selector import build_research_candidate
 from app.services.research.classification import classify_market_research_context
+from app.services.research.upcoming_data_quality import build_market_data_quality
 
 
 ANALYSIS_HISTORY_LIMIT = 20
@@ -68,6 +69,22 @@ def build_market_analysis(db: Session, market: Market) -> MarketAnalysisRead:
         external_signals=external_signals,
         candidate_score=candidate.candidate_score,
     )
+    data_quality = build_market_data_quality(
+        market_id=candidate.market_id,
+        question=candidate.question,
+        sport=candidate.sport,
+        market_shape=candidate.market_shape,
+        close_time=candidate.close_time,
+        market_yes_price=candidate.market_yes_price,
+        market_no_price=candidate.market_no_price,
+        liquidity=candidate.liquidity,
+        volume=candidate.volume,
+        polysignal_score=polysignal_score,
+        has_snapshot=latest_snapshot is not None,
+        has_external_signal=bool(external_signals),
+        has_prediction=latest_prediction is not None,
+        has_research=bool(research_runs or research_findings or evidence_items),
+    )
 
     warnings: list[str] = []
     if latest_snapshot is None:
@@ -87,6 +104,7 @@ def build_market_analysis(db: Session, market: Market) -> MarketAnalysisRead:
             else None
         ),
         polysignal_score=polysignal_score,
+        data_quality=data_quality.to_payload(),
         candidate_context=MarketAnalysisCandidateContext(
             candidate_score=candidate.candidate_score,
             candidate_reasons=list(candidate.candidate_reasons),

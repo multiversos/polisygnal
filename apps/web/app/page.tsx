@@ -118,6 +118,33 @@ type UpcomingSportsResponse = {
   filters_applied: Record<string, unknown>;
 };
 
+type UpcomingDataQualityItem = {
+  market_id: number;
+  question: string;
+  sport: string;
+  market_shape: string;
+  close_time?: string | null;
+  has_snapshot: boolean;
+  has_yes_price: boolean;
+  has_no_price: boolean;
+  has_liquidity: boolean;
+  has_volume: boolean;
+  has_external_signal: boolean;
+  has_prediction: boolean;
+  has_research: boolean;
+  has_polysignal_score: boolean;
+  missing_fields: string[];
+  quality_score: number;
+  quality_label: "Completo" | "Parcial" | "Insuficiente" | string;
+  warnings: string[];
+};
+
+type UpcomingDataQualityResponse = {
+  summary: Record<string, number>;
+  items: UpcomingDataQualityItem[];
+  filters_applied: Record<string, unknown>;
+};
+
 type MarketPriceLike = {
   market_yes_price?: string | number | null;
   market_no_price?: string | number | null;
@@ -169,6 +196,8 @@ type DashboardState = {
   candidates: ResearchCandidate[];
   upcomingMarkets: UpcomingSportsMarket[];
   upcomingCounts: Record<string, number> | null;
+  upcomingDataQualitySummary: Record<string, number> | null;
+  upcomingDataQualityItems: UpcomingDataQualityItem[];
   externalSignals: ExternalMarketSignal[];
   watchlistItems: WatchlistItem[];
   loading: boolean;
@@ -619,6 +648,18 @@ function buildUpcomingPath(filters: UpcomingFilters): string {
   return `/research/upcoming-sports?${params.toString()}`;
 }
 
+function buildUpcomingDataQualityPath(filters: UpcomingFilters): string {
+  const params = new URLSearchParams({
+    limit: "50",
+    days: String(filters.days),
+  });
+  const apiSport = getSportApiFilter(filters.sport);
+  if (apiSport) {
+    params.set("sport", apiSport);
+  }
+  return `/research/upcoming-sports/data-quality?${params.toString()}`;
+}
+
 function getSportSelectorOption(value: string) {
   return sportsSelectorOptions.find((option) => option.id === value) ?? sportsSelectorOptions[0];
 }
@@ -721,6 +762,14 @@ const warningLabels: Record<string, string> = {
   zero_volume: "volumen cero",
   zero_open_interest: "interés abierto cero",
   missing_latest_snapshot: "sin snapshot reciente",
+  missing_snapshot: "sin snapshot",
+  missing_price: "faltan precios",
+  missing_close_time: "sin fecha de cierre",
+  missing_liquidity: "liquidez no disponible",
+  missing_volume: "volumen no disponible",
+  sport_uncertain: "deporte incierto",
+  market_shape_uncertain: "tipo de mercado incierto",
+  polysignal_score_pending: "score pendiente",
   market_closed: "mercado cerrado",
   no_external_signal: "sin señal externa",
   future_or_championship_market: "mercado futuro/campeonato",
@@ -1145,11 +1194,109 @@ function UrgencyScoreBar({ score }: { score: unknown }) {
   );
 }
 
+function getScorePendingMessage(dataQuality?: UpcomingDataQualityItem | null): string {
+  if (!dataQuality) {
+    return "Faltan datos suficientes para estimar.";
+  }
+
+  const missingFields = new Set(dataQuality.missing_fields);
+  if (
+    missingFields.has("snapshot") ||
+    missingFields.has("yes_price") ||
+    missingFields.has("no_price")
+  ) {
+    return "Faltan precios o snapshots para estimar.";
+  }
+  if (missingFields.has("sport") || missingFields.has("market_shape")) {
+    return "Falta clasificaciÃ³n confiable para estimar.";
+  }
+  return "Faltan datos mÃ­nimos para estimar.";
+}
+
+function DataQualityBadges({
+  dataQuality,
+}: {
+  dataQuality?: UpcomingDataQualityItem | null;
+}) {
+  if (!dataQuality) {
+    return null;
+  }
+
+  const badges: string[] = [];
+  if (!dataQuality.has_yes_price || !dataQuality.has_no_price) {
+    badges.push("Faltan precios");
+  }
+  if (!dataQuality.has_snapshot) {
+    badges.push("Sin snapshot");
+  }
+  if (dataQuality.sport === "other" || dataQuality.missing_fields.includes("sport")) {
+    badges.push("Deporte incierto");
+  }
+  if (!dataQuality.has_polysignal_score) {
+    badges.push("Score pendiente");
+  }
+
+  if (badges.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="data-quality-badges" aria-label="Calidad de datos">
+      {badges.map((badge) => (
+        <span className="warning-chip" key={badge}>
+          {badge}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function DataQualitySummaryPanel({
+  loading,
+  summary,
+}: {
+  loading: boolean;
+  summary: Record<string, number> | null;
+}) {
+  const getValue = (key: string) => (loading ? "..." : summary?.[key] ?? 0);
+  return (
+    <section className="data-quality-summary" aria-label="Calidad de datos de prÃ³ximos partidos">
+      <div>
+        <span>Completos</span>
+        <strong>{getValue("complete_count")}</strong>
+      </div>
+      <div>
+        <span>Parciales</span>
+        <strong>{getValue("partial_count")}</strong>
+      </div>
+      <div>
+        <span>Insuficientes</span>
+        <strong>{getValue("insufficient_count")}</strong>
+      </div>
+      <div>
+        <span>Faltan precios</span>
+        <strong>{getValue("missing_price_count")}</strong>
+      </div>
+      <div>
+        <span>Sin snapshots</span>
+        <strong>{getValue("missing_snapshot_count")}</strong>
+      </div>
+      <div>
+        <span>Sport=other</span>
+        <strong>{getValue("sport_other_count")}</strong>
+      </div>
+      <p>El score queda pendiente cuando faltan precios, snapshots o clasificaciÃ³n confiable.</p>
+    </section>
+  );
+}
+
 function PolySignalScoreCard({
   compact = false,
+  dataQuality,
   score,
 }: {
   compact?: boolean;
+  dataQuality?: UpcomingDataQualityItem | null;
   score?: PolySignalScore | null;
 }) {
   if (!score || score.score_probability === null || score.score_probability === undefined) {
@@ -1159,7 +1306,7 @@ function PolySignalScoreCard({
           <span>PolySignal SÍ</span>
           <strong>pendiente</strong>
         </div>
-        <p>Faltan datos suficientes para estimar.</p>
+        <p>{getScorePendingMessage(dataQuality)}</p>
       </div>
     );
   }
@@ -1412,11 +1559,13 @@ function CandidateCard({
 }
 
 function UpcomingMarketCard({
+  dataQuality,
   isWatchlisted,
   market,
   onToggleWatchlist,
   watchlistBusy,
 }: {
+  dataQuality?: UpcomingDataQualityItem | null;
   isWatchlisted: boolean;
   market: UpcomingSportsMarket;
   onToggleWatchlist: (marketId: number) => void;
@@ -1442,6 +1591,7 @@ function UpcomingMarketCard({
         </div>
         <strong className={`urgency-pill ${scoreTone(score)}`}>{formatScore(score)}</strong>
       </div>
+      <DataQualityBadges dataQuality={dataQuality} />
 
       <div className="upcoming-main">
         <div className="candidate-main-copy">
@@ -1471,7 +1621,7 @@ function UpcomingMarketCard({
 
         <div className="upcoming-side">
           <UrgencyScoreBar score={score} />
-          <PolySignalScoreCard score={market.polysignal_score} />
+          <PolySignalScoreCard dataQuality={dataQuality} score={market.polysignal_score} />
           <MarketPricePanel candidate={market} />
         </div>
         <div className="upcoming-date-row" aria-label="Fechas del mercado">
@@ -1686,6 +1836,8 @@ export default function DashboardPage() {
     candidates: [],
     upcomingMarkets: [],
     upcomingCounts: null,
+    upcomingDataQualitySummary: null,
+    upcomingDataQualityItems: [],
     externalSignals: [],
     watchlistItems: [],
     loading: true,
@@ -1739,12 +1891,23 @@ export default function DashboardPage() {
 
     const candidatesPath = buildCandidatesPath(filters);
     const upcomingPath = buildUpcomingPath(upcomingFilters);
-    const [health, overview, candidates, upcomingSports, dashboardMeta, externalSignals, watchlist] =
+    const upcomingDataQualityPath = buildUpcomingDataQualityPath(upcomingFilters);
+    const [
+      health,
+      overview,
+      candidates,
+      upcomingSports,
+      upcomingDataQuality,
+      dashboardMeta,
+      externalSignals,
+      watchlist,
+    ] =
       await Promise.allSettled([
         fetchJson<HealthResponse>("/health"),
         fetchJson<MarketsOverviewResponse>("/markets/overview"),
         fetchJson<CandidatesResponse>(candidatesPath),
         fetchJson<UpcomingSportsResponse>(upcomingPath),
+        fetchJson<UpcomingDataQualityResponse>(upcomingDataQualityPath),
         fetchJson<DashboardMetaResponse>("/dashboard/latest/meta"),
         fetchJson<ExternalSignalsResponse>("/external-signals/kalshi?limit=10"),
         fetchWatchlistItems(),
@@ -1759,6 +1922,9 @@ export default function DashboardPage() {
     }
     if (upcomingSports.status === "rejected") {
       errors.push("No se pudieron cargar mercados próximos");
+    }
+    if (upcomingDataQuality.status === "rejected") {
+      errors.push("No se pudo cargar calidad de datos");
     }
     if (externalSignals.status === "rejected") {
       errors.push("No se pudieron cargar señales externas");
@@ -1779,6 +1945,10 @@ export default function DashboardPage() {
         upcomingSports.status === "fulfilled" ? upcomingSports.value.items : [],
       upcomingCounts:
         upcomingSports.status === "fulfilled" ? upcomingSports.value.counts : null,
+      upcomingDataQualitySummary:
+        upcomingDataQuality.status === "fulfilled" ? upcomingDataQuality.value.summary : null,
+      upcomingDataQualityItems:
+        upcomingDataQuality.status === "fulfilled" ? upcomingDataQuality.value.items : [],
       externalSignals:
         externalSignals.status === "fulfilled" ? externalSignals.value.signals : [],
       watchlistItems: watchlist.status === "fulfilled" ? watchlist.value : [],
@@ -1826,6 +1996,10 @@ export default function DashboardPage() {
     matchesSelectedSport(market.sport, upcomingFilters.sport),
   );
   const topUpcomingMarkets = filteredUpcomingMarkets.slice(0, 8);
+  const dataQualityByMarketId = useMemo(() => {
+    const entries = state.upcomingDataQualityItems.map((item) => [item.market_id, item] as const);
+    return new Map(entries);
+  }, [state.upcomingDataQualityItems]);
   const watchlistByMarketId = useMemo(() => {
     const entries = state.watchlistItems.map((item) => [item.market_id, item] as const);
     return new Map(entries);
@@ -2102,6 +2276,10 @@ export default function DashboardPage() {
           <span>Ganador de partido: {state.loading ? "..." : state.upcomingCounts?.match_winner ?? 0}</span>
           <span>Futuros/campeonatos: {state.loading ? "..." : state.upcomingCounts?.championship_futures ?? 0}</span>
         </div>
+        <DataQualitySummaryPanel
+          loading={state.loading}
+          summary={state.upcomingDataQualitySummary}
+        />
 
         {state.loading ? (
           <div className="empty-state">Cargando próximos mercados...</div>
@@ -2122,6 +2300,7 @@ export default function DashboardPage() {
           <div className="upcoming-card-grid">
             {topUpcomingMarkets.map((market) => (
               <UpcomingMarketCard
+                dataQuality={dataQualityByMarketId.get(market.market_id)}
                 isWatchlisted={watchlistByMarketId.has(market.market_id)}
                 key={market.market_id}
                 market={market}

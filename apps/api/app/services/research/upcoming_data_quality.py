@@ -110,8 +110,17 @@ def list_upcoming_data_quality(
     )
 
     items = [
-        _build_quality_item(
-            item=item,
+        build_market_data_quality(
+            market_id=item.market_id,
+            question=item.question,
+            sport=item.sport,
+            market_shape=item.market_shape,
+            close_time=item.close_time,
+            market_yes_price=item.market_yes_price,
+            market_no_price=item.market_no_price,
+            liquidity=item.liquidity,
+            volume=item.volume,
+            polysignal_score=item.polysignal_score,
             has_snapshot=item.market_id in snapshots,
             has_external_signal=item.market_id in external_market_ids,
             has_prediction=item.market_id in prediction_market_ids,
@@ -134,9 +143,18 @@ def list_upcoming_data_quality(
     )
 
 
-def _build_quality_item(
+def build_market_data_quality(
     *,
-    item,
+    market_id: int,
+    question: str,
+    sport: str,
+    market_shape: str,
+    close_time: datetime | None,
+    market_yes_price,
+    market_no_price,
+    liquidity,
+    volume,
+    polysignal_score,
     has_snapshot: bool,
     has_external_signal: bool,
     has_prediction: bool,
@@ -145,16 +163,16 @@ def _build_quality_item(
     missing_fields: list[str] = []
     warnings: list[str] = []
 
-    has_yes_price = item.market_yes_price is not None
-    has_no_price = item.market_no_price is not None
-    has_liquidity = item.liquidity is not None
-    has_volume = item.volume is not None
+    has_yes_price = market_yes_price is not None
+    has_no_price = market_no_price is not None
+    has_liquidity = liquidity is not None
+    has_volume = volume is not None
     has_polysignal_score = (
-        item.polysignal_score is not None
-        and item.polysignal_score.score_probability is not None
+        polysignal_score is not None
+        and polysignal_score.score_probability is not None
     )
 
-    if item.close_time is None:
+    if close_time is None:
         missing_fields.append("close_time")
         warnings.append("missing_close_time")
     if not has_snapshot:
@@ -172,10 +190,10 @@ def _build_quality_item(
     if not has_volume:
         missing_fields.append("volume")
         warnings.append("missing_volume")
-    if item.sport == "other":
+    if sport == "other":
         missing_fields.append("sport")
         warnings.append("sport_uncertain")
-    if item.market_shape in UNCERTAIN_SHAPES:
+    if market_shape in UNCERTAIN_SHAPES:
         missing_fields.append("market_shape")
         warnings.append("market_shape_uncertain")
     if not has_polysignal_score:
@@ -188,9 +206,9 @@ def _build_quality_item(
         has_no_price=has_no_price,
         has_liquidity=has_liquidity,
         has_volume=has_volume,
-        has_close_time=item.close_time is not None,
-        has_known_sport=item.sport != "other",
-        has_clear_shape=item.market_shape not in UNCERTAIN_SHAPES,
+        has_close_time=close_time is not None,
+        has_known_sport=sport != "other",
+        has_clear_shape=market_shape not in UNCERTAIN_SHAPES,
         has_polysignal_score=has_polysignal_score,
     )
     quality_label = _quality_label(
@@ -198,18 +216,18 @@ def _build_quality_item(
         has_snapshot=has_snapshot,
         has_yes_price=has_yes_price,
         has_no_price=has_no_price,
-        has_close_time=item.close_time is not None,
-        has_known_sport=item.sport != "other",
-        has_clear_shape=item.market_shape not in UNCERTAIN_SHAPES,
+        has_close_time=close_time is not None,
+        has_known_sport=sport != "other",
+        has_clear_shape=market_shape not in UNCERTAIN_SHAPES,
         has_polysignal_score=has_polysignal_score,
     )
 
     return UpcomingDataQualityItem(
-        market_id=item.market_id,
-        question=item.question,
-        sport=item.sport,
-        market_shape=item.market_shape,
-        close_time=item.close_time,
+        market_id=market_id,
+        question=question,
+        sport=sport,
+        market_shape=market_shape,
+        close_time=close_time,
         has_snapshot=has_snapshot,
         has_yes_price=has_yes_price,
         has_no_price=has_no_price,

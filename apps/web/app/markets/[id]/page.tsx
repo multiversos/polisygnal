@@ -247,10 +247,32 @@ type PolySignalScore = {
   color_hint: "positive" | "negative" | "neutral" | "warning" | string;
 };
 
+type MarketDataQuality = {
+  market_id: number;
+  question: string;
+  sport: string;
+  market_shape: string;
+  close_time?: string | null;
+  has_snapshot: boolean;
+  has_yes_price: boolean;
+  has_no_price: boolean;
+  has_liquidity: boolean;
+  has_volume: boolean;
+  has_external_signal: boolean;
+  has_prediction: boolean;
+  has_research: boolean;
+  has_polysignal_score: boolean;
+  missing_fields: string[];
+  quality_score: number;
+  quality_label: "Completo" | "Parcial" | "Insuficiente" | string;
+  warnings: string[];
+};
+
 type MarketAnalysis = {
   market: AnalysisMarket;
   latest_snapshot?: AnalysisSnapshot | null;
   polysignal_score?: PolySignalScore | null;
+  data_quality?: MarketDataQuality | null;
   candidate_context?: CandidateContext | null;
   latest_prediction?: AnalysisPrediction | null;
   prediction_history: AnalysisPrediction[];
@@ -338,6 +360,14 @@ const warningLabels: Record<string, string> = {
   no_prediction_found: "sin predicción investigada",
   missing_yes_price: "falta precio SÍ",
   missing_price_data: "faltan datos de precio",
+  missing_snapshot: "sin snapshot",
+  missing_price: "faltan precios",
+  missing_close_time: "sin fecha de cierre",
+  missing_liquidity: "liquidez no disponible",
+  missing_volume: "volumen no disponible",
+  sport_uncertain: "deporte incierto",
+  market_shape_uncertain: "tipo de mercado incierto",
+  polysignal_score_pending: "score pendiente",
   preliminary_score: "score preliminar",
   missing_market_yes_price: "falta precio SÍ",
   external_signal_low_match_confidence: "señal externa con baja coincidencia",
@@ -1232,6 +1262,97 @@ function PolySignalScorePanel({ score }: { score?: PolySignalScore | null }) {
   );
 }
 
+function formatQualityBoolean(value: boolean): string {
+  return value ? "SÃ­" : "No";
+}
+
+function scorePendingMessage(dataQuality?: MarketDataQuality | null): string {
+  if (!dataQuality) {
+    return "Faltan datos suficientes para estimar.";
+  }
+  const missingFields = new Set(dataQuality.missing_fields);
+  if (
+    missingFields.has("snapshot") ||
+    missingFields.has("yes_price") ||
+    missingFields.has("no_price")
+  ) {
+    return "Faltan precios o snapshots para estimar.";
+  }
+  if (missingFields.has("sport") || missingFields.has("market_shape")) {
+    return "Falta clasificaciÃ³n confiable para estimar.";
+  }
+  return "Faltan datos mÃ­nimos para estimar.";
+}
+
+function DataQualityPanel({
+  dataQuality,
+  score,
+}: {
+  dataQuality?: MarketDataQuality | null;
+  score?: PolySignalScore | null;
+}) {
+  if (!dataQuality) {
+    return null;
+  }
+
+  const hasScore = score?.score_probability !== null && score?.score_probability !== undefined;
+  const shouldShow =
+    !hasScore ||
+    (score?.warnings?.length ?? 0) > 0 ||
+    dataQuality.quality_label !== "Completo";
+  if (!shouldShow) {
+    return null;
+  }
+
+  return (
+    <section className="analysis-section data-quality-detail-section">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">DiagnÃ³stico read-only</span>
+          <h2>Calidad de datos</h2>
+          <p className="section-note">
+            El score queda pendiente cuando faltan datos mÃ­nimos. PolySignal no inventa probabilidades.
+          </p>
+        </div>
+        <span className={`data-quality-label ${dataQuality.quality_label.toLowerCase()}`}>
+          {dataQuality.quality_label}
+        </span>
+      </div>
+
+      {!hasScore ? (
+        <div className="empty-state compact">
+          <strong>PolySignal SÃ pendiente</strong>
+          <p>{scorePendingMessage(dataQuality)}</p>
+        </div>
+      ) : null}
+
+      <div className="analysis-stat-grid">
+        <div><span>Precio SÃ</span><strong>{formatQualityBoolean(dataQuality.has_yes_price)}</strong></div>
+        <div><span>Precio NO</span><strong>{formatQualityBoolean(dataQuality.has_no_price)}</strong></div>
+        <div><span>Snapshot</span><strong>{formatQualityBoolean(dataQuality.has_snapshot)}</strong></div>
+        <div><span>SeÃ±al externa</span><strong>{formatQualityBoolean(dataQuality.has_external_signal)}</strong></div>
+        <div><span>PredicciÃ³n guardada</span><strong>{formatQualityBoolean(dataQuality.has_prediction)}</strong></div>
+        <div><span>Research disponible</span><strong>{formatQualityBoolean(dataQuality.has_research)}</strong></div>
+        <div><span>PolySignal Score</span><strong>{formatQualityBoolean(dataQuality.has_polysignal_score)}</strong></div>
+        <div><span>Calidad</span><strong>{dataQuality.quality_score}/100</strong></div>
+      </div>
+
+      {dataQuality.missing_fields.length > 0 ? (
+        <div>
+          <h3>QuÃ© falta</h3>
+          <div className="candidate-chip-list">
+            {dataQuality.missing_fields.map((field) => (
+              <span className="warning-chip" key={field}>{formatWarningLabel(field)}</span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="quiet-text">No hay faltantes crÃ­ticos para este mercado.</p>
+      )}
+    </section>
+  );
+}
+
 function PriceHistoryPanel({
   history,
   error,
@@ -2069,6 +2190,10 @@ export default function MarketAnalysisPage() {
             <div className="analysis-main">
               <PricePanel snapshot={analysis.latest_snapshot} />
               <PolySignalScorePanel score={analysis.polysignal_score} />
+              <DataQualityPanel
+                dataQuality={analysis.data_quality}
+                score={analysis.polysignal_score}
+              />
               <PriceHistoryPanel history={state.priceHistory} error={state.priceHistoryError} />
               <CandidateContextPanel context={analysis.candidate_context} />
               <ExternalSignalsPanel signals={analysis.external_signals} snapshot={analysis.latest_snapshot} />
