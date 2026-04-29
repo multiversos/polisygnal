@@ -40,6 +40,21 @@ type BriefingUpcomingMarket = {
   volume?: string | number | null;
   urgency_score?: string | number | null;
   warnings: string[];
+  freshness?: MarketFreshness | null;
+};
+
+type MarketFreshness = {
+  freshness_status: "fresh" | "stale" | "incomplete" | "unknown" | string;
+  reasons: string[];
+  latest_snapshot_at?: string | null;
+  close_time?: string | null;
+  age_hours?: string | number | null;
+  recommended_action:
+    | "ok"
+    | "needs_snapshot"
+    | "review_market"
+    | "exclude_from_scoring"
+    | string;
 };
 
 type BriefingWatchlistItem = {
@@ -140,6 +155,30 @@ const gapLabels: Record<string, string> = {
   sin_reporte_de_prediccion: "Sin reporte de predicción",
 };
 
+const freshnessStatusLabels: Record<string, string> = {
+  stale: "Requiere revisión",
+  incomplete: "Datos incompletos",
+  unknown: "Frescura desconocida",
+  fresh: "Datos frescos",
+};
+
+const freshnessActionLabels: Record<string, string> = {
+  ok: "OK",
+  needs_snapshot: "Necesita snapshot",
+  review_market: "Revisar mercado",
+  exclude_from_scoring: "Excluir del score",
+};
+
+const freshnessReasonLabels: Record<string, string> = {
+  missing_snapshot: "Sin snapshot",
+  missing_prices: "Faltan precios",
+  close_time_past: "Cierre pasado",
+  close_time_missing: "Sin fecha de cierre",
+  snapshot_too_old: "Snapshot viejo",
+  market_closed: "Mercado cerrado",
+  data_quality_insufficient: "Calidad insuficiente",
+};
+
 function toNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -228,6 +267,29 @@ function formatWarningList(value: BriefingExternalSignal["warnings"]): string[] 
     return value.map(String).filter(Boolean);
   }
   return Object.entries(value).map(([key, entry]) => `${key}: ${String(entry)}`);
+}
+
+function formatFreshnessStatus(value?: string | null): string {
+  if (!value) {
+    return "Frescura desconocida";
+  }
+  return freshnessStatusLabels[value] ?? value.replace(/_/g, " ");
+}
+
+function formatFreshnessAction(value?: string | null): string {
+  if (!value) {
+    return "Revisar datos";
+  }
+  return freshnessActionLabels[value] ?? value.replace(/_/g, " ");
+}
+
+function formatFreshnessReason(value: string): string {
+  return freshnessReasonLabels[value] ?? value.replace(/_/g, " ");
+}
+
+function needsFreshnessReview(item: BriefingUpcomingMarket): boolean {
+  const freshness = item.freshness;
+  return Boolean(freshness && freshness.freshness_status !== "fresh");
 }
 
 function translateMarketTitleToSpanish(title: string): string {
@@ -326,6 +388,10 @@ export default function DailyBriefingPage() {
       ["Faltan evidencias", counts?.research_gaps_count ?? 0],
     ] as const;
   }, [briefing]);
+  const staleUpcomingMarkets = useMemo(
+    () => (briefing?.upcoming_markets ?? []).filter(needsFreshnessReview).slice(0, 5),
+    [briefing],
+  );
 
   const copyMarkdown = useCallback(async () => {
     setMarkdownCopyStatus("copying");
@@ -464,6 +530,38 @@ export default function DailyBriefingPage() {
           ))}
         </div>
       </section>
+
+      {staleUpcomingMarkets.length > 0 ? (
+        <section className="panel briefing-section">
+          <div className="panel-heading compact">
+            <div>
+              <h2>Mercados que requieren revisión de datos</h2>
+              <p>
+                Señales internas de frescura; PolySignal no inventa precios ni
+                probabilidades cuando faltan datos.
+              </p>
+            </div>
+          </div>
+          <div className="briefing-list">
+            {staleUpcomingMarkets.map((item) => (
+              <BriefingMarketCard
+                key={`freshness-${item.market_id}`}
+                marketId={item.market_id}
+                question={item.question}
+                sport={item.sport}
+                marketShape={item.market_shape}
+                closeTime={item.freshness?.close_time ?? item.close_time ?? item.event_time}
+                metrics={[
+                  ["Estado", formatFreshnessStatus(item.freshness?.freshness_status)],
+                  ["Acción", formatFreshnessAction(item.freshness?.recommended_action)],
+                  ["Snapshot", formatDateTime(item.freshness?.latest_snapshot_at)],
+                ]}
+                warnings={(item.freshness?.reasons ?? []).map(formatFreshnessReason)}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="briefing-grid">
         <BriefingSection

@@ -79,6 +79,20 @@ type PolySignalScore = {
   color_hint: "positive" | "negative" | "neutral" | "warning" | string;
 };
 
+type MarketFreshness = {
+  freshness_status: "fresh" | "stale" | "incomplete" | "unknown" | string;
+  reasons: string[];
+  latest_snapshot_at?: string | null;
+  close_time?: string | null;
+  age_hours?: string | number | null;
+  recommended_action:
+    | "ok"
+    | "needs_snapshot"
+    | "review_market"
+    | "exclude_from_scoring"
+    | string;
+};
+
 type ResearchCandidate = {
   market_id: number;
   question: string;
@@ -100,6 +114,7 @@ type ResearchCandidate = {
   icon_url?: string | null;
   participants: CandidateParticipant[];
   polysignal_score?: PolySignalScore | null;
+  freshness?: MarketFreshness | null;
 };
 
 type CandidatesResponse = {
@@ -128,6 +143,7 @@ type UpcomingSportsMarket = {
   warnings: string[];
   participants: CandidateParticipant[];
   polysignal_score?: PolySignalScore | null;
+  freshness?: MarketFreshness | null;
 };
 
 type UpcomingSportsResponse = {
@@ -157,6 +173,7 @@ type UpcomingDataQualityItem = {
   quality_score: number;
   quality_label: "Completo" | "Parcial" | "Insuficiente" | string;
   warnings: string[];
+  freshness?: MarketFreshness | null;
 };
 
 type UpcomingDataQualityResponse = {
@@ -699,6 +716,25 @@ const warningLabels: Record<string, string> = {
   participants_uncertain: "participantes por confirmar",
   liquidity_unknown: "liquidez desconocida",
   volume_unknown: "volumen desconocido",
+  close_time_past: "cierre pasado",
+  close_time_missing: "sin fecha de cierre",
+  snapshot_too_old: "snapshot viejo",
+  missing_prices: "faltan precios",
+  data_quality_insufficient: "calidad insuficiente",
+};
+
+const freshnessStatusLabels: Record<string, string> = {
+  fresh: "Datos frescos",
+  stale: "Requiere revisión",
+  incomplete: "Datos incompletos",
+  unknown: "Frescura desconocida",
+};
+
+const freshnessActionLabels: Record<string, string> = {
+  ok: "OK",
+  needs_snapshot: "Necesita snapshot",
+  review_market: "Revisar mercado",
+  exclude_from_scoring: "Excluir del score",
 };
 
 const marketTermTranslations: Record<string, string> = {
@@ -927,6 +963,20 @@ function formatReasonLabel(value: string): string {
 function formatWarningLabel(value: string): string {
   const key = stripScoreSuffix(value);
   return warningLabels[key] ?? humanizeToken(key);
+}
+
+function formatFreshnessStatus(value?: string | null): string {
+  if (!value) {
+    return "Frescura desconocida";
+  }
+  return freshnessStatusLabels[value] ?? humanizeToken(value);
+}
+
+function formatFreshnessAction(value?: string | null): string {
+  if (!value) {
+    return "Revisar datos";
+  }
+  return freshnessActionLabels[value] ?? humanizeToken(value);
 }
 
 function formatSmartAlertSeverity(value: string): string {
@@ -1171,6 +1221,33 @@ function DataQualityBadges({
 
   return (
     <div className="data-quality-badges" aria-label="Calidad de datos">
+      {badges.map((badge) => (
+        <span className="warning-chip" key={badge}>
+          {badge}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function FreshnessBadges({
+  freshness,
+}: {
+  freshness?: MarketFreshness | null;
+}) {
+  if (!freshness || freshness.freshness_status === "fresh") {
+    return null;
+  }
+
+  const reasonBadges = (freshness.reasons ?? []).slice(0, 3).map(formatWarningLabel);
+  const badges = [
+    formatFreshnessStatus(freshness.freshness_status),
+    formatFreshnessAction(freshness.recommended_action),
+    ...reasonBadges,
+  ];
+
+  return (
+    <div className="data-quality-badges freshness-badges" aria-label="Frescura de datos">
       {badges.map((badge) => (
         <span className="warning-chip" key={badge}>
           {badge}
@@ -1606,6 +1683,7 @@ function UpcomingMarketCard({
         <strong className={`urgency-pill ${scoreTone(score)}`}>{formatScore(score)}</strong>
       </div>
       <DataQualityBadges dataQuality={dataQuality} />
+      <FreshnessBadges freshness={dataQuality?.freshness ?? market.freshness} />
 
       <div className="upcoming-main">
         <div className="candidate-main-copy">

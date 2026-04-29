@@ -852,6 +852,10 @@ h2 {
   gap: 6px;
 }
 
+.freshness-badges {
+  padding: 8px 0 0;
+}
+
 .upcoming-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
@@ -2605,6 +2609,18 @@ h2 {
 
 .data-quality-detail-section {
   border-left: 4px solid var(--amber);
+}
+
+.freshness-detail-section {
+  border-left: 4px solid var(--amber);
+}
+
+.freshness-detail-section.fresh {
+  border-left-color: var(--accent);
+}
+
+.freshness-detail-section.stale {
+  border-left-color: var(--red);
 }
 
 .data-quality-label {

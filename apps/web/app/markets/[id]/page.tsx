@@ -290,6 +290,20 @@ type PolySignalScore = {
   color_hint: "positive" | "negative" | "neutral" | "warning" | string;
 };
 
+type MarketFreshness = {
+  freshness_status: "fresh" | "stale" | "incomplete" | "unknown" | string;
+  reasons: string[];
+  latest_snapshot_at?: string | null;
+  close_time?: string | null;
+  age_hours?: string | number | null;
+  recommended_action:
+    | "ok"
+    | "needs_snapshot"
+    | "review_market"
+    | "exclude_from_scoring"
+    | string;
+};
+
 type MarketDataQuality = {
   market_id: number;
   question: string;
@@ -309,6 +323,7 @@ type MarketDataQuality = {
   quality_score: number;
   quality_label: "Completo" | "Parcial" | "Insuficiente" | string;
   warnings: string[];
+  freshness?: MarketFreshness | null;
 };
 
 type MarketAnalysis = {
@@ -316,6 +331,7 @@ type MarketAnalysis = {
   latest_snapshot?: AnalysisSnapshot | null;
   polysignal_score?: PolySignalScore | null;
   data_quality?: MarketDataQuality | null;
+  freshness?: MarketFreshness | null;
   candidate_context?: CandidateContext | null;
   latest_prediction?: AnalysisPrediction | null;
   prediction_history: AnalysisPrediction[];
@@ -547,6 +563,25 @@ const warningLabels: Record<string, string> = {
   low_volume: "bajo volumen",
   market_inactive_or_closed: "mercado inactivo o cerrado",
   generic_research_template: "template genérico",
+  close_time_past: "cierre pasado",
+  close_time_missing: "sin fecha de cierre",
+  snapshot_too_old: "snapshot viejo",
+  missing_prices: "faltan precios",
+  data_quality_insufficient: "calidad insuficiente",
+};
+
+const freshnessStatusLabels: Record<string, string> = {
+  fresh: "Datos frescos",
+  stale: "Requiere revisión",
+  incomplete: "Datos incompletos",
+  unknown: "Frescura desconocida",
+};
+
+const freshnessActionLabels: Record<string, string> = {
+  ok: "OK",
+  needs_snapshot: "Necesita snapshot",
+  review_market: "Revisar mercado",
+  exclude_from_scoring: "Excluir del score",
 };
 
 const reasonLabels: Record<string, string> = {
@@ -770,6 +805,20 @@ function formatReasonLabel(value: string): string {
 function formatWarningLabel(value: string): string {
   const key = stripScoreSuffix(value);
   return warningLabels[key] ?? humanizeToken(key);
+}
+
+function formatFreshnessStatus(value?: string | null): string {
+  if (!value) {
+    return "Frescura desconocida";
+  }
+  return freshnessStatusLabels[value] ?? humanizeToken(value);
+}
+
+function formatFreshnessAction(value?: string | null): string {
+  if (!value) {
+    return "Revisar datos";
+  }
+  return freshnessActionLabels[value] ?? humanizeToken(value);
 }
 
 function formatSportLabel(value?: string | null): string {
@@ -1598,6 +1647,52 @@ function DataQualityPanel({
         </div>
       ) : (
         <p className="quiet-text">No hay faltantes crÃ­ticos para este mercado.</p>
+      )}
+    </section>
+  );
+}
+
+function FreshnessPanel({ freshness }: { freshness?: MarketFreshness | null }) {
+  if (!freshness) {
+    return null;
+  }
+
+  const isFresh = freshness.freshness_status === "fresh";
+  const reasons = freshness.reasons ?? [];
+
+  return (
+    <section className={`analysis-section freshness-detail-section ${freshness.freshness_status}`}>
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Frescura interna</span>
+          <h2>Frescura de datos</h2>
+          <p className="section-note">
+            PolySignal no estima probabilidades cuando faltan precios o snapshots confiables.
+          </p>
+        </div>
+        <span className={`data-quality-label ${isFresh ? "completo" : "parcial"}`}>
+          {formatFreshnessStatus(freshness.freshness_status)}
+        </span>
+      </div>
+
+      <div className="analysis-stat-grid">
+        <div><span>Acción sugerida</span><strong>{formatFreshnessAction(freshness.recommended_action)}</strong></div>
+        <div><span>Último snapshot</span><strong>{formatDateTime(freshness.latest_snapshot_at)}</strong></div>
+        <div><span>Cierre</span><strong>{formatDateTime(freshness.close_time)}</strong></div>
+        <div><span>Edad snapshot</span><strong>{freshness.age_hours ?? "N/D"} h</strong></div>
+      </div>
+
+      {reasons.length > 0 ? (
+        <div>
+          <h3>Señales de revisión</h3>
+          <div className="candidate-chip-list">
+            {reasons.map((reason) => (
+              <span className="warning-chip" key={reason}>{formatWarningLabel(reason)}</span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="quiet-text">No hay señales internas de obsolescencia para este mercado.</p>
       )}
     </section>
   );
@@ -3518,6 +3613,7 @@ export default function MarketAnalysisPage() {
                 dataQuality={analysis.data_quality}
                 score={analysis.polysignal_score}
               />
+              <FreshnessPanel freshness={analysis.freshness ?? analysis.data_quality?.freshness} />
               <MarketTimelinePanel state={timelineState} />
               <PriceHistoryPanel history={state.priceHistory} error={state.priceHistoryError} />
               <CandidateContextPanel context={analysis.candidate_context} />
