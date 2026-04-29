@@ -277,6 +277,44 @@ const quickLinks = [
   { label: "Revisar coincidencias Kalshi", href: "/external-signals/matches" },
 ];
 
+const commandCenterLinks = [
+  {
+    label: "Briefing",
+    description: "Resumen operativo diario",
+    href: "/briefing",
+  },
+  {
+    label: "Deportes",
+    description: "Mercados próximos por deporte",
+    href: "/sports",
+  },
+  {
+    label: "Investigación",
+    description: "Runs y packets generados",
+    href: "/research",
+  },
+  {
+    label: "Alertas",
+    description: "Recordatorios operativos",
+    href: "/alerts",
+  },
+  {
+    label: "Workflow",
+    description: "Kanban de investigación",
+    href: "/workflow",
+  },
+  {
+    label: "Backtesting",
+    description: "Resultados manuales y métricas",
+    href: "/backtesting",
+  },
+  {
+    label: "Salud de datos",
+    description: "Cobertura, precios y snapshots",
+    href: "/data-health",
+  },
+];
+
 async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     cache: "no-store",
@@ -1990,11 +2028,11 @@ export default function DashboardPage() {
       <header className="topbar">
         <div>
           <p className="eyebrow">PolySignal</p>
-          <h1>Inteligencia para mercados predictivos</h1>
+          <h1>Centro de comando PolySignal</h1>
           <p className="subtitle">
-            Dashboard de solo lectura enfocado temporalmente en partidos
-            deportivos de los próximos 7 días. Los campeonatos, premios y
-            futuros largos quedan pausados por ahora.
+            Vista operativa de solo lectura para revisar partidos próximos,
+            seguimiento, alertas, workflow y calidad de datos sin ejecutar
+            research automático, predicciones ni trading.
           </p>
         </div>
         <div className="topbar-actions">
@@ -2015,6 +2053,23 @@ export default function DashboardPage() {
           recomendación de apuesta. No ejecuta apuestas automáticas, research ni
           predicciones desde esta UI.
         </span>
+      </section>
+
+      <section className="command-center-shortcuts" aria-label="Accesos rápidos del centro de comando">
+        <div className="panel-heading compact">
+          <div>
+            <h2>Accesos rápidos</h2>
+            <p>Las vistas principales del flujo operativo diario en un solo lugar.</p>
+          </div>
+        </div>
+        <nav className="command-center-link-grid" aria-label="Vistas principales">
+          {commandCenterLinks.map((link) => (
+            <a className="command-center-link-card" href={link.href} key={link.href}>
+              <strong>{link.label}</strong>
+              <span>{link.description}</span>
+            </a>
+          ))}
+        </nav>
       </section>
 
       {state.error ? (
