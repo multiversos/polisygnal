@@ -468,6 +468,30 @@ const timelineTypeLabels: Record<string, string> = {
   tag: "Etiqueta",
 };
 
+const timelineTypeIcons: Record<string, string> = {
+  price_snapshot: "P",
+  research_run: "R",
+  finding: "E",
+  prediction_report: "I",
+  external_signal: "S",
+  watchlist: "W",
+  investigation_status: "F",
+  decision: "D",
+  outcome: "O",
+  tag: "T",
+};
+
+const timelineFilterOptions = [
+  { value: "all", label: "Todos" },
+  { value: "price", label: "Precio" },
+  { value: "research", label: "Investigacion" },
+  { value: "evidence", label: "Evidencia" },
+  { value: "decisions", label: "Decisiones" },
+  { value: "external", label: "Senales externas" },
+] as const;
+
+type TimelineFilter = (typeof timelineFilterOptions)[number]["value"];
+
 const marketShapeLabels: Record<string, string> = {
   match_winner: "ganador de partido",
   championship: "campeonato",
@@ -686,6 +710,48 @@ function formatShortDateLabel(value?: string | null): string {
     month: "short",
     day: "numeric",
   });
+}
+
+function timelineFilterMatches(item: MarketTimelineItem, filter: TimelineFilter): boolean {
+  if (filter === "all") {
+    return true;
+  }
+  if (filter === "price") {
+    return item.type === "price_snapshot";
+  }
+  if (filter === "research") {
+    return item.type === "research_run" || item.type === "prediction_report";
+  }
+  if (filter === "evidence") {
+    return item.type === "finding";
+  }
+  if (filter === "decisions") {
+    return [
+      "decision",
+      "investigation_status",
+      "outcome",
+      "tag",
+      "watchlist",
+    ].includes(item.type);
+  }
+  if (filter === "external") {
+    return item.type === "external_signal";
+  }
+  return true;
+}
+
+function groupTimelineItems(items: MarketTimelineItem[]) {
+  const groups: Array<{ label: string; items: MarketTimelineItem[] }> = [];
+  for (const item of items) {
+    const label = formatShortDateLabel(item.timestamp);
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup?.label === label) {
+      lastGroup.items.push(item);
+    } else {
+      groups.push({ label, items: [item] });
+    }
+  }
+  return groups;
 }
 
 function humanizeToken(value?: string | null): string {
@@ -1538,6 +1604,13 @@ function DataQualityPanel({
 }
 
 function MarketTimelinePanel({ state }: { state: MarketTimelineState }) {
+  const [activeFilter, setActiveFilter] = useState<TimelineFilter>("all");
+  const filteredItems = useMemo(
+    () => state.items.filter((item) => timelineFilterMatches(item, activeFilter)),
+    [activeFilter, state.items],
+  );
+  const groupedItems = useMemo(() => groupTimelineItems(filteredItems), [filteredItems]);
+
   return (
     <section className="analysis-section market-timeline-section">
       <div className="analysis-section-heading">
@@ -1549,6 +1622,19 @@ function MarketTimelinePanel({ state }: { state: MarketTimelineState }) {
             crea research, predicciones ni datos nuevos.
           </p>
         </div>
+      </div>
+
+      <div className="market-timeline-filters" aria-label="Filtros de timeline">
+        {timelineFilterOptions.map((option) => (
+          <button
+            className={activeFilter === option.value ? "active" : ""}
+            key={option.value}
+            onClick={() => setActiveFilter(option.value)}
+            type="button"
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
 
       {state.loading ? <div className="empty-state compact">Cargando timeline...</div> : null}
@@ -1563,34 +1649,46 @@ function MarketTimelinePanel({ state }: { state: MarketTimelineState }) {
           No hay eventos registrados para este mercado todavia.
         </div>
       ) : null}
-      {!state.loading && state.items.length > 0 ? (
+      {!state.loading && state.items.length > 0 && filteredItems.length === 0 ? (
+        <div className="empty-state compact">
+          No hay eventos para este tipo de actividad en la linea de tiempo.
+        </div>
+      ) : null}
+      {!state.loading && filteredItems.length > 0 ? (
         <div className="market-timeline-list">
-          {state.items.map((item, index) => (
-            <article
-              className={`market-timeline-item type-${item.type}`}
-              key={`${item.type}-${item.timestamp}-${index}`}
-            >
-              <div className="market-timeline-marker" aria-hidden="true" />
-              <div className="market-timeline-card">
-                <div className="market-timeline-heading">
-                  <span>{timelineTypeLabels[item.type] ?? humanizeToken(item.type)}</span>
-                  <time>{formatDateTime(item.timestamp)}</time>
-                </div>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-                <div className="candidate-chip-list">
-                  <span className="reason-chip muted">{item.source}</span>
-                  {item.status ? (
-                    <span className="reason-chip">{humanizeToken(item.status)}</span>
-                  ) : null}
-                  {item.url ? (
-                    <a className="text-link" href={item.url} rel="noreferrer" target="_blank">
-                      Ver fuente
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-            </article>
+          {groupedItems.map((group) => (
+            <div className="market-timeline-group" key={group.label}>
+              <div className="market-timeline-date-label">{group.label}</div>
+              {group.items.map((item, index) => (
+                <article
+                  className={`market-timeline-item type-${item.type}`}
+                  key={`${item.type}-${item.timestamp}-${index}`}
+                >
+                  <div className="market-timeline-marker" aria-hidden="true">
+                    {timelineTypeIcons[item.type] ?? "A"}
+                  </div>
+                  <div className="market-timeline-card">
+                    <div className="market-timeline-heading">
+                      <span>{timelineTypeLabels[item.type] ?? humanizeToken(item.type)}</span>
+                      <time>{formatDateTime(item.timestamp)}</time>
+                    </div>
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
+                    <div className="candidate-chip-list">
+                      <span className="reason-chip muted">{item.source}</span>
+                      {item.status ? (
+                        <span className="reason-chip">{humanizeToken(item.status)}</span>
+                      ) : null}
+                      {item.url ? (
+                        <a className="text-link" href={item.url} rel="noreferrer" target="_blank">
+                          Ver fuente
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           ))}
         </div>
       ) : null}

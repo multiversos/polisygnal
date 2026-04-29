@@ -3218,10 +3218,35 @@ h2 {
   gap: 14px;
 }
 
+.market-timeline-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.market-timeline-filters button {
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--muted-strong);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.market-timeline-filters button:hover,
+.market-timeline-filters button.active {
+  border-color: var(--line-strong);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
 .market-timeline-list {
   position: relative;
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .market-timeline-list::before {
@@ -3234,10 +3259,31 @@ h2 {
   content: "";
 }
 
+.market-timeline-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.market-timeline-date-label {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  margin-left: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted-strong);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .market-timeline-item {
   position: relative;
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: 22px minmax(0, 1fr);
   gap: 10px;
   min-width: 0;
 }
@@ -3245,12 +3291,18 @@ h2 {
 .market-timeline-marker {
   position: relative;
   z-index: 1;
-  width: 18px;
-  height: 18px;
-  margin-top: 14px;
-  border: 3px solid var(--surface);
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  border: 2px solid var(--surface);
   border-radius: 999px;
   background: var(--accent);
+  color: var(--button-foreground);
+  font-size: 0.68rem;
+  font-weight: 950;
   box-shadow: 0 0 0 1px var(--line);
 }
 
