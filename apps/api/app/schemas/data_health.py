@@ -48,3 +48,29 @@ class SnapshotGapsRead(BaseModel):
     missing_price_count: int = 0
     stale_snapshot_count: int = 0
     items: list[SnapshotGapItemRead] = Field(default_factory=list)
+
+
+class RefreshPriorityItemRead(BaseModel):
+    market_id: int
+    title: str
+    sport: str
+    close_time: datetime | None = None
+    missing_snapshot: bool = False
+    missing_price: bool = False
+    freshness_status: str
+    data_quality_label: str
+    refresh_priority_score: int = 0
+    reasons: list[str] = Field(default_factory=list)
+    suggested_command_snapshot: str
+    suggested_command_metadata: str
+
+
+class RefreshPrioritiesRead(BaseModel):
+    generated_at: datetime
+    sport: str | None = None
+    days: int = 7
+    total_considered: int = 0
+    returned: int = 0
+    missing_snapshot_count: int = 0
+    missing_price_count: int = 0
+    items: list[RefreshPriorityItemRead] = Field(default_factory=list)

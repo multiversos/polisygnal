@@ -3924,6 +3924,61 @@ h2 {
   justify-content: flex-end;
 }
 
+.refresh-priority-section {
+  display: grid;
+  gap: 16px;
+}
+
+.refresh-priority-list {
+  display: grid;
+  gap: 12px;
+}
+
+.refresh-priority-card {
+  align-items: start;
+  background: color-mix(in srgb, var(--surface) 90%, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 88px minmax(0, 1fr);
+  padding: 14px;
+}
+
+.refresh-priority-score {
+  align-items: center;
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-height: 76px;
+  padding: 10px;
+}
+
+.refresh-priority-score span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.refresh-priority-score strong {
+  color: var(--foreground);
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.refresh-priority-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.compact-command-list .command-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .refresh-plan-section {
   display: grid;
   gap: 18px;
@@ -4069,6 +4124,14 @@ h2 {
 
   .refresh-plan-card-header {
     grid-template-columns: 1fr;
+  }
+
+  .refresh-priority-card {
+    grid-template-columns: 1fr;
+  }
+
+  .refresh-priority-score {
+    justify-items: start;
   }
 }
 

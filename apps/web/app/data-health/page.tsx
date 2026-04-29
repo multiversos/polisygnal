@@ -6,9 +6,11 @@ import { useCallback, useEffect, useState } from "react";
 import { MainNavigation } from "../components/MainNavigation";
 import {
   fetchDataHealthOverview,
+  fetchRefreshPriorities,
   fetchRefreshRuns,
   fetchSnapshotGaps,
   type DataHealthOverview,
+  type RefreshPriorities,
   type RefreshRuns,
   type SnapshotGaps,
 } from "../lib/dataHealth";
@@ -78,6 +80,7 @@ function buildMetadataCommand(marketId: number): string {
 export default function DataHealthPage() {
   const [overview, setOverview] = useState<DataHealthOverview | null>(null);
   const [snapshotGaps, setSnapshotGaps] = useState<SnapshotGaps | null>(null);
+  const [refreshPriorities, setRefreshPriorities] = useState<RefreshPriorities | null>(null);
   const [refreshRuns, setRefreshRuns] = useState<RefreshRuns | null>(null);
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,13 +90,20 @@ export default function DataHealthPage() {
     setLoading(true);
     setError(null);
     try {
-      const [overviewResult, snapshotGapsResult, refreshRunsResult] = await Promise.all([
+      const [
+        overviewResult,
+        snapshotGapsResult,
+        refreshPrioritiesResult,
+        refreshRunsResult,
+      ] = await Promise.all([
         fetchDataHealthOverview(),
         fetchSnapshotGaps({ days: 7, limit: 50 }),
+        fetchRefreshPriorities({ days: 7, limit: 12 }),
         fetchRefreshRuns({ limit: 10 }),
       ]);
       setOverview(overviewResult);
       setSnapshotGaps(snapshotGapsResult);
+      setRefreshPriorities(refreshPrioritiesResult);
       setRefreshRuns(refreshRunsResult);
     } catch {
       setError("No se pudo cargar la salud de datos.");
@@ -250,6 +260,98 @@ export default function DataHealthPage() {
                 <a className="text-link" href={`/markets/${item.market_id}`}>
                   Ver analisis
                 </a>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="dashboard-panel refresh-priority-section">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Priorizacion</p>
+            <h2>Prioridad de actualizacion</h2>
+            <p className="section-note">
+              Ranking read-only de mercados proximos que conviene revisar primero con
+              refresh controlado. No ejecuta comandos desde la UI.
+            </p>
+          </div>
+          <span className="badge muted">
+            {refreshPriorities?.returned ?? 0} priorizados
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">Calculando prioridades de refresh...</div>
+        ) : !refreshPriorities || refreshPriorities.items.length === 0 ? (
+          <div className="empty-state">
+            No hay candidatos de refresh con los filtros actuales.
+          </div>
+        ) : (
+          <div className="refresh-priority-list">
+            {refreshPriorities.items.slice(0, 8).map((item) => (
+              <article className="refresh-priority-card" key={`priority-${item.market_id}`}>
+                <div className="refresh-priority-score">
+                  <span>Prioridad</span>
+                  <strong>{item.refresh_priority_score}</strong>
+                </div>
+                <div className="refresh-priority-body">
+                  <div className="refresh-plan-card-header">
+                    <div>
+                      <span className="eyebrow">{formatSport(item.sport)}</span>
+                      <h3>{item.title}</h3>
+                    </div>
+                    <Link className="text-link" href={`/markets/${item.market_id}`}>
+                      Ver mercado
+                    </Link>
+                  </div>
+                  <div className="snapshot-gap-meta">
+                    <span className={`data-quality-label ${item.freshness_status}`}>
+                      {formatFreshnessStatus(item.freshness_status)}
+                    </span>
+                    <span className="reason-chip">{item.data_quality_label}</span>
+                    {item.missing_snapshot ? (
+                      <span className="warning-chip">Sin snapshot</span>
+                    ) : null}
+                    {item.missing_price ? (
+                      <span className="warning-chip">Precio incompleto</span>
+                    ) : null}
+                    <span className="reason-chip">Cierre {formatDate(item.close_time)}</span>
+                  </div>
+                  <div className="data-health-notes">
+                    {item.reasons.slice(0, 5).map((reason) => (
+                      <span className="reason-chip" key={`${item.market_id}-${reason}`}>
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="refresh-command-list compact-command-list">
+                    <div className="command-card">
+                      <div>
+                        <span>Snapshot dry-run</span>
+                        <code>{item.suggested_command_snapshot}</code>
+                      </div>
+                      <button
+                        onClick={() => void copyCommand(item.suggested_command_snapshot)}
+                        type="button"
+                      >
+                        {copiedCommand === item.suggested_command_snapshot ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                    <div className="command-card">
+                      <div>
+                        <span>Metadata dry-run</span>
+                        <code>{item.suggested_command_metadata}</code>
+                      </div>
+                      <button
+                        onClick={() => void copyCommand(item.suggested_command_metadata)}
+                        type="button"
+                      >
+                        {copiedCommand === item.suggested_command_metadata ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </article>
             ))}
           </div>
