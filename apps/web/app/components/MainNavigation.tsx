@@ -14,6 +14,7 @@ const navigationItems = [
   { label: "Briefing diario", href: "/briefing" },
   { label: "Investigacion", href: "/research" },
   { label: "Mi seguimiento", href: "/#mi-seguimiento" },
+  { label: "Decisiones", href: "/decisions" },
   { label: "Workflow", href: "/workflow" },
   { label: "Alertas", href: "/alerts" },
   { label: "Coincidencias Kalshi", href: "/external-signals/matches" },

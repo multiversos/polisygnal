@@ -77,6 +77,10 @@ export function fetchMarketDecisions(
   return requestDecision<MarketDecisionItem[]>(`/markets/${marketId}/decisions`);
 }
 
+export function fetchAllMarketDecisions(limit = 200): Promise<MarketDecisionItem[]> {
+  return requestDecision<MarketDecisionItem[]>(`/decisions?limit=${limit}`);
+}
+
 export function createMarketDecision(
   marketId: number | string,
   payload: MarketDecisionPayload,
