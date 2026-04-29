@@ -59,6 +59,10 @@ import {
   generateResearchPacket,
   type ResearchPacketResult,
 } from "../../lib/researchPackets";
+import {
+  fetchMarketTimeline,
+  type MarketTimelineItem,
+} from "../../lib/marketTimeline";
 
 type JsonPayload = Record<string, unknown> | unknown[];
 
@@ -412,6 +416,12 @@ type ResearchPacketPanelState = {
   copied: "ingest" | "dry-run" | null;
 };
 
+type MarketTimelineState = {
+  items: MarketTimelineItem[];
+  loading: boolean;
+  error: string | null;
+};
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -444,6 +454,19 @@ const decisionConfidenceOptions: Array<{
   { value: "medium", label: DECISION_CONFIDENCE_LABELS.medium },
   { value: "high", label: DECISION_CONFIDENCE_LABELS.high },
 ];
+
+const timelineTypeLabels: Record<string, string> = {
+  price_snapshot: "Movimiento de precio",
+  research_run: "Investigacion",
+  finding: "Evidencia",
+  prediction_report: "Reporte",
+  external_signal: "Senal externa",
+  watchlist: "Watchlist",
+  investigation_status: "Estado de investigacion",
+  decision: "Decision humana",
+  outcome: "Resultado registrado",
+  tag: "Etiqueta",
+};
 
 const marketShapeLabels: Record<string, string> = {
   match_winner: "ganador de partido",
@@ -1514,6 +1537,67 @@ function DataQualityPanel({
   );
 }
 
+function MarketTimelinePanel({ state }: { state: MarketTimelineState }) {
+  return (
+    <section className="analysis-section market-timeline-section">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Actividad</span>
+          <h2>Linea de tiempo</h2>
+          <p className="section-note">
+            Eventos relevantes del mercado reunidos en modo solo lectura. No
+            crea research, predicciones ni datos nuevos.
+          </p>
+        </div>
+      </div>
+
+      {state.loading ? <div className="empty-state compact">Cargando timeline...</div> : null}
+      {state.error ? (
+        <div className="alert-panel compact" role="status">
+          <strong>Timeline no disponible</strong>
+          <span>{state.error}</span>
+        </div>
+      ) : null}
+      {!state.loading && state.items.length === 0 ? (
+        <div className="empty-state compact">
+          No hay eventos registrados para este mercado todavia.
+        </div>
+      ) : null}
+      {!state.loading && state.items.length > 0 ? (
+        <div className="market-timeline-list">
+          {state.items.map((item, index) => (
+            <article
+              className={`market-timeline-item type-${item.type}`}
+              key={`${item.type}-${item.timestamp}-${index}`}
+            >
+              <div className="market-timeline-marker" aria-hidden="true" />
+              <div className="market-timeline-card">
+                <div className="market-timeline-heading">
+                  <span>{timelineTypeLabels[item.type] ?? humanizeToken(item.type)}</span>
+                  <time>{formatDateTime(item.timestamp)}</time>
+                </div>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+                <div className="candidate-chip-list">
+                  <span className="reason-chip muted">{item.source}</span>
+                  {item.status ? (
+                    <span className="reason-chip">{humanizeToken(item.status)}</span>
+                  ) : null}
+                  {item.url ? (
+                    <a className="text-link" href={item.url} rel="noreferrer" target="_blank">
+                      Ver fuente
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function PriceHistoryPanel({
   history,
   error,
@@ -2471,6 +2555,11 @@ export default function MarketAnalysisPage() {
     notesDraft: "",
     copied: null,
   });
+  const [timelineState, setTimelineState] = useState<MarketTimelineState>({
+    items: [],
+    loading: true,
+    error: null,
+  });
   const [state, setState] = useState<LoadState>({
     analysis: null,
     priceHistory: null,
@@ -2673,6 +2762,24 @@ export default function MarketAnalysisPage() {
         loading: false,
         error: "No se pudieron cargar decisiones humanas.",
       }));
+    }
+  }, [marketId]);
+
+  const loadMarketTimeline = useCallback(async () => {
+    setTimelineState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const response = await fetchMarketTimeline(marketId);
+      setTimelineState({
+        items: response.items,
+        loading: false,
+        error: null,
+      });
+    } catch {
+      setTimelineState({
+        items: [],
+        loading: false,
+        error: "No se pudo cargar la linea de tiempo.",
+      });
     }
   }, [marketId]);
 
@@ -3165,6 +3272,10 @@ export default function MarketAnalysisPage() {
     void loadMarketDecisions();
   }, [loadMarketDecisions]);
 
+  useEffect(() => {
+    void loadMarketTimeline();
+  }, [loadMarketTimeline]);
+
   const analysis = state.analysis;
   const translatedTitle = analysis ? translateMarketTitleToSpanish(analysis.market.question) : "";
   const originalChanged = Boolean(analysis && translatedTitle !== analysis.market.question);
@@ -3309,6 +3420,7 @@ export default function MarketAnalysisPage() {
                 dataQuality={analysis.data_quality}
                 score={analysis.polysignal_score}
               />
+              <MarketTimelinePanel state={timelineState} />
               <PriceHistoryPanel history={state.priceHistory} error={state.priceHistoryError} />
               <CandidateContextPanel context={analysis.candidate_context} />
               <ExternalSignalsPanel signals={analysis.external_signals} snapshot={analysis.latest_snapshot} />

@@ -3213,6 +3213,103 @@ h2 {
   overflow-x: auto;
 }
 
+.market-timeline-section {
+  display: grid;
+  gap: 14px;
+}
+
+.market-timeline-list {
+  position: relative;
+  display: grid;
+  gap: 12px;
+}
+
+.market-timeline-list::before {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 8px;
+  width: 2px;
+  background: var(--line);
+  content: "";
+}
+
+.market-timeline-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.market-timeline-marker {
+  position: relative;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  margin-top: 14px;
+  border: 3px solid var(--surface);
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.market-timeline-item.type-price_snapshot .market-timeline-marker {
+  background: var(--blue);
+}
+
+.market-timeline-item.type-external_signal .market-timeline-marker {
+  background: var(--amber);
+}
+
+.market-timeline-item.type-decision .market-timeline-marker,
+.market-timeline-item.type-outcome .market-timeline-marker {
+  background: var(--red);
+}
+
+.market-timeline-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.market-timeline-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.market-timeline-heading span,
+.market-timeline-heading time {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.market-timeline-card h3,
+.market-timeline-card p {
+  margin: 0;
+}
+
+.market-timeline-card h3 {
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.market-timeline-card p {
+  color: var(--muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .backtesting-outcome-list {
   display: grid;
   gap: 12px;
