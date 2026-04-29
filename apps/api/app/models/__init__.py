@@ -4,6 +4,7 @@ from app.models.external_market_signal import ExternalMarketSignal
 from app.models.market import Market
 from app.models.market_decision_log import MarketDecisionLog
 from app.models.market_investigation_status import MarketInvestigationStatus
+from app.models.manual_evidence_item import ManualEvidenceItem
 from app.models.market_outcome import MarketOutcome
 from app.models.market_tag import MarketTag, MarketTagLink
 from app.models.market_snapshot import MarketSnapshot
@@ -22,6 +23,7 @@ __all__ = [
     "Market",
     "MarketDecisionLog",
     "MarketInvestigationStatus",
+    "ManualEvidenceItem",
     "MarketOutcome",
     "MarketTag",
     "MarketTagLink",

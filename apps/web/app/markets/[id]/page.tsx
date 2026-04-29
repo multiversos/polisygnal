@@ -63,6 +63,14 @@ import {
   fetchMarketTimeline,
   type MarketTimelineItem,
 } from "../../lib/marketTimeline";
+import {
+  MANUAL_EVIDENCE_REVIEW_STATUS_LABELS,
+  MANUAL_EVIDENCE_STANCE_LABELS,
+  createManualEvidence,
+  fetchMarketManualEvidence,
+  type ManualEvidenceItem,
+  type ManualEvidenceStance,
+} from "../../lib/manualEvidence";
 
 type JsonPayload = Record<string, unknown> | unknown[];
 
@@ -453,6 +461,19 @@ type MarketTimelineState = {
   error: string | null;
 };
 
+type ManualEvidencePanelState = {
+  items: ManualEvidenceItem[];
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  sourceNameDraft: string;
+  sourceUrlDraft: string;
+  titleDraft: string;
+  claimDraft: string;
+  stanceDraft: ManualEvidenceStance;
+  notesDraft: string;
+};
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -522,6 +543,13 @@ const timelineFilterOptions = [
 ] as const;
 
 type TimelineFilter = (typeof timelineFilterOptions)[number]["value"];
+
+const manualEvidenceStanceOptions: Array<{ value: ManualEvidenceStance; label: string }> = [
+  { value: "favor_yes", label: MANUAL_EVIDENCE_STANCE_LABELS.favor_yes },
+  { value: "against_yes", label: MANUAL_EVIDENCE_STANCE_LABELS.against_yes },
+  { value: "neutral", label: MANUAL_EVIDENCE_STANCE_LABELS.neutral },
+  { value: "risk", label: MANUAL_EVIDENCE_STANCE_LABELS.risk },
+];
 
 const marketShapeLabels: Record<string, string> = {
   match_winner: "ganador de partido",
@@ -2806,6 +2834,146 @@ function MarketDecisionLogPanel({
   );
 }
 
+function ManualEvidencePanel({
+  onClaimChange,
+  onNotesChange,
+  onSave,
+  onSourceNameChange,
+  onSourceUrlChange,
+  onStanceChange,
+  onTitleChange,
+  state,
+}: {
+  onClaimChange: (claim: string) => void;
+  onNotesChange: (notes: string) => void;
+  onSave: () => void;
+  onSourceNameChange: (sourceName: string) => void;
+  onSourceUrlChange: (sourceUrl: string) => void;
+  onStanceChange: (stance: ManualEvidenceStance) => void;
+  onTitleChange: (title: string) => void;
+  state: ManualEvidencePanelState;
+}) {
+  return (
+    <section className="analysis-section manual-evidence-panel">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Entrada manual</span>
+          <h2>Evidencia manual</h2>
+        </div>
+      </div>
+      <p className="section-note">
+        La evidencia manual requiere revision. No crea prediccion automaticamente,
+        no ejecuta research y no ejecuta trading.
+      </p>
+
+      {state.loading ? <div className="empty-state compact">Cargando evidencia manual...</div> : null}
+      {state.error ? (
+        <div className="alert-panel compact" role="status">
+          <strong>Evidencia manual no disponible</strong>
+          <span>{state.error}</span>
+        </div>
+      ) : null}
+
+      {!state.loading ? (
+        <div className="manual-evidence-list">
+          {state.items.length === 0 ? (
+            <span className="reason-chip muted">Sin evidencia manual guardada.</span>
+          ) : (
+            state.items.map((item) => (
+              <article className="manual-evidence-card" key={item.id}>
+                <div className="manual-evidence-card-header">
+                  <strong>{item.source_name}</strong>
+                  <span>{MANUAL_EVIDENCE_REVIEW_STATUS_LABELS[item.review_status]}</span>
+                </div>
+                <span className="reason-chip">{MANUAL_EVIDENCE_STANCE_LABELS[item.stance]}</span>
+                <p>{item.claim}</p>
+                {item.source_url ? (
+                  <a className="text-link" href={item.source_url} rel="noreferrer" target="_blank">
+                    Abrir fuente
+                  </a>
+                ) : null}
+                {item.notes ? <small>{item.notes}</small> : null}
+              </article>
+            ))
+          )}
+        </div>
+      ) : null}
+
+      <div className="manual-evidence-form">
+        <label>
+          Fuente
+          <input
+            disabled={state.saving}
+            onChange={(event) => onSourceNameChange(event.target.value)}
+            placeholder="Sitio oficial, liga, reporte publico..."
+            value={state.sourceNameDraft}
+          />
+        </label>
+        <label>
+          URL
+          <input
+            disabled={state.saving}
+            onChange={(event) => onSourceUrlChange(event.target.value)}
+            placeholder="https://..."
+            value={state.sourceUrlDraft}
+          />
+        </label>
+        <label>
+          Titulo
+          <input
+            disabled={state.saving}
+            onChange={(event) => onTitleChange(event.target.value)}
+            placeholder="Titulo opcional"
+            value={state.titleDraft}
+          />
+        </label>
+        <label>
+          Postura
+          <select
+            disabled={state.saving}
+            onChange={(event) => onStanceChange(event.target.value as ManualEvidenceStance)}
+            value={state.stanceDraft}
+          >
+            {manualEvidenceStanceOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="full-span">
+          Claim / hallazgo
+          <textarea
+            disabled={state.saving}
+            onChange={(event) => onClaimChange(event.target.value)}
+            placeholder="Resume el dato verificable sin convertirlo en prediccion."
+            rows={3}
+            value={state.claimDraft}
+          />
+        </label>
+        <label className="full-span">
+          Nota
+          <textarea
+            disabled={state.saving}
+            onChange={(event) => onNotesChange(event.target.value)}
+            placeholder="Contexto operativo o dudas pendientes."
+            rows={2}
+            value={state.notesDraft}
+          />
+        </label>
+        <button
+          className="primary-button"
+          disabled={state.saving || !state.sourceNameDraft.trim() || !state.claimDraft.trim()}
+          onClick={onSave}
+          type="button"
+        >
+          {state.saving ? "Guardando..." : "Guardar evidencia"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export default function MarketAnalysisPage() {
   const params = useParams<{ id: string }>();
   const marketId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -2827,6 +2995,18 @@ export default function MarketAnalysisPage() {
     items: [],
     loading: true,
     error: null,
+  });
+  const [manualEvidenceState, setManualEvidenceState] = useState<ManualEvidencePanelState>({
+    items: [],
+    loading: true,
+    saving: false,
+    error: null,
+    sourceNameDraft: "",
+    sourceUrlDraft: "",
+    titleDraft: "",
+    claimDraft: "",
+    stanceDraft: "neutral",
+    notesDraft: "",
   });
   const [state, setState] = useState<LoadState>({
     analysis: null,
@@ -3167,6 +3347,48 @@ export default function MarketAnalysisPage() {
     }
   }, []);
 
+  const saveManualEvidence = useCallback(async () => {
+    setManualEvidenceState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      const item = await createManualEvidence(Number(marketId), {
+        source_name: manualEvidenceState.sourceNameDraft.trim(),
+        source_url: manualEvidenceState.sourceUrlDraft.trim() || null,
+        title: manualEvidenceState.titleDraft.trim() || null,
+        claim: manualEvidenceState.claimDraft.trim(),
+        stance: manualEvidenceState.stanceDraft,
+        notes: manualEvidenceState.notesDraft.trim() || null,
+      });
+      setManualEvidenceState((current) => ({
+        ...current,
+        items: [item, ...current.items],
+        saving: false,
+        error: null,
+        sourceNameDraft: "",
+        sourceUrlDraft: "",
+        titleDraft: "",
+        claimDraft: "",
+        stanceDraft: "neutral",
+        notesDraft: "",
+      }));
+      void loadMarketTimeline();
+    } catch {
+      setManualEvidenceState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo guardar evidencia manual.",
+      }));
+    }
+  }, [
+    loadMarketTimeline,
+    manualEvidenceState.claimDraft,
+    manualEvidenceState.notesDraft,
+    manualEvidenceState.sourceNameDraft,
+    manualEvidenceState.sourceUrlDraft,
+    manualEvidenceState.stanceDraft,
+    manualEvidenceState.titleDraft,
+    marketId,
+  ]);
+
   const addToWatchlist = useCallback(async () => {
     setWatchlistState((current) => ({ ...current, saving: true, error: null }));
     try {
@@ -3351,6 +3573,25 @@ export default function MarketAnalysisPage() {
         ...current,
         saving: false,
         error: "No se pudo quitar la etiqueta.",
+      }));
+    }
+  }, [marketId]);
+
+  const loadManualEvidence = useCallback(async () => {
+    setManualEvidenceState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const items = await fetchMarketManualEvidence(Number(marketId));
+      setManualEvidenceState((current) => ({
+        ...current,
+        items,
+        loading: false,
+        error: null,
+      }));
+    } catch {
+      setManualEvidenceState((current) => ({
+        ...current,
+        loading: false,
+        error: "No se pudo cargar evidencia manual.",
       }));
     }
   }, [marketId]);
@@ -3544,6 +3785,10 @@ export default function MarketAnalysisPage() {
     void loadMarketTimeline();
   }, [loadMarketTimeline]);
 
+  useEffect(() => {
+    void loadManualEvidence();
+  }, [loadManualEvidence]);
+
   const analysis = state.analysis;
   const translatedTitle = analysis ? translateMarketTitleToSpanish(analysis.market.question) : "";
   const originalChanged = Boolean(analysis && translatedTitle !== analysis.market.question);
@@ -3695,6 +3940,28 @@ export default function MarketAnalysisPage() {
               <CandidateContextPanel context={analysis.candidate_context} />
               <ExternalSignalsPanel signals={analysis.external_signals} snapshot={analysis.latest_snapshot} />
               <EvidencePanel analysis={analysis} />
+              <ManualEvidencePanel
+                onClaimChange={(claim) =>
+                  setManualEvidenceState((current) => ({ ...current, claimDraft: claim }))
+                }
+                onNotesChange={(notes) =>
+                  setManualEvidenceState((current) => ({ ...current, notesDraft: notes }))
+                }
+                onSave={saveManualEvidence}
+                onSourceNameChange={(sourceName) =>
+                  setManualEvidenceState((current) => ({ ...current, sourceNameDraft: sourceName }))
+                }
+                onSourceUrlChange={(sourceUrl) =>
+                  setManualEvidenceState((current) => ({ ...current, sourceUrlDraft: sourceUrl }))
+                }
+                onStanceChange={(stance) =>
+                  setManualEvidenceState((current) => ({ ...current, stanceDraft: stance }))
+                }
+                onTitleChange={(title) =>
+                  setManualEvidenceState((current) => ({ ...current, titleDraft: title }))
+                }
+                state={manualEvidenceState}
+              />
               <PredictionPanel analysis={analysis} />
               <ResearchRunsPanel runs={analysis.research_runs} />
             </div>

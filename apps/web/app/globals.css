@@ -4097,6 +4097,79 @@ h2 {
   background: var(--surface);
 }
 
+.manual-evidence-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.manual-evidence-list {
+  display: grid;
+  gap: 10px;
+}
+
+.manual-evidence-card {
+  background: color-mix(in srgb, var(--surface) 90%, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.manual-evidence-card-header {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.manual-evidence-card-header span,
+.manual-evidence-card small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.manual-evidence-card p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.manual-evidence-form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.manual-evidence-form label {
+  color: var(--muted-strong);
+  display: grid;
+  font-size: 0.82rem;
+  font-weight: 700;
+  gap: 6px;
+}
+
+.manual-evidence-form input,
+.manual-evidence-form select,
+.manual-evidence-form textarea {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--foreground);
+  font: inherit;
+  min-width: 0;
+  padding: 10px;
+}
+
+.manual-evidence-form .full-span {
+  grid-column: 1 / -1;
+}
+
+.manual-evidence-form .primary-button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
 .trial-step-grid {
   display: grid;
   gap: 12px;
@@ -4174,6 +4247,10 @@ h2 {
 
   .refresh-priority-score {
     justify-items: start;
+  }
+
+  .manual-evidence-form {
+    grid-template-columns: 1fr;
   }
 }
 

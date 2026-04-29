@@ -52,6 +52,12 @@ class Market(Base):
         back_populates="market",
         cascade="all, delete-orphan",
     )
+    manual_evidence_items = relationship(
+        "ManualEvidenceItem",
+        back_populates="market",
+        cascade="all, delete-orphan",
+        order_by="ManualEvidenceItem.created_at.desc()",
+    )
     predictions = relationship(
         "Prediction",
         back_populates="market",
