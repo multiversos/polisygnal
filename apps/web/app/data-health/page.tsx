@@ -5,7 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 import { MainNavigation } from "../components/MainNavigation";
 import {
   fetchDataHealthOverview,
+  fetchSnapshotGaps,
   type DataHealthOverview,
+  type SnapshotGaps,
 } from "../lib/dataHealth";
 
 const sportLabels: Record<string, string> = {
@@ -18,6 +20,20 @@ const sportLabels: Record<string, string> = {
   cricket: "Cricket",
   mlb: "Béisbol",
   other: "Otro",
+};
+
+const freshnessStatusLabels: Record<string, string> = {
+  fresh: "Fresco",
+  stale: "Stale",
+  incomplete: "Incompleto",
+  unknown: "Desconocido",
+};
+
+const recommendedActionLabels: Record<string, string> = {
+  ok: "OK",
+  needs_snapshot: "Necesita snapshot",
+  review_market: "Revisar mercado",
+  exclude_from_scoring: "Excluir del score",
 };
 
 function formatDate(value?: string | null): string {
@@ -40,8 +56,17 @@ function formatSport(value: string): string {
   return sportLabels[value] ?? value.replaceAll("_", " ");
 }
 
+function formatFreshnessStatus(value: string): string {
+  return freshnessStatusLabels[value] ?? value.replaceAll("_", " ");
+}
+
+function formatRecommendedAction(value: string): string {
+  return recommendedActionLabels[value] ?? value.replaceAll("_", " ");
+}
+
 export default function DataHealthPage() {
   const [overview, setOverview] = useState<DataHealthOverview | null>(null);
+  const [snapshotGaps, setSnapshotGaps] = useState<SnapshotGaps | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,7 +74,12 @@ export default function DataHealthPage() {
     setLoading(true);
     setError(null);
     try {
-      setOverview(await fetchDataHealthOverview());
+      const [overviewResult, snapshotGapsResult] = await Promise.all([
+        fetchDataHealthOverview(),
+        fetchSnapshotGaps({ days: 7, limit: 50 }),
+      ]);
+      setOverview(overviewResult);
+      setSnapshotGaps(snapshotGapsResult);
     } catch {
       setError("No se pudo cargar la salud de datos.");
     } finally {
@@ -125,6 +155,77 @@ export default function DataHealthPage() {
           <strong>{loading ? "..." : formatDate(overview?.latest_snapshot_at)}</strong>
           <p>Frescura local</p>
         </article>
+      </section>
+
+      <section className="dashboard-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Diagnostico seguro</p>
+            <h2>Gaps de snapshots</h2>
+            <p className="section-note">
+              Mercados proximos que necesitan snapshots o precios. Esta vista no ejecuta sync
+              ni llama Polymarket.
+            </p>
+          </div>
+          <span className="badge muted">
+            {snapshotGaps?.total_checked ?? 0} revisados
+          </span>
+        </div>
+
+        <div className="metric-grid compact-metrics">
+          <article className="metric-card">
+            <span>Sin snapshot</span>
+            <strong>{loading ? "..." : snapshotGaps?.missing_snapshot_count ?? 0}</strong>
+            <p>Necesitan captura local</p>
+          </article>
+          <article className="metric-card">
+            <span>Faltan precios</span>
+            <strong>{loading ? "..." : snapshotGaps?.missing_price_count ?? 0}</strong>
+            <p>SÍ/NO incompleto</p>
+          </article>
+          <article className="metric-card">
+            <span>Snapshot viejo</span>
+            <strong>{loading ? "..." : snapshotGaps?.stale_snapshot_count ?? 0}</strong>
+            <p>Mayor a la ventana segura</p>
+          </article>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">Cargando gaps de snapshots...</div>
+        ) : !snapshotGaps || snapshotGaps.items.length === 0 ? (
+          <div className="empty-state">
+            No hay mercados proximos con los filtros actuales.
+          </div>
+        ) : (
+          <div className="snapshot-gap-list">
+            {snapshotGaps.items.slice(0, 10).map((item) => (
+              <article className="snapshot-gap-card" key={item.market_id}>
+                <div>
+                  <span className="eyebrow">{formatSport(item.sport)}</span>
+                  <h3>{item.title}</h3>
+                  <p>
+                    Cierre {formatDate(item.close_time)} · Snapshot{" "}
+                    {formatDate(item.latest_snapshot_at)}
+                  </p>
+                </div>
+                <div className="snapshot-gap-meta">
+                  <span className={`data-quality-label ${item.freshness_status}`}>
+                    {formatFreshnessStatus(item.freshness_status)}
+                  </span>
+                  <span className="reason-chip">
+                    {formatRecommendedAction(item.recommended_action)}
+                  </span>
+                  {!item.has_yes_price || !item.has_no_price ? (
+                    <span className="warning-chip">Precio incompleto</span>
+                  ) : null}
+                </div>
+                <a className="text-link" href={`/markets/${item.market_id}`}>
+                  Ver analisis
+                </a>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="dashboard-panel">

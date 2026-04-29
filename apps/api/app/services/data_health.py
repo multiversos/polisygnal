@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.models.market import Market
 from app.models.market_snapshot import MarketSnapshot
-from app.schemas.data_health import DataHealthOverviewRead, DataHealthSportCoverage
+from app.schemas.data_health import (
+    DataHealthOverviewRead,
+    DataHealthSportCoverage,
+    SnapshotGapItemRead,
+    SnapshotGapsRead,
+)
+from app.services.market_freshness import build_market_freshness
 
 
 @dataclass(slots=True)
@@ -105,6 +111,92 @@ def build_data_health_overview(
             )
             for sport, counter in sorted(coverage_by_sport.items())
         ],
+    )
+
+
+def build_snapshot_gaps(
+    db: Session,
+    *,
+    sport: str | None = None,
+    days: int = 7,
+    limit: int = 50,
+    now: datetime | None = None,
+) -> SnapshotGapsRead:
+    current_time = _normalize_datetime(now or datetime.now(tz=UTC))
+    safe_days = max(days, 0)
+    safe_limit = max(min(limit, 200), 0)
+    window_end = current_time + timedelta(days=safe_days)
+    requested_sport = _normalize_sport(sport) if sport else None
+
+    statement = (
+        select(
+            Market.id,
+            Market.question,
+            Market.sport_type,
+            Market.end_date,
+            Market.active,
+            Market.closed,
+        )
+        .where(Market.active.is_(True))
+        .where(Market.closed.is_(False))
+        .where(Market.end_date.is_not(None))
+        .where(Market.end_date >= current_time)
+        .where(Market.end_date <= window_end)
+        .order_by(Market.end_date.asc(), Market.id.asc())
+        .limit(safe_limit)
+    )
+    if requested_sport:
+        statement = statement.where(func.lower(Market.sport_type) == requested_sport)
+
+    rows = db.execute(statement).all()
+    snapshots = _list_latest_snapshot_summaries(db)
+    items: list[SnapshotGapItemRead] = []
+    missing_snapshot_count = 0
+    missing_price_count = 0
+    stale_snapshot_count = 0
+
+    for row in rows:
+        snapshot = snapshots.get(row.id)
+        if snapshot is None:
+            missing_snapshot_count += 1
+        if snapshot is None or not snapshot.has_yes_price or not snapshot.has_no_price:
+            missing_price_count += 1
+
+        freshness = build_market_freshness(
+            close_time=row.end_date,
+            latest_snapshot=snapshot,
+            yes_price=None if snapshot is None or not snapshot.has_yes_price else 1,
+            no_price=None if snapshot is None or not snapshot.has_no_price else 1,
+            active=bool(row.active),
+            closed=bool(row.closed),
+            now=current_time,
+        )
+        if "snapshot_too_old" in freshness.reasons:
+            stale_snapshot_count += 1
+
+        items.append(
+            SnapshotGapItemRead(
+                market_id=row.id,
+                title=row.question,
+                sport=_normalize_sport(row.sport_type),
+                close_time=row.end_date,
+                latest_snapshot_at=snapshot.captured_at if snapshot is not None else None,
+                has_yes_price=bool(snapshot and snapshot.has_yes_price),
+                has_no_price=bool(snapshot and snapshot.has_no_price),
+                freshness_status=freshness.freshness_status,
+                recommended_action=freshness.recommended_action,
+            )
+        )
+
+    return SnapshotGapsRead(
+        generated_at=current_time,
+        sport=requested_sport,
+        days=safe_days,
+        total_checked=len(rows),
+        missing_snapshot_count=missing_snapshot_count,
+        missing_price_count=missing_price_count,
+        stale_snapshot_count=stale_snapshot_count,
+        items=items,
     )
 
 

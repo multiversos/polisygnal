@@ -3877,6 +3877,52 @@ h2 {
   gap: 8px;
 }
 
+.snapshot-gap-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.snapshot-gap-card {
+  align-items: center;
+  background: color-mix(in srgb, var(--surface) 88%, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 14px;
+}
+
+.snapshot-gap-card h3 {
+  font-size: 0.98rem;
+  margin: 2px 0 4px;
+}
+
+.snapshot-gap-card p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  margin: 0;
+}
+
+.snapshot-gap-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 760px) {
+  .snapshot-gap-card {
+    grid-template-columns: 1fr;
+  }
+
+  .snapshot-gap-meta {
+    justify-content: flex-start;
+  }
+}
+
 .workflow-board {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
