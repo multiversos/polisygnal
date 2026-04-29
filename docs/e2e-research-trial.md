@@ -253,3 +253,50 @@ Proximos pasos recomendados:
 2. Mejorar la frescura de snapshots/precios con sync controlado, no masivo.
 3. Exponer validation reports de dry-run de forma segura en `/research/runs/{run_id}/quality-gate`.
 4. Repetir el trial con un mercado que tenga snapshot/precios y evento realmente futuro.
+
+## Como repetir el trial
+
+Usar la página `/trials/e2e` como checklist visual y repetir el flujo de forma manual:
+
+1. Elegir un mercado desde `/`, `/sports` o:
+
+   ```text
+   GET /research/upcoming-sports?days=7&include_futures=false&focus=match_winner&limit=20
+   ```
+
+2. Revisar calidad y frescura:
+
+   ```text
+   GET /research/upcoming-sports/data-quality?days=7&limit=50
+   GET /data-health/snapshot-gaps?days=7&limit=50
+   python -m app.commands.inspect_snapshot_gaps --days 7 --limit 50
+   ```
+
+3. Generar el Research Packet solo desde una acción explícita:
+
+   ```text
+   POST /markets/{market_id}/research-packet
+   ```
+
+4. Ejecutar primero Quality Gate en dry-run:
+
+   ```powershell
+   python -m app.commands.ingest_codex_research --run-id {RUN_ID} --dry-run
+   ```
+
+5. No ingestar si la respuesta es `mock_structural`, si el Quality Gate devuelve `review_required`/`reject`, o si faltan fuentes verificables.
+
+6. Si el dry-run pasa con `real_web` verificable, revisar manualmente el reporte antes de cualquier ingesta normal.
+
+7. Actualizar watchlist, investigation status y decision log con lenguaje operativo. No registrar montos, stake, ordenes ni recomendaciones de apuesta.
+
+8. Registrar outcome manual solo cuando exista resultado real verificado.
+
+No hacer en este flujo:
+
+- no usar OpenAI API;
+- no ejecutar research automático;
+- no inventar fuentes, precios ni evidencia;
+- no crear predicciones automáticas;
+- no ejecutar trading ni órdenes;
+- no commitear logs, packets, responses ni validation reports.

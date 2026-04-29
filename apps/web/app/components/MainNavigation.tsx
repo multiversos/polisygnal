@@ -20,6 +20,7 @@ const navigationItems = [
   { label: "Coincidencias Kalshi", href: "/external-signals/matches" },
   { label: "Calidad de fuentes", href: "/sources" },
   { label: "Salud de datos", href: "/data-health" },
+  { label: "Trial E2E", href: "/trials/e2e" },
   { label: "Backtesting", href: "/backtesting" },
 ];
 

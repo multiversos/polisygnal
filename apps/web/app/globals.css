@@ -3913,6 +3913,33 @@ h2 {
   justify-content: flex-end;
 }
 
+.trial-step-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.trial-step-card {
+  background: color-mix(in srgb, var(--surface) 90%, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.trial-step-card h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.trial-step-card p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
 @media (max-width: 760px) {
   .snapshot-gap-card {
     grid-template-columns: 1fr;
