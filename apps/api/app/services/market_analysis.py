@@ -84,6 +84,9 @@ def build_market_analysis(db: Session, market: Market) -> MarketAnalysisRead:
         has_external_signal=bool(external_signals),
         has_prediction=latest_prediction is not None,
         has_research=bool(research_runs or research_findings or evidence_items),
+        latest_snapshot=latest_snapshot,
+        active=market.active,
+        closed=market.closed,
     )
 
     warnings: list[str] = []
@@ -105,6 +108,7 @@ def build_market_analysis(db: Session, market: Market) -> MarketAnalysisRead:
         ),
         polysignal_score=polysignal_score,
         data_quality=data_quality.to_payload(),
+        freshness=data_quality.freshness,
         candidate_context=MarketAnalysisCandidateContext(
             candidate_score=candidate.candidate_score,
             candidate_reasons=list(candidate.candidate_reasons),

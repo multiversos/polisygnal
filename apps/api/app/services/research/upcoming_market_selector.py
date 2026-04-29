@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.event import Event
 from app.models.market import Market
 from app.repositories.market_snapshots import list_latest_market_snapshots_for_markets
+from app.schemas.market_freshness import MarketFreshnessRead
 from app.schemas.polysignal_score import PolySignalScoreRead
+from app.services.market_freshness import build_market_freshness
 from app.services.polysignal_score import build_polysignal_score
 from app.services.research.candidate_selector import (
     ResearchCandidateParticipant,
@@ -76,6 +78,7 @@ class UpcomingSportsMarket:
     warnings: list[str]
     participants: list[ResearchCandidateParticipant]
     polysignal_score: PolySignalScoreRead | None = None
+    freshness: MarketFreshnessRead | None = None
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -100,6 +103,11 @@ class UpcomingSportsMarket:
             "polysignal_score": (
                 self.polysignal_score.model_dump()
                 if self.polysignal_score is not None
+                else None
+            ),
+            "freshness": (
+                self.freshness.model_dump()
+                if self.freshness is not None
                 else None
             ),
         }
@@ -249,6 +257,7 @@ def list_upcoming_sports_markets(
             item=item,
             market=markets_by_id[item.market_id],
             latest_snapshot=snapshots.get(item.market_id),
+            now=current_time,
         )
         for item in selected
         if item.market_id in markets_by_id
@@ -276,6 +285,7 @@ def _with_polysignal_score(
     item: UpcomingSportsMarket,
     market: Market,
     latest_snapshot,
+    now: datetime,
 ) -> UpcomingSportsMarket:
     return replace(
         item,
@@ -284,6 +294,14 @@ def _with_polysignal_score(
             market=market,
             latest_snapshot=latest_snapshot,
             candidate_score=item.candidate_score,
+        ),
+        freshness=build_market_freshness(
+            market=market,
+            close_time=item.close_time or item.event_time,
+            latest_snapshot=latest_snapshot,
+            yes_price=item.market_yes_price,
+            no_price=item.market_no_price,
+            now=now,
         ),
     )
 

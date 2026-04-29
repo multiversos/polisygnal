@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.market_freshness import MarketFreshnessRead
 from app.schemas.polysignal_score import PolySignalScoreRead
 from app.schemas.research import UpcomingDataQualityItemRead
 
@@ -188,6 +189,7 @@ class MarketAnalysisRead(BaseModel):
     latest_snapshot: MarketAnalysisSnapshot | None = None
     polysignal_score: PolySignalScoreRead | None = None
     data_quality: UpcomingDataQualityItemRead | None = None
+    freshness: MarketFreshnessRead | None = None
     candidate_context: MarketAnalysisCandidateContext | None = None
     latest_prediction: MarketAnalysisPrediction | None = None
     prediction_history: list[MarketAnalysisPrediction] = Field(default_factory=list)

@@ -65,6 +65,9 @@ def test_upcoming_data_quality_marks_complete_market(db_session: Session) -> Non
     assert item.has_external_signal is True
     assert item.has_polysignal_score is True
     assert item.missing_fields == []
+    assert item.freshness is not None
+    assert item.freshness.freshness_status == "fresh"
+    assert item.freshness.recommended_action == "ok"
 
 
 def test_upcoming_data_quality_detects_missing_price(db_session: Session) -> None:
@@ -106,6 +109,9 @@ def test_upcoming_data_quality_detects_missing_snapshot(db_session: Session) -> 
     assert "snapshot" in item.missing_fields
     assert "missing_snapshot" in item.warnings
     assert "polysignal_score" in item.missing_fields
+    assert item.freshness is not None
+    assert item.freshness.freshness_status == "incomplete"
+    assert item.freshness.recommended_action == "needs_snapshot"
 
 
 def test_upcoming_data_quality_detects_missing_close_time_with_event_time(
@@ -155,6 +161,12 @@ def test_upcoming_data_quality_endpoint_responds_without_mutating_db(
     assert payload["summary"]["total"] == 1
     assert payload["items"][0]["market_id"] == market.id
     assert payload["items"][0]["quality_label"] in {"Completo", "Parcial", "Insuficiente"}
+    assert payload["items"][0]["freshness"]["freshness_status"] in {
+        "fresh",
+        "incomplete",
+        "stale",
+        "unknown",
+    }
     assert payload["filters_applied"]["sport"] == "nba"
     assert payload["filters_applied"]["days"] == 7
     assert db_session.scalar(select(func.count()).select_from(Prediction)) == before_predictions

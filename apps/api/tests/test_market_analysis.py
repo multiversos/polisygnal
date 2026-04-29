@@ -45,6 +45,9 @@ def test_get_market_analysis_returns_consolidated_read_only_payload(
     assert payload["data_quality"]["quality_label"] == "Completo"
     assert payload["data_quality"]["has_polysignal_score"] is True
     assert payload["data_quality"]["has_snapshot"] is True
+    assert payload["freshness"]["freshness_status"] in {"fresh", "stale"}
+    assert payload["freshness"]["recommended_action"] in {"ok", "needs_snapshot"}
+    assert payload["data_quality"]["freshness"]["freshness_status"] == payload["freshness"]["freshness_status"]
     assert payload["candidate_context"]["candidate_score"] is not None
     assert payload["candidate_context"]["research_template_name"]
     assert payload["external_signals"][0]["source"] == "kalshi"
@@ -97,6 +100,8 @@ def test_get_market_analysis_returns_empty_sections_for_market_without_evidence(
     assert payload["data_quality"]["quality_label"] == "Insuficiente"
     assert "snapshot" in payload["data_quality"]["missing_fields"]
     assert "polysignal_score" in payload["data_quality"]["missing_fields"]
+    assert payload["freshness"]["freshness_status"] == "incomplete"
+    assert "missing_snapshot" in payload["freshness"]["reasons"]
     assert payload["candidate_context"] is not None
     assert payload["prediction_history"] == []
     assert payload["research_runs"] == []

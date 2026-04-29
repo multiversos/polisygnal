@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.market_freshness import MarketFreshnessRead
 from app.schemas.prediction import PredictionItemResponse
 from app.schemas.polysignal_score import PolySignalScoreRead
 
@@ -150,6 +151,7 @@ class UpcomingSportsMarketRead(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     participants: list[ResearchCandidateParticipantRead] = Field(default_factory=list)
     polysignal_score: PolySignalScoreRead | None = None
+    freshness: MarketFreshnessRead | None = None
 
 
 class UpcomingSportsResponse(BaseModel):
@@ -179,6 +181,7 @@ class UpcomingDataQualityItemRead(BaseModel):
     quality_score: int
     quality_label: str
     warnings: list[str] = Field(default_factory=list)
+    freshness: MarketFreshnessRead | None = None
 
 
 class UpcomingDataQualityResponse(BaseModel):

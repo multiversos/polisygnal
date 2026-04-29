@@ -10,6 +10,8 @@ from app.models.external_market_signal import ExternalMarketSignal
 from app.models.prediction import Prediction
 from app.models.research_run import ResearchRun
 from app.repositories.market_snapshots import list_latest_market_snapshots_for_markets
+from app.schemas.market_freshness import MarketFreshnessRead
+from app.services.market_freshness import build_market_freshness
 from app.services.research.upcoming_market_selector import (
     DEFAULT_UPCOMING_FOCUS,
     list_upcoming_sports_markets,
@@ -42,6 +44,7 @@ class UpcomingDataQualityItem:
     quality_score: int
     quality_label: str
     warnings: list[str]
+    freshness: MarketFreshnessRead | None = None
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -63,6 +66,11 @@ class UpcomingDataQualityItem:
             "quality_score": self.quality_score,
             "quality_label": self.quality_label,
             "warnings": list(self.warnings),
+            "freshness": (
+                self.freshness.model_dump()
+                if self.freshness is not None
+                else None
+            ),
         }
 
 
@@ -125,6 +133,8 @@ def list_upcoming_data_quality(
             has_external_signal=item.market_id in external_market_ids,
             has_prediction=item.market_id in prediction_market_ids,
             has_research=item.market_id in research_market_ids,
+            latest_snapshot=snapshots.get(item.market_id),
+            now=current_time,
         )
         for item in selection.items
     ]
@@ -159,6 +169,10 @@ def build_market_data_quality(
     has_external_signal: bool,
     has_prediction: bool,
     has_research: bool,
+    latest_snapshot=None,
+    active: bool | None = None,
+    closed: bool | None = None,
+    now: datetime | None = None,
 ) -> UpcomingDataQualityItem:
     missing_fields: list[str] = []
     warnings: list[str] = []
@@ -221,6 +235,16 @@ def build_market_data_quality(
         has_clear_shape=market_shape not in UNCERTAIN_SHAPES,
         has_polysignal_score=has_polysignal_score,
     )
+    freshness = build_market_freshness(
+        close_time=close_time,
+        latest_snapshot=latest_snapshot,
+        yes_price=market_yes_price,
+        no_price=market_no_price,
+        active=active,
+        closed=closed,
+        data_quality_label=quality_label,
+        now=now,
+    )
 
     return UpcomingDataQualityItem(
         market_id=market_id,
@@ -241,6 +265,7 @@ def build_market_data_quality(
         quality_score=quality_score,
         quality_label=quality_label,
         warnings=_dedupe(warnings),
+        freshness=freshness,
     )
 
 

@@ -415,6 +415,8 @@ def test_upcoming_sports_endpoint_lists_items_without_mutating_db(
     assert payload["items"][0]["urgency_score"] is not None
     assert payload["items"][0]["polysignal_score"]["score_probability"] == "0.5500"
     assert payload["items"][0]["polysignal_score"]["source"] == "preliminary_composite"
+    assert payload["items"][0]["freshness"]["freshness_status"] == "fresh"
+    assert payload["items"][0]["freshness"]["recommended_action"] == "ok"
     assert payload["counts"]["returned"] == 1
     assert payload["filters_applied"]["sport"] == "nba"
     assert payload["filters_applied"]["days"] == 1
