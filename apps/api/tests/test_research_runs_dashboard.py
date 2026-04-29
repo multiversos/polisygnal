@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+import app.api.routes_research as routes_research
 from app.models.event import Event
 from app.models.market import Market
 from app.models.prediction import Prediction
@@ -161,7 +164,11 @@ def test_research_runs_openapi_includes_endpoints(client: TestClient) -> None:
 def test_research_run_quality_gate_without_report_is_instructional(
     client: TestClient,
     db_session: Session,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    monkeypatch.setattr(routes_research, "DEFAULT_VALIDATION_DIR", tmp_path / "validation")
+    monkeypatch.setattr(routes_research, "DEFAULT_RESPONSE_DIR", tmp_path / "responses")
     market = _create_market(db_session, suffix="quality-gate")
     run = _create_research_run(
         db_session,
@@ -178,38 +185,103 @@ def test_research_run_quality_gate_without_report_is_instructional(
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["status"] == "pending_dry_run"
+    assert payload["status"] == "not_available"
     assert payload["dry_run_command"].endswith("--dry-run")
+    assert payload["report_exists"] is False
     assert payload["validation_report"] is None
-    assert "validation_report_not_found" in payload["warnings"]
+    assert "validation_report_not_found" in payload["system_warnings"]
 
 
-def test_research_run_quality_gate_uses_saved_validation_report(
+def test_research_run_quality_gate_reads_validation_report_file(
     client: TestClient,
     db_session: Session,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    validation_dir = tmp_path / "validation"
+    response_dir = tmp_path / "responses"
+    validation_dir.mkdir()
+    response_dir.mkdir()
+    monkeypatch.setattr(routes_research, "DEFAULT_VALIDATION_DIR", validation_dir)
+    monkeypatch.setattr(routes_research, "DEFAULT_RESPONSE_DIR", response_dir)
     market = _create_market(db_session, suffix="quality-gate-report")
     run = _create_research_run(
         db_session,
         market.id,
         status="completed",
-        metadata_json={
-            "validation_path": "logs/research-agent/validation/12.json",
-            "validation_report": {
-                "severity": "warning",
-                "recommended_action": "review_required",
-            },
-        },
+        metadata_json={},
     )
     db_session.commit()
+    (validation_dir / f"{run.id}.json").write_text(
+        json.dumps(
+            {
+                "severity": "warning",
+                "errors": [],
+                "warnings": [
+                    {
+                        "code": "mock_structural_response",
+                        "message": "mock_structural responses require review",
+                    }
+                ],
+                "source_quality_score": "0.0000",
+                "evidence_balance_score": "1.0000",
+                "confidence_adjusted": "0.1000",
+                "recommended_action": "review_required",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (response_dir / f"{run.id}.json").write_text(
+        json.dumps(
+            {
+                "research_mode": "mock_structural",
+                "source_review_required": True,
+            }
+        ),
+        encoding="utf-8",
+    )
 
     response = client.get(f"/research/runs/{run.id}/quality-gate")
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["status"] == "requires_review"
-    assert payload["validation_path"].endswith("12.json")
+    assert payload["status"] == "validation_review_required"
+    assert payload["report_exists"] is True
+    assert payload["validation_report_name"] == f"{run.id}.json"
+    assert "validation_path" not in payload
+    assert payload["recommended_action"] == "review_required"
+    assert payload["severity"] == "warning"
+    assert payload["source_quality_score"] == "0.0000"
+    assert payload["evidence_balance_score"] == "1.0000"
+    assert payload["confidence_adjusted"] == "0.1000"
+    assert payload["research_mode"] == "mock_structural"
+    assert payload["source_review_required"] is True
     assert payload["validation_report"]["recommended_action"] == "review_required"
+    assert payload["warnings"][0]["code"] == "mock_structural_response"
+
+
+def test_research_run_quality_gate_invalid_report_is_controlled(
+    client: TestClient,
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    validation_dir = tmp_path / "validation"
+    validation_dir.mkdir()
+    monkeypatch.setattr(routes_research, "DEFAULT_VALIDATION_DIR", validation_dir)
+    monkeypatch.setattr(routes_research, "DEFAULT_RESPONSE_DIR", tmp_path / "responses")
+    market = _create_market(db_session, suffix="quality-gate-invalid")
+    run = _create_research_run(db_session, market.id)
+    db_session.commit()
+    (validation_dir / f"{run.id}.json").write_text("{not-json", encoding="utf-8")
+
+    response = client.get(f"/research/runs/{run.id}/quality-gate")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "error"
+    assert payload["report_exists"] is False
+    assert "validation_report_invalid" in payload["system_warnings"]
 
 
 def _create_market(db_session: Session, *, suffix: str = "research-run") -> Market:

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -35,6 +39,10 @@ from app.schemas.research_runs import (
 )
 from app.schemas.research_quality_gate import ResearchQualityGateRead
 from app.services.research.candidate_selector import list_research_candidates
+from app.services.research.codex_agent_adapter import (
+    DEFAULT_RESPONSE_DIR,
+    DEFAULT_VALIDATION_DIR,
+)
 from app.services.research.pipeline import run_market_research
 from app.services.research.upcoming_data_quality import list_upcoming_data_quality
 from app.services.research.upcoming_market_selector import list_upcoming_sports_markets
@@ -408,42 +416,101 @@ def _serialize_research_run_list_item(research_run: ResearchRun) -> ResearchRunL
 
 def _build_quality_gate_payload(research_run: ResearchRun) -> ResearchQualityGateRead:
     metadata = _metadata_dict(research_run.metadata_json)
-    validation_report = metadata.get("validation_report")
-    validation_report_payload = validation_report if isinstance(validation_report, dict) else None
-    validation_path = _metadata_str(metadata, "validation_path")
-    ingest_command = _metadata_str(metadata, "ingest_command")
+    validation_file = _safe_artifact_path(DEFAULT_VALIDATION_DIR, research_run.id)
+    response_file = _safe_artifact_path(DEFAULT_RESPONSE_DIR, research_run.id)
+    validation_report_payload: dict[str, object] | None = None
+    report_generated_at: datetime | None = None
+    system_warnings: list[str] = []
+
+    if validation_file.exists():
+        loaded_report = _read_json_file(validation_file)
+        if loaded_report is None:
+            system_warnings.append("validation_report_invalid")
+        if isinstance(loaded_report, dict):
+            validation_report_payload = loaded_report
+            try:
+                report_generated_at = datetime.fromtimestamp(
+                    validation_file.stat().st_mtime,
+                    tz=UTC,
+                )
+            except OSError:
+                report_generated_at = None
+    else:
+        metadata_report = metadata.get("validation_report")
+        if isinstance(metadata_report, dict):
+            validation_report_payload = metadata_report
+            system_warnings.append("validation_report_from_metadata")
+        else:
+            system_warnings.append("validation_report_not_found")
+
+    response_research_mode: str | None = None
+    source_review_required: bool | None = None
+    if response_file.exists():
+        response_payload = _read_json_file(response_file)
+        if response_payload is None:
+            system_warnings.append("response_json_unreadable")
+        if isinstance(response_payload, dict):
+            research_mode = response_payload.get("research_mode")
+            if isinstance(research_mode, str):
+                response_research_mode = research_mode
+            source_review = response_payload.get("source_review_required")
+            if isinstance(source_review, bool):
+                source_review_required = source_review
+
+    response_research_mode = response_research_mode or _metadata_str(
+        metadata,
+        "response_research_mode",
+    )
+    if source_review_required is None:
+        metadata_source_review = metadata.get("source_review_required")
+        if isinstance(metadata_source_review, bool):
+            source_review_required = metadata_source_review
+
+    ingest_command = (
+        _metadata_str(metadata, "ingest_command")
+        or f"python -m app.commands.ingest_codex_research --run-id {research_run.id}"
+    )
     dry_run_command = (
         f"{ingest_command} --dry-run"
         if ingest_command and "--dry-run" not in ingest_command
         else ingest_command
-    ) or f"python -m app.commands.ingest_codex_research --run-id {research_run.id} --dry-run"
+    )
 
-    warnings: list[str] = []
     if validation_report_payload is None:
-        status_value = (
-            "pending_dry_run"
-            if _metadata_str(metadata, "expected_response_path") or research_run.status == "pending_agent"
-            else "not_available"
-        )
-        warnings.append("validation_report_not_found")
+        status_value = "error" if "validation_report_invalid" in system_warnings else "not_available"
     else:
         recommended_action = validation_report_payload.get("recommended_action")
         severity = validation_report_payload.get("severity")
         if recommended_action == "ingest":
-            status_value = "approved"
+            status_value = "validation_pass"
         elif recommended_action == "review_required":
-            status_value = "requires_review"
-        elif recommended_action == "reject" or severity == "failed":
-            status_value = "rejected"
+            status_value = "validation_review_required"
+        elif recommended_action == "reject" or severity in {"failed", "error"}:
+            status_value = "validation_rejected"
         else:
-            status_value = "requires_review"
+            status_value = "validation_review_required"
 
     return ResearchQualityGateRead(
         research_run_id=research_run.id,
         market_id=research_run.market_id,
         status=status_value,
+        report_exists=validation_report_payload is not None,
+        report_generated_at=report_generated_at,
+        recommended_action=_quality_report_str(validation_report_payload, "recommended_action"),
+        severity=_quality_report_str(validation_report_payload, "severity"),
+        errors=_quality_report_issues(validation_report_payload, "errors"),
+        warnings=_quality_report_issues(validation_report_payload, "warnings"),
+        source_quality_score=_quality_report_str(validation_report_payload, "source_quality_score"),
+        evidence_balance_score=_quality_report_str(
+            validation_report_payload,
+            "evidence_balance_score",
+        ),
+        confidence_adjusted=_quality_report_str(validation_report_payload, "confidence_adjusted"),
+        research_mode=response_research_mode,
+        source_review_required=source_review_required,
         dry_run_command=dry_run_command,
-        validation_path=validation_path,
+        ingest_command=ingest_command,
+        validation_report_name=(validation_file.name if validation_file.exists() else None),
         validation_report=validation_report_payload,
         instructions=[
             "Guarda la response JSON en la ruta esperada del run.",
@@ -451,8 +518,62 @@ def _build_quality_gate_payload(research_run: ResearchRun) -> ResearchQualityGat
             "Revisa errores, warnings, calidad de fuentes y limites de ajuste.",
             "No ingestas si el Quality Gate rechaza la respuesta.",
         ],
-        warnings=warnings,
+        system_warnings=system_warnings,
     )
+
+
+def _safe_artifact_path(base_dir: Path, run_id: int) -> Path:
+    base_path = base_dir.resolve()
+    artifact_path = (base_path / f"{run_id}.json").resolve()
+    if artifact_path.parent != base_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ruta de artefacto invalida.",
+        )
+    return artifact_path
+
+
+def _read_json_file(path: Path) -> object | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _quality_report_str(
+    validation_report: dict[str, object] | None,
+    key: str,
+) -> str | None:
+    if validation_report is None:
+        return None
+    value = validation_report.get(key)
+    if value is None:
+        return None
+    return str(value)
+
+
+def _quality_report_issues(
+    validation_report: dict[str, object] | None,
+    key: str,
+) -> list[dict[str, object]]:
+    if validation_report is None:
+        return []
+    value = validation_report.get(key)
+    if not isinstance(value, list):
+        return []
+    issues: list[dict[str, object]] = []
+    for item in value:
+        if isinstance(item, dict):
+            message = item.get("message")
+            issues.append(
+                {
+                    "code": str(item.get("code")) if item.get("code") is not None else None,
+                    "message": str(message) if message is not None else str(item),
+                }
+            )
+        else:
+            issues.append({"code": None, "message": str(item)})
+    return issues
 
 
 def _serialize_research_run(research_run: object) -> ResearchRunRead:

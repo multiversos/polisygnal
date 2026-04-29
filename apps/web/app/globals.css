@@ -3561,6 +3561,12 @@ h2 {
   color: var(--amber-ink);
 }
 
+.quality-badge.danger {
+  border-color: rgba(220, 38, 38, 0.36);
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--red-ink);
+}
+
 .status-completed {
   border-color: rgba(22, 163, 74, 0.35);
   background: rgba(22, 163, 74, 0.1);
@@ -3658,23 +3664,44 @@ h2 {
   gap: 14px;
 }
 
-.quality-gate-status.approved {
+.quality-gate-status.validation_pass {
   border-color: rgba(22, 163, 74, 0.35);
   background: rgba(22, 163, 74, 0.1);
   color: var(--accent-ink);
 }
 
-.quality-gate-status.pending_dry_run,
-.quality-gate-status.requires_review {
+.quality-gate-status.not_available,
+.quality-gate-status.validation_review_required {
   border-color: rgba(234, 179, 8, 0.4);
   background: rgba(234, 179, 8, 0.12);
   color: var(--amber-ink);
 }
 
-.quality-gate-status.rejected {
+.quality-gate-status.error,
+.quality-gate-status.validation_rejected {
   border-color: rgba(220, 38, 38, 0.35);
   background: rgba(220, 38, 38, 0.1);
   color: var(--red-ink);
+}
+
+.quality-gate-help {
+  margin: 0;
+  color: var(--muted-strong);
+  line-height: 1.5;
+}
+
+.quality-gate-report {
+  display: grid;
+  gap: 10px;
+}
+
+.quality-gate-subtitle {
+  margin: 0 0 8px;
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .quality-gate-command {

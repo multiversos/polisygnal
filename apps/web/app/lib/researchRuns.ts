@@ -55,11 +55,23 @@ export type ResearchQualityGate = {
   research_run_id: number;
   market_id: number;
   status: string;
+  report_exists: boolean;
+  report_generated_at?: string | null;
+  recommended_action?: string | null;
+  severity?: string | null;
+  errors: Array<{ code?: string | null; message: string }>;
+  warnings: Array<{ code?: string | null; message: string }>;
+  source_quality_score?: string | number | null;
+  evidence_balance_score?: string | number | null;
+  confidence_adjusted?: string | number | null;
+  research_mode?: string | null;
+  source_review_required?: boolean | null;
   dry_run_command: string;
-  validation_path?: string | null;
+  ingest_command: string;
+  validation_report_name?: string | null;
   validation_report?: Record<string, unknown> | null;
   instructions: string[];
-  warnings: string[];
+  system_warnings: string[];
 };
 
 const API_BASE_URL = (

@@ -26,11 +26,11 @@ const modeLabels: Record<string, string> = {
 };
 
 const qualityGateLabels: Record<string, string> = {
-  approved: "Aprobado",
+  error: "Error",
   not_available: "No disponible",
-  pending_dry_run: "Pendiente de dry-run",
-  rejected: "Rechazado",
-  requires_review: "Requiere revision",
+  validation_pass: "Validacion aprobada",
+  validation_rejected: "Validacion rechazada",
+  validation_review_required: "Requiere revision",
 };
 
 function formatDate(value?: string | null): string {
@@ -64,6 +64,33 @@ function buildIngestCommand(run: ResearchRunDetail): string {
 function buildDryRunCommand(run: ResearchRunDetail): string {
   const command = buildIngestCommand(run);
   return command.includes("--dry-run") ? command : `${command} --dry-run`;
+}
+
+function formatGateValue(value?: string | number | null): string {
+  if (value === null || value === undefined || value === "") {
+    return "N/D";
+  }
+  return String(value);
+}
+
+function formatIssueLabel(issue: { code?: string | null; message: string }): string {
+  return issue.code ? `${issue.code.replaceAll("_", " ")}: ${issue.message}` : issue.message;
+}
+
+function qualityGateHelpText(statusValue?: string): string {
+  if (statusValue === "validation_pass") {
+    return "La respuesta paso validacion, pero la ingesta sigue siendo una accion separada fuera de esta UI.";
+  }
+  if (statusValue === "validation_review_required") {
+    return "Requiere revision humana antes de ingestar. No se debe crear prediccion sin revisar fuentes y contexto.";
+  }
+  if (statusValue === "validation_rejected") {
+    return "El Quality Gate rechazo la respuesta. No ingestar.";
+  }
+  if (statusValue === "error") {
+    return "El reporte existe pero no pudo leerse de forma segura.";
+  }
+  return "Ejecuta dry-run para generar un reporte de validacion antes de cualquier ingestion manual.";
 }
 
 function PathRow({ label, value }: { label: string; value?: string | null }) {
@@ -304,13 +331,82 @@ export default function ResearchRunDetailPage() {
                 Copiar dry-run
               </button>
             </div>
-            {qualityGate?.validation_path ? (
-              <PathRow label="Validation report" value={qualityGate.validation_path} />
+            <p className="quality-gate-help">
+              {qualityGateHelpText(qualityGate?.status)}
+            </p>
+            {qualityGate?.report_exists ? (
+              <div className="quality-gate-report">
+                <dl className="research-detail-grid">
+                  <div>
+                    <dt>Recommended action</dt>
+                    <dd>{formatGateValue(qualityGate.recommended_action)}</dd>
+                  </div>
+                  <div>
+                    <dt>Severity</dt>
+                    <dd>{formatGateValue(qualityGate.severity)}</dd>
+                  </div>
+                  <div>
+                    <dt>Source quality</dt>
+                    <dd>{formatGateValue(qualityGate.source_quality_score)}</dd>
+                  </div>
+                  <div>
+                    <dt>Evidence balance</dt>
+                    <dd>{formatGateValue(qualityGate.evidence_balance_score)}</dd>
+                  </div>
+                  <div>
+                    <dt>Confidence adjusted</dt>
+                    <dd>{formatGateValue(qualityGate.confidence_adjusted)}</dd>
+                  </div>
+                  <div>
+                    <dt>Research mode</dt>
+                    <dd>{formatGateValue(qualityGate.research_mode)}</dd>
+                  </div>
+                  <div>
+                    <dt>Source review</dt>
+                    <dd>
+                      {qualityGate.source_review_required === null ||
+                      qualityGate.source_review_required === undefined
+                        ? "N/D"
+                        : qualityGate.source_review_required
+                          ? "Si"
+                          : "No"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Reporte</dt>
+                    <dd>{qualityGate.validation_report_name ?? "Disponible"}</dd>
+                  </div>
+                </dl>
+              </div>
             ) : (
               <div className="empty-state">
                 No hay reporte de validacion guardado todavia. Ejecuta dry-run para generarlo.
               </div>
             )}
+            {qualityGate?.errors.length ? (
+              <div>
+                <h3 className="quality-gate-subtitle">Errores</h3>
+                <div className="quality-badge-row">
+                  {qualityGate.errors.map((issue) => (
+                    <span className="quality-badge danger" key={formatIssueLabel(issue)}>
+                      {formatIssueLabel(issue)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {qualityGate?.warnings.length ? (
+              <div>
+                <h3 className="quality-gate-subtitle">Warnings</h3>
+                <div className="quality-badge-row">
+                  {qualityGate.warnings.map((issue) => (
+                    <span className="quality-badge warning" key={formatIssueLabel(issue)}>
+                      {formatIssueLabel(issue)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {qualityGate?.instructions.length ? (
               <ul className="quality-gate-list">
                 {qualityGate.instructions.map((instruction) => (
@@ -318,9 +414,9 @@ export default function ResearchRunDetailPage() {
                 ))}
               </ul>
             ) : null}
-            {qualityGate?.warnings.length ? (
+            {qualityGate?.system_warnings.length ? (
               <div className="quality-badge-row">
-                {qualityGate.warnings.map((warning) => (
+                {qualityGate.system_warnings.map((warning) => (
                   <span className="quality-badge warning" key={warning}>
                     {warning.replaceAll("_", " ")}
                   </span>
