@@ -1,0 +1,298 @@
+"use client";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { MainNavigation } from "../../../components/MainNavigation";
+import { fetchResearchRunDetail, type ResearchRunDetail } from "../../../lib/researchRuns";
+
+const statusLabels: Record<string, string> = {
+  completed: "Completado",
+  failed: "Fallido",
+  pending_agent: "Pendiente de agente",
+  running: "En curso",
+};
+
+const modeLabels: Record<string, string> = {
+  cheap_research: "Research economico",
+  codex_agent: "Codex Agent",
+  local_only: "Solo local",
+};
+
+function formatDate(value?: string | null): string {
+  if (!value) {
+    return "N/D";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("es", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatStatus(status?: string): string {
+  return status ? statusLabels[status] ?? status.replaceAll("_", " ") : "N/D";
+}
+
+function formatMode(mode?: string): string {
+  return mode ? modeLabels[mode] ?? mode.replaceAll("_", " ") : "N/D";
+}
+
+function buildIngestCommand(run: ResearchRunDetail): string {
+  return run.ingest_command || `python -m app.commands.ingest_codex_research --run-id ${run.id}`;
+}
+
+function buildDryRunCommand(run: ResearchRunDetail): string {
+  const command = buildIngestCommand(run);
+  return command.includes("--dry-run") ? command : `${command} --dry-run`;
+}
+
+function PathRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="research-detail-path-row">
+      <span>{label}</span>
+      <code>{value || "No disponible"}</code>
+    </div>
+  );
+}
+
+export default function ResearchRunDetailPage() {
+  const params = useParams<{ id: string }>();
+  const runId = params.id;
+  const [run, setRun] = useState<ResearchRunDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const loadRun = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const detail = await fetchResearchRunDetail(runId);
+      setRun(detail);
+    } catch {
+      setError("No se pudo cargar el detalle del research run.");
+    } finally {
+      setLoading(false);
+    }
+  }, [runId]);
+
+  useEffect(() => {
+    void loadRun();
+  }, [loadRun]);
+
+  const commands = useMemo(() => {
+    if (!run) {
+      return { dryRun: "", ingest: "" };
+    }
+    return {
+      dryRun: buildDryRunCommand(run),
+      ingest: buildIngestCommand(run),
+    };
+  }, [run]);
+
+  const copyText = async (label: string, value: string) => {
+    if (!value) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(label);
+    } catch {
+      setCopied("No se pudo copiar automaticamente; copia el comando manualmente.");
+    }
+  };
+
+  return (
+    <main className="dashboard-shell research-detail-page">
+      <MainNavigation />
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Centro de investigacion</p>
+          <h1>Research run {run ? `#${run.id}` : ""}</h1>
+          <p className="subtitle">
+            Detalle operativo del packet. Esta pagina no ingesta respuestas, no
+            llama OpenAI y no crea predicciones.
+          </p>
+        </div>
+        <div className="topbar-actions">
+          <Link className="analysis-link secondary" href="/research">
+            Volver a investigacion
+          </Link>
+          <button className="theme-toggle" onClick={() => void loadRun()} type="button">
+            Actualizar
+          </button>
+        </div>
+      </header>
+
+      <section className="safety-strip">
+        <strong>Quality Gate primero:</strong>
+        <span>
+          Usa dry-run y revisa el Quality Gate antes de cualquier ingestion manual.
+          No hay boton para ingestar desde esta UI.
+        </span>
+      </section>
+
+      {error ? (
+        <section className="alert-panel" role="status">
+          <strong>Run no disponible</strong>
+          <span>{error}</span>
+        </section>
+      ) : null}
+
+      {loading ? (
+        <section className="dashboard-panel">
+          <div className="empty-state">Cargando research run...</div>
+        </section>
+      ) : run ? (
+        <>
+          <section className="metric-grid" aria-label="Resumen del research run">
+            <article className="metric-card">
+              <span>Estado</span>
+              <strong>{formatStatus(run.status)}</strong>
+              <p>{formatMode(run.research_mode)}</p>
+            </article>
+            <article className="metric-card">
+              <span>Market</span>
+              <strong>#{run.market_id}</strong>
+              <p>{run.market?.sport ?? "Sin deporte"}</p>
+            </article>
+            <article className="metric-card">
+              <span>Findings</span>
+              <strong>{run.findings_count}</strong>
+              <p>{run.has_report ? "Reporte disponible" : "Sin reporte"}</p>
+            </article>
+            <article className="metric-card">
+              <span>Prediccion</span>
+              <strong>{run.has_prediction ? "Si" : "No"}</strong>
+              <p>{run.prediction_family ?? "Sin familia"}</p>
+            </article>
+          </section>
+
+          <section className="dashboard-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Mercado asociado</p>
+                <h2>{run.market?.question ?? `Mercado #${run.market_id}`}</h2>
+              </div>
+              <Link className="analysis-link" href={`/markets/${run.market_id}`}>
+                Ver mercado
+              </Link>
+            </div>
+            <dl className="research-detail-grid">
+              <div>
+                <dt>Inicio</dt>
+                <dd>{formatDate(run.started_at)}</dd>
+              </div>
+              <div>
+                <dt>Fin</dt>
+                <dd>{formatDate(run.finished_at)}</dd>
+              </div>
+              <div>
+                <dt>Modo</dt>
+                <dd>{formatMode(run.research_mode)}</dd>
+              </div>
+              <div>
+                <dt>Web search</dt>
+                <dd>{run.web_search_used ? "Si" : "No"}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="dashboard-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Packet</p>
+                <h2>Rutas del paquete</h2>
+              </div>
+              {run.status === "pending_agent" ? (
+                <span className="badge status-pending_agent">Pendiente de respuesta</span>
+              ) : null}
+            </div>
+            <div className="research-detail-paths">
+              <PathRow label="Request JSON" value={run.request_path} />
+              <PathRow label="Packet Markdown" value={run.packet_path} />
+              <PathRow label="Response esperada" value={run.expected_response_path} />
+            </div>
+          </section>
+
+          <section className="dashboard-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Comandos</p>
+                <h2>Quality Gate e ingestion manual</h2>
+              </div>
+              {copied ? <span className="badge muted">{copied}</span> : null}
+            </div>
+            <div className="command-list">
+              <article className="command-card">
+                <span>Dry-run recomendado</span>
+                <code>{commands.dryRun}</code>
+                <button
+                  className="theme-toggle"
+                  onClick={() => void copyText("Dry-run copiado", commands.dryRun)}
+                  type="button"
+                >
+                  Copiar comando
+                </button>
+              </article>
+              <article className="command-card warning">
+                <span>Ingestion avanzada manual</span>
+                <code>{commands.ingest}</code>
+                <p>
+                  Usa este comando solo despues de revisar el dry-run y el Quality Gate.
+                </p>
+                <button
+                  className="theme-toggle"
+                  onClick={() => void copyText("Comando avanzado copiado", commands.ingest)}
+                  type="button"
+                >
+                  Copiar comando
+                </button>
+              </article>
+            </div>
+          </section>
+
+          <section className="dashboard-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Salidas guardadas</p>
+                <h2>Findings, reporte y prediccion</h2>
+              </div>
+            </div>
+            <div className="research-output-grid">
+              <article>
+                <strong>{run.findings_count}</strong>
+                <span>Findings</span>
+              </article>
+              <article>
+                <strong>{run.has_report ? "Si" : "No"}</strong>
+                <span>Reporte</span>
+              </article>
+              <article>
+                <strong>{run.has_prediction ? "Si" : "No"}</strong>
+                <span>Prediccion</span>
+              </article>
+            </div>
+            {run.status === "pending_agent" ? (
+              <p className="section-note">
+                Pendiente de respuesta del agente. Guarda la response JSON en la ruta
+                esperada y valida con dry-run antes de ingestar.
+              </p>
+            ) : null}
+          </section>
+        </>
+      ) : (
+        <section className="dashboard-panel">
+          <div className="empty-state">No se encontro el research run.</div>
+        </section>
+      )}
+    </main>
+  );
+}
