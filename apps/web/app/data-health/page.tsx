@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
@@ -104,6 +105,9 @@ export default function DataHealthPage() {
           </p>
         </div>
         <div className="topbar-actions">
+          <Link className="text-link" href="/help/data-issues">
+            Playbook de datos
+          </Link>
           <button className="theme-toggle" onClick={() => void loadDataHealth()} type="button">
             Actualizar
           </button>

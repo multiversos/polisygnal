@@ -3940,6 +3940,37 @@ h2 {
   margin: 0;
 }
 
+.help-card-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.help-card {
+  background: color-mix(in srgb, var(--surface) 90%, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.help-card h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.help-card p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.help-card strong {
+  color: var(--foreground);
+}
+
 @media (max-width: 760px) {
   .snapshot-gap-card {
     grid-template-columns: 1fr;
