@@ -146,6 +146,42 @@ from app.services.research.classification import (
             "sports_generic",
         ),
         (
+            "Will Vissel Kobe win on 2026-04-29?",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Yokohama F. Marinos vs Urawa Reds",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "FC Tokyo vs Kawasaki Frontale",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Manchester United vs Chelsea",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Boca Juniors vs River Plate",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
+            "Flamengo vs Palmeiras",
+            "soccer",
+            "match_winner",
+            "sports_generic",
+        ),
+        (
             "Pohang Steelers FC vs Ulsan HD FC",
             "soccer",
             "match_winner",
@@ -222,8 +258,16 @@ def test_classify_ambiguous_sports_yes_no_market() -> None:
     assert classification.research_template_name == "sports_generic"
 
 
+def test_ambiguous_city_does_not_force_soccer() -> None:
+    classification = classify_market_research_context(question="Will City win on 2026-04-29?")
+
+    assert classification.sport == "other"
+    assert classification.vertical == "other"
+
+
 def test_public_inference_helpers() -> None:
     assert infer_sport(question="Will the Chiefs beat the Bills?") == "nfl"
+    assert infer_sport(question="Will the Kansas City Chiefs win on 2026-04-29?") == "nfl"
     assert (
         infer_sport(
             question="Will Pohang Steelers FC win?",

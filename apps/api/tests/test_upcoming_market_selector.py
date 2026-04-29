@@ -204,6 +204,32 @@ def test_upcoming_selector_sport_filter_uses_classification_not_metadata(
     assert selection.items[0].market_shape == "match_winner"
 
 
+def test_upcoming_selector_includes_j_league_style_soccer_winner(
+    db_session: Session,
+) -> None:
+    soccer = _create_market(
+        db_session,
+        suffix="j-league-winner",
+        question="Will Vissel Kobe win on 2026-04-29?",
+        event_title="Vissel Kobe vs. Cerezo Osaka",
+        end_date=NOW + timedelta(days=2),
+        sport_type=None,
+    )
+    _add_snapshot(db_session, market=soccer)
+
+    selection = list_upcoming_sports_markets(
+        db_session,
+        sport="soccer",
+        limit=10,
+        days=7,
+        now=NOW,
+    )
+
+    assert [item.market_id for item in selection.items] == [soccer.id]
+    assert selection.items[0].sport == "soccer"
+    assert selection.items[0].market_shape == "match_winner"
+
+
 def test_upcoming_selector_supports_mma_filter_without_metadata(db_session: Session) -> None:
     fight = _create_market(
         db_session,

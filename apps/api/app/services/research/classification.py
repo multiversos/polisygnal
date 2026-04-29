@@ -31,6 +31,106 @@ SUPPORTED_MARKET_SHAPES = {
     "other",
 }
 
+SOCCER_CLUB_TERMS = (
+    "vissel kobe",
+    "cerezo osaka",
+    "yokohama f. marinos",
+    "yokohama marinos",
+    "urawa reds",
+    "kawasaki frontale",
+    "kashima antlers",
+    "gamba osaka",
+    "fc tokyo",
+    "sanfrecce hiroshima",
+    "sagan tosu",
+    "nagoya grampus",
+    "avispa fukuoka",
+    "albirex niigata",
+    "shonan bellmare",
+    "machida zelvia",
+    "tokyo verdy",
+    "kyoto sanga",
+    "kashiwa reysol",
+    "jubilo iwata",
+    "vegalta sendai",
+    "real madrid",
+    "barcelona",
+    "atletico",
+    "atletico madrid",
+    "athletic bilbao",
+    "real sociedad",
+    "sevilla",
+    "valencia",
+    "manchester city",
+    "manchester united",
+    "arsenal",
+    "liverpool",
+    "chelsea",
+    "tottenham",
+    "psg",
+    "paris saint germain",
+    "bayern",
+    "borussia dortmund",
+    "dortmund",
+    "benfica",
+    "porto",
+    "ajax",
+    "sporting cp",
+    "inter miami",
+    "inter milan",
+    "ac milan",
+    "juventus",
+    "napoli",
+    "roma",
+    "lazio",
+    "atalanta",
+    "lafc",
+    "boca juniors",
+    "river plate",
+    "flamengo",
+    "palmeiras",
+    "corinthians",
+    "club america",
+    "chivas",
+    "tigres",
+    "cruz azul",
+    "monterrey",
+    "fathunionsport",
+    "cod meknes",
+    "al nassr saudi club",
+    "al ahli saudi club",
+    "al riyadh saudi club",
+    "al qadisiyah saudi club",
+    "al taawoun saudi club",
+    "al ittihad saudi club",
+)
+SOCCER_COMPETITION_TERMS = (
+    "j league",
+    "j1 league",
+    "j2 league",
+    "mls",
+    "premier league",
+    "champions league",
+    "europa league",
+    "la liga",
+    "serie a",
+    "bundesliga",
+    "copa libertadores",
+    "copa sudamericana",
+    "copa",
+    "club world cup",
+    "world cup qualifier",
+    "world cup qualifying",
+)
+FOOTBALL_CONTEXT_TERMS = (
+    "football club",
+    "fc ",
+    "cf ",
+    "fk ",
+    "afc ",
+    "sc ",
+)
+
 SPORT_KEYWORDS: dict[str, tuple[str, ...]] = {
     "nba": (
         "nba",
@@ -69,42 +169,9 @@ SPORT_KEYWORDS: dict[str, tuple[str, ...]] = {
     ),
     "soccer": (
         "soccer",
-        "football club",
-        "real madrid",
-        "barcelona",
-        "atletico",
-        "manchester city",
-        "manchester united",
-        "arsenal",
-        "liverpool",
-        "chelsea",
-        "tottenham",
-        "psg",
-        "paris saint germain",
-        "bayern",
-        "borussia dortmund",
-        "dortmund",
-        "inter miami",
-        "inter milan",
-        "ac milan",
-        "juventus",
-        "lafc",
-        "mls",
-        "premier league",
-        "champions league",
-        "europa league",
-        "la liga",
-        "serie a",
-        "bundesliga",
-        "copa",
-        "club world cup",
-        "world cup qualifier",
-        "world cup qualifying",
-        "fc ",
-        "cf ",
-        "fk ",
-        "afc ",
-        "sc ",
+        *SOCCER_CLUB_TERMS,
+        *SOCCER_COMPETITION_TERMS,
+        *FOOTBALL_CONTEXT_TERMS,
     ),
     "nhl": (
         "nhl",
@@ -598,6 +665,9 @@ def _infer_market_shape_with_reason(
     if _contains_any(normalized_text, MATCH_WINNER_HINTS) or _looks_like_head_to_head(text) or len(nba_teams) >= 2:
         return "match_winner", "market_shape=match_winner from head-to-head wording"
 
+    if sport != "other" and _looks_like_dated_sports_winner(text):
+        return "match_winner", "market_shape=match_winner from dated sports winner wording"
+
     if _contains_any(normalized_text, CHAMPIONSHIP_HINTS):
         return "championship", "market_shape=championship from title/championship wording"
 
@@ -621,6 +691,16 @@ def _looks_like_player_prop(normalized_text: str) -> bool:
 
 def _looks_like_head_to_head(text: str) -> bool:
     return bool(re.search(r"\b(?:v|vs|versus)\.?\b", text, flags=re.IGNORECASE))
+
+
+def _looks_like_dated_sports_winner(text: str) -> bool:
+    return bool(
+        re.search(
+            r"\bwill\s+.+?\s+win\s+on\s+\d{4}-\d{2}-\d{2}\b",
+            text,
+            flags=re.IGNORECASE,
+        )
+    )
 
 
 def _combined_text(*values: str | None) -> str:
