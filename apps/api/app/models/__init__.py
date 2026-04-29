@@ -10,6 +10,7 @@ from app.models.market_snapshot import MarketSnapshot
 from app.models.prediction_report import PredictionReport
 from app.models.prediction import Prediction
 from app.models.research_finding import ResearchFinding
+from app.models.refresh_run import RefreshRun
 from app.models.research_run import ResearchRun
 from app.models.source import Source
 from app.models.watchlist_item import WatchlistItem
@@ -28,6 +29,7 @@ __all__ = [
     "PredictionReport",
     "Prediction",
     "ResearchFinding",
+    "RefreshRun",
     "ResearchRun",
     "Source",
     "WatchlistItem",

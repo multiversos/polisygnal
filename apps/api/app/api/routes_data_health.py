@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.data_health import DataHealthOverviewRead, SnapshotGapsRead
+from app.schemas.refresh_run import RefreshRunsRead
 from app.services.data_health import build_data_health_overview, build_snapshot_gaps
+from app.services.refresh_runs import list_refresh_runs
 
 router = APIRouter(tags=["data-health"])
 
@@ -23,3 +25,12 @@ def get_snapshot_gaps(
     db: Session = Depends(get_db),
 ) -> SnapshotGapsRead:
     return build_snapshot_gaps(db, sport=sport, days=days, limit=limit)
+
+
+@router.get("/data-health/refresh-runs", response_model=RefreshRunsRead)
+def get_refresh_runs(
+    refresh_type: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=0, le=100),
+    db: Session = Depends(get_db),
+) -> RefreshRunsRead:
+    return RefreshRunsRead(items=list_refresh_runs(db, refresh_type=refresh_type, limit=limit))

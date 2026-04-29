@@ -11,6 +11,7 @@ from app.clients.polymarket import PolymarketGammaClient
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.services.controlled_metadata_refresh import refresh_market_metadata_controlled
+from app.services.refresh_runs import build_refresh_audit_summary, record_refresh_run
 
 
 def main() -> None:
@@ -36,11 +37,41 @@ def main() -> None:
                 days=args.days,
                 dry_run=dry_run,
             )
-            if dry_run:
-                db.rollback()
-            else:
-                db.commit()
+            finished_at = datetime.now(tz=UTC)
+            payload = _with_command_metadata(
+                payload,
+                started_at=started_at,
+                finished_at=finished_at,
+                started_perf=started_perf,
+                market_id=args.market_id,
+                sport=args.sport,
+                days=args.days,
+                limit=args.limit,
+            )
+            _record_success_audit(
+                db,
+                payload,
+                market_id=args.market_id,
+                sport=args.sport,
+                days=args.days,
+                limit=args.limit,
+                dry_run=dry_run,
+                started_at=started_at,
+                finished_at=finished_at,
+            )
+            db.commit()
     except Exception as exc:
+        finished_at = datetime.now(tz=UTC)
+        _try_record_failed_audit(
+            market_id=args.market_id,
+            sport=args.sport,
+            days=args.days,
+            limit=args.limit,
+            dry_run=dry_run,
+            started_at=started_at,
+            finished_at=finished_at,
+            error=exc,
+        )
         payload = {
             "status": "error",
             "dry_run": dry_run,
@@ -52,19 +83,6 @@ def main() -> None:
         raise SystemExit(1) from exc
     finally:
         gamma_client.close()
-
-    finished_at = datetime.now(tz=UTC)
-    payload = {
-        "status": _status_from_payload(payload),
-        "started_at": started_at.isoformat(),
-        "finished_at": finished_at.isoformat(),
-        "duration_seconds": round(perf_counter() - started_perf, 3),
-        "market_id": args.market_id,
-        "sport": args.sport,
-        "days": args.days,
-        "limit": args.limit,
-        **payload,
-    }
 
     if args.json:
         print(json.dumps(payload, indent=2, ensure_ascii=True))
@@ -115,6 +133,106 @@ def _status_from_payload(payload: dict[str, Any]) -> str:
     if payload.get("partial_error_count", 0):
         return "warning"
     return "ok"
+
+
+def _audit_status_from_payload(payload: dict[str, Any]) -> str:
+    if payload.get("partial_error_count", 0):
+        return "partial"
+    return "success"
+
+
+def _with_command_metadata(
+    payload: dict[str, Any],
+    *,
+    started_at: datetime,
+    finished_at: datetime,
+    started_perf: float,
+    market_id: int | None,
+    sport: str | None,
+    days: int,
+    limit: int,
+) -> dict[str, Any]:
+    return {
+        "status": _status_from_payload(payload),
+        "started_at": started_at.isoformat(),
+        "finished_at": finished_at.isoformat(),
+        "duration_seconds": round(perf_counter() - started_perf, 3),
+        "market_id": market_id,
+        "sport": sport,
+        "days": days,
+        "limit": limit,
+        **payload,
+    }
+
+
+def _record_success_audit(
+    db,
+    payload: dict[str, Any],
+    *,
+    market_id: int | None,
+    sport: str | None,
+    days: int,
+    limit: int,
+    dry_run: bool,
+    started_at: datetime,
+    finished_at: datetime,
+) -> None:
+    record_refresh_run(
+        db,
+        refresh_type="metadata",
+        mode="dry_run" if dry_run else "apply",
+        status=_audit_status_from_payload(payload),
+        markets_checked=int(payload.get("markets_checked") or 0),
+        markets_updated=int(payload.get("markets_updated") or 0),
+        errors_count=int(payload.get("partial_error_count") or 0),
+        summary_json=build_refresh_audit_summary(
+            payload,
+            refresh_type="metadata",
+            market_id=market_id,
+            sport=sport,
+            days=days,
+            limit=limit,
+        ),
+        started_at=started_at,
+        finished_at=finished_at,
+    )
+
+
+def _try_record_failed_audit(
+    *,
+    market_id: int | None,
+    sport: str | None,
+    days: int,
+    limit: int,
+    dry_run: bool,
+    started_at: datetime,
+    finished_at: datetime,
+    error: Exception,
+) -> None:
+    try:
+        with SessionLocal() as db:
+            record_refresh_run(
+                db,
+                refresh_type="metadata",
+                mode="dry_run" if dry_run else "apply",
+                status="failed",
+                markets_checked=0,
+                markets_updated=0,
+                errors_count=1,
+                summary_json={
+                    "market_id": market_id,
+                    "sport": sport,
+                    "days": days,
+                    "limit": limit,
+                    "error_type": type(error).__name__,
+                    "error": str(error)[:300],
+                },
+                started_at=started_at,
+                finished_at=finished_at,
+            )
+            db.commit()
+    except Exception:
+        return
 
 
 def _print_human(payload: dict[str, Any]) -> None:
