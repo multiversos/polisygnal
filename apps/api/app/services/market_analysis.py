@@ -28,6 +28,7 @@ from app.schemas.market_analysis import (
     MarketAnalysisSnapshot,
 )
 from app.services.external_market_signals import list_external_market_signals
+from app.services.market_links import build_market_links
 from app.services.polysignal_score import build_polysignal_score
 from app.services.research.candidate_selector import build_research_candidate
 from app.services.research.classification import classify_market_research_context
@@ -101,6 +102,7 @@ def build_market_analysis(db: Session, market: Market) -> MarketAnalysisRead:
 
     return MarketAnalysisRead(
         market=_serialize_market(market),
+        links=build_market_links(market),
         latest_snapshot=(
             MarketAnalysisSnapshot.model_validate(latest_snapshot)
             if latest_snapshot is not None

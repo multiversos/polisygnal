@@ -4055,6 +4055,48 @@ h2 {
   font-size: 0.82rem;
 }
 
+.market-links-section {
+  display: grid;
+  gap: 14px;
+}
+
+.market-link-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.market-link-card {
+  background: color-mix(in srgb, var(--surface) 90%, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  text-decoration: none;
+}
+
+.market-link-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.market-link-card span {
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.market-link-card code {
+  color: var(--muted);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.market-link-card.internal {
+  background: var(--surface);
+}
+
 .trial-step-grid {
   display: grid;
   gap: 12px;

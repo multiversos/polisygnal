@@ -184,8 +184,23 @@ class MarketAnalysisExternalSignal(BaseModel):
     created_at: datetime
 
 
+class MarketLinksRead(BaseModel):
+    polymarket_url: str | None = None
+    polymarket_event_slug: str | None = None
+    polymarket_market_slug: str | None = None
+    internal_analysis_url: str
+    internal_json_url: str
+    price_history_url: str
+    markdown_url: str
+    external_signals_url: str
+    clob_yes_book_url: str | None = None
+    clob_no_book_url: str | None = None
+    source_notes: list[str] = Field(default_factory=list)
+
+
 class MarketAnalysisRead(BaseModel):
     market: MarketAnalysisMarket
+    links: MarketLinksRead | None = None
     latest_snapshot: MarketAnalysisSnapshot | None = None
     polysignal_score: PolySignalScoreRead | None = None
     data_quality: UpcomingDataQualityItemRead | None = None

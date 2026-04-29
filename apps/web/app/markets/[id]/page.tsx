@@ -326,8 +326,23 @@ type MarketDataQuality = {
   freshness?: MarketFreshness | null;
 };
 
+type MarketLinks = {
+  polymarket_url?: string | null;
+  polymarket_event_slug?: string | null;
+  polymarket_market_slug?: string | null;
+  internal_analysis_url: string;
+  internal_json_url: string;
+  price_history_url: string;
+  markdown_url: string;
+  external_signals_url: string;
+  clob_yes_book_url?: string | null;
+  clob_no_book_url?: string | null;
+  source_notes: string[];
+};
+
 type MarketAnalysis = {
   market: AnalysisMarket;
+  links?: MarketLinks | null;
   latest_snapshot?: AnalysisSnapshot | null;
   polysignal_score?: PolySignalScore | null;
   data_quality?: MarketDataQuality | null;
@@ -1694,6 +1709,66 @@ function FreshnessPanel({ freshness }: { freshness?: MarketFreshness | null }) {
       ) : (
         <p className="quiet-text">No hay señales internas de obsolescencia para este mercado.</p>
       )}
+    </section>
+  );
+}
+
+function MarketLinksPanel({ links }: { links?: MarketLinks | null }) {
+  if (!links) {
+    return null;
+  }
+
+  const apiLinks = [
+    { label: "JSON del analisis", href: `${API_BASE_URL}${links.internal_json_url}` },
+    { label: "Historial de precios", href: `${API_BASE_URL}${links.price_history_url}` },
+    { label: "Markdown del analisis", href: `${API_BASE_URL}${links.markdown_url}` },
+    { label: "Senales externas", href: `${API_BASE_URL}${links.external_signals_url}` },
+  ];
+  const externalLinks = [
+    links.polymarket_url ? { label: "Abrir en Polymarket", href: links.polymarket_url } : null,
+    links.clob_yes_book_url ? { label: "CLOB token SI", href: links.clob_yes_book_url } : null,
+    links.clob_no_book_url ? { label: "CLOB token NO", href: links.clob_no_book_url } : null,
+  ].filter(Boolean) as Array<{ label: string; href: string }>;
+
+  return (
+    <section className="analysis-section market-links-section">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Fuentes y rutas</span>
+          <h2>Enlaces del mercado</h2>
+          <p className="section-note">
+            Links utiles construidos desde slugs e identificadores existentes. Si falta
+            un slug, PolySignal no inventa una URL externa.
+          </p>
+        </div>
+      </div>
+
+      <div className="market-link-grid">
+        {externalLinks.length > 0 ? (
+          externalLinks.map((link) => (
+            <a className="market-link-card" href={link.href} key={link.label} rel="noreferrer" target="_blank">
+              <span>{link.label}</span>
+              <code>{link.href}</code>
+            </a>
+          ))
+        ) : (
+          <div className="empty-state compact">No hay links externos confiables para este mercado.</div>
+        )}
+        {apiLinks.map((link) => (
+          <a className="market-link-card internal" href={link.href} key={link.label} rel="noreferrer" target="_blank">
+            <span>{link.label}</span>
+            <code>{link.href}</code>
+          </a>
+        ))}
+      </div>
+
+      {links.source_notes.length > 0 ? (
+        <div className="candidate-chip-list">
+          {links.source_notes.map((note) => (
+            <span className="reason-chip" key={note}>{humanizeToken(note)}</span>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -3614,6 +3689,7 @@ export default function MarketAnalysisPage() {
                 score={analysis.polysignal_score}
               />
               <FreshnessPanel freshness={analysis.freshness ?? analysis.data_quality?.freshness} />
+              <MarketLinksPanel links={analysis.links} />
               <MarketTimelinePanel state={timelineState} />
               <PriceHistoryPanel history={state.priceHistory} error={state.priceHistoryError} />
               <CandidateContextPanel context={analysis.candidate_context} />

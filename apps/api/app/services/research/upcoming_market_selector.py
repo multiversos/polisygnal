@@ -13,6 +13,7 @@ from app.repositories.market_snapshots import list_latest_market_snapshots_for_m
 from app.schemas.market_freshness import MarketFreshnessRead
 from app.schemas.polysignal_score import PolySignalScoreRead
 from app.services.market_freshness import build_market_freshness
+from app.services.market_links import build_market_links
 from app.services.polysignal_score import build_polysignal_score
 from app.services.research.candidate_selector import (
     ResearchCandidateParticipant,
@@ -79,6 +80,7 @@ class UpcomingSportsMarket:
     participants: list[ResearchCandidateParticipant]
     polysignal_score: PolySignalScoreRead | None = None
     freshness: MarketFreshnessRead | None = None
+    links: dict[str, object] | None = None
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -110,6 +112,7 @@ class UpcomingSportsMarket:
                 if self.freshness is not None
                 else None
             ),
+            "links": self.links,
         }
 
 
@@ -303,6 +306,7 @@ def _with_polysignal_score(
             no_price=item.market_no_price,
             now=now,
         ),
+        links=build_market_links(market).model_dump(),
     )
 
 
