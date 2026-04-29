@@ -6,8 +6,10 @@ import { useCallback, useEffect, useState } from "react";
 import { MainNavigation } from "../components/MainNavigation";
 import {
   fetchDataHealthOverview,
+  fetchRefreshRuns,
   fetchSnapshotGaps,
   type DataHealthOverview,
+  type RefreshRuns,
   type SnapshotGaps,
 } from "../lib/dataHealth";
 
@@ -65,9 +67,19 @@ function formatRecommendedAction(value: string): string {
   return recommendedActionLabels[value] ?? value.replaceAll("_", " ");
 }
 
+function buildSnapshotCommand(marketId: number): string {
+  return `python -m app.commands.refresh_market_snapshots --market-id ${marketId} --dry-run --json`;
+}
+
+function buildMetadataCommand(marketId: number): string {
+  return `python -m app.commands.refresh_market_metadata --market-id ${marketId} --dry-run --json`;
+}
+
 export default function DataHealthPage() {
   const [overview, setOverview] = useState<DataHealthOverview | null>(null);
   const [snapshotGaps, setSnapshotGaps] = useState<SnapshotGaps | null>(null);
+  const [refreshRuns, setRefreshRuns] = useState<RefreshRuns | null>(null);
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,12 +87,14 @@ export default function DataHealthPage() {
     setLoading(true);
     setError(null);
     try {
-      const [overviewResult, snapshotGapsResult] = await Promise.all([
+      const [overviewResult, snapshotGapsResult, refreshRunsResult] = await Promise.all([
         fetchDataHealthOverview(),
         fetchSnapshotGaps({ days: 7, limit: 50 }),
+        fetchRefreshRuns({ limit: 10 }),
       ]);
       setOverview(overviewResult);
       setSnapshotGaps(snapshotGapsResult);
+      setRefreshRuns(refreshRunsResult);
     } catch {
       setError("No se pudo cargar la salud de datos.");
     } finally {
@@ -91,6 +105,16 @@ export default function DataHealthPage() {
   useEffect(() => {
     void loadDataHealth();
   }, [loadDataHealth]);
+
+  const copyCommand = async (command: string) => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopiedCommand(command);
+      window.setTimeout(() => setCopiedCommand(null), 1600);
+    } catch {
+      setCopiedCommand(null);
+    }
+  };
 
   return (
     <main className="dashboard-shell data-health-page">
@@ -230,6 +254,125 @@ export default function DataHealthPage() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="dashboard-panel refresh-plan-section">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Plan operativo</p>
+            <h2>Plan de actualizacion controlada</h2>
+            <p className="section-note">
+              Usa estos comandos primero en dry-run. La UI solo los muestra y copia;
+              no ejecuta refresh, sync, predicciones ni trading.
+            </p>
+          </div>
+          <span className="badge muted">
+            {snapshotGaps?.items.length ?? 0} candidatos
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">Preparando plan de actualizacion...</div>
+        ) : !snapshotGaps || snapshotGaps.items.length === 0 ? (
+          <div className="empty-state">
+            No hay gaps activos para planificar refresh con los filtros actuales.
+          </div>
+        ) : (
+          <div className="refresh-plan-grid">
+            {snapshotGaps.items.slice(0, 6).map((item) => {
+              const snapshotCommand = buildSnapshotCommand(item.market_id);
+              const metadataCommand = buildMetadataCommand(item.market_id);
+              return (
+                <article className="refresh-plan-card" key={`refresh-${item.market_id}`}>
+                  <div className="refresh-plan-card-header">
+                    <div>
+                      <span className="eyebrow">{formatSport(item.sport)}</span>
+                      <h3>{item.title}</h3>
+                    </div>
+                    <Link className="text-link" href={`/markets/${item.market_id}`}>
+                      Ver mercado
+                    </Link>
+                  </div>
+                  <div className="snapshot-gap-meta">
+                    <span className={`data-quality-label ${item.freshness_status}`}>
+                      {formatFreshnessStatus(item.freshness_status)}
+                    </span>
+                    <span className="reason-chip">
+                      {formatRecommendedAction(item.recommended_action)}
+                    </span>
+                    <span className="reason-chip">
+                      Cierre {formatDate(item.close_time)}
+                    </span>
+                  </div>
+                  <div className="refresh-command-list">
+                    <div className="command-card">
+                      <div>
+                        <span>Snapshot dry-run</span>
+                        <code>{snapshotCommand}</code>
+                      </div>
+                      <button onClick={() => void copyCommand(snapshotCommand)} type="button">
+                        {copiedCommand === snapshotCommand ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                    <div className="command-card">
+                      <div>
+                        <span>Metadata dry-run</span>
+                        <code>{metadataCommand}</code>
+                      </div>
+                      <button onClick={() => void copyCommand(metadataCommand)} type="button">
+                        {copiedCommand === metadataCommand ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="refresh-run-section">
+          <div className="panel-heading compact-heading">
+            <div>
+              <p className="eyebrow">Auditoria</p>
+              <h3>Refresh runs recientes</h3>
+            </div>
+          </div>
+          {loading ? (
+            <div className="empty-state">Cargando auditoria de refresh...</div>
+          ) : !refreshRuns || refreshRuns.items.length === 0 ? (
+            <div className="empty-state">
+              Aun no hay refresh runs auditados.
+            </div>
+          ) : (
+            <div className="refresh-run-list">
+              {refreshRuns.items.map((run) => (
+                <article className="refresh-run-card" key={run.id}>
+                  <div>
+                    <strong>
+                      #{run.id} {run.refresh_type === "snapshot" ? "Snapshots" : "Metadata"}
+                    </strong>
+                    <span>{formatDate(run.started_at)}</span>
+                  </div>
+                  <div className="snapshot-gap-meta">
+                    <span className="reason-chip">{run.mode}</span>
+                    <span className={`data-quality-label ${run.status}`}>
+                      {run.status}
+                    </span>
+                    <span className="reason-chip">
+                      {run.markets_checked} revisados
+                    </span>
+                    <span className="reason-chip">
+                      {run.markets_updated} actualizados
+                    </span>
+                    {run.errors_count > 0 ? (
+                      <span className="warning-chip">{run.errors_count} errores</span>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="dashboard-panel">

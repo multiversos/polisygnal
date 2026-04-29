@@ -45,6 +45,24 @@ export type SnapshotGaps = {
   items: SnapshotGapItem[];
 };
 
+export type RefreshRun = {
+  id: number;
+  refresh_type: string;
+  mode: string;
+  status: string;
+  markets_checked: number;
+  markets_updated: number;
+  errors_count: number;
+  summary_json?: Record<string, unknown> | null;
+  started_at: string;
+  finished_at: string;
+  created_at: string;
+};
+
+export type RefreshRuns = {
+  items: RefreshRun[];
+};
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -80,4 +98,25 @@ export async function fetchSnapshotGaps(params?: {
     throw new Error(`/data-health/snapshot-gaps responded ${response.status}`);
   }
   return response.json() as Promise<SnapshotGaps>;
+}
+
+export async function fetchRefreshRuns(params?: {
+  refresh_type?: string | null;
+  limit?: number;
+}): Promise<RefreshRuns> {
+  const searchParams = new URLSearchParams();
+  if (params?.refresh_type) {
+    searchParams.set("refresh_type", params.refresh_type);
+  }
+  searchParams.set("limit", String(params?.limit ?? 20));
+  const response = await fetch(
+    `${API_BASE_URL}/data-health/refresh-runs?${searchParams.toString()}`,
+    {
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`/data-health/refresh-runs responded ${response.status}`);
+  }
+  return response.json() as Promise<RefreshRuns>;
 }
