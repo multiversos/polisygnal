@@ -12,6 +12,7 @@ const navigationItems = [
   { label: "Dashboard", href: "/" },
   { label: "Deportes", href: "/sports" },
   { label: "Briefing diario", href: "/briefing" },
+  { label: "Investigacion", href: "/research" },
   { label: "Mi seguimiento", href: "/#mi-seguimiento" },
   { label: "Workflow", href: "/workflow" },
   { label: "Alertas", href: "/alerts" },
