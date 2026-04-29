@@ -50,3 +50,15 @@ class ManualEvidenceRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ManualEvidenceDashboardItem(ManualEvidenceRead):
+    market_question: str | None = None
+    market_slug: str | None = None
+    sport: str | None = None
+    market_shape: str | None = None
+
+
+class ManualEvidenceListResponse(BaseModel):
+    items: list[ManualEvidenceDashboardItem]
+    count: int

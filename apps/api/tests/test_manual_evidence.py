@@ -92,11 +92,46 @@ def test_manual_evidence_invalid_stance_is_422(
     assert response.status_code == 422
 
 
+def test_manual_evidence_dashboard_list_filters_items(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(db_session)
+    db_session.commit()
+    client.post(
+        f"/markets/{market.id}/manual-evidence",
+        json={
+            "source_name": "Official source",
+            "claim": "Neutral context",
+            "stance": "neutral",
+        },
+    )
+    risk_response = client.post(
+        f"/markets/{market.id}/manual-evidence",
+        json={
+            "source_name": "Risk source",
+            "claim": "Risk context",
+            "stance": "risk",
+        },
+    )
+
+    response = client.get("/manual-evidence?stance=risk&status=pending_review&limit=50")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    assert payload["items"][0]["id"] == risk_response.json()["id"]
+    assert payload["items"][0]["market_question"] == market.question
+    assert payload["items"][0]["sport"] == "soccer"
+    assert payload["items"][0]["market_shape"] == "match_winner"
+
+
 def test_manual_evidence_openapi_includes_endpoints(client: TestClient) -> None:
     response = client.get("/openapi.json")
 
     assert response.status_code == 200
     paths = response.json()["paths"]
+    assert "/manual-evidence" in paths
     assert "/markets/{market_id}/manual-evidence" in paths
     assert "/manual-evidence/{evidence_id}" in paths
 

@@ -19,6 +19,18 @@ export type ManualEvidenceItem = {
   updated_at: string;
 };
 
+export type ManualEvidenceDashboardItem = ManualEvidenceItem & {
+  market_question?: string | null;
+  market_slug?: string | null;
+  sport?: string | null;
+  market_shape?: string | null;
+};
+
+export type ManualEvidenceListResponse = {
+  items: ManualEvidenceDashboardItem[];
+  count: number;
+};
+
 export type ManualEvidencePayload = {
   source_name: string;
   source_url?: string | null;
@@ -64,6 +76,26 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function fetchMarketManualEvidence(marketId: number): Promise<ManualEvidenceItem[]> {
   return requestJson<ManualEvidenceItem[]>(`/markets/${marketId}/manual-evidence`);
+}
+
+export async function fetchManualEvidence(params?: {
+  status?: ManualEvidenceReviewStatus | null;
+  stance?: ManualEvidenceStance | null;
+  market_id?: number | null;
+  limit?: number;
+}): Promise<ManualEvidenceListResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.status) {
+    searchParams.set("status", params.status);
+  }
+  if (params?.stance) {
+    searchParams.set("stance", params.stance);
+  }
+  if (params?.market_id) {
+    searchParams.set("market_id", String(params.market_id));
+  }
+  searchParams.set("limit", String(params?.limit ?? 50));
+  return requestJson<ManualEvidenceListResponse>(`/manual-evidence?${searchParams.toString()}`);
 }
 
 export async function createManualEvidence(

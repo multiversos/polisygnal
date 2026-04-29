@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.manual_evidence_item import ManualEvidenceItem
 from app.models.market import Market
@@ -29,6 +29,30 @@ def list_manual_evidence_for_market(
         .where(ManualEvidenceItem.market_id == market_id)
         .order_by(ManualEvidenceItem.created_at.desc(), ManualEvidenceItem.id.desc())
     )
+    return list(db.scalars(stmt).all())
+
+
+def list_manual_evidence(
+    db: Session,
+    *,
+    status: str | None = None,
+    stance: str | None = None,
+    market_id: int | None = None,
+    limit: int = 50,
+) -> list[ManualEvidenceItem]:
+    safe_limit = max(min(limit, 200), 0)
+    stmt = (
+        select(ManualEvidenceItem)
+        .options(joinedload(ManualEvidenceItem.market))
+        .order_by(ManualEvidenceItem.created_at.desc(), ManualEvidenceItem.id.desc())
+        .limit(safe_limit)
+    )
+    if status:
+        stmt = stmt.where(ManualEvidenceItem.review_status == status)
+    if stance:
+        stmt = stmt.where(ManualEvidenceItem.stance == stance)
+    if market_id is not None:
+        stmt = stmt.where(ManualEvidenceItem.market_id == market_id)
     return list(db.scalars(stmt).all())
 
 

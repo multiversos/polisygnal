@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.manual_evidence import (
     ManualEvidenceCreate,
+    ManualEvidenceDashboardItem,
+    ManualEvidenceListResponse,
     ManualEvidenceRead,
     ManualEvidenceUpdate,
 )
@@ -14,11 +16,34 @@ from app.services.manual_evidence import (
     ManualEvidenceNotFoundError,
     create_manual_evidence,
     delete_manual_evidence,
+    list_manual_evidence,
     list_manual_evidence_for_market,
     update_manual_evidence,
 )
+from app.services.research.classification import classify_market_research_context
 
 router = APIRouter(tags=["manual-evidence"])
+
+
+@router.get("/manual-evidence", response_model=ManualEvidenceListResponse)
+def get_manual_evidence_list(
+    status_filter: str | None = Query(default=None, alias="status"),
+    stance: str | None = Query(default=None),
+    market_id: int | None = Query(default=None),
+    limit: int = Query(default=50, ge=0, le=200),
+    db: Session = Depends(get_db),
+) -> ManualEvidenceListResponse:
+    items = list_manual_evidence(
+        db,
+        status=status_filter,
+        stance=stance,
+        market_id=market_id,
+        limit=limit,
+    )
+    return ManualEvidenceListResponse(
+        items=[_serialize_dashboard_item(item) for item in items],
+        count=len(items),
+    )
 
 
 @router.get(
@@ -86,3 +111,16 @@ def delete_manual_evidence_route(
     except ManualEvidenceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _serialize_dashboard_item(item) -> ManualEvidenceDashboardItem:
+    market = item.market
+    classification = classify_market_research_context(market=market) if market is not None else None
+    payload = ManualEvidenceRead.model_validate(item).model_dump()
+    return ManualEvidenceDashboardItem(
+        **payload,
+        market_question=market.question if market is not None else None,
+        market_slug=market.slug if market is not None else None,
+        sport=classification.sport if classification is not None else None,
+        market_shape=classification.market_shape if classification is not None else None,
+    )
