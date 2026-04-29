@@ -100,6 +100,12 @@ class Market(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    decision_logs = relationship(
+        "MarketDecisionLog",
+        back_populates="market",
+        cascade="all, delete-orphan",
+        order_by="MarketDecisionLog.created_at.desc()",
+    )
     tag_links = relationship(
         "MarketTagLink",
         back_populates="market",

@@ -3131,6 +3131,46 @@ h2 {
   justify-content: flex-start;
 }
 
+.decision-log-list {
+  display: grid;
+  gap: 10px;
+}
+
+.decision-log-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.decision-log-card > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.decision-log-card strong {
+  color: var(--foreground);
+  font-size: 0.95rem;
+}
+
+.decision-log-card span,
+.decision-log-card p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.decision-log-card p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .backtesting-outcome-list {
   display: grid;
   gap: 12px;

@@ -45,6 +45,16 @@ import {
   type MarketOutcome,
   type ResolvedOutcome,
 } from "../../lib/backtesting";
+import {
+  DECISION_CONFIDENCE_LABELS,
+  MARKET_DECISION_LABELS,
+  createMarketDecision,
+  deleteMarketDecision,
+  fetchMarketDecisions,
+  type DecisionConfidenceLabel,
+  type MarketDecision,
+  type MarketDecisionItem,
+} from "../../lib/marketDecisions";
 
 type JsonPayload = Record<string, unknown> | unknown[];
 
@@ -379,6 +389,17 @@ type MarketOutcomePanelState = {
   resolvedAtDraft: string;
 };
 
+type MarketDecisionPanelState = {
+  items: MarketDecisionItem[];
+  loading: boolean;
+  saving: boolean;
+  deletingId: number | null;
+  error: string | null;
+  decisionDraft: MarketDecision;
+  noteDraft: string;
+  confidenceDraft: DecisionConfidenceLabel | "";
+};
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -391,6 +412,25 @@ const outcomeOptions: Array<{ value: ResolvedOutcome; label: string }> = [
   { value: "no", label: "No" },
   { value: "invalid", label: "Inválido" },
   { value: "unknown", label: "Desconocido" },
+];
+
+const decisionOptions: Array<{ value: MarketDecision; label: string }> = [
+  { value: "monitor", label: MARKET_DECISION_LABELS.monitor },
+  { value: "investigate_more", label: MARKET_DECISION_LABELS.investigate_more },
+  { value: "ignore", label: MARKET_DECISION_LABELS.ignore },
+  { value: "possible_opportunity", label: MARKET_DECISION_LABELS.possible_opportunity },
+  { value: "dismissed", label: MARKET_DECISION_LABELS.dismissed },
+  { value: "waiting_for_data", label: MARKET_DECISION_LABELS.waiting_for_data },
+];
+
+const decisionConfidenceOptions: Array<{
+  value: DecisionConfidenceLabel | "";
+  label: string;
+}> = [
+  { value: "", label: "Sin confianza" },
+  { value: "low", label: DECISION_CONFIDENCE_LABELS.low },
+  { value: "medium", label: DECISION_CONFIDENCE_LABELS.medium },
+  { value: "high", label: DECISION_CONFIDENCE_LABELS.high },
 ];
 
 const marketShapeLabels: Record<string, string> = {
@@ -2279,6 +2319,129 @@ function MarketOutcomeDetailPanel({
   );
 }
 
+function MarketDecisionLogPanel({
+  onConfidenceChange,
+  onDecisionChange,
+  onDelete,
+  onNoteChange,
+  onSave,
+  state,
+}: {
+  onConfidenceChange: (confidence: DecisionConfidenceLabel | "") => void;
+  onDecisionChange: (decision: MarketDecision) => void;
+  onDelete: (decisionId: number) => void;
+  onNoteChange: (note: string) => void;
+  onSave: () => void;
+  state: MarketDecisionPanelState;
+}) {
+  return (
+    <section className="analysis-section watchlist-detail-panel">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Bitacora manual</span>
+          <h2>Decisiones humanas</h2>
+        </div>
+      </div>
+      <p className="section-note">
+        Estas decisiones son notas manuales para organizar analisis. No ejecutan
+        apuestas ni trading.
+      </p>
+
+      {state.loading ? <div className="empty-state compact">Cargando decisiones...</div> : null}
+      {state.error ? (
+        <div className="alert-panel compact" role="status">
+          <strong>Decision no disponible</strong>
+          <span>{state.error}</span>
+        </div>
+      ) : null}
+
+      {!state.loading ? (
+        <div className="decision-log-list">
+          {state.items.length === 0 ? (
+            <span className="reason-chip muted">Sin decisiones guardadas.</span>
+          ) : (
+            state.items.map((item) => (
+              <article className="decision-log-card" key={item.id}>
+                <div>
+                  <strong>{MARKET_DECISION_LABELS[item.decision]}</strong>
+                  <span>{formatDateTime(item.created_at)}</span>
+                </div>
+                {item.confidence_label ? (
+                  <span className="reason-chip">
+                    Confianza {DECISION_CONFIDENCE_LABELS[item.confidence_label]}
+                  </span>
+                ) : null}
+                {item.note ? <p>{item.note}</p> : null}
+                <button
+                  className="watchlist-button secondary"
+                  disabled={state.saving || state.deletingId === item.id}
+                  onClick={() => onDelete(item.id)}
+                  type="button"
+                >
+                  {state.deletingId === item.id ? "Eliminando..." : "Eliminar"}
+                </button>
+              </article>
+            ))
+          )}
+        </div>
+      ) : null}
+
+      <div className="watchlist-form">
+        <label>
+          Decision
+          <select
+            disabled={state.saving}
+            onChange={(event) => onDecisionChange(event.target.value as MarketDecision)}
+            value={state.decisionDraft}
+          >
+            {decisionOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Confianza
+          <select
+            disabled={state.saving}
+            onChange={(event) =>
+              onConfidenceChange(event.target.value as DecisionConfidenceLabel | "")
+            }
+            value={state.confidenceDraft}
+          >
+            {decisionConfidenceOptions.map((option) => (
+              <option key={option.value || "none"} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Nota
+          <textarea
+            disabled={state.saving}
+            maxLength={4000}
+            onChange={(event) => onNoteChange(event.target.value)}
+            placeholder="Ej. esperar datos de lesiones, revisar movimiento o dejar para mas tarde."
+            value={state.noteDraft}
+          />
+        </label>
+        <div className="watchlist-actions">
+          <button
+            className="watchlist-button"
+            disabled={state.loading || state.saving}
+            onClick={onSave}
+            type="button"
+          >
+            {state.saving ? "Guardando..." : "Guardar decision"}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function MarketAnalysisPage() {
   const params = useParams<{ id: string }>();
   const marketId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -2331,6 +2494,16 @@ export default function MarketAnalysisPage() {
     sourceDraft: "manual",
     notesDraft: "",
     resolvedAtDraft: "",
+  });
+  const [marketDecisionState, setMarketDecisionState] = useState<MarketDecisionPanelState>({
+    items: [],
+    loading: true,
+    saving: false,
+    deletingId: null,
+    error: null,
+    decisionDraft: "monitor",
+    noteDraft: "",
+    confidenceDraft: "",
   });
 
   const loadAnalysis = useCallback(async () => {
@@ -2465,6 +2638,25 @@ export default function MarketAnalysisPage() {
     }
   }, [marketId]);
 
+  const loadMarketDecisions = useCallback(async () => {
+    setMarketDecisionState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const items = await fetchMarketDecisions(marketId);
+      setMarketDecisionState((current) => ({
+        ...current,
+        items,
+        loading: false,
+        error: null,
+      }));
+    } catch {
+      setMarketDecisionState((current) => ({
+        ...current,
+        loading: false,
+        error: "No se pudieron cargar decisiones humanas.",
+      }));
+    }
+  }, [marketId]);
+
   const saveMarketOutcome = useCallback(async () => {
     setMarketOutcomeState((current) => ({ ...current, saving: true, error: null }));
     try {
@@ -2528,6 +2720,58 @@ export default function MarketAnalysisPage() {
       }));
     }
   }, [marketId, marketOutcomeState.item]);
+
+  const saveMarketDecision = useCallback(async () => {
+    setMarketDecisionState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      const item = await createMarketDecision(marketId, {
+        decision: marketDecisionState.decisionDraft,
+        note: marketDecisionState.noteDraft.trim() || null,
+        confidence_label: marketDecisionState.confidenceDraft || null,
+      });
+      setMarketDecisionState((current) => ({
+        ...current,
+        items: [item, ...current.items],
+        saving: false,
+        error: null,
+        noteDraft: "",
+      }));
+    } catch {
+      setMarketDecisionState((current) => ({
+        ...current,
+        saving: false,
+        error: "No se pudo guardar la decision humana.",
+      }));
+    }
+  }, [
+    marketDecisionState.confidenceDraft,
+    marketDecisionState.decisionDraft,
+    marketDecisionState.noteDraft,
+    marketId,
+  ]);
+
+  const removeMarketDecision = useCallback(async (decisionId: number) => {
+    setMarketDecisionState((current) => ({
+      ...current,
+      deletingId: decisionId,
+      error: null,
+    }));
+    try {
+      await deleteMarketDecision(decisionId);
+      setMarketDecisionState((current) => ({
+        ...current,
+        items: current.items.filter((item) => item.id !== decisionId),
+        deletingId: null,
+        error: null,
+      }));
+    } catch {
+      setMarketDecisionState((current) => ({
+        ...current,
+        deletingId: null,
+        error: "No se pudo eliminar la decision humana.",
+      }));
+    }
+  }, []);
 
   const addToWatchlist = useCallback(async () => {
     setWatchlistState((current) => ({ ...current, saving: true, error: null }));
@@ -2833,6 +3077,10 @@ export default function MarketAnalysisPage() {
     void loadMarketOutcome();
   }, [loadMarketOutcome]);
 
+  useEffect(() => {
+    void loadMarketDecisions();
+  }, [loadMarketDecisions]);
+
   const analysis = state.analysis;
   const translatedTitle = analysis ? translateMarketTitleToSpanish(analysis.market.question) : "";
   const originalChanged = Boolean(analysis && translatedTitle !== analysis.market.question);
@@ -3042,6 +3290,27 @@ export default function MarketAnalysisPage() {
                   setMarketOutcomeState((current) => ({ ...current, sourceDraft: source }))
                 }
                 state={marketOutcomeState}
+              />
+
+              <MarketDecisionLogPanel
+                onConfidenceChange={(confidence) =>
+                  setMarketDecisionState((current) => ({
+                    ...current,
+                    confidenceDraft: confidence,
+                  }))
+                }
+                onDecisionChange={(decision) =>
+                  setMarketDecisionState((current) => ({
+                    ...current,
+                    decisionDraft: decision,
+                  }))
+                }
+                onDelete={removeMarketDecision}
+                onNoteChange={(note) =>
+                  setMarketDecisionState((current) => ({ ...current, noteDraft: note }))
+                }
+                onSave={saveMarketDecision}
+                state={marketDecisionState}
               />
 
               <section className="analysis-section">

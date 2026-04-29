@@ -2,6 +2,7 @@ from app.models.evidence_item import EvidenceItem
 from app.models.event import Event
 from app.models.external_market_signal import ExternalMarketSignal
 from app.models.market import Market
+from app.models.market_decision_log import MarketDecisionLog
 from app.models.market_investigation_status import MarketInvestigationStatus
 from app.models.market_outcome import MarketOutcome
 from app.models.market_tag import MarketTag, MarketTagLink
@@ -18,6 +19,7 @@ __all__ = [
     "Event",
     "ExternalMarketSignal",
     "Market",
+    "MarketDecisionLog",
     "MarketInvestigationStatus",
     "MarketOutcome",
     "MarketTag",
