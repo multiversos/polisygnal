@@ -55,6 +55,10 @@ import {
   type MarketDecision,
   type MarketDecisionItem,
 } from "../../lib/marketDecisions";
+import {
+  generateResearchPacket,
+  type ResearchPacketResult,
+} from "../../lib/researchPackets";
 
 type JsonPayload = Record<string, unknown> | unknown[];
 
@@ -398,6 +402,14 @@ type MarketDecisionPanelState = {
   decisionDraft: MarketDecision;
   noteDraft: string;
   confidenceDraft: DecisionConfidenceLabel | "";
+};
+
+type ResearchPacketPanelState = {
+  loading: boolean;
+  error: string | null;
+  result: ResearchPacketResult | null;
+  notesDraft: string;
+  copied: "ingest" | "dry-run" | null;
 };
 
 const API_BASE_URL = (
@@ -2452,6 +2464,13 @@ export default function MarketAnalysisPage() {
     error: null,
     fallback: null,
   });
+  const [researchPacketState, setResearchPacketState] = useState<ResearchPacketPanelState>({
+    loading: false,
+    error: null,
+    result: null,
+    notesDraft: "",
+    copied: null,
+  });
   const [state, setState] = useState<LoadState>({
     analysis: null,
     priceHistory: null,
@@ -3057,6 +3076,71 @@ export default function MarketAnalysisPage() {
     }
   }, []);
 
+  const generatePacketFromUi = useCallback(async () => {
+    setResearchPacketState((current) => ({
+      ...current,
+      loading: true,
+      error: null,
+      copied: null,
+    }));
+    try {
+      const result = await generateResearchPacket(marketId, researchPacketState.notesDraft);
+      setResearchPacketState((current) => ({
+        ...current,
+        loading: false,
+        error: null,
+        result,
+      }));
+    } catch {
+      setResearchPacketState((current) => ({
+        ...current,
+        loading: false,
+        error: "No se pudo generar el Research Packet.",
+      }));
+    }
+  }, [marketId, researchPacketState.notesDraft]);
+
+  const copyResearchPacketCommand = useCallback(
+    async (command: string, key: "ingest" | "dry-run") => {
+      if (typeof window === "undefined" || typeof document === "undefined") {
+        return;
+      }
+      try {
+        let copied = false;
+        if (navigator.clipboard) {
+          try {
+            await navigator.clipboard.writeText(command);
+            copied = true;
+          } catch {
+            copied = false;
+          }
+        }
+        if (!copied) {
+          const textarea = document.createElement("textarea");
+          textarea.value = command;
+          textarea.setAttribute("readonly", "true");
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          copied = document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+        if (!copied) {
+          return;
+        }
+        setResearchPacketState((current) => ({ ...current, copied: key }));
+        window.setTimeout(
+          () => setResearchPacketState((current) => ({ ...current, copied: null })),
+          1800,
+        );
+      } catch {
+        setResearchPacketState((current) => ({ ...current, copied: null }));
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     void loadAnalysis();
   }, [loadAnalysis]);
@@ -3337,6 +3421,96 @@ export default function MarketAnalysisPage() {
                   <span className="reason-chip">
                     Ya existen investigaciones previas para este mercado.
                   </span>
+                ) : null}
+                <div className="research-packet-ui">
+                  <label className="watchlist-field">
+                    Notas opcionales para el packet
+                    <textarea
+                      disabled={researchPacketState.loading}
+                      maxLength={4000}
+                      onChange={(event) =>
+                        setResearchPacketState((current) => ({
+                          ...current,
+                          notesDraft: event.target.value,
+                        }))
+                      }
+                      placeholder="Ej. revisar lesionados, calendario reciente o movimiento de precio."
+                      rows={3}
+                      value={researchPacketState.notesDraft}
+                    />
+                  </label>
+                  <button
+                    className="watchlist-button"
+                    disabled={researchPacketState.loading}
+                    onClick={() => void generatePacketFromUi()}
+                    type="button"
+                  >
+                    {researchPacketState.loading ? "Generando..." : "Generar Research Packet"}
+                  </button>
+                  <p className="section-note">
+                    Esto no ejecuta investigacion automatica. Solo prepara
+                    archivos para revisar con Codex/ChatGPT.
+                  </p>
+                </div>
+                {researchPacketState.error ? (
+                  <div className="alert-panel compact" role="status">
+                    <strong>Research Packet</strong>
+                    <span>{researchPacketState.error}</span>
+                  </div>
+                ) : null}
+                {researchPacketState.result ? (
+                  <div className="research-packet-result">
+                    <div>
+                      <span>research_run_id</span>
+                      <strong>{researchPacketState.result.research_run_id}</strong>
+                    </div>
+                    <div>
+                      <span>request</span>
+                      <code>{researchPacketState.result.request_path}</code>
+                    </div>
+                    <div>
+                      <span>packet</span>
+                      <code>{researchPacketState.result.packet_path}</code>
+                    </div>
+                    <div>
+                      <span>response esperada</span>
+                      <code>{researchPacketState.result.expected_response_path}</code>
+                    </div>
+                    <div className="command-card">
+                      <div>
+                        <span>Ingesta dry-run</span>
+                        <code>{researchPacketState.result.ingest_dry_run_command}</code>
+                      </div>
+                      <button
+                        onClick={() =>
+                          void copyResearchPacketCommand(
+                            researchPacketState.result?.ingest_dry_run_command ?? "",
+                            "dry-run",
+                          )
+                        }
+                        type="button"
+                      >
+                        {researchPacketState.copied === "dry-run" ? "Copiado" : "Copiar comando"}
+                      </button>
+                    </div>
+                    <div className="command-card">
+                      <div>
+                        <span>Ingesta final manual</span>
+                        <code>{researchPacketState.result.ingest_command}</code>
+                      </div>
+                      <button
+                        onClick={() =>
+                          void copyResearchPacketCommand(
+                            researchPacketState.result?.ingest_command ?? "",
+                            "ingest",
+                          )
+                        }
+                        type="button"
+                      >
+                        {researchPacketState.copied === "ingest" ? "Copiado" : "Copiar comando"}
+                      </button>
+                    </div>
+                  </div>
                 ) : null}
                 <div className="command-card">
                   <div>

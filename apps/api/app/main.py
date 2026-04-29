@@ -10,6 +10,7 @@ from app.api.routes_external_signals import router as external_signals_router
 from app.api.routes_investigation_status import router as investigation_status_router
 from app.api.routes_market_decisions import router as market_decisions_router
 from app.api.routes_research import router as research_router
+from app.api.routes_research_packets import router as research_packets_router
 from app.api.routes_smart_alerts import router as smart_alerts_router
 from app.api.routes_sources import router as sources_router
 from app.api.routes_tags import router as tags_router
@@ -36,6 +37,7 @@ app.include_router(router)
 app.include_router(backtesting_router)
 app.include_router(data_health_router)
 app.include_router(research_router)
+app.include_router(research_packets_router)
 app.include_router(external_signals_router)
 app.include_router(watchlist_router)
 app.include_router(investigation_status_router)

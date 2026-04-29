@@ -3171,6 +3171,48 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.research-packet-ui,
+.research-packet-result {
+  display: grid;
+  gap: 10px;
+}
+
+.research-packet-result {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.research-packet-result > div:not(.command-card) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.research-packet-result span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.research-packet-result strong {
+  color: var(--foreground);
+  font-size: 1.05rem;
+}
+
+.research-packet-result code {
+  display: block;
+  padding: 8px;
+  border-radius: 7px;
+  background: var(--code-background);
+  color: var(--code-foreground);
+  font-size: 0.74rem;
+  line-height: 1.45;
+  overflow-x: auto;
+}
+
 .backtesting-outcome-list {
   display: grid;
   gap: 12px;
