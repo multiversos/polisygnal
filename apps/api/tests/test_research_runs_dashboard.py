@@ -155,6 +155,61 @@ def test_research_runs_openapi_includes_endpoints(client: TestClient) -> None:
     paths = response.json()["paths"]
     assert "/research/runs" in paths
     assert "/research/runs/{run_id}" in paths
+    assert "/research/runs/{run_id}/quality-gate" in paths
+
+
+def test_research_run_quality_gate_without_report_is_instructional(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(db_session, suffix="quality-gate")
+    run = _create_research_run(
+        db_session,
+        market.id,
+        status="pending_agent",
+        metadata_json={
+            "expected_response_path": "logs/research-agent/responses/11.json",
+            "ingest_command": "python -m app.commands.ingest_codex_research --run-id 11",
+        },
+    )
+    db_session.commit()
+
+    response = client.get(f"/research/runs/{run.id}/quality-gate")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "pending_dry_run"
+    assert payload["dry_run_command"].endswith("--dry-run")
+    assert payload["validation_report"] is None
+    assert "validation_report_not_found" in payload["warnings"]
+
+
+def test_research_run_quality_gate_uses_saved_validation_report(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    market = _create_market(db_session, suffix="quality-gate-report")
+    run = _create_research_run(
+        db_session,
+        market.id,
+        status="completed",
+        metadata_json={
+            "validation_path": "logs/research-agent/validation/12.json",
+            "validation_report": {
+                "severity": "warning",
+                "recommended_action": "review_required",
+            },
+        },
+    )
+    db_session.commit()
+
+    response = client.get(f"/research/runs/{run.id}/quality-gate")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "requires_review"
+    assert payload["validation_path"].endswith("12.json")
+    assert payload["validation_report"]["recommended_action"] == "review_required"
 
 
 def _create_market(db_session: Session, *, suffix: str = "research-run") -> Market:

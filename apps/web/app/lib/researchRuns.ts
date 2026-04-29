@@ -51,6 +51,17 @@ export type ResearchRunDetail = ResearchRunItem & {
   prediction?: unknown | null;
 };
 
+export type ResearchQualityGate = {
+  research_run_id: number;
+  market_id: number;
+  status: string;
+  dry_run_command: string;
+  validation_path?: string | null;
+  validation_report?: Record<string, unknown> | null;
+  instructions: string[];
+  warnings: string[];
+};
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -90,4 +101,16 @@ export async function fetchResearchRunDetail(runId: number | string): Promise<Re
     throw new Error(`/research/runs/${runId} responded ${response.status}`);
   }
   return response.json() as Promise<ResearchRunDetail>;
+}
+
+export async function fetchResearchRunQualityGate(
+  runId: number | string,
+): Promise<ResearchQualityGate> {
+  const response = await fetch(`${API_BASE_URL}/research/runs/${runId}/quality-gate`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`/research/runs/${runId}/quality-gate responded ${response.status}`);
+  }
+  return response.json() as Promise<ResearchQualityGate>;
 }

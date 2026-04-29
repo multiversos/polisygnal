@@ -5,7 +5,12 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { MainNavigation } from "../../../components/MainNavigation";
-import { fetchResearchRunDetail, type ResearchRunDetail } from "../../../lib/researchRuns";
+import {
+  fetchResearchRunDetail,
+  fetchResearchRunQualityGate,
+  type ResearchQualityGate,
+  type ResearchRunDetail,
+} from "../../../lib/researchRuns";
 
 const statusLabels: Record<string, string> = {
   completed: "Completado",
@@ -18,6 +23,14 @@ const modeLabels: Record<string, string> = {
   cheap_research: "Research economico",
   codex_agent: "Codex Agent",
   local_only: "Solo local",
+};
+
+const qualityGateLabels: Record<string, string> = {
+  approved: "Aprobado",
+  not_available: "No disponible",
+  pending_dry_run: "Pendiente de dry-run",
+  rejected: "Rechazado",
+  requires_review: "Requiere revision",
 };
 
 function formatDate(value?: string | null): string {
@@ -66,6 +79,7 @@ export default function ResearchRunDetailPage() {
   const params = useParams<{ id: string }>();
   const runId = params.id;
   const [run, setRun] = useState<ResearchRunDetail | null>(null);
+  const [qualityGate, setQualityGate] = useState<ResearchQualityGate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -74,8 +88,12 @@ export default function ResearchRunDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const detail = await fetchResearchRunDetail(runId);
+      const [detail, gate] = await Promise.all([
+        fetchResearchRunDetail(runId),
+        fetchResearchRunQualityGate(runId),
+      ]);
       setRun(detail);
+      setQualityGate(gate);
     } catch {
       setError("No se pudo cargar el detalle del research run.");
     } finally {
@@ -92,10 +110,10 @@ export default function ResearchRunDetailPage() {
       return { dryRun: "", ingest: "" };
     }
     return {
-      dryRun: buildDryRunCommand(run),
+      dryRun: qualityGate?.dry_run_command || buildDryRunCommand(run),
       ingest: buildIngestCommand(run),
     };
-  }, [run]);
+  }, [qualityGate?.dry_run_command, run]);
 
   const copyText = async (label: string, value: string) => {
     if (!value) {
@@ -257,6 +275,58 @@ export default function ResearchRunDetailPage() {
                 </button>
               </article>
             </div>
+          </section>
+
+          <section className="dashboard-panel quality-gate-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Validacion</p>
+                <h2>Quality Gate</h2>
+              </div>
+              <span className={`badge quality-gate-status ${qualityGate?.status ?? "not_available"}`}>
+                {qualityGateLabels[qualityGate?.status ?? "not_available"] ?? "No disponible"}
+              </span>
+            </div>
+            <p className="section-note">
+              El Quality Gate valida fuentes, evidencia, limites de ajuste y modo
+              mock/real antes de permitir una prediccion manualmente ingestada.
+            </p>
+            <div className="quality-gate-command">
+              <span>Comando dry-run</span>
+              <code>{qualityGate?.dry_run_command ?? commands.dryRun}</code>
+              <button
+                className="theme-toggle"
+                onClick={() =>
+                  void copyText("Dry-run de Quality Gate copiado", qualityGate?.dry_run_command ?? commands.dryRun)
+                }
+                type="button"
+              >
+                Copiar dry-run
+              </button>
+            </div>
+            {qualityGate?.validation_path ? (
+              <PathRow label="Validation report" value={qualityGate.validation_path} />
+            ) : (
+              <div className="empty-state">
+                No hay reporte de validacion guardado todavia. Ejecuta dry-run para generarlo.
+              </div>
+            )}
+            {qualityGate?.instructions.length ? (
+              <ul className="quality-gate-list">
+                {qualityGate.instructions.map((instruction) => (
+                  <li key={instruction}>{instruction}</li>
+                ))}
+              </ul>
+            ) : null}
+            {qualityGate?.warnings.length ? (
+              <div className="quality-badge-row">
+                {qualityGate.warnings.map((warning) => (
+                  <span className="quality-badge warning" key={warning}>
+                    {warning.replaceAll("_", " ")}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </section>
 
           <section className="dashboard-panel">

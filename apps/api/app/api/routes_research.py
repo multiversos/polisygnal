@@ -33,6 +33,7 @@ from app.schemas.research_runs import (
     ResearchRunMarketSummary,
     ResearchRunsResponse,
 )
+from app.schemas.research_quality_gate import ResearchQualityGateRead
 from app.services.research.candidate_selector import list_research_candidates
 from app.services.research.pipeline import run_market_research
 from app.services.research.upcoming_data_quality import list_upcoming_data_quality
@@ -125,6 +126,24 @@ def get_research_run_detail(
             ),
         }
     )
+
+
+@router.get(
+    "/research/runs/{run_id}/quality-gate",
+    response_model=ResearchQualityGateRead,
+    tags=["research"],
+)
+def get_research_run_quality_gate(
+    run_id: int,
+    db: Session = Depends(get_db),
+) -> ResearchQualityGateRead:
+    research_run = get_research_run_by_id(db, run_id)
+    if research_run is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Research run {run_id} no encontrado.",
+        )
+    return _build_quality_gate_payload(research_run)
 
 
 @router.get(
@@ -384,6 +403,55 @@ def _serialize_research_run_list_item(research_run: ResearchRun) -> ResearchRunL
             "ingest_command": _metadata_str(metadata, "ingest_command"),
             "warnings": warnings,
         }
+    )
+
+
+def _build_quality_gate_payload(research_run: ResearchRun) -> ResearchQualityGateRead:
+    metadata = _metadata_dict(research_run.metadata_json)
+    validation_report = metadata.get("validation_report")
+    validation_report_payload = validation_report if isinstance(validation_report, dict) else None
+    validation_path = _metadata_str(metadata, "validation_path")
+    ingest_command = _metadata_str(metadata, "ingest_command")
+    dry_run_command = (
+        f"{ingest_command} --dry-run"
+        if ingest_command and "--dry-run" not in ingest_command
+        else ingest_command
+    ) or f"python -m app.commands.ingest_codex_research --run-id {research_run.id} --dry-run"
+
+    warnings: list[str] = []
+    if validation_report_payload is None:
+        status_value = (
+            "pending_dry_run"
+            if _metadata_str(metadata, "expected_response_path") or research_run.status == "pending_agent"
+            else "not_available"
+        )
+        warnings.append("validation_report_not_found")
+    else:
+        recommended_action = validation_report_payload.get("recommended_action")
+        severity = validation_report_payload.get("severity")
+        if recommended_action == "ingest":
+            status_value = "approved"
+        elif recommended_action == "review_required":
+            status_value = "requires_review"
+        elif recommended_action == "reject" or severity == "failed":
+            status_value = "rejected"
+        else:
+            status_value = "requires_review"
+
+    return ResearchQualityGateRead(
+        research_run_id=research_run.id,
+        market_id=research_run.market_id,
+        status=status_value,
+        dry_run_command=dry_run_command,
+        validation_path=validation_path,
+        validation_report=validation_report_payload,
+        instructions=[
+            "Guarda la response JSON en la ruta esperada del run.",
+            "Ejecuta el comando dry-run antes de cualquier ingestion manual.",
+            "Revisa errores, warnings, calidad de fuentes y limites de ajuste.",
+            "No ingestas si el Quality Gate rechaza la respuesta.",
+        ],
+        warnings=warnings,
     )
 
 
