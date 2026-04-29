@@ -2987,6 +2987,150 @@ h2 {
   gap: 12px;
 }
 
+.sports-page {
+  display: grid;
+  gap: 20px;
+}
+
+.sports-index-grid,
+.sports-market-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.sport-overview-card {
+  --sport-accent: var(--accent);
+  --sport-soft: var(--accent-soft);
+  --sport-ink: var(--accent-ink);
+
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--sport-accent);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, var(--surface), var(--surface-raised)),
+    var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.sport-overview-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--sport-soft);
+  color: var(--sport-ink);
+  font-size: 1.45rem;
+}
+
+.sport-overview-card h2,
+.sport-overview-card p,
+.sports-market-card h2,
+.sports-market-card p {
+  margin: 0;
+}
+
+.sport-overview-card h2 {
+  font-size: 1.18rem;
+}
+
+.sport-overview-card p,
+.sports-market-card p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.sports-market-section {
+  display: grid;
+  gap: 14px;
+}
+
+.sports-market-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.sports-market-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.sports-market-card h2 {
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.sports-market-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sports-market-metrics div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+}
+
+.sports-market-metrics span,
+.sports-market-score span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sports-market-metrics strong,
+.sports-market-score strong {
+  color: var(--foreground);
+  font-weight: 900;
+}
+
+.sports-market-score {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+}
+
+.sports-market-score.positive {
+  border-left-color: var(--accent);
+}
+
+.sports-market-score.negative {
+  border-left-color: var(--red);
+}
+
+.sports-market-score.warning {
+  border-left-color: var(--amber);
+}
+
+.sports-market-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .backtesting-outcome-list {
   display: grid;
   gap: 12px;

@@ -10,6 +10,7 @@ const THEME_STORAGE_KEY = "polysignal-theme";
 
 const navigationItems = [
   { label: "Dashboard", href: "/" },
+  { label: "Deportes", href: "/sports" },
   { label: "Briefing diario", href: "/briefing" },
   { label: "Mi seguimiento", href: "/#mi-seguimiento" },
   { label: "Workflow", href: "/workflow" },
