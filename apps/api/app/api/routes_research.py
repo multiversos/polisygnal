@@ -21,6 +21,7 @@ from app.repositories.research_runs import (
     list_research_runs_for_market,
 )
 from app.schemas.prediction import PredictionItemResponse
+from app.schemas.analysis_readiness import AnalysisReadinessResponse
 from app.schemas.research import (
     PredictionReportRead,
     ResearchCandidatesResponse,
@@ -39,6 +40,7 @@ from app.schemas.research_runs import (
 )
 from app.schemas.research_quality_gate import ResearchQualityGateRead
 from app.services.research.candidate_selector import list_research_candidates
+from app.services.research.analysis_readiness import list_analysis_readiness
 from app.services.research.codex_agent_adapter import (
     DEFAULT_RESPONSE_DIR,
     DEFAULT_VALIDATION_DIR,
@@ -152,6 +154,25 @@ def get_research_run_quality_gate(
             detail=f"Research run {run_id} no encontrado.",
         )
     return _build_quality_gate_payload(research_run)
+
+
+@router.get(
+    "/research/analysis-readiness",
+    response_model=AnalysisReadinessResponse,
+    tags=["research"],
+)
+def get_analysis_readiness(
+    sport: str | None = Query(default=None),
+    days: int = Query(default=7, ge=1, le=30),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> AnalysisReadinessResponse:
+    return list_analysis_readiness(
+        db,
+        sport=sport,
+        days=days,
+        limit=limit,
+    )
 
 
 @router.get(

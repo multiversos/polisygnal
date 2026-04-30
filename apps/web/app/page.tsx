@@ -182,6 +182,46 @@ type UpcomingDataQualityResponse = {
   filters_applied: Record<string, unknown>;
 };
 
+type AnalysisReadinessItem = {
+  market_id: number;
+  title: string;
+  sport: string;
+  market_shape: string;
+  close_time?: string | null;
+  yes_price?: string | number | null;
+  no_price?: string | number | null;
+  liquidity?: string | number | null;
+  volume?: string | number | null;
+  data_quality_label: string;
+  freshness_status: string;
+  polysignal_score_status: string;
+  readiness_status: "ready" | "needs_refresh" | "blocked" | string;
+  readiness_score: number;
+  reasons: string[];
+  missing_fields: string[];
+  suggested_next_action: string;
+  suggested_refresh_snapshot_command: string;
+  suggested_refresh_metadata_command: string;
+};
+
+type AnalysisReadinessResponse = {
+  generated_at: string;
+  sport?: string | null;
+  days: number;
+  limit: number;
+  summary: {
+    total_checked: number;
+    ready_count: number;
+    refresh_needed_count: number;
+    blocked_count: number;
+    missing_snapshot_count: number;
+    missing_price_count: number;
+    score_pending_count: number;
+  };
+  items: AnalysisReadinessItem[];
+  filters_applied: Record<string, unknown>;
+};
+
 type MarketPriceLike = {
   market_yes_price?: string | number | null;
   market_no_price?: string | number | null;
@@ -235,6 +275,8 @@ type DashboardState = {
   upcomingCounts: Record<string, number> | null;
   upcomingDataQualitySummary: Record<string, number> | null;
   upcomingDataQualityItems: UpcomingDataQualityItem[];
+  analysisReadinessSummary: AnalysisReadinessResponse["summary"] | null;
+  analysisReadinessItems: AnalysisReadinessItem[];
   externalSignals: ExternalMarketSignal[];
   watchlistItems: WatchlistItem[];
   investigationStatuses: InvestigationStatusItem[];
@@ -616,6 +658,18 @@ function buildUpcomingDataQualityPath(filters: UpcomingFilters): string {
   return `/research/upcoming-sports/data-quality?${params.toString()}`;
 }
 
+function buildAnalysisReadinessPath(filters: UpcomingFilters): string {
+  const params = new URLSearchParams({
+    limit: "50",
+    days: String(filters.days),
+  });
+  const apiSport = getSportApiFilter(filters.sport);
+  if (apiSport) {
+    params.set("sport", apiSport);
+  }
+  return `/research/analysis-readiness?${params.toString()}`;
+}
+
 function formatOptionLabel(value: string): string {
   if (value === "all") {
     return "todos";
@@ -979,6 +1033,32 @@ function formatFreshnessAction(value?: string | null): string {
   return freshnessActionLabels[value] ?? humanizeToken(value);
 }
 
+function formatReadinessStatus(value: string): string {
+  if (value === "ready") {
+    return "Listo";
+  }
+  if (value === "needs_refresh") {
+    return "Necesita refresh";
+  }
+  if (value === "blocked") {
+    return "Bloqueado";
+  }
+  return humanizeToken(value);
+}
+
+function formatReadinessAction(value: string): string {
+  if (value === "listo_para_research_packet") {
+    return "Listo para Research Packet";
+  }
+  if (value === "ejecutar_refresh_snapshot_dry_run") {
+    return "Probar snapshot dry-run";
+  }
+  if (value === "revisar_o_descartar_por_ahora") {
+    return "Revisar o descartar por ahora";
+  }
+  return humanizeToken(value);
+}
+
 function formatSmartAlertSeverity(value: string): string {
   if (value === "critical") {
     return "Crítica";
@@ -1292,6 +1372,89 @@ function DataQualitySummaryPanel({
         <strong>{getValue("sport_other_count")}</strong>
       </div>
       <p>El score queda pendiente cuando faltan precios, snapshots o clasificaciÃ³n confiable.</p>
+    </section>
+  );
+}
+
+function FirstAnalysisReadinessPanel({
+  items,
+  loading,
+  summary,
+}: {
+  items: AnalysisReadinessItem[];
+  loading: boolean;
+  summary: AnalysisReadinessResponse["summary"] | null;
+}) {
+  const readyItems = items.filter((item) => item.readiness_status === "ready").slice(0, 3);
+  return (
+    <section className="panel first-analysis-panel" aria-label="Mercados listos para analisis">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Primeros analisis</p>
+          <h2>Mercados listos para analisis</h2>
+          <p>
+            PolySignal separa mercados listos de los que necesitan refresh controlado.
+            La UI no ejecuta refresh, research ni predicciones.
+          </p>
+        </div>
+        <a className="text-link" href="/data-health">
+          Ver Data Health
+        </a>
+      </div>
+      <div className="data-quality-summary compact-readiness-summary">
+        <div>
+          <span>Listos</span>
+          <strong>{loading ? "..." : summary?.ready_count ?? 0}</strong>
+        </div>
+        <div>
+          <span>Necesitan refresh</span>
+          <strong>{loading ? "..." : summary?.refresh_needed_count ?? 0}</strong>
+        </div>
+        <div>
+          <span>Bloqueados</span>
+          <strong>{loading ? "..." : summary?.blocked_count ?? 0}</strong>
+        </div>
+        <div>
+          <span>Score pendiente</span>
+          <strong>{loading ? "..." : summary?.score_pending_count ?? 0}</strong>
+        </div>
+      </div>
+      {loading ? (
+        <div className="empty-state compact">Calculando readiness...</div>
+      ) : readyItems.length === 0 ? (
+        <div className="empty-state compact">
+          <strong>No hay mercados completamente listos todavia.</strong>
+          <p>
+            Revisa Data Health para ver candidatos que necesitan snapshot/precio y
+            comandos dry-run de refresh controlado.
+          </p>
+        </div>
+      ) : (
+        <div className="ready-market-list">
+          {readyItems.map((item) => (
+            <article className="ready-market-card" key={`ready-${item.market_id}`}>
+              <div>
+                <span className="eyebrow">{formatSportLabel(item.sport)}</span>
+                <h3>{humanizeMarketTitle(item.title)}</h3>
+                <p>
+                  Cierre {formatDateTime(item.close_time)} - {item.data_quality_label} -{" "}
+                  {formatReadinessAction(item.suggested_next_action)}
+                </p>
+              </div>
+              <div className="snapshot-gap-meta">
+                <span className="readiness-status ready">
+                  {formatReadinessStatus(item.readiness_status)}
+                </span>
+                <span className="reason-chip">SI {formatMarketPercent(item.yes_price)}</span>
+                <span className="reason-chip">NO {formatMarketPercent(item.no_price)}</span>
+                <a className="text-link" href={`/markets/${item.market_id}`}>
+                  Ver analisis
+                </a>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -1885,6 +2048,8 @@ export default function DashboardPage() {
     upcomingCounts: null,
     upcomingDataQualitySummary: null,
     upcomingDataQualityItems: [],
+    analysisReadinessSummary: null,
+    analysisReadinessItems: [],
     externalSignals: [],
     watchlistItems: [],
     investigationStatuses: [],
@@ -1901,6 +2066,7 @@ export default function DashboardPage() {
     const candidatesPath = buildCandidatesPath(filters);
     const upcomingPath = buildUpcomingPath(upcomingFilters);
     const upcomingDataQualityPath = buildUpcomingDataQualityPath(upcomingFilters);
+    const analysisReadinessPath = buildAnalysisReadinessPath(upcomingFilters);
     const alertSport = getSportApiFilter(upcomingFilters.sport);
     const [
       health,
@@ -1908,6 +2074,7 @@ export default function DashboardPage() {
       candidates,
       upcomingSports,
       upcomingDataQuality,
+      analysisReadiness,
       dashboardMeta,
       externalSignals,
       watchlist,
@@ -1920,6 +2087,7 @@ export default function DashboardPage() {
         fetchJson<CandidatesResponse>(candidatesPath),
         fetchJson<UpcomingSportsResponse>(upcomingPath),
         fetchJson<UpcomingDataQualityResponse>(upcomingDataQualityPath),
+        fetchJson<AnalysisReadinessResponse>(analysisReadinessPath),
         fetchJson<DashboardMetaResponse>("/dashboard/latest/meta"),
         fetchJson<ExternalSignalsResponse>("/external-signals/kalshi?limit=10"),
         fetchWatchlistItems(),
@@ -1939,6 +2107,9 @@ export default function DashboardPage() {
     }
     if (upcomingDataQuality.status === "rejected") {
       errors.push("No se pudo cargar calidad de datos");
+    }
+    if (analysisReadiness.status === "rejected") {
+      errors.push("No se pudo cargar readiness de analisis");
     }
     if (externalSignals.status === "rejected") {
       errors.push("No se pudieron cargar señales externas");
@@ -1969,6 +2140,10 @@ export default function DashboardPage() {
         upcomingDataQuality.status === "fulfilled" ? upcomingDataQuality.value.summary : null,
       upcomingDataQualityItems:
         upcomingDataQuality.status === "fulfilled" ? upcomingDataQuality.value.items : [],
+      analysisReadinessSummary:
+        analysisReadiness.status === "fulfilled" ? analysisReadiness.value.summary : null,
+      analysisReadinessItems:
+        analysisReadiness.status === "fulfilled" ? analysisReadiness.value.items : [],
       externalSignals:
         externalSignals.status === "fulfilled" ? externalSignals.value.signals : [],
       watchlistItems: watchlist.status === "fulfilled" ? watchlist.value : [],
@@ -2198,6 +2373,12 @@ export default function DashboardPage() {
       <SportsSelectorBar
         selectedSport={upcomingFilters.sport}
         onSelect={handleSelectSport}
+      />
+
+      <FirstAnalysisReadinessPanel
+        items={state.analysisReadinessItems}
+        loading={state.loading}
+        summary={state.analysisReadinessSummary}
       />
 
       <section className="filter-panel dashboard-filter-panel" aria-label="Filtros de candidatos">

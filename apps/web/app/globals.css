@@ -3975,6 +3975,107 @@ h2 {
   min-width: 0;
 }
 
+.readiness-section,
+.first-analysis-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.readiness-list,
+.ready-market-list {
+  display: grid;
+  gap: 12px;
+}
+
+.readiness-card,
+.ready-market-card {
+  align-items: start;
+  background: color-mix(in srgb, var(--surface) 91%, var(--background));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.readiness-card {
+  grid-template-columns: 92px minmax(0, 1fr);
+}
+
+.ready-market-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.readiness-card.ready,
+.ready-market-card {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+}
+
+.readiness-card.needs_refresh {
+  border-color: color-mix(in srgb, var(--amber) 34%, var(--line));
+}
+
+.readiness-card.blocked {
+  border-color: color-mix(in srgb, var(--muted) 28%, var(--line));
+}
+
+.readiness-score {
+  align-items: center;
+  background: color-mix(in srgb, var(--blue-soft) 64%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--blue) 24%, var(--line));
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-height: 76px;
+  padding: 10px;
+}
+
+.readiness-score span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.readiness-score strong {
+  color: var(--foreground);
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.readiness-card-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.readiness-status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 5px 9px;
+}
+
+.readiness-status.ready {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.readiness-status.needs_refresh {
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+
+.readiness-status.blocked {
+  background: var(--surface-muted);
+  color: var(--muted-strong);
+}
+
+.compact-readiness-summary {
+  margin: 0;
+}
+
 .compact-command-list .command-card {
   grid-template-columns: minmax(0, 1fr) auto;
 }
@@ -4937,7 +5038,9 @@ h2 {
   .match-review-layout,
   .analysis-chip-columns,
   .prediction-report-grid,
-  .command-card {
+  .command-card,
+  .readiness-card,
+  .ready-market-card {
     grid-template-columns: 1fr;
   }
 

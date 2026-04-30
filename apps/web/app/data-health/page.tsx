@@ -5,10 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
 import {
+  fetchAnalysisReadiness,
   fetchDataHealthOverview,
   fetchRefreshPriorities,
   fetchRefreshRuns,
   fetchSnapshotGaps,
+  type AnalysisReadiness,
   type DataHealthOverview,
   type RefreshPriorities,
   type RefreshRuns,
@@ -41,6 +43,18 @@ const recommendedActionLabels: Record<string, string> = {
   exclude_from_scoring: "Excluir del score",
 };
 
+const readinessStatusLabels: Record<string, string> = {
+  ready: "Listo",
+  needs_refresh: "Necesita refresh",
+  blocked: "Bloqueado",
+};
+
+const readinessActionLabels: Record<string, string> = {
+  listo_para_research_packet: "Listo para Research Packet",
+  ejecutar_refresh_snapshot_dry_run: "Probar snapshot dry-run",
+  revisar_o_descartar_por_ahora: "Revisar o descartar por ahora",
+};
+
 function formatDate(value?: string | null): string {
   if (!value) {
     return "N/D";
@@ -69,6 +83,14 @@ function formatRecommendedAction(value: string): string {
   return recommendedActionLabels[value] ?? value.replaceAll("_", " ");
 }
 
+function formatReadinessStatus(value: string): string {
+  return readinessStatusLabels[value] ?? value.replaceAll("_", " ");
+}
+
+function formatReadinessAction(value: string): string {
+  return readinessActionLabels[value] ?? value.replaceAll("_", " ");
+}
+
 function buildSnapshotCommand(marketId: number): string {
   return `python -m app.commands.refresh_market_snapshots --market-id ${marketId} --dry-run --json`;
 }
@@ -79,6 +101,7 @@ function buildMetadataCommand(marketId: number): string {
 
 export default function DataHealthPage() {
   const [overview, setOverview] = useState<DataHealthOverview | null>(null);
+  const [analysisReadiness, setAnalysisReadiness] = useState<AnalysisReadiness | null>(null);
   const [snapshotGaps, setSnapshotGaps] = useState<SnapshotGaps | null>(null);
   const [refreshPriorities, setRefreshPriorities] = useState<RefreshPriorities | null>(null);
   const [refreshRuns, setRefreshRuns] = useState<RefreshRuns | null>(null);
@@ -92,16 +115,19 @@ export default function DataHealthPage() {
     try {
       const [
         overviewResult,
+        analysisReadinessResult,
         snapshotGapsResult,
         refreshPrioritiesResult,
         refreshRunsResult,
       ] = await Promise.all([
         fetchDataHealthOverview(),
+        fetchAnalysisReadiness({ days: 7, limit: 50 }),
         fetchSnapshotGaps({ days: 7, limit: 50 }),
         fetchRefreshPriorities({ days: 7, limit: 12 }),
         fetchRefreshRuns({ limit: 10 }),
       ]);
       setOverview(overviewResult);
+      setAnalysisReadiness(analysisReadinessResult);
       setSnapshotGaps(snapshotGapsResult);
       setRefreshPriorities(refreshPrioritiesResult);
       setRefreshRuns(refreshRunsResult);
@@ -193,6 +219,140 @@ export default function DataHealthPage() {
           <strong>{loading ? "..." : formatDate(overview?.latest_snapshot_at)}</strong>
           <p>Frescura local</p>
         </article>
+      </section>
+
+      <section className="dashboard-panel readiness-section">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Primeros analisis</p>
+            <h2>Preparacion para primeros analisis</h2>
+            <p className="section-note">
+              Separa mercados listos de los que necesitan refresh o deben quedar bloqueados.
+              Esta vista no ejecuta refresh, research ni predicciones.
+            </p>
+          </div>
+          <span className="badge muted">
+            {analysisReadiness?.summary.total_checked ?? 0} revisados
+          </span>
+        </div>
+
+        <div className="metric-grid compact-metrics">
+          <article className="metric-card">
+            <span>Listos</span>
+            <strong>{loading ? "..." : analysisReadiness?.summary.ready_count ?? 0}</strong>
+            <p>Con snapshot, precios y deporte claro</p>
+          </article>
+          <article className="metric-card">
+            <span>Necesitan refresh</span>
+            <strong>
+              {loading ? "..." : analysisReadiness?.summary.refresh_needed_count ?? 0}
+            </strong>
+            <p>Candidatos buenos sin snapshot/precio</p>
+          </article>
+          <article className="metric-card">
+            <span>Bloqueados</span>
+            <strong>{loading ? "..." : analysisReadiness?.summary.blocked_count ?? 0}</strong>
+            <p>Inciertos, stale o no aptos por ahora</p>
+          </article>
+          <article className="metric-card">
+            <span>Score pendiente</span>
+            <strong>
+              {loading ? "..." : analysisReadiness?.summary.score_pending_count ?? 0}
+            </strong>
+            <p>Normalmente por falta de precio</p>
+          </article>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">Calculando readiness...</div>
+        ) : !analysisReadiness || analysisReadiness.items.length === 0 ? (
+          <div className="empty-state">
+            No hay mercados proximos para evaluar en la ventana actual.
+          </div>
+        ) : (
+          <div className="readiness-list">
+            {analysisReadiness.items.slice(0, 12).map((item) => (
+              <article
+                className={`readiness-card ${item.readiness_status}`}
+                key={`readiness-${item.market_id}`}
+              >
+                <div className="readiness-score">
+                  <span>Readiness</span>
+                  <strong>{item.readiness_score}</strong>
+                </div>
+                <div className="readiness-card-body">
+                  <div className="refresh-plan-card-header">
+                    <div>
+                      <span className="eyebrow">{formatSport(item.sport)}</span>
+                      <h3>{item.title}</h3>
+                    </div>
+                    <Link className="text-link" href={`/markets/${item.market_id}`}>
+                      Ver mercado
+                    </Link>
+                  </div>
+                  <div className="snapshot-gap-meta">
+                    <span className={`readiness-status ${item.readiness_status}`}>
+                      {formatReadinessStatus(item.readiness_status)}
+                    </span>
+                    <span className="reason-chip">{item.data_quality_label}</span>
+                    <span className={`data-quality-label ${item.freshness_status}`}>
+                      {formatFreshnessStatus(item.freshness_status)}
+                    </span>
+                    <span className="reason-chip">
+                      {formatReadinessAction(item.suggested_next_action)}
+                    </span>
+                    <span className="reason-chip">Cierre {formatDate(item.close_time)}</span>
+                  </div>
+                  <div className="snapshot-gap-meta">
+                    {item.yes_price !== null && item.yes_price !== undefined ? (
+                      <span className="reason-chip">SI {Number(item.yes_price) * 100}%</span>
+                    ) : (
+                      <span className="warning-chip">Falta precio SI</span>
+                    )}
+                    {item.no_price !== null && item.no_price !== undefined ? (
+                      <span className="reason-chip">NO {Number(item.no_price) * 100}%</span>
+                    ) : (
+                      <span className="warning-chip">Falta precio NO</span>
+                    )}
+                    {item.missing_fields.includes("snapshot") ? (
+                      <span className="warning-chip">Sin snapshot</span>
+                    ) : null}
+                    {item.polysignal_score_status === "pending" ? (
+                      <span className="warning-chip">Score pendiente</span>
+                    ) : null}
+                  </div>
+                  {item.missing_fields.length > 0 ? (
+                    <div className="data-health-notes">
+                      {item.missing_fields.slice(0, 6).map((field) => (
+                        <span className="reason-chip" key={`${item.market_id}-${field}`}>
+                          Falta {field.replaceAll("_", " ")}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {item.readiness_status === "needs_refresh" ? (
+                    <div className="refresh-command-list compact-command-list">
+                      <div className="command-card">
+                        <div>
+                          <span>Snapshot dry-run</span>
+                          <code>{item.suggested_refresh_snapshot_command}</code>
+                        </div>
+                        <button
+                          onClick={() => void copyCommand(item.suggested_refresh_snapshot_command)}
+                          type="button"
+                        >
+                          {copiedCommand === item.suggested_refresh_snapshot_command
+                            ? "Copiado"
+                            : "Copiar"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="dashboard-panel">

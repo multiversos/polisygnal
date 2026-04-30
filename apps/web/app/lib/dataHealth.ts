@@ -89,6 +89,48 @@ export type RefreshPriorities = {
   items: RefreshPriorityItem[];
 };
 
+export type AnalysisReadinessSummary = {
+  total_checked: number;
+  ready_count: number;
+  refresh_needed_count: number;
+  blocked_count: number;
+  missing_snapshot_count: number;
+  missing_price_count: number;
+  score_pending_count: number;
+};
+
+export type AnalysisReadinessItem = {
+  market_id: number;
+  title: string;
+  sport: string;
+  market_shape: string;
+  close_time?: string | null;
+  yes_price?: string | number | null;
+  no_price?: string | number | null;
+  liquidity?: string | number | null;
+  volume?: string | number | null;
+  data_quality_label: string;
+  freshness_status: string;
+  polysignal_score_status: string;
+  readiness_status: "ready" | "needs_refresh" | "blocked" | string;
+  readiness_score: number;
+  reasons: string[];
+  missing_fields: string[];
+  suggested_next_action: string;
+  suggested_refresh_snapshot_command: string;
+  suggested_refresh_metadata_command: string;
+};
+
+export type AnalysisReadiness = {
+  generated_at: string;
+  sport?: string | null;
+  days: number;
+  limit: number;
+  summary: AnalysisReadinessSummary;
+  items: AnalysisReadinessItem[];
+  filters_applied: Record<string, unknown>;
+};
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -168,4 +210,27 @@ export async function fetchRefreshPriorities(params?: {
     throw new Error(`/data-health/refresh-priorities responded ${response.status}`);
   }
   return response.json() as Promise<RefreshPriorities>;
+}
+
+export async function fetchAnalysisReadiness(params?: {
+  sport?: string | null;
+  days?: number;
+  limit?: number;
+}): Promise<AnalysisReadiness> {
+  const searchParams = new URLSearchParams();
+  if (params?.sport) {
+    searchParams.set("sport", params.sport);
+  }
+  searchParams.set("days", String(params?.days ?? 7));
+  searchParams.set("limit", String(params?.limit ?? 50));
+  const response = await fetch(
+    `${API_BASE_URL}/research/analysis-readiness?${searchParams.toString()}`,
+    {
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`/research/analysis-readiness responded ${response.status}`);
+  }
+  return response.json() as Promise<AnalysisReadiness>;
 }
