@@ -348,6 +348,79 @@ type MarketLinks = {
   source_notes: string[];
 };
 
+type WalletTradeSignal = {
+  wallet_address: string;
+  wallet_short: string;
+  profile_name?: string | null;
+  side?: string | null;
+  trade_action?: string | null;
+  outcome?: string | null;
+  trade_size_usd?: string | number | null;
+  price?: string | number | null;
+  token_size?: string | number | null;
+  timestamp?: string | null;
+  signal_type: string;
+  signal_score: string | number;
+  transaction_hash?: string | null;
+  warnings: string[];
+};
+
+type WalletPositionSignal = {
+  wallet_address: string;
+  wallet_short: string;
+  profile_name?: string | null;
+  side?: string | null;
+  outcome?: string | null;
+  position_size_usd?: string | number | null;
+  avg_price?: string | number | null;
+  current_price?: string | number | null;
+  token_size?: string | number | null;
+  realized_pnl?: string | number | null;
+  total_pnl?: string | number | null;
+  signal_type: string;
+  signal_score: string | number;
+  warnings: string[];
+};
+
+type NotableWallet = {
+  wallet_address: string;
+  wallet_short: string;
+  profile_name?: string | null;
+  trade_count: number;
+  max_trade_size_usd?: string | number | null;
+  position_size_usd?: string | number | null;
+  realized_pnl?: string | number | null;
+  signal_types: string[];
+  signal_score: string | number;
+  warnings: string[];
+};
+
+type WalletConcentrationSummary = {
+  total_position_size_usd: string | number;
+  sides: Array<{
+    side: string;
+    wallet_count: number;
+    total_position_size_usd: string | number;
+    largest_wallet_share?: string | number | null;
+  }>;
+  concentrated_side?: string | null;
+  warnings: string[];
+};
+
+type WalletIntelligence = {
+  market_id: number;
+  condition_id?: string | null;
+  threshold_usd: string | number;
+  limit: number;
+  data_available: boolean;
+  large_trades: WalletTradeSignal[];
+  large_positions: WalletPositionSignal[];
+  notable_wallets: NotableWallet[];
+  concentration_summary: WalletConcentrationSummary;
+  warnings: string[];
+  generated_at: string;
+};
+
 type MarketAnalysis = {
   market: AnalysisMarket;
   links?: MarketLinks | null;
@@ -385,6 +458,8 @@ type LoadState = {
   analysis: MarketAnalysis | null;
   priceHistory: PriceHistoryResponse | null;
   priceHistoryError: string | null;
+  walletIntelligence: WalletIntelligence | null;
+  walletIntelligenceError: string | null;
   loading: boolean;
   error: string | null;
   notFound: boolean;
@@ -740,6 +815,18 @@ function formatCompact(value: unknown): string {
   return new Intl.NumberFormat("es-US", {
     notation: "compact",
     maximumFractionDigits: 1,
+  }).format(number);
+}
+
+function formatUsd(value: unknown): string {
+  const number = toNumber(value);
+  if (number === null) {
+    return "N/D";
+  }
+  return new Intl.NumberFormat("es-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: number >= 1000 ? 0 : 2,
   }).format(number);
 }
 
@@ -1797,6 +1884,164 @@ function MarketLinksPanel({ links }: { links?: MarketLinks | null }) {
           ))}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function WalletIntelligencePanel({
+  error,
+  intelligence,
+}: {
+  error?: string | null;
+  intelligence?: WalletIntelligence | null;
+}) {
+  const hasLargeTrades = (intelligence?.large_trades.length ?? 0) > 0;
+  const hasLargePositions = (intelligence?.large_positions.length ?? 0) > 0;
+  const hasNotableWallets = (intelligence?.notable_wallets.length ?? 0) > 0;
+
+  return (
+    <section className="analysis-section wallet-intelligence-section">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Senales publicas</span>
+          <h2>Actividad de billeteras</h2>
+          <p className="section-note">
+            Las wallets son direcciones publicas/pseudonimas. Esta seccion muestra
+            actividad de mercado, no identidad personal ni acusaciones.
+          </p>
+        </div>
+        {intelligence ? (
+          <span className="timestamp-pill">
+            Umbral {formatUsd(intelligence.threshold_usd)}
+          </span>
+        ) : null}
+      </div>
+
+      {error ? (
+        <div className="alert-panel compact" role="status">
+          <strong>Actividad no disponible</strong>
+          <span>{error}</span>
+        </div>
+      ) : null}
+
+      {!intelligence || !intelligence.data_available ? (
+        <div className="empty-state compact">
+          No hay actividad de billeteras disponible para este mercado.
+        </div>
+      ) : (
+        <>
+          <div className="analysis-stat-grid">
+            <div>
+              <span>Operaciones grandes</span>
+              <strong>{intelligence.large_trades.length}</strong>
+            </div>
+            <div>
+              <span>Posiciones grandes</span>
+              <strong>{intelligence.large_positions.length}</strong>
+            </div>
+            <div>
+              <span>Wallets relevantes</span>
+              <strong>{intelligence.notable_wallets.length}</strong>
+            </div>
+            <div>
+              <span>Generado</span>
+              <strong>{formatDateTime(intelligence.generated_at)}</strong>
+            </div>
+          </div>
+
+          {intelligence.warnings.length > 0 ? (
+            <div className="candidate-chip-list">
+              {intelligence.warnings.map((warning) => (
+                <span className="warning-chip" key={warning}>
+                  {formatWarningLabel(warning)}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {hasLargeTrades ? (
+            <div className="wallet-activity-list">
+              <h3>Operaciones grandes</h3>
+              {intelligence.large_trades.slice(0, 5).map((trade) => (
+                <article className="wallet-activity-card" key={`${trade.wallet_short}-${trade.timestamp}-${trade.trade_size_usd}`}>
+                  <div className="wallet-activity-heading">
+                    <strong>{trade.wallet_short}</strong>
+                    <span>{humanizeToken(trade.signal_type)}</span>
+                  </div>
+                  <div className="wallet-activity-metrics">
+                    <span>{(trade.side || trade.outcome || "lado").toUpperCase()}</span>
+                    <span>{formatUsd(trade.trade_size_usd)}</span>
+                    <span>Precio {formatProbability(trade.price)}</span>
+                    <span>{formatDateTime(trade.timestamp)}</span>
+                  </div>
+                  {trade.profile_name ? <small>{trade.profile_name}</small> : null}
+                </article>
+              ))}
+            </div>
+          ) : null}
+
+          {hasLargePositions ? (
+            <div className="wallet-activity-list">
+              <h3>Posiciones grandes</h3>
+              {intelligence.large_positions.slice(0, 5).map((position) => (
+                <article className="wallet-activity-card" key={`${position.wallet_short}-${position.side}-${position.position_size_usd}`}>
+                  <div className="wallet-activity-heading">
+                    <strong>{position.wallet_short}</strong>
+                    <span>{humanizeToken(position.signal_type)}</span>
+                  </div>
+                  <div className="wallet-activity-metrics">
+                    <span>{(position.side || position.outcome || "lado").toUpperCase()}</span>
+                    <span>{formatUsd(position.position_size_usd)}</span>
+                    <span>Prom. {formatProbability(position.avg_price)}</span>
+                    <span>Actual {formatProbability(position.current_price)}</span>
+                  </div>
+                  {position.profile_name ? <small>{position.profile_name}</small> : null}
+                </article>
+              ))}
+            </div>
+          ) : null}
+
+          {hasNotableWallets ? (
+            <div className="wallet-activity-list compact">
+              <h3>Wallets para revision</h3>
+              {intelligence.notable_wallets.slice(0, 5).map((wallet) => (
+                <article className="wallet-activity-card compact" key={wallet.wallet_short}>
+                  <div className="wallet-activity-heading">
+                    <strong>{wallet.wallet_short}</strong>
+                    <span>Score {formatScore(wallet.signal_score)}</span>
+                  </div>
+                  <div className="candidate-chip-list">
+                    {wallet.signal_types.map((signal) => (
+                      <span className="reason-chip" key={signal}>
+                        {humanizeToken(signal)}
+                      </span>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+
+          {intelligence.concentration_summary.sides.length > 0 ? (
+            <div className="wallet-concentration-box">
+              <h3>Concentracion por lado</h3>
+              <div className="wallet-activity-metrics">
+                {intelligence.concentration_summary.sides.map((side) => (
+                  <span key={side.side}>
+                    {side.side.toUpperCase()}: {formatUsd(side.total_position_size_usd)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {!hasLargeTrades && !hasLargePositions ? (
+            <div className="empty-state compact">
+              Hay datos publicos, pero no se detectaron operaciones o posiciones por encima del umbral.
+            </div>
+          ) : null}
+        </>
+      )}
     </section>
   );
 }
@@ -3012,6 +3257,8 @@ export default function MarketAnalysisPage() {
     analysis: null,
     priceHistory: null,
     priceHistoryError: null,
+    walletIntelligence: null,
+    walletIntelligenceError: null,
     loading: true,
     error: null,
     notFound: false,
@@ -3069,11 +3316,14 @@ export default function MarketAnalysisPage() {
       error: null,
       notFound: false,
       priceHistoryError: null,
+      walletIntelligence: null,
+      walletIntelligenceError: null,
     }));
     try {
-      const [analysisResult, historyResult] = await Promise.allSettled([
+      const [analysisResult, historyResult, walletResult] = await Promise.allSettled([
         fetchJson<MarketAnalysis>(`/markets/${marketId}/analysis`),
         fetchJson<PriceHistoryResponse>(`/markets/${marketId}/price-history?limit=50&order=asc`),
+        fetchJson<WalletIntelligence>(`/markets/${marketId}/wallet-intelligence?min_usd=10000&limit=20`),
       ]);
       if (analysisResult.status === "rejected") {
         throw analysisResult.reason;
@@ -3085,6 +3335,11 @@ export default function MarketAnalysisPage() {
           historyResult.status === "rejected"
             ? "No se pudo cargar el historial de precio."
             : null,
+        walletIntelligence: walletResult.status === "fulfilled" ? walletResult.value : null,
+        walletIntelligenceError:
+          walletResult.status === "rejected"
+            ? "No se pudo cargar actividad de billeteras."
+            : null,
         loading: false,
         error: null,
         notFound: false,
@@ -3095,6 +3350,8 @@ export default function MarketAnalysisPage() {
         analysis: null,
         priceHistory: null,
         priceHistoryError: null,
+        walletIntelligence: null,
+        walletIntelligenceError: null,
         loading: false,
         error: message === "not_found" ? null : "No se pudo cargar el análisis del mercado.",
         notFound: message === "not_found",
@@ -3935,6 +4192,10 @@ export default function MarketAnalysisPage() {
               />
               <FreshnessPanel freshness={analysis.freshness ?? analysis.data_quality?.freshness} />
               <MarketLinksPanel links={analysis.links} />
+              <WalletIntelligencePanel
+                error={state.walletIntelligenceError}
+                intelligence={state.walletIntelligence}
+              />
               <MarketTimelinePanel state={timelineState} />
               <PriceHistoryPanel history={state.priceHistory} error={state.priceHistoryError} />
               <CandidateContextPanel context={analysis.candidate_context} />

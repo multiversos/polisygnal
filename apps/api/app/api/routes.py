@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,6 +9,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.clients.polymarket import PolymarketClientError, PolymarketGammaClient, get_polymarket_client
+from app.clients.polymarket_data import PolymarketDataClient, get_polymarket_data_client
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.market import Market
@@ -88,6 +90,8 @@ from app.services.market_overview import build_markets_overview
 from app.services.market_analysis import build_market_analysis
 from app.services.market_analysis_markdown import render_market_analysis_markdown
 from app.services.market_price_history import build_market_price_history
+from app.schemas.wallet_intelligence import WalletIntelligenceRead
+from app.services.wallet_intelligence import build_wallet_intelligence
 from app.services.evaluation import (
     EVALUATION_HISTORY_DEFAULT_LIMIT,
     build_evaluation_history,
@@ -484,6 +488,30 @@ def get_market_analysis(
 ) -> MarketAnalysisRead:
     market = _require_market(db, market_id)
     return build_market_analysis(db, market)
+
+
+@router.get(
+    "/markets/{market_id}/wallet-intelligence",
+    response_model=WalletIntelligenceRead,
+    tags=["markets"],
+)
+def get_market_wallet_intelligence(
+    market_id: int,
+    min_usd: Decimal = Query(default=Decimal("10000"), ge=Decimal("0"), le=Decimal("10000000")),
+    limit: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    data_client: PolymarketDataClient = Depends(get_polymarket_data_client),
+    gamma_client: PolymarketGammaClient = Depends(get_polymarket_client),
+) -> WalletIntelligenceRead:
+    market = _require_market(db, market_id)
+    return build_wallet_intelligence(
+        db,
+        market,
+        data_client=data_client,
+        gamma_client=gamma_client,
+        min_usd=min_usd,
+        limit=limit,
+    )
 
 
 @router.get(

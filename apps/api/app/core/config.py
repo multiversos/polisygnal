@@ -56,6 +56,14 @@ class Settings(BaseSettings):
         default=20.0,
         alias="POLYSIGNAL_CLOB_TIMEOUT_SECONDS",
     )
+    polymarket_data_base_url: str = Field(
+        default="https://data-api.polymarket.com",
+        alias="POLYSIGNAL_POLYMARKET_DATA_BASE_URL",
+    )
+    polymarket_data_timeout_seconds: float = Field(
+        default=20.0,
+        alias="POLYSIGNAL_POLYMARKET_DATA_TIMEOUT_SECONDS",
+    )
     polymarket_user_agent: str = Field(
         default="PolySignal/0.1",
         alias="POLYSIGNAL_POLYMARKET_USER_AGENT",

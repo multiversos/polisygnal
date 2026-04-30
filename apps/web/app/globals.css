@@ -4198,6 +4198,66 @@ h2 {
   background: var(--surface);
 }
 
+.wallet-intelligence-section {
+  display: grid;
+  gap: 14px;
+}
+
+.wallet-activity-list {
+  display: grid;
+  gap: 10px;
+}
+
+.wallet-activity-list h3,
+.wallet-concentration-box h3 {
+  margin: 0;
+}
+
+.wallet-activity-card,
+.wallet-concentration-box {
+  background: color-mix(in srgb, var(--surface) 90%, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.wallet-activity-card.compact {
+  gap: 10px;
+}
+
+.wallet-activity-heading {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.wallet-activity-heading span,
+.wallet-activity-card small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.wallet-activity-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wallet-activity-metrics span {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--foreground);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 8px;
+}
+
 .manual-evidence-panel {
   display: grid;
   gap: 14px;

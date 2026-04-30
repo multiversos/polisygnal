@@ -35,6 +35,10 @@ class PolymarketMarketPayload(BaseModel):
     id: str | None = None
     question: str | None = None
     slug: str | None = None
+    condition_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("conditionId", "condition_id"),
+    )
     description: str | None = None
     image_url: str | None = Field(
         default=None,
