@@ -44,10 +44,14 @@ class FakeDataClient:
         trades: list[PolymarketDataTrade] | None = None,
         positions: list[PolymarketDataMarketPosition] | None = None,
         explode: bool = False,
+        trades_explode: bool = False,
+        positions_explode: bool = False,
     ) -> None:
         self.trades = trades or []
         self.positions = positions or []
         self.explode = explode
+        self.trades_explode = trades_explode
+        self.positions_explode = positions_explode
 
     def get_trades_for_market(
         self,
@@ -58,7 +62,7 @@ class FakeDataClient:
         taker_only: bool = True,
     ) -> list[PolymarketDataTrade]:
         _ = condition_id, offset, taker_only
-        if self.explode:
+        if self.explode or self.trades_explode:
             raise PolymarketDataClientError("data unavailable")
         return self.trades[:limit]
 
@@ -70,7 +74,7 @@ class FakeDataClient:
         limit: int = 50,
     ) -> list[PolymarketDataMarketPosition]:
         _ = condition_id, status
-        if self.explode:
+        if self.explode or self.positions_explode:
             raise PolymarketDataClientError("data unavailable")
         return self.positions[:limit]
 
@@ -94,6 +98,7 @@ def test_polymarket_data_client_parses_public_wallet_payloads() -> None:
                 ],
             )
         if request.url.path == "/v1/market-positions":
+            assert request.url.params.get("sortBy") == "TOKENS"
             return httpx.Response(
                 200,
                 json=[
@@ -186,6 +191,30 @@ def test_wallet_intelligence_uses_stored_condition_id_before_gamma(
     assert response.condition_id == "0xstoredcondition"
     assert response.data_available is True
     assert len(response.large_trades) == 1
+
+
+def test_wallet_intelligence_keeps_trades_when_positions_are_unavailable(
+    db_session: Session,
+) -> None:
+    market = _create_market(db_session, suffix="partial-position-failure")
+    market.condition_id = "0xstoredcondition"
+
+    response = build_wallet_intelligence(
+        db_session,
+        market,
+        data_client=FakeDataClient(
+            trades=[_trade(size="50000", price="0.25")],
+            positions_explode=True,
+        ),
+        gamma_client=FakeGammaClient(condition_id=None),
+        min_usd=Decimal("10000"),
+        limit=20,
+    )
+
+    assert response.data_available is True
+    assert len(response.large_trades) == 1
+    assert response.large_positions == []
+    assert "wallet_positions_unavailable" in response.warnings
 
 
 def test_wallet_intelligence_ignores_trade_below_threshold(db_session: Session) -> None:

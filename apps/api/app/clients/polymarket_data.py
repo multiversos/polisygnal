@@ -260,7 +260,7 @@ class PolymarketDataClient:
             params={
                 "market": condition_id,
                 "status": status,
-                "sortBy": "CURRENT_VALUE",
+                "sortBy": "TOKENS",
                 "sortDirection": "DESC",
             },
         )

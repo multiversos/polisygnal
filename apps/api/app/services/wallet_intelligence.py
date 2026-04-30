@@ -52,10 +52,18 @@ def build_wallet_intelligence(
             warnings=["condition_id_unavailable"],
         )
 
+    warnings: list[str] = []
     try:
         trades = data_client.get_trades_for_market(condition_id, limit=safe_limit)
+    except PolymarketDataClientError:
+        trades = []
+        warnings.append("wallet_trades_unavailable")
+    try:
         positions = data_client.get_positions_for_market(condition_id, limit=safe_limit)
     except PolymarketDataClientError:
+        positions = []
+        warnings.append("wallet_positions_unavailable")
+    if "wallet_trades_unavailable" in warnings and "wallet_positions_unavailable" in warnings:
         return _empty_response(
             market=market,
             threshold=threshold,
@@ -73,7 +81,6 @@ def build_wallet_intelligence(
         large_positions=large_positions,
     )
 
-    warnings: list[str] = []
     if not trades and not positions:
         warnings.append("wallet_data_empty")
     if trades or positions:

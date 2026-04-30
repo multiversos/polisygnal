@@ -695,6 +695,8 @@ const warningLabels: Record<string, string> = {
   data_quality_insufficient: "calidad insuficiente",
   condition_id_unavailable: "falta condition_id",
   wallet_data_unavailable: "datos de billeteras no disponibles",
+  wallet_trades_unavailable: "trades de billeteras no disponibles",
+  wallet_positions_unavailable: "posiciones de billeteras no disponibles",
   wallet_data_empty: "sin datos de billeteras",
   no_large_wallet_activity_at_threshold: "sin actividad grande en el umbral",
 };
