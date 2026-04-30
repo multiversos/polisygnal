@@ -335,6 +335,31 @@ export default function DataHealthPage() {
               : "Copiar"}
           </button>
         </div>
+        <div className="command-card standalone-command">
+          <div>
+            <span>Import metadata dry-run</span>
+            <code>
+              python -m app.commands.import_live_discovered_markets --days 7 --limit 25 --max-import 3 --dry-run --json
+            </code>
+            <p>
+              No importa desde la UI. Ejecuta dry-run primero y usa --apply solo con
+              limites pequenos.
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              void copyCommand(
+                "python -m app.commands.import_live_discovered_markets --days 7 --limit 25 --max-import 3 --dry-run --json",
+              )
+            }
+            type="button"
+          >
+            {copiedCommand ===
+            "python -m app.commands.import_live_discovered_markets --days 7 --limit 25 --max-import 3 --dry-run --json"
+              ? "Copiado"
+              : "Copiar"}
+          </button>
+        </div>
 
         {loading ? (
           <div className="empty-state">Consultando discovery live limitado...</div>

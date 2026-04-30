@@ -135,6 +135,8 @@ SPORT_KEYWORDS: dict[str, tuple[str, ...]] = {
     "nba": (
         "nba",
         "basketball",
+        "euroleague",
+        "euro league",
         "lakers",
         "warriors",
         "celtics",
@@ -339,6 +341,7 @@ SPORT_INFERENCE_ORDER = (
     "mlb",
     "nhl",
     "nfl",
+    "nba",
     "soccer",
     "tennis",
     "horse_racing",

@@ -265,6 +265,17 @@ def test_ambiguous_city_does_not_force_soccer() -> None:
     assert classification.vertical == "other"
 
 
+def test_euroleague_slug_overrides_soccer_club_name_collision() -> None:
+    classification = classify_market_research_context(
+        question="Valencia vs. Panathinaikos",
+        event_title="euroleague-valencia-panathin-2026-04-30",
+        event_category="sports",
+    )
+
+    assert classification.sport == "nba"
+    assert classification.market_shape == "match_winner"
+
+
 def test_public_inference_helpers() -> None:
     assert infer_sport(question="Will the Chiefs beat the Bills?") == "nfl"
     assert infer_sport(question="Will the Kansas City Chiefs win on 2026-04-29?") == "nfl"

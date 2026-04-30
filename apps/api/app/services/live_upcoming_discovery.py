@@ -104,10 +104,11 @@ def discover_live_upcoming_markets(
     for event_payload, market_payload in remote_entries:
         question = _safe_text(market_payload.question) or "Mercado sin pregunta"
         event_title = _safe_text(event_payload.title)
+        event_context = _combined_text(event_title, event_payload.slug, market_payload.slug)
         close_time = _effective_close_time(event_payload, market_payload)
         classification = classify_market_research_context(
             question=question,
-            event_title=event_title,
+            event_title=event_context,
             event_category=event_payload.category,
         )
         if normalized_sport is not None and classification.sport != normalized_sport:
@@ -385,6 +386,10 @@ def _safe_text(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _combined_text(*values: str | None) -> str:
+    return " ".join(value.strip() for value in values if value and value.strip())
 
 
 def _clean_string_list(values: list[str]) -> list[str]:
