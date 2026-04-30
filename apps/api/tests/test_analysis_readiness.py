@@ -190,6 +190,31 @@ def test_analysis_readiness_min_hours_to_close_filters_short_windows(
     assert good_window.id in filtered_ids
 
 
+def test_analysis_readiness_uses_remote_slug_context_for_imported_euroleague(
+    db_session: Session,
+) -> None:
+    market = _create_market(
+        db_session,
+        suffix="euroleague",
+        question="Valencia vs. Panathinaikos",
+        sport_type="nba",
+        market_type="match_winner",
+        end_date=NOW + timedelta(days=1),
+        event_title="Valencia vs. Panathinaikos",
+        event_slug="euroleague-valencia-panathin-2026-04-30",
+        market_slug="euroleague-valencia-panathin-2026-04-30",
+    )
+    _add_snapshot(db_session, market=market)
+    db_session.flush()
+
+    response = list_analysis_readiness(db_session, sport="nba", days=7, limit=10, now=NOW)
+
+    assert response.summary.ready_count == 1
+    assert response.items[0].market_id == market.id
+    assert response.items[0].sport == "nba"
+    assert response.items[0].market_shape == "match_winner"
+
+
 def _create_market(
     db_session: Session,
     *,
@@ -198,12 +223,15 @@ def _create_market(
     sport_type: str | None,
     market_type: str | None,
     end_date: datetime,
+    event_title: str | None = None,
+    event_slug: str | None = None,
+    market_slug: str | None = None,
 ) -> Market:
     event = Event(
         polymarket_event_id=f"readiness-event-{suffix}",
-        title=f"Readiness Event {suffix}",
+        title=event_title or f"Readiness Event {suffix}",
         category="sports",
-        slug=f"readiness-event-{suffix}",
+        slug=event_slug or f"readiness-event-{suffix}",
         active=True,
         closed=False,
     )
@@ -213,7 +241,7 @@ def _create_market(
         polymarket_market_id=f"readiness-market-{suffix}",
         event_id=event.id,
         question=question,
-        slug=f"readiness-market-{suffix}",
+        slug=market_slug or f"readiness-market-{suffix}",
         sport_type=sport_type,
         market_type=market_type,
         active=True,

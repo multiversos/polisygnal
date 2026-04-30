@@ -411,7 +411,9 @@ def classify_market_research_context(
     resolved_market_type = (
         market_type if market_type is not None else getattr(market, "market_type", None)
     )
-    text = _combined_text(market_question, resolved_event_title)
+    market_slug = getattr(market, "slug", None)
+    event_slug = getattr(market_event, "slug", None)
+    text = _combined_text(market_question, resolved_event_title, market_slug, event_slug)
 
     sport, sport_reason = _infer_sport_with_reason(
         text=text,
