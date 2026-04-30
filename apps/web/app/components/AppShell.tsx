@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-
-import { sportsSelectorOptions } from "./SportsSelectorBar";
 
 type ThemePreference = "light" | "dark";
 type NavIconName =
@@ -77,34 +75,15 @@ function isActivePath(pathname: string, href: string): boolean {
   return cleanHref !== "/" && pathname.startsWith(cleanHref);
 }
 
-function selectedSportFromPath(pathname: string): string {
-  if (!pathname.startsWith("/sports/")) {
-    return "all";
-  }
-  const sportId = pathname.split("/").filter(Boolean)[1];
-  return sportsSelectorOptions.some((option) => option.id === sportId) ? sportId : "all";
-}
-
-function sportsPathFor(id: string): string {
-  return id === "all" ? "/sports" : `/sports/${id}`;
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [theme, setTheme] = useState<ThemePreference>("light");
-  const [selectedSport, setSelectedSport] = useState("all");
-  const isDashboard = pathname === "/";
 
   useEffect(() => {
     const resolvedTheme = resolveThemePreference();
     setTheme(resolvedTheme);
     applyThemePreference(resolvedTheme);
   }, []);
-
-  useEffect(() => {
-    setSelectedSport(selectedSportFromPath(pathname));
-  }, [pathname]);
 
   const logoSrc = useMemo(
     () =>
@@ -125,17 +104,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       }
       return nextTheme;
     });
-  };
-
-  const handleSportSelect = (sport: string) => {
-    setSelectedSport(sport);
-    if (isDashboard) {
-      window.dispatchEvent(
-        new CustomEvent("polysignal:sport-select", { detail: { sport } }),
-      );
-      return;
-    }
-    router.push(sportsPathFor(sport));
   };
 
   return (
@@ -176,20 +144,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span>PolySignal</span>
               <strong>Mercados proximos y datos operativos</strong>
             </div>
-          </div>
-          <div className="app-sports-bar" aria-label="Barra superior de deportes">
-            {sportsSelectorOptions.map((option) => (
-              <button
-                aria-pressed={selectedSport === option.id}
-                className={`app-sport-chip ${selectedSport === option.id ? "active" : ""}`}
-                key={option.id}
-                onClick={() => handleSportSelect(option.id)}
-                type="button"
-              >
-                <span className="app-sport-dot" aria-hidden="true" />
-                <span>{option.label}</span>
-              </button>
-            ))}
           </div>
         </header>
         <div className="app-main">{children}</div>
