@@ -37,7 +37,11 @@ class PolymarketMarketPayload(BaseModel):
     slug: str | None = None
     condition_id: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("conditionId", "condition_id"),
+        validation_alias=AliasChoices("conditionId", "conditionID", "condition_id"),
+    )
+    question_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("questionID", "questionId", "question_id"),
     )
     description: str | None = None
     image_url: str | None = Field(
@@ -68,13 +72,21 @@ class PolymarketMarketPayload(BaseModel):
     closed: bool | None = None
     end_date: datetime | None = Field(default=None, alias="endDate")
     start_date: datetime | None = Field(default=None, alias="startDate")
-    clob_token_ids: list[str] = Field(default_factory=list, alias="clobTokenIds")
+    clob_token_ids: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("clobTokenIds", "clobTokenIDs", "clob_token_ids"),
+    )
+    outcomes: list[str] = Field(default_factory=list)
+    outcome_tokens: list[dict[str, object]] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("tokens", "outcomeTokens", "outcome_tokens"),
+    )
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    @field_validator("clob_token_ids", mode="before")
+    @field_validator("clob_token_ids", "outcomes", mode="before")
     @classmethod
-    def parse_clob_token_ids(cls, value: object) -> list[str]:
+    def parse_string_list(cls, value: object) -> list[str]:
         if value is None:
             return []
         if isinstance(value, list):
@@ -90,6 +102,41 @@ class PolymarketMarketPayload(BaseModel):
             if isinstance(parsed, list):
                 return [str(item) for item in parsed]
         return []
+
+    @field_validator("outcome_tokens", mode="before")
+    @classmethod
+    def parse_outcome_tokens(cls, value: object) -> list[dict[str, object]]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            raw_value = value.strip()
+            if not raw_value:
+                return []
+            try:
+                value = json.loads(raw_value)
+            except json.JSONDecodeError:
+                return []
+        if not isinstance(value, list):
+            return []
+        tokens: list[dict[str, object]] = []
+        for item in value:
+            if isinstance(item, dict):
+                clean_item: dict[str, object] = {}
+                for key in (
+                    "token_id",
+                    "tokenId",
+                    "id",
+                    "outcome",
+                    "name",
+                    "price",
+                ):
+                    if item.get(key) is not None:
+                        clean_item[key] = item[key]
+                if clean_item:
+                    tokens.append(clean_item)
+            elif item is not None:
+                tokens.append({"token_id": str(item)})
+        return tokens
 
     @field_validator("image_url", "icon_url", mode="before")
     @classmethod

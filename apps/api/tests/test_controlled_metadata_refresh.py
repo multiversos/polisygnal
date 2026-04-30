@@ -42,7 +42,10 @@ def test_metadata_refresh_dry_run_does_not_update_market(db_session: Session) ->
                 "active": False,
                 "closed": True,
                 "endDate": remote_end.isoformat(),
+                "conditionId": "0xremotecondition",
+                "questionID": "remote-question-id",
                 "clobTokenIds": '["remote-yes", "remote-no"]',
+                "outcomes": '["Yes", "No"]',
             }
         }
     )
@@ -65,6 +68,10 @@ def test_metadata_refresh_dry_run_does_not_update_market(db_session: Session) ->
         "end_date",
         "yes_token_id",
         "no_token_id",
+        "condition_id",
+        "question_id",
+        "clob_token_ids",
+        "outcome_tokens",
     }
     assert market.question == "Local question dry-run"
     assert market.active is True
@@ -94,7 +101,10 @@ def test_metadata_refresh_apply_updates_safe_fields_without_null_overwrite(
                 "active": True,
                 "closed": False,
                 "endDate": remote_end.isoformat(),
+                "conditionID": "0xremoteapply",
+                "questionID": "remote-question-apply-id",
                 "clobTokenIds": '["remote-yes", "remote-no"]',
+                "outcomes": '["Yes", "No"]',
                 "image": None,
                 "icon": None,
             }
@@ -118,6 +128,13 @@ def test_metadata_refresh_apply_updates_safe_fields_without_null_overwrite(
     assert market.question == "Remote question apply"
     assert market.slug == "remote-question-apply"
     assert market.rules_text == "Remote rules"
+    assert market.condition_id == "0xremoteapply"
+    assert market.question_id == "remote-question-apply-id"
+    assert market.clob_token_ids == ["remote-yes", "remote-no"]
+    assert market.outcome_tokens == [
+        {"token_id": "remote-yes", "outcome_index": 0, "outcome": "Yes"},
+        {"token_id": "remote-no", "outcome_index": 1, "outcome": "No"},
+    ]
     assert market.yes_token_id == "remote-yes"
     assert market.no_token_id == "remote-no"
     assert market.image_url == "https://local.example/image.png"
@@ -153,6 +170,51 @@ def test_metadata_refresh_limit_is_respected(db_session: Session) -> None:
 
     assert payload["markets_checked"] == 2
     assert len(payload["items"]) == 2
+
+
+def test_metadata_refresh_does_not_overwrite_identifiers_with_null(
+    db_session: Session,
+) -> None:
+    market = _create_market(db_session, suffix="identifier-null")
+    market.condition_id = "0xexisting"
+    market.question_id = "existing-question"
+    market.clob_token_ids = ["existing-yes", "existing-no"]
+    market.outcome_tokens = [
+        {"token_id": "existing-yes", "outcome_index": 0, "outcome": "Yes"},
+        {"token_id": "existing-no", "outcome_index": 1, "outcome": "No"},
+    ]
+    db_session.commit()
+    client = FakeGammaClient(
+        {
+            market.polymarket_market_id: {
+                "id": market.polymarket_market_id,
+                "question": market.question,
+                "slug": market.slug,
+                "active": market.active,
+                "closed": market.closed,
+                "endDate": market.end_date.isoformat() if market.end_date else None,
+                "image": None,
+                "icon": None,
+            }
+        }
+    )
+
+    payload = run_metadata_refresh(
+        db_session,
+        gamma_client=client,
+        market_id=market.id,
+        dry_run=False,
+    )
+    db_session.refresh(market)
+
+    assert payload["markets_updated"] == 0
+    assert market.condition_id == "0xexisting"
+    assert market.question_id == "existing-question"
+    assert market.clob_token_ids == ["existing-yes", "existing-no"]
+    assert market.outcome_tokens == [
+        {"token_id": "existing-yes", "outcome_index": 0, "outcome": "Yes"},
+        {"token_id": "existing-no", "outcome_index": 1, "outcome": "No"},
+    ]
 
 
 def test_metadata_refresh_market_not_found_has_stable_error(db_session: Session) -> None:

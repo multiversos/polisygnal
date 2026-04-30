@@ -17,6 +17,11 @@ class MarketListItem(BaseModel):
     event_id: int
     question: str
     slug: str
+    condition_id: str | None = None
+    question_id: str | None = None
+    clob_token_ids: list[str] | None = None
+    outcome_tokens: list[dict[str, object]] | None = None
+    polymarket_url: str | None = None
     image_url: str | None = None
     icon_url: str | None = None
     sport_type: str | None = None
@@ -73,6 +78,11 @@ class MarketDetail(BaseModel):
     event_id: int
     question: str
     slug: str
+    condition_id: str | None = None
+    question_id: str | None = None
+    clob_token_ids: list[str] | None = None
+    outcome_tokens: list[dict[str, object]] | None = None
+    polymarket_url: str | None = None
     yes_token_id: str | None = None
     no_token_id: str | None = None
     image_url: str | None = None

@@ -18,6 +18,8 @@ def test_market_links_builds_known_urls(db_session: Session) -> None:
         yes_token_id="yes-token",
         no_token_id="no-token",
     )
+    market.condition_id = "0xcondition"
+    market.question_id = "question-id"
 
     links = build_market_links(market)
 
@@ -28,7 +30,25 @@ def test_market_links_builds_known_urls(db_session: Session) -> None:
     assert links.markdown_url == f"/markets/{market.id}/analysis/markdown"
     assert links.clob_yes_book_url == "https://clob.polymarket.com/book?token_id=yes-token"
     assert links.clob_no_book_url == "https://clob.polymarket.com/book?token_id=no-token"
+    assert links.condition_id == "0xcondition"
+    assert links.question_id == "question-id"
     assert "polymarket_url_constructed_from_event_slug" in links.source_notes
+
+
+def test_market_links_prefers_stored_polymarket_url(db_session: Session) -> None:
+    market = _create_market(
+        db_session,
+        event_slug="event-slug",
+        market_slug="market-slug",
+        yes_token_id=None,
+        no_token_id=None,
+    )
+    market.polymarket_url = "https://polymarket.example/event/stored"
+
+    links = build_market_links(market)
+
+    assert links.polymarket_url == "https://polymarket.example/event/stored"
+    assert "polymarket_url_stored_from_public_metadata" in links.source_notes
 
 
 def test_market_links_do_not_invent_polymarket_url_without_event_slug(

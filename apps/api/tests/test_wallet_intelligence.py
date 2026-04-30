@@ -27,8 +27,10 @@ from app.services.wallet_intelligence import abbreviate_wallet, build_wallet_int
 class FakeGammaClient:
     def __init__(self, condition_id: str | None = "0xcondition") -> None:
         self.condition_id = condition_id
+        self.calls = 0
 
     def fetch_markets_by_ids(self, market_ids: list[str]) -> dict[str, object]:
+        self.calls += 1
         return {
             market_id: type("GammaMarket", (), {"condition_id": self.condition_id})()
             for market_id in market_ids
@@ -161,6 +163,29 @@ def test_wallet_intelligence_detects_large_trade_and_abbreviates_wallet(
     assert response.large_trades[0].wallet_short == "0xabcd...7890"
     assert abbreviate_wallet("0xabcdef1234567890") == "0xabcd...7890"
     assert response.notable_wallets[0].signal_types == ["large_trade"]
+
+
+def test_wallet_intelligence_uses_stored_condition_id_before_gamma(
+    db_session: Session,
+) -> None:
+    market = _create_market(db_session, suffix="stored-condition")
+    market.condition_id = "0xstoredcondition"
+    gamma_client = FakeGammaClient(condition_id=None)
+    data_client = FakeDataClient(trades=[_trade(size="50000", price="0.25")])
+
+    response = build_wallet_intelligence(
+        db_session,
+        market,
+        data_client=data_client,
+        gamma_client=gamma_client,
+        min_usd=Decimal("10000"),
+        limit=20,
+    )
+
+    assert gamma_client.calls == 0
+    assert response.condition_id == "0xstoredcondition"
+    assert response.data_available is True
+    assert len(response.large_trades) == 1
 
 
 def test_wallet_intelligence_ignores_trade_below_threshold(db_session: Session) -> None:

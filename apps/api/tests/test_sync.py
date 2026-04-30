@@ -7,7 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.routes import get_polymarket_client
-from app.clients.polymarket import PolymarketEventPayload, PolymarketEventsPage
+from app.clients.polymarket import (
+    PolymarketEventPayload,
+    PolymarketEventsPage,
+    PolymarketMarketPayload,
+)
 from app.main import app
 from app.models.event import Event
 from app.models.market import Market
@@ -36,7 +40,10 @@ class FakePolymarketClient:
                     "description": "Official NBA result determines resolution.",
                     "active": True,
                     "closed": False,
+                    "conditionID": "0xsynccondition",
+                    "questionID": "sync-question-id",
                     "clobTokenIds": "[\"yes-token\", \"no-token\"]",
+                    "outcomes": "[\"Yes\", \"No\"]",
                 },
                 {
                     "id": "bad-market",
@@ -106,6 +113,33 @@ def override_polymarket_client() -> Generator[FakePolymarketClient, None, None]:
     yield FakePolymarketClient()
 
 
+def test_polymarket_market_payload_parses_public_identifier_aliases() -> None:
+    payload = PolymarketMarketPayload.model_validate(
+        {
+            "id": "market-1",
+            "question": "Will Team A win?",
+            "slug": "team-a-win",
+            "conditionID": "0xcondition",
+            "questionID": "question-1",
+            "clobTokenIDs": '["yes-token", "no-token"]',
+            "outcomes": '["Yes", "No"]',
+            "tokens": [
+                {"tokenId": "yes-token", "outcome": "Yes"},
+                {"tokenId": "no-token", "outcome": "No"},
+            ],
+        }
+    )
+
+    assert payload.condition_id == "0xcondition"
+    assert payload.question_id == "question-1"
+    assert payload.clob_token_ids == ["yes-token", "no-token"]
+    assert payload.outcomes == ["Yes", "No"]
+    assert payload.outcome_tokens == [
+        {"tokenId": "yes-token", "outcome": "Yes"},
+        {"tokenId": "no-token", "outcome": "No"},
+    ]
+
+
 def test_sync_polymarket_creates_records(client: TestClient, db_session: Session) -> None:
     FakePolymarketClient.requested_tag_ids.clear()
     app.dependency_overrides[get_polymarket_client] = override_polymarket_client
@@ -138,6 +172,14 @@ def test_sync_polymarket_creates_records(client: TestClient, db_session: Session
     assert stored_market is not None
     assert stored_market.sport_type == "nba"
     assert stored_market.market_type == "winner"
+    assert stored_market.condition_id == "0xsynccondition"
+    assert stored_market.question_id == "sync-question-id"
+    assert stored_market.clob_token_ids == ["yes-token", "no-token"]
+    assert stored_market.outcome_tokens == [
+        {"token_id": "yes-token", "outcome_index": 0, "outcome": "Yes"},
+        {"token_id": "no-token", "outcome_index": 1, "outcome": "No"},
+    ]
+    assert stored_market.polymarket_url == "https://polymarket.com/event/2026-nba-champion"
     assert stored_market.yes_token_id == "yes-token"
     assert stored_market.no_token_id == "no-token"
     assert stored_market.image_url == "https://polymarket.example/markets/thunder.png"

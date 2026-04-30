@@ -13,8 +13,10 @@ CLOB_BASE_URL = "https://clob.polymarket.com"
 def build_market_links(market: Market) -> MarketLinksRead:
     event = market.event
     source_notes: list[str] = []
-    polymarket_url = None
-    if event is not None and event.slug:
+    polymarket_url = _clean_text(market.polymarket_url)
+    if polymarket_url is not None:
+        source_notes.append("polymarket_url_stored_from_public_metadata")
+    elif event is not None and event.slug:
         polymarket_url = f"{POLYMARKET_BASE_URL}/event/{quote(event.slug.strip(), safe='')}"
         source_notes.append("polymarket_url_constructed_from_event_slug")
     elif market.slug:
@@ -31,6 +33,8 @@ def build_market_links(market: Market) -> MarketLinksRead:
         polymarket_url=polymarket_url,
         polymarket_event_slug=event.slug if event is not None else None,
         polymarket_market_slug=market.slug,
+        condition_id=market.condition_id,
+        question_id=market.question_id,
         internal_analysis_url=f"/markets/{market.id}",
         internal_json_url=f"/markets/{market.id}/analysis",
         price_history_url=f"/markets/{market.id}/price-history",
@@ -47,3 +51,10 @@ def _clob_book_url(token_id: str | None) -> str | None:
     if not token:
         return None
     return f"{CLOB_BASE_URL}/book?token_id={quote(token, safe='')}"
+
+
+def _clean_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None

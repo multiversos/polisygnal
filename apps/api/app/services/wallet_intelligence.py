@@ -106,6 +106,9 @@ def abbreviate_wallet(wallet: str | None) -> str:
 
 
 def _resolve_condition_id(market: Market, gamma_client: PolymarketGammaClient) -> str | None:
+    stored_condition_id = _clean_text(market.condition_id)
+    if stored_condition_id is not None:
+        return stored_condition_id
     try:
         payloads = gamma_client.fetch_markets_by_ids([market.polymarket_market_id])
     except PolymarketClientError:

@@ -247,6 +247,7 @@ def _sync_single_market(
         "sport_type": classify_sport_type(event_payload),
         "market_type": classify_market_type(event_payload, market_payload),
     }
+    market_updates.update(_identifier_update_values(event_payload, market_payload))
     market_updates.update(_image_update_values(market_payload))
     market_changed = _apply_model_updates(market, market_updates)
 
@@ -352,6 +353,65 @@ def _image_update_values(
         if value is not None:
             values[field_name] = value
     return values
+
+
+def _identifier_update_values(
+    event_payload: PolymarketEventPayload,
+    market_payload: PolymarketMarketPayload,
+) -> dict[str, object]:
+    values: dict[str, object] = {}
+    condition_id = _required_text(market_payload.condition_id)
+    question_id = _required_text(market_payload.question_id)
+    clob_token_ids = _clean_string_list(market_payload.clob_token_ids)
+    outcome_tokens = _build_outcome_tokens(market_payload)
+    polymarket_url = _polymarket_event_url(event_payload.slug)
+
+    if condition_id is not None:
+        values["condition_id"] = condition_id
+    if question_id is not None:
+        values["question_id"] = question_id
+    if clob_token_ids:
+        values["clob_token_ids"] = clob_token_ids
+    if outcome_tokens:
+        values["outcome_tokens"] = outcome_tokens
+    if polymarket_url is not None:
+        values["polymarket_url"] = polymarket_url
+    return values
+
+
+def _clean_string_list(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        cleaned = _required_text(value)
+        if cleaned is not None:
+            result.append(cleaned)
+    return result
+
+
+def _build_outcome_tokens(market_payload: PolymarketMarketPayload) -> list[dict[str, object]]:
+    if market_payload.outcome_tokens:
+        return market_payload.outcome_tokens
+    clob_token_ids = _clean_string_list(market_payload.clob_token_ids)
+    outcomes = _clean_string_list(market_payload.outcomes)
+    if not clob_token_ids:
+        return []
+    tokens: list[dict[str, object]] = []
+    for index, token_id in enumerate(clob_token_ids):
+        item: dict[str, object] = {
+            "token_id": token_id,
+            "outcome_index": index,
+        }
+        if index < len(outcomes):
+            item["outcome"] = outcomes[index]
+        tokens.append(item)
+    return tokens
+
+
+def _polymarket_event_url(event_slug: str | None) -> str | None:
+    slug = _required_text(event_slug)
+    if slug is None:
+        return None
+    return f"https://polymarket.com/event/{slug}"
 
 
 def _derive_event_category(event_payload: PolymarketEventPayload) -> str | None:

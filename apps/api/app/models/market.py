@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -18,6 +18,11 @@ class Market(Base):
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), index=True)
     question: Mapped[str] = mapped_column(String(512), nullable=False)
     slug: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
+    condition_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    question_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    clob_token_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    outcome_tokens: Mapped[list[dict[str, object]] | None] = mapped_column(JSON, nullable=True)
+    polymarket_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     yes_token_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     no_token_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     sport_type: Mapped[str | None] = mapped_column(String(32), nullable=True)

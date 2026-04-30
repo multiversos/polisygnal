@@ -90,6 +90,11 @@ type AnalysisMarket = {
   event_category?: string | null;
   question: string;
   slug: string;
+  condition_id?: string | null;
+  question_id?: string | null;
+  clob_token_ids?: string[] | null;
+  outcome_tokens?: Array<Record<string, unknown>> | null;
+  polymarket_url?: string | null;
   sport_type?: string | null;
   market_type?: string | null;
   evidence_shape?: string | null;
@@ -338,6 +343,8 @@ type MarketLinks = {
   polymarket_url?: string | null;
   polymarket_event_slug?: string | null;
   polymarket_market_slug?: string | null;
+  condition_id?: string | null;
+  question_id?: string | null;
   internal_analysis_url: string;
   internal_json_url: string;
   price_history_url: string;
@@ -686,6 +693,10 @@ const warningLabels: Record<string, string> = {
   snapshot_too_old: "snapshot viejo",
   missing_prices: "faltan precios",
   data_quality_insufficient: "calidad insuficiente",
+  condition_id_unavailable: "falta condition_id",
+  wallet_data_unavailable: "datos de billeteras no disponibles",
+  wallet_data_empty: "sin datos de billeteras",
+  no_large_wallet_activity_at_threshold: "sin actividad grande en el umbral",
 };
 
 const freshnessStatusLabels: Record<string, string> = {
@@ -921,6 +932,17 @@ function groupTimelineItems(items: MarketTimelineItem[]) {
 
 function humanizeToken(value?: string | null): string {
   return value?.replaceAll("_", " ").replaceAll("-", " ").trim() || "N/D";
+}
+
+function shortIdentifier(value?: string | null): string {
+  if (!value) {
+    return "N/D";
+  }
+  const trimmed = value.trim();
+  if (trimmed.length <= 16) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, 8)}...${trimmed.slice(-6)}`;
 }
 
 function stripScoreSuffix(value: string): string {
@@ -1898,6 +1920,11 @@ function WalletIntelligencePanel({
   const hasLargeTrades = (intelligence?.large_trades.length ?? 0) > 0;
   const hasLargePositions = (intelligence?.large_positions.length ?? 0) > 0;
   const hasNotableWallets = (intelligence?.notable_wallets.length ?? 0) > 0;
+  const walletWarnings = intelligence?.warnings ?? [];
+  const missingConditionId = walletWarnings.includes("condition_id_unavailable");
+  const emptyMessage = missingConditionId
+    ? "Falta condition_id para consultar actividad de billeteras. Refresca metadata de mercado para intentar obtener identificadores publicos."
+    : "No hay actividad de billeteras disponible para este mercado.";
 
   return (
     <section className="analysis-section wallet-intelligence-section">
@@ -1912,7 +1939,7 @@ function WalletIntelligencePanel({
         </div>
         {intelligence ? (
           <span className="timestamp-pill">
-            Umbral {formatUsd(intelligence.threshold_usd)}
+            {intelligence.condition_id ? `condition_id ${shortIdentifier(intelligence.condition_id)}` : `Umbral ${formatUsd(intelligence.threshold_usd)}`}
           </span>
         ) : null}
       </div>
@@ -1925,9 +1952,18 @@ function WalletIntelligencePanel({
       ) : null}
 
       {!intelligence || !intelligence.data_available ? (
-        <div className="empty-state compact">
-          No hay actividad de billeteras disponible para este mercado.
-        </div>
+        <>
+          {walletWarnings.length > 0 ? (
+            <div className="candidate-chip-list">
+              {walletWarnings.map((warning) => (
+                <span className="warning-chip" key={warning}>
+                  {formatWarningLabel(warning)}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <div className="empty-state compact">{emptyMessage}</div>
+        </>
       ) : (
         <>
           <div className="analysis-stat-grid">

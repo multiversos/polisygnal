@@ -17,6 +17,11 @@ from app.models.research_run import ResearchRun
 SAFE_MARKET_FIELDS = (
     "question",
     "slug",
+    "condition_id",
+    "question_id",
+    "clob_token_ids",
+    "outcome_tokens",
+    "polymarket_url",
     "active",
     "closed",
     "end_date",
@@ -209,6 +214,10 @@ def _safe_updates_from_remote(remote: PolymarketMarketDetailsPayload) -> dict[st
     raw_updates: dict[str, object] = {
         "question": remote.question,
         "slug": remote.slug,
+        "condition_id": _required_text(remote.condition_id),
+        "question_id": _required_text(remote.question_id),
+        "clob_token_ids": _clean_string_list(remote.clob_token_ids),
+        "outcome_tokens": _build_outcome_tokens(remote),
         "active": remote.active,
         "closed": remote.closed,
         "end_date": remote.end_date,
@@ -221,7 +230,7 @@ def _safe_updates_from_remote(remote: PolymarketMarketDetailsPayload) -> dict[st
     return {
         key: value
         for key, value in raw_updates.items()
-        if key in SAFE_MARKET_FIELDS and value is not None
+        if key in SAFE_MARKET_FIELDS and value is not None and value != []
     }
 
 
@@ -246,6 +255,41 @@ def _extract_binary_token_ids(token_ids: list[str]) -> tuple[str | None, str | N
     if len(token_ids) == 1:
         return token_ids[0], None
     return None, None
+
+
+def _required_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def _clean_string_list(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        cleaned = _required_text(value)
+        if cleaned is not None:
+            result.append(cleaned)
+    return result
+
+
+def _build_outcome_tokens(remote: PolymarketMarketDetailsPayload) -> list[dict[str, object]]:
+    if remote.outcome_tokens:
+        return remote.outcome_tokens
+    clob_token_ids = _clean_string_list(remote.clob_token_ids)
+    outcomes = _clean_string_list(remote.outcomes)
+    if not clob_token_ids:
+        return []
+    tokens: list[dict[str, object]] = []
+    for index, token_id in enumerate(clob_token_ids):
+        item: dict[str, object] = {
+            "token_id": token_id,
+            "outcome_index": index,
+        }
+        if index < len(outcomes):
+            item["outcome"] = outcomes[index]
+        tokens.append(item)
+    return tokens
 
 
 def _serialize_value(value: object) -> object:

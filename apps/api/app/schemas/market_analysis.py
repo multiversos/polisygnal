@@ -29,6 +29,11 @@ class MarketAnalysisMarket(BaseModel):
     event_category: str | None = None
     question: str
     slug: str
+    condition_id: str | None = None
+    question_id: str | None = None
+    clob_token_ids: list[str] | None = None
+    outcome_tokens: list[dict[str, object]] | None = None
+    polymarket_url: str | None = None
     sport_type: str | None = None
     market_type: str | None = None
     evidence_shape: str | None = None
@@ -188,6 +193,8 @@ class MarketLinksRead(BaseModel):
     polymarket_url: str | None = None
     polymarket_event_slug: str | None = None
     polymarket_market_slug: str | None = None
+    condition_id: str | None = None
+    question_id: str | None = None
     internal_analysis_url: str
     internal_json_url: str
     price_history_url: str
