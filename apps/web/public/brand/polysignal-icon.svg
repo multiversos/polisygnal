@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">PolySignal icon</title>
+  <desc id="desc">Geometric P mark with signal bars.</desc>
+  <defs>
+    <linearGradient id="polyIconGradient" x1="14" x2="82" y1="82" y2="14" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#14b8a6"/>
+      <stop offset="0.52" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="96" rx="22" fill="#08111f"/>
+  <path
+    d="M28 76V20h26c12.5 0 22 8.6 22 20.3C76 52.4 66.5 61 54 61H42v15H28Zm14-29h11.2c5.2 0 8.8-2.9 8.8-7s-3.6-7-8.8-7H42v14Z"
+    fill="url(#polyIconGradient)"
+  />
+  <path d="M46 41h8v18h-8V41Zm13-7h8v25h-8V34Zm-26 14h8v11h-8V48Z" fill="#dffcff" opacity=".92"/>
+</svg>

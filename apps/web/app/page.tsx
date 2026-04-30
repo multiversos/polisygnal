@@ -2238,6 +2238,17 @@ export default function DashboardPage() {
     setUpcomingFilters((current) => ({ ...current, sport }));
   }, []);
 
+  useEffect(() => {
+    const handleShellSportSelect = (event: Event) => {
+      const detail = (event as CustomEvent<{ sport?: string }>).detail;
+      if (typeof detail?.sport === "string") {
+        handleSelectSport(detail.sport);
+      }
+    };
+    window.addEventListener("polysignal:sport-select", handleShellSportSelect);
+    return () => window.removeEventListener("polysignal:sport-select", handleShellSportSelect);
+  }, [handleSelectSport]);
+
   const handleToggleWatchlist = useCallback(async (marketId: number) => {
     setWatchlistActionMarketId(marketId);
     setWatchlistError(null);

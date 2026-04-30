@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 310 88" role="img" aria-labelledby="title desc">
+  <title id="title">PolySignal</title>
+  <desc id="desc">PolySignal wordmark with geometric signal icon.</desc>
+  <defs>
+    <linearGradient id="polyLogoGradient" x1="8" x2="78" y1="78" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#14b8a6"/>
+      <stop offset="0.52" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="80" height="80" rx="20" fill="#08111f"/>
+  <path
+    d="M27 69V19h23.5C62 19 71 27 71 38.2 71 49.3 62 57 50.5 57H40v12H27Zm13-24h9.6c4.9 0 8.2-2.7 8.2-6.8 0-4-3.3-6.8-8.2-6.8H40V45Z"
+    fill="url(#polyLogoGradient)"
+  />
+  <path d="M43 38h7v16h-7V38Zm12-6h7v22h-7V32Zm-24 13h7v9h-7v-9Z" fill="#dffcff" opacity=".92"/>
+  <text x="102" y="39" fill="#102033" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="900" letter-spacing="0">
+    PolySignal
+  </text>
+  <text x="103" y="62" fill="#5f6f85" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="0">
+    Market intelligence workspace
+  </text>
+</svg>
