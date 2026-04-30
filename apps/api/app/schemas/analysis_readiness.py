@@ -26,6 +26,7 @@ class AnalysisReadinessItem(BaseModel):
     sport: str
     market_shape: str
     close_time: datetime | None = None
+    time_window_label: str
     yes_price: Decimal | None = None
     no_price: Decimal | None = None
     liquidity: Decimal | None = None

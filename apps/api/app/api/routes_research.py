@@ -168,6 +168,7 @@ def get_analysis_readiness(
     sport: str | None = Query(default=None),
     days: int = Query(default=7, ge=1, le=30),
     limit: int = Query(default=50, ge=1, le=200),
+    min_hours_to_close: float | None = Query(default=None, ge=0),
     db: Session = Depends(get_db),
 ) -> AnalysisReadinessResponse:
     return list_analysis_readiness(
@@ -175,6 +176,7 @@ def get_analysis_readiness(
         sport=sport,
         days=days,
         limit=limit,
+        min_hours_to_close=min_hours_to_close,
     )
 
 

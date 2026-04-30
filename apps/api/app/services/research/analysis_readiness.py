@@ -11,6 +11,7 @@ from app.schemas.analysis_readiness import (
 )
 from app.services.research.upcoming_data_quality import list_upcoming_data_quality
 from app.services.research.upcoming_market_selector import list_upcoming_sports_markets
+from app.services.time_windows import describe_time_window
 
 
 READY_STATUS = "ready"
@@ -42,6 +43,7 @@ def list_analysis_readiness(
     sport: str | None = None,
     days: int = 7,
     limit: int = 50,
+    min_hours_to_close: float | None = None,
     now: datetime | None = None,
 ) -> AnalysisReadinessResponse:
     current_time = _normalize_datetime(now or datetime.now(tz=UTC))
@@ -65,10 +67,20 @@ def list_analysis_readiness(
     )
     quality_by_market_id = {item.market_id: item for item in quality_selection.items}
     items = [
-        _build_item(upcoming_item, quality_by_market_id[upcoming_item.market_id])
+        _build_item(upcoming_item, quality_by_market_id[upcoming_item.market_id], now=current_time)
         for upcoming_item in upcoming_selection.items
         if upcoming_item.market_id in quality_by_market_id
     ]
+    if min_hours_to_close is not None:
+        items = [
+            item
+            for item in items
+            if item.close_time is not None
+            and (
+                (_normalize_datetime(item.close_time) - current_time).total_seconds() / 3600
+            )
+            >= min_hours_to_close
+        ]
     items.sort(
         key=lambda item: (
             _status_rank(item.readiness_status),
@@ -108,13 +120,14 @@ def list_analysis_readiness(
             "limit": safe_limit,
             "include_futures": False,
             "focus": "match_winner",
+            "min_hours_to_close": min_hours_to_close,
             "window_start": upcoming_selection.filters_applied.get("window_start"),
             "window_end": upcoming_selection.filters_applied.get("window_end"),
         },
     )
 
 
-def _build_item(upcoming_item, quality_item) -> AnalysisReadinessItem:
+def _build_item(upcoming_item, quality_item, *, now: datetime) -> AnalysisReadinessItem:
     has_snapshot = quality_item.has_snapshot
     has_price = quality_item.has_yes_price and quality_item.has_no_price
     has_clear_sport = quality_item.sport != "other"
@@ -130,6 +143,7 @@ def _build_item(upcoming_item, quality_item) -> AnalysisReadinessItem:
         quality_item.freshness.recommended_action if quality_item.freshness else "review_market"
     )
     score_status = "calculated" if quality_item.has_polysignal_score else "pending"
+    time_window = describe_time_window(quality_item.close_time, now=now)
 
     reasons: list[str] = []
     if has_snapshot:
@@ -156,6 +170,11 @@ def _build_item(upcoming_item, quality_item) -> AnalysisReadinessItem:
         reasons.append("polysignal_score_pending")
     if freshness_status != "fresh":
         reasons.append(f"freshness_{freshness_status}")
+    reasons.append(time_window.reason)
+    if time_window.is_good_refresh_window:
+        reasons.append("preferred_refresh_window")
+    if time_window.is_too_soon:
+        reasons.append("closes_too_soon")
 
     blocked = (
         not has_future_close
@@ -177,7 +196,7 @@ def _build_item(upcoming_item, quality_item) -> AnalysisReadinessItem:
         suggested_next_action = "listo_para_research_packet"
     elif needs_refresh:
         readiness_status = NEEDS_REFRESH_STATUS
-        suggested_next_action = "ejecutar_refresh_snapshot_dry_run"
+        suggested_next_action = _refresh_action_for_time_window(time_window)
     else:
         readiness_status = BLOCKED_STATUS
         suggested_next_action = "revisar_o_descartar_por_ahora"
@@ -188,6 +207,7 @@ def _build_item(upcoming_item, quality_item) -> AnalysisReadinessItem:
         sport=quality_item.sport,
         market_shape=quality_item.market_shape,
         close_time=quality_item.close_time,
+        time_window_label=time_window.label,
         yes_price=upcoming_item.market_yes_price,
         no_price=upcoming_item.market_no_price,
         liquidity=upcoming_item.liquidity,
@@ -205,6 +225,7 @@ def _build_item(upcoming_item, quality_item) -> AnalysisReadinessItem:
             data_quality_label=quality_item.quality_label,
             freshness_status=freshness_status,
             blocked=blocked,
+            hours_until_close=time_window.hours_until_close,
         ),
         reasons=_dedupe(reasons),
         missing_fields=_missing_fields(quality_item.missing_fields, has_clear_shape),
@@ -230,6 +251,7 @@ def _readiness_score(
     data_quality_label: str,
     freshness_status: str,
     blocked: bool,
+    hours_until_close: float | None,
 ) -> int:
     score = 0
     if has_snapshot:
@@ -252,7 +274,27 @@ def _readiness_score(
         score -= 20
     if blocked:
         score = min(score, 40)
+    if hours_until_close is None:
+        score -= 10
+    elif hours_until_close < 1:
+        score -= 35
+    elif hours_until_close < 6:
+        score -= 15
+    elif 24 <= hours_until_close <= 24 * 7:
+        score += 10
     return max(0, min(100, score))
+
+
+def _refresh_action_for_time_window(time_window) -> str:
+    if time_window.hours_until_close is None:
+        return "revisar_o_descartar_por_ahora"
+    if time_window.hours_until_close < 1:
+        return "demasiado_cerca_del_cierre_revisar_solo_si_ya_tiene_datos"
+    if time_window.hours_until_close < 6:
+        return "refresh_posible_pero_ventana_corta"
+    if time_window.hours_until_close >= 24:
+        return "buen_candidato_para_refresh_controlado"
+    return "ejecutar_refresh_snapshot_dry_run"
 
 
 def _is_primary_match_winner_title(title: str | None) -> bool:

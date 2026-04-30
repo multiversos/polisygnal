@@ -55,6 +55,10 @@ const readinessActionLabels: Record<string, string> = {
   listo_para_research_packet: "Listo para Research Packet",
   ejecutar_refresh_snapshot_dry_run: "Probar snapshot dry-run",
   revisar_o_descartar_por_ahora: "Revisar o descartar por ahora",
+  demasiado_cerca_del_cierre_revisar_solo_si_ya_tiene_datos:
+    "Demasiado cerca del cierre",
+  refresh_posible_pero_ventana_corta: "Refresh posible, ventana corta",
+  buen_candidato_para_refresh_controlado: "Buen candidato para refresh",
 };
 
 const discoveryStatusLabels: Record<string, string> = {
@@ -113,6 +117,22 @@ function buildMetadataCommand(marketId: number): string {
   return `python -m app.commands.refresh_market_metadata --market-id ${marketId} --dry-run --json`;
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timeoutId));
+  });
+}
+
+function isClosingTooSoon(label?: string | null): boolean {
+  return label === "Menos de 1h" || label === "1-6h";
+}
+
 export default function DataHealthPage() {
   const [overview, setOverview] = useState<DataHealthOverview | null>(null);
   const [analysisReadiness, setAnalysisReadiness] = useState<AnalysisReadiness | null>(null);
@@ -128,6 +148,14 @@ export default function DataHealthPage() {
     setLoading(true);
     setError(null);
     try {
+      const results = await Promise.allSettled([
+        withTimeout(fetchDataHealthOverview(), 10000, "overview"),
+        withTimeout(fetchAnalysisReadiness({ days: 7, limit: 50 }), 30000, "readiness"),
+        withTimeout(fetchSnapshotGaps({ days: 7, limit: 50 }), 30000, "snapshot-gaps"),
+        withTimeout(fetchRefreshPriorities({ days: 7, limit: 12 }), 30000, "refresh-priorities"),
+        withTimeout(fetchRefreshRuns({ limit: 10 }), 10000, "refresh-runs"),
+        withTimeout(fetchLiveUpcomingDiscovery({ days: 7, limit: 25 }), 20000, "live-discovery"),
+      ]);
       const [
         overviewResult,
         analysisReadinessResult,
@@ -135,20 +163,29 @@ export default function DataHealthPage() {
         refreshPrioritiesResult,
         refreshRunsResult,
         liveDiscoveryResult,
-      ] = await Promise.all([
-        fetchDataHealthOverview(),
-        fetchAnalysisReadiness({ days: 7, limit: 50 }),
-        fetchSnapshotGaps({ days: 7, limit: 50 }),
-        fetchRefreshPriorities({ days: 7, limit: 12 }),
-        fetchRefreshRuns({ limit: 10 }),
-        fetchLiveUpcomingDiscovery({ days: 7, limit: 25 }),
-      ]);
-      setOverview(overviewResult);
-      setAnalysisReadiness(analysisReadinessResult);
-      setSnapshotGaps(snapshotGapsResult);
-      setRefreshPriorities(refreshPrioritiesResult);
-      setRefreshRuns(refreshRunsResult);
-      setLiveDiscovery(liveDiscoveryResult);
+      ] = results;
+
+      if (overviewResult.status === "fulfilled") {
+        setOverview(overviewResult.value);
+      }
+      if (analysisReadinessResult.status === "fulfilled") {
+        setAnalysisReadiness(analysisReadinessResult.value);
+      }
+      if (snapshotGapsResult.status === "fulfilled") {
+        setSnapshotGaps(snapshotGapsResult.value);
+      }
+      if (refreshPrioritiesResult.status === "fulfilled") {
+        setRefreshPriorities(refreshPrioritiesResult.value);
+      }
+      if (refreshRunsResult.status === "fulfilled") {
+        setRefreshRuns(refreshRunsResult.value);
+      }
+      if (liveDiscoveryResult.status === "fulfilled") {
+        setLiveDiscovery(liveDiscoveryResult.value);
+      }
+      if (results.some((result) => result.status === "rejected")) {
+        setError("Algunos diagnosticos no se pudieron cargar. Los paneles disponibles siguen visibles.");
+      }
     } catch {
       setError("No se pudo cargar la salud de datos.");
     } finally {
@@ -366,6 +403,9 @@ export default function DataHealthPage() {
               Separa mercados listos de los que necesitan refresh o deben quedar bloqueados.
               Esta vista no ejecuta refresh, research ni predicciones.
             </p>
+            <p className="section-note">
+              Para pruebas E2E, prioriza mercados con 24h a 7 dias antes del cierre.
+            </p>
           </div>
           <span className="badge muted">
             {analysisReadiness?.summary.total_checked ?? 0} revisados
@@ -437,6 +477,10 @@ export default function DataHealthPage() {
                     <span className="reason-chip">
                       {formatReadinessAction(item.suggested_next_action)}
                     </span>
+                    <span className="reason-chip">{item.time_window_label}</span>
+                    {isClosingTooSoon(item.time_window_label) ? (
+                      <span className="warning-chip">Cierra demasiado pronto</span>
+                    ) : null}
                     <span className="reason-chip">Cierre {formatDate(item.close_time)}</span>
                   </div>
                   <div className="snapshot-gap-meta">
@@ -571,6 +615,9 @@ export default function DataHealthPage() {
               Ranking read-only de mercados proximos que conviene revisar primero con
               refresh controlado. No ejecuta comandos desde la UI.
             </p>
+            <p className="section-note">
+              Para pruebas E2E, prioriza mercados con 24h a 7 dias antes del cierre.
+            </p>
           </div>
           <span className="badge muted">
             {refreshPriorities?.returned ?? 0} priorizados
@@ -611,6 +658,10 @@ export default function DataHealthPage() {
                     ) : null}
                     {item.missing_price ? (
                       <span className="warning-chip">Precio incompleto</span>
+                    ) : null}
+                    <span className="reason-chip">{item.time_window_label}</span>
+                    {isClosingTooSoon(item.time_window_label) ? (
+                      <span className="warning-chip">Cierra demasiado pronto</span>
                     ) : null}
                     <span className="reason-chip">Cierre {formatDate(item.close_time)}</span>
                   </div>

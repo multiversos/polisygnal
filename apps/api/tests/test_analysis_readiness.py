@@ -67,8 +67,13 @@ def test_analysis_readiness_classifies_ready_needs_refresh_and_blocked(
     assert response.summary.blocked_count == 2
     assert by_id[ready.id].readiness_status == "ready"
     assert by_id[ready.id].yes_price == Decimal("0.5600")
+    assert by_id[ready.id].time_window_label == "1-3 dias"
     assert by_id[ready.id].suggested_next_action == "listo_para_research_packet"
     assert by_id[needs_refresh.id].readiness_status == "needs_refresh"
+    assert by_id[needs_refresh.id].time_window_label == "1-3 dias"
+    assert by_id[needs_refresh.id].suggested_next_action == (
+        "buen_candidato_para_refresh_controlado"
+    )
     assert "snapshot" in by_id[needs_refresh.id].missing_fields
     assert "--dry-run --json" in by_id[needs_refresh.id].suggested_refresh_snapshot_command
     assert by_id[blocked.id].readiness_status == "blocked"
@@ -142,6 +147,47 @@ def test_inspect_analysis_readiness_command_is_read_only_and_json_serializable(
     assert json.dumps(payload, ensure_ascii=True, default=str)
     assert db_session.scalar(select(func.count()).select_from(Prediction)) == before_predictions
     assert db_session.scalar(select(func.count()).select_from(ResearchRun)) == before_runs
+
+
+def test_analysis_readiness_min_hours_to_close_filters_short_windows(
+    db_session: Session,
+) -> None:
+    too_soon = _create_market(
+        db_session,
+        suffix="too-soon",
+        question="Lions vs Bears",
+        sport_type="nfl",
+        market_type="winner",
+        end_date=NOW + timedelta(minutes=45),
+    )
+    good_window = _create_market(
+        db_session,
+        suffix="good-window",
+        question="Knicks vs Nets",
+        sport_type="nba",
+        market_type="winner",
+        end_date=NOW + timedelta(days=2),
+    )
+    db_session.flush()
+
+    unfiltered = list_analysis_readiness(db_session, days=7, limit=10, now=NOW)
+    by_id = {item.market_id: item for item in unfiltered.items}
+    assert by_id[too_soon.id].time_window_label == "Menos de 1h"
+    assert by_id[too_soon.id].suggested_next_action == (
+        "demasiado_cerca_del_cierre_revisar_solo_si_ya_tiene_datos"
+    )
+    assert by_id[good_window.id].time_window_label == "1-3 dias"
+
+    filtered = list_analysis_readiness(
+        db_session,
+        days=7,
+        limit=10,
+        min_hours_to_close=6,
+        now=NOW,
+    )
+    filtered_ids = {item.market_id for item in filtered.items}
+    assert too_soon.id not in filtered_ids
+    assert good_window.id in filtered_ids
 
 
 def _create_market(

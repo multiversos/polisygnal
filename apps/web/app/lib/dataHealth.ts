@@ -68,6 +68,7 @@ export type RefreshPriorityItem = {
   title: string;
   sport: string;
   close_time?: string | null;
+  time_window_label: string;
   missing_snapshot: boolean;
   missing_price: boolean;
   freshness_status: string;
@@ -86,6 +87,8 @@ export type RefreshPriorities = {
   returned: number;
   missing_snapshot_count: number;
   missing_price_count: number;
+  min_hours_to_close?: number | null;
+  filters_applied: Record<string, unknown>;
   items: RefreshPriorityItem[];
 };
 
@@ -105,6 +108,7 @@ export type AnalysisReadinessItem = {
   sport: string;
   market_shape: string;
   close_time?: string | null;
+  time_window_label: string;
   yes_price?: string | number | null;
   no_price?: string | number | null;
   liquidity?: string | number | null;
@@ -238,6 +242,7 @@ export async function fetchRefreshPriorities(params?: {
   sport?: string | null;
   days?: number;
   limit?: number;
+  min_hours_to_close?: number | null;
 }): Promise<RefreshPriorities> {
   const searchParams = new URLSearchParams();
   if (params?.sport) {
@@ -245,6 +250,9 @@ export async function fetchRefreshPriorities(params?: {
   }
   searchParams.set("days", String(params?.days ?? 7));
   searchParams.set("limit", String(params?.limit ?? 25));
+  if (params?.min_hours_to_close !== undefined && params.min_hours_to_close !== null) {
+    searchParams.set("min_hours_to_close", String(params.min_hours_to_close));
+  }
   const response = await fetch(
     `${API_BASE_URL}/data-health/refresh-priorities?${searchParams.toString()}`,
     {

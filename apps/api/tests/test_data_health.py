@@ -256,8 +256,11 @@ def test_refresh_priorities_endpoint_orders_operational_candidates(
     assert response.status_code == 200
     payload = response.json()
     assert payload["returned"] == 2
+    assert payload["min_hours_to_close"] == 6.0
+    assert payload["filters_applied"]["min_hours_to_close"] == 6.0
     assert payload["items"][0]["market_id"] == watchlisted.id
     assert payload["items"][0]["refresh_priority_score"] > payload["items"][1]["refresh_priority_score"]
+    assert payload["items"][0]["time_window_label"] == "6-24h"
     assert "watchlist:+15" in payload["items"][0]["reasons"]
     assert "decision_waiting_for_data:+12" in payload["items"][0]["reasons"]
     assert f"--market-id {watchlisted.id}" in payload["items"][0]["suggested_command_snapshot"]
@@ -265,6 +268,50 @@ def test_refresh_priorities_endpoint_orders_operational_candidates(
     assert lower_priority.id in {item["market_id"] for item in payload["items"]}
     assert db_session.scalar(select(func.count()).select_from(Prediction)) == before_predictions
     assert db_session.scalar(select(func.count()).select_from(ResearchRun)) == before_runs
+
+
+def test_refresh_priorities_prioritizes_useful_time_windows(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    now = datetime.now(tz=UTC)
+    too_soon = _create_market(
+        db_session,
+        suffix="priority-too-soon",
+        sport="soccer",
+        end_date=now + timedelta(minutes=45),
+    )
+    good_window = _create_market(
+        db_session,
+        suffix="priority-good-window",
+        sport="soccer",
+        end_date=now + timedelta(days=2),
+    )
+    db_session.commit()
+
+    filtered_response = client.get(
+        "/data-health/refresh-priorities?sport=soccer&days=7&limit=10"
+    )
+    assert filtered_response.status_code == 200
+    filtered_payload = filtered_response.json()
+    filtered_ids = {item["market_id"] for item in filtered_payload["items"]}
+    assert good_window.id in filtered_ids
+    assert too_soon.id not in filtered_ids
+
+    unfiltered_response = client.get(
+        "/data-health/refresh-priorities"
+        "?sport=soccer&days=7&limit=10&min_hours_to_close=0"
+    )
+    assert unfiltered_response.status_code == 200
+    unfiltered_payload = unfiltered_response.json()
+    by_id = {item["market_id"]: item for item in unfiltered_payload["items"]}
+    assert by_id[good_window.id]["refresh_priority_score"] > by_id[too_soon.id][
+        "refresh_priority_score"
+    ]
+    assert by_id[good_window.id]["time_window_label"] == "1-3 dias"
+    assert "good_refresh_window:+35" in by_id[good_window.id]["reasons"]
+    assert by_id[too_soon.id]["time_window_label"] == "Menos de 1h"
+    assert "closes_within_1h:-60" in by_id[too_soon.id]["reasons"]
 
 
 def test_refresh_priorities_endpoint_is_documented(client: TestClient) -> None:

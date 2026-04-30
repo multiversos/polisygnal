@@ -227,3 +227,137 @@ Confirmado durante el batch:
 4. Revisar por que varios mercados claros devuelven `no_pricing_or_liquidity`.
 5. Considerar una vista de "mercados ready" por deporte para acelerar pruebas
    manuales.
+
+## Batch v2 con ventana de tiempo
+
+Fecha local de sesion: 2026-04-29 / 2026-04-30 UTC
+
+El primer batch demostro que un mercado puede pasar a `ready` y expirar casi
+de inmediato. El caso fue `31998`, que tuvo snapshot/precio real pero cruzo su
+`close_time` poco despues. Para evitarlo, se ajusto la priorizacion operativa:
+
+- Penalizar mercados con cierre pasado o cierre en menos de 1 hora.
+- Penalizar mercados entre 1 y 6 horas.
+- Priorizar mercados con ventana util de 24 horas a 7 dias.
+- Mostrar `time_window_label` en readiness y prioridades.
+- Filtrar por defecto el CLI de readiness con `--min-hours-to-close 6`.
+
+### Diagnostico por ventana
+
+Comando read-only:
+
+```bash
+python -m app.commands.inspect_analysis_readiness --days 7 --limit 200 --min-hours-to-close 0 --json
+```
+
+Resumen observado:
+
+| Ventana | Total | Needs refresh | Blocked | Sin snapshot | Sin precio | Match winner |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Menos de 1h | 1 | 0 | 0 | 0 | 0 | 0 |
+| 1-6h | 1 | 0 | 0 | 0 | 0 | 0 |
+| 6-24h | 76 | 40 | 36 | 76 | 76 | 76 |
+| 1-3 dias | 122 | 78 | 44 | 122 | 122 | 122 |
+
+Con el filtro recomendado:
+
+```bash
+python -m app.commands.inspect_analysis_readiness --days 7 --limit 100 --json
+```
+
+Resumen posterior:
+
+- Total revisado: 98
+- Ready: 0
+- Needs refresh: 78
+- Blocked: 20
+- Sin snapshot: 98
+- Sin precio SI/NO: 98
+- Score pendiente: 98
+
+Los candidatos principales quedaron en ventana `1-3 dias`, con accion
+`buen_candidato_para_refresh_controlado`.
+
+### Candidatos dry-run
+
+Se eligieron 10 mercados con ventana util, shape `match_winner`, deporte claro
+o razonablemente inferido, y sin props/futuros evidentes.
+
+| market_id | Mercado | Deporte | Ventana | Dry-run |
+| --- | --- | --- | --- | --- |
+| 57513 | KBO: Lotte Giants vs. Kia Tigers | mlb | 1-3 dias | would_refresh |
+| 57514 | KBO: Samsung Lions vs. Kiwoom Heroes | mlb | 1-3 dias | would_refresh |
+| 57511 | KBO: LG Twins vs. Doosan Bears | mlb | 1-3 dias | would_refresh |
+| 57512 | KBO: KT Wiz vs. SSG Landers | mlb | 1-3 dias | would_refresh |
+| 55076 | Indian Premier League: Royal Challengers Bangalore vs Gujarat Titans | cricket | 1-3 dias | would_refresh |
+| 55088 | Pakistan Super League: Hyderabad Kingsmen vs Islamabad United | cricket | 1-3 dias | would_refresh |
+| 57518 | Boston Red Sox vs. Baltimore Orioles | mlb | 1-3 dias | would_refresh |
+| 57522 | Colorado Rockies vs. New York Mets | mlb | 1-3 dias | would_refresh |
+| 57524 | Minnesota Twins vs. Tampa Bay Rays | mlb | 1-3 dias | would_refresh |
+| 57526 | Philadelphia Phillies vs. Atlanta Braves | mlb | 1-3 dias | would_refresh |
+
+El dry-run no creo snapshots, predictions ni research_runs.
+
+### Applies controlados
+
+Se aplico refresh a 5 mercados unicos como maximo:
+
+```bash
+python -m app.commands.refresh_market_snapshots --market-id <ID> --apply --json
+```
+
+| market_id | Resultado | Snapshot | Motivo |
+| --- | --- | --- | --- |
+| 57513 | warning | no | no_pricing_or_liquidity |
+| 57514 | warning | no | no_pricing_or_liquidity |
+| 57511 | warning | no | no_pricing_or_liquidity |
+| 57512 | warning | no | no_pricing_or_liquidity |
+| 55076 | warning | no | no_pricing_or_liquidity |
+
+No se aplico a nuevos mercados despues de esos 5. Se inspecciono nuevamente
+`57513` para confirmar el motivo detallado del skip. No hubo snapshots creados.
+
+### Recheck posterior
+
+Comandos read-only:
+
+```bash
+python -m app.commands.recheck_data_quality --days 7 --limit 100 --json
+python -m app.commands.inspect_analysis_readiness --days 7 --limit 100 --json
+```
+
+Data quality posterior:
+
+- Total revisado: 100
+- Completo: 0
+- Parcial: 0
+- Insuficiente: 100
+- Sin snapshot: 100
+- Sin precio SI/NO: 100
+- Freshness: `incomplete` en 100 mercados
+
+Readiness posterior:
+
+- Total revisado: 98
+- Ready: 0
+- Needs refresh: 78
+- Blocked: 20
+- Sin snapshot: 98
+- Sin precio SI/NO: 98
+- Score pendiente: 98
+
+### Resultado
+
+La nueva priorizacion resolvio el problema de seleccionar mercados que cierran
+demasiado pronto, pero el refresh controlado no obtuvo pricing/liquidez remoto
+para los 5 applies. Esto es un resultado seguro: PolySignal no invento
+snapshots ni precios y mantuvo los mercados como `needs_refresh`.
+
+Proximos pasos recomendados:
+
+1. Usar live discovery para encontrar mercados remotos con precio y condition_id.
+2. Preferir imports/backfill controlados antes de snapshot refresh cuando la DB
+   local tenga IDs viejos.
+3. Reintentar snapshot refresh solo con dry-run y ventana de 24h a 7 dias.
+4. Revisar clasificacion de mercados como KBO si siguen apareciendo como `mlb`
+   por el fallback de deportes.

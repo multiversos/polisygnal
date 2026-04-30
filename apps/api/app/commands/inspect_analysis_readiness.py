@@ -24,6 +24,7 @@ def main() -> None:
                 sport=args.sport,
                 days=args.days,
                 limit=args.limit,
+                min_hours_to_close=args.min_hours_to_close,
             )
         except Exception as exc:
             print(
@@ -58,6 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sport", type=str, default=None, help="Filtro opcional de deporte.")
     parser.add_argument("--days", type=int, default=7, help="Ventana de proximos dias.")
     parser.add_argument("--limit", type=int, default=50, help="Cantidad maxima de mercados.")
+    parser.add_argument(
+        "--min-hours-to-close",
+        type=float,
+        default=6,
+        help="Filtra candidatos que cierran demasiado pronto. Usa 0 para no filtrar.",
+    )
     parser.add_argument("--json", action="store_true", help="Imprime salida JSON.")
     return parser
 
@@ -68,10 +75,22 @@ def _run(
     sport: str | None = None,
     days: int = 7,
     limit: int = 50,
+    min_hours_to_close: float | None = 6,
 ) -> dict[str, Any]:
     before_predictions = db.scalar(select(func.count()).select_from(Prediction)) or 0
     before_research_runs = db.scalar(select(func.count()).select_from(ResearchRun)) or 0
-    readiness = list_analysis_readiness(db, sport=sport, days=days, limit=limit)
+    normalized_min_hours = (
+        None
+        if min_hours_to_close is not None and min_hours_to_close <= 0
+        else min_hours_to_close
+    )
+    readiness = list_analysis_readiness(
+        db,
+        sport=sport,
+        days=days,
+        limit=limit,
+        min_hours_to_close=normalized_min_hours,
+    )
     after_predictions = db.scalar(select(func.count()).select_from(Prediction)) or 0
     after_research_runs = db.scalar(select(func.count()).select_from(ResearchRun)) or 0
     return {
@@ -83,6 +102,7 @@ def _run(
         "sport": readiness.sport,
         "days": readiness.days,
         "limit": readiness.limit,
+        "min_hours_to_close": readiness.filters_applied.get("min_hours_to_close"),
         "summary": readiness.summary.model_dump(),
         "ready": [
             item.model_dump()
@@ -106,7 +126,10 @@ def _run(
 def _print_human(payload: dict[str, Any]) -> None:
     summary = payload["summary"]
     print("Analysis readiness (read-only)")
-    print(f"days={payload['days']} limit={payload['limit']} sport={payload['sport'] or 'all'}")
+    print(
+        f"days={payload['days']} limit={payload['limit']} "
+        f"sport={payload['sport'] or 'all'} min_hours_to_close={payload['min_hours_to_close']}"
+    )
     print(
         "checked={total_checked} ready={ready_count} needs_refresh={refresh_needed_count} "
         "blocked={blocked_count} missing_snapshot={missing_snapshot_count} "
@@ -117,7 +140,7 @@ def _print_human(payload: dict[str, Any]) -> None:
     if not payload["items"]:
         print("No upcoming markets found for the current filters.")
         return
-    print("market_id\tstatus\tscore\tsport\tquality\tfreshness\taction\ttitle")
+    print("market_id\tstatus\tscore\tsport\twindow\tquality\tfreshness\taction\ttitle")
     for item in payload["items"]:
         print(
             "\t".join(
@@ -126,6 +149,7 @@ def _print_human(payload: dict[str, Any]) -> None:
                     item["readiness_status"],
                     str(item["readiness_score"]),
                     item["sport"],
+                    item["time_window_label"],
                     item["data_quality_label"],
                     item["freshness_status"],
                     item["suggested_next_action"],

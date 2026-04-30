@@ -46,6 +46,13 @@ def get_refresh_priorities(
     sport: str | None = Query(default=None),
     days: int = Query(default=7, ge=1, le=30),
     limit: int = Query(default=25, ge=0, le=100),
+    min_hours_to_close: float | None = Query(default=6, ge=0),
     db: Session = Depends(get_db),
 ) -> RefreshPrioritiesRead:
-    return build_refresh_priorities(db, sport=sport, days=days, limit=limit)
+    return build_refresh_priorities(
+        db,
+        sport=sport,
+        days=days,
+        limit=limit,
+        min_hours_to_close=min_hours_to_close,
+    )

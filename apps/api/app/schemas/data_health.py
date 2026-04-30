@@ -55,6 +55,7 @@ class RefreshPriorityItemRead(BaseModel):
     title: str
     sport: str
     close_time: datetime | None = None
+    time_window_label: str
     missing_snapshot: bool = False
     missing_price: bool = False
     freshness_status: str
@@ -73,4 +74,6 @@ class RefreshPrioritiesRead(BaseModel):
     returned: int = 0
     missing_snapshot_count: int = 0
     missing_price_count: int = 0
+    min_hours_to_close: float | None = None
+    filters_applied: dict[str, object | None] = Field(default_factory=dict)
     items: list[RefreshPriorityItemRead] = Field(default_factory=list)

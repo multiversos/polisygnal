@@ -17,6 +17,7 @@ from app.services.research.upcoming_data_quality import (
     build_market_data_quality,
 )
 from app.services.research.upcoming_market_selector import list_upcoming_sports_markets
+from app.services.time_windows import describe_time_window
 
 
 MAX_SCORE = 200
@@ -36,6 +37,7 @@ def build_refresh_priorities(
     sport: str | None = None,
     days: int = 7,
     limit: int = 25,
+    min_hours_to_close: float | None = 6,
     now: datetime | None = None,
 ) -> RefreshPrioritiesRead:
     current_time = _normalize_datetime(now or datetime.now(tz=UTC))
@@ -90,12 +92,21 @@ def build_refresh_priorities(
         )
         missing_price = item.market_yes_price is None or item.market_no_price is None
         freshness_status = item.freshness.freshness_status if item.freshness else "unknown"
+        time_window = describe_time_window(item.close_time, now=current_time)
+        if (
+            min_hours_to_close is not None
+            and time_window.hours_until_close is not None
+            and time_window.hours_until_close < min_hours_to_close
+        ):
+            reasons = _dedupe([*reasons, "filtered_below_min_hours_to_close"])
+            score = min(score, 25)
         items.append(
             RefreshPriorityItemRead(
                 market_id=item.market_id,
                 title=item.question,
                 sport=item.sport,
                 close_time=item.close_time,
+                time_window_label=time_window.label,
                 missing_snapshot=missing_snapshot,
                 missing_price=missing_price,
                 freshness_status=freshness_status,
@@ -121,6 +132,16 @@ def build_refresh_priorities(
         ),
         reverse=True,
     )
+    if min_hours_to_close is not None:
+        items = [
+            item
+            for item in items
+            if _meets_min_hours_to_close(
+                item.close_time,
+                now=current_time,
+                min_hours_to_close=min_hours_to_close,
+            )
+        ]
     selected = items[:safe_limit]
     return RefreshPrioritiesRead(
         generated_at=current_time,
@@ -130,6 +151,13 @@ def build_refresh_priorities(
         returned=len(selected),
         missing_snapshot_count=sum(1 for item in selected if item.missing_snapshot),
         missing_price_count=sum(1 for item in selected if item.missing_price),
+        min_hours_to_close=min_hours_to_close,
+        filters_applied={
+            "sport": selection.filters_applied.get("sport"),
+            "days": safe_days,
+            "limit": safe_limit,
+            "min_hours_to_close": min_hours_to_close,
+        },
         items=selected,
     )
 
@@ -147,23 +175,31 @@ def _score_item(
     reasons: list[str] = []
 
     close_time = _normalize_datetime(item.close_time) if item.close_time is not None else None
-    if close_time is None:
+    time_window = describe_time_window(close_time, now=now)
+    if time_window.hours_until_close is None:
+        score -= Decimal("35")
+        reasons.append("no_close_time:-35")
+    elif time_window.is_past:
+        score -= Decimal("80")
+        reasons.append("close_time_past:-80")
+    elif time_window.hours_until_close < 1:
+        score -= Decimal("60")
+        reasons.append("closes_within_1h:-60")
+        reasons.append("closes_too_soon")
+    elif time_window.hours_until_close < 6:
         score -= Decimal("20")
-        reasons.append("close_time_missing:-20")
-    else:
-        hours_until_close = (close_time - now).total_seconds() / 3600
-        if hours_until_close < 0:
-            score -= Decimal("40")
-            reasons.append("close_time_past:-40")
-        elif hours_until_close <= 24:
-            score += Decimal("30")
-            reasons.append("closes_within_24h:+30")
-        elif hours_until_close <= 72:
-            score += Decimal("22")
-            reasons.append("closes_within_72h:+22")
+        reasons.append("closes_within_6h:-20")
+        reasons.append("closes_too_soon")
+    elif time_window.hours_until_close < 24:
+        score += Decimal("18")
+        reasons.append("closes_within_24h:+18")
+    elif time_window.hours_until_close <= 24 * 7:
+        if time_window.hours_until_close <= 72:
+            score += Decimal("35")
+            reasons.append("good_refresh_window:+35")
         else:
-            score += Decimal("14")
-            reasons.append("closes_within_7d:+14")
+            score += Decimal("30")
+            reasons.append("good_refresh_window:+30")
 
     if item.market_shape == "match_winner":
         score += Decimal("20")
@@ -280,6 +316,22 @@ def _latest_decisions(db: Session, market_ids: list[int]) -> dict[int, str]:
 
 def _timestamp(value: datetime | None) -> float:
     return _normalize_datetime(value).timestamp() if value is not None else 0
+
+
+def _hours_until_close(value: datetime | None, now: datetime) -> float | None:
+    if value is None:
+        return None
+    return (_normalize_datetime(value) - now).total_seconds() / 3600
+
+
+def _meets_min_hours_to_close(
+    value: datetime | None,
+    *,
+    now: datetime,
+    min_hours_to_close: float,
+) -> bool:
+    hours_until_close = _hours_until_close(value, now)
+    return hours_until_close is not None and hours_until_close >= min_hours_to_close
 
 
 def _normalize_datetime(value: datetime) -> datetime:
