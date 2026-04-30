@@ -67,6 +67,10 @@ def test_analysis_readiness_classifies_ready_needs_refresh_and_blocked(
     assert response.summary.blocked_count == 2
     assert by_id[ready.id].readiness_status == "ready"
     assert by_id[ready.id].yes_price == Decimal("0.5600")
+    assert by_id[ready.id].source == "local_existing"
+    assert by_id[ready.id].suggested_research_packet_command.endswith(
+        f"--market-id {ready.id}"
+    )
     assert by_id[ready.id].time_window_label == "1-3 dias"
     assert by_id[ready.id].suggested_next_action == "listo_para_research_packet"
     assert by_id[needs_refresh.id].readiness_status == "needs_refresh"
@@ -204,6 +208,8 @@ def test_analysis_readiness_uses_remote_slug_context_for_imported_euroleague(
         event_slug="euroleague-valencia-panathin-2026-04-30",
         market_slug="euroleague-valencia-panathin-2026-04-30",
     )
+    market.condition_id = "0xeuroleaguecondition"
+    market.clob_token_ids = ["yes-token", "no-token"]
     _add_snapshot(db_session, market=market)
     db_session.flush()
 
@@ -213,6 +219,8 @@ def test_analysis_readiness_uses_remote_slug_context_for_imported_euroleague(
     assert response.items[0].market_id == market.id
     assert response.items[0].sport == "nba"
     assert response.items[0].market_shape == "match_winner"
+    assert response.items[0].source == "snapshot_from_discovery"
+    assert "discovery" in (response.items[0].ready_reason or "")
 
 
 def _create_market(

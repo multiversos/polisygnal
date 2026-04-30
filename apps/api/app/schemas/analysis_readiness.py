@@ -25,6 +25,8 @@ class AnalysisReadinessItem(BaseModel):
     title: str
     sport: str
     market_shape: str
+    source: str = "local_existing"
+    ready_reason: str | None = None
     close_time: datetime | None = None
     time_window_label: str
     yes_price: Decimal | None = None
@@ -39,6 +41,7 @@ class AnalysisReadinessItem(BaseModel):
     reasons: list[str] = Field(default_factory=list)
     missing_fields: list[str] = Field(default_factory=list)
     suggested_next_action: str
+    suggested_research_packet_command: str
     suggested_refresh_snapshot_command: str
     suggested_refresh_metadata_command: str
 

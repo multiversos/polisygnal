@@ -187,7 +187,10 @@ type AnalysisReadinessItem = {
   title: string;
   sport: string;
   market_shape: string;
+  source: string;
+  ready_reason?: string | null;
   close_time?: string | null;
+  time_window_label?: string | null;
   yes_price?: string | number | null;
   no_price?: string | number | null;
   liquidity?: string | number | null;
@@ -200,6 +203,7 @@ type AnalysisReadinessItem = {
   reasons: string[];
   missing_fields: string[];
   suggested_next_action: string;
+  suggested_research_packet_command: string;
   suggested_refresh_snapshot_command: string;
   suggested_refresh_metadata_command: string;
 };
@@ -660,7 +664,7 @@ function buildUpcomingDataQualityPath(filters: UpcomingFilters): string {
 
 function buildAnalysisReadinessPath(filters: UpcomingFilters): string {
   const params = new URLSearchParams({
-    limit: "50",
+    limit: "12",
     days: String(filters.days),
   });
   const apiSport = getSportApiFilter(filters.sport);
@@ -1059,6 +1063,16 @@ function formatReadinessAction(value: string): string {
   return humanizeToken(value);
 }
 
+function formatReadinessSource(value?: string | null): string {
+  if (value === "snapshot_from_discovery") {
+    return "Snapshot reciente";
+  }
+  if (value === "imported_from_discovery") {
+    return "Discovery";
+  }
+  return "Local";
+}
+
 function formatSmartAlertSeverity(value: string): string {
   if (value === "critical") {
     return "Crítica";
@@ -1434,17 +1448,24 @@ function FirstAnalysisReadinessPanel({
           {readyItems.map((item) => (
             <article className="ready-market-card" key={`ready-${item.market_id}`}>
               <div>
-                <span className="eyebrow">{formatSportLabel(item.sport)}</span>
+                <span className="eyebrow">
+                  {formatSportLabel(item.sport)} · {formatReadinessSource(item.source)}
+                </span>
                 <h3>{humanizeMarketTitle(item.title)}</h3>
                 <p>
                   Cierre {formatDateTime(item.close_time)} - {item.data_quality_label} -{" "}
                   {formatReadinessAction(item.suggested_next_action)}
                 </p>
+                {item.ready_reason ? <p>{item.ready_reason}</p> : null}
               </div>
               <div className="snapshot-gap-meta">
                 <span className="readiness-status ready">
                   {formatReadinessStatus(item.readiness_status)}
                 </span>
+                <span className="reason-chip">Score {item.readiness_score}</span>
+                {item.time_window_label ? (
+                  <span className="reason-chip">{item.time_window_label}</span>
+                ) : null}
                 <span className="reason-chip">SI {formatMarketPercent(item.yes_price)}</span>
                 <span className="reason-chip">NO {formatMarketPercent(item.no_price)}</span>
                 <a className="text-link" href={`/markets/${item.market_id}`}>

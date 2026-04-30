@@ -107,6 +107,8 @@ export type AnalysisReadinessItem = {
   title: string;
   sport: string;
   market_shape: string;
+  source: string;
+  ready_reason?: string | null;
   close_time?: string | null;
   time_window_label: string;
   yes_price?: string | number | null;
@@ -121,6 +123,7 @@ export type AnalysisReadinessItem = {
   reasons: string[];
   missing_fields: string[];
   suggested_next_action: string;
+  suggested_research_packet_command: string;
   suggested_refresh_snapshot_command: string;
   suggested_refresh_metadata_command: string;
 };

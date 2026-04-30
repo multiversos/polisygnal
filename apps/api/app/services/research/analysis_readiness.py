@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.market import Market
 from app.schemas.analysis_readiness import (
     AnalysisReadinessItem,
     AnalysisReadinessResponse,
@@ -66,8 +68,14 @@ def list_analysis_readiness(
         now=current_time,
     )
     quality_by_market_id = {item.market_id: item for item in quality_selection.items}
+    source_by_market_id = _load_readiness_sources(db, quality_by_market_id.keys())
     items = [
-        _build_item(upcoming_item, quality_by_market_id[upcoming_item.market_id], now=current_time)
+        _build_item(
+            upcoming_item,
+            quality_by_market_id[upcoming_item.market_id],
+            source=source_by_market_id.get(upcoming_item.market_id, "local_existing"),
+            now=current_time,
+        )
         for upcoming_item in upcoming_selection.items
         if upcoming_item.market_id in quality_by_market_id
     ]
@@ -127,7 +135,7 @@ def list_analysis_readiness(
     )
 
 
-def _build_item(upcoming_item, quality_item, *, now: datetime) -> AnalysisReadinessItem:
+def _build_item(upcoming_item, quality_item, *, source: str, now: datetime) -> AnalysisReadinessItem:
     has_snapshot = quality_item.has_snapshot
     has_price = quality_item.has_yes_price and quality_item.has_no_price
     has_clear_sport = quality_item.sport != "other"
@@ -206,6 +214,14 @@ def _build_item(upcoming_item, quality_item, *, now: datetime) -> AnalysisReadin
         title=quality_item.question,
         sport=quality_item.sport,
         market_shape=quality_item.market_shape,
+        source=source,
+        ready_reason=_ready_reason(
+            has_snapshot=has_snapshot,
+            has_price=has_price,
+            has_score=score_status == "calculated",
+            source=source,
+            readiness_status=readiness_status,
+        ),
         close_time=quality_item.close_time,
         time_window_label=time_window.label,
         yes_price=upcoming_item.market_yes_price,
@@ -230,6 +246,10 @@ def _build_item(upcoming_item, quality_item, *, now: datetime) -> AnalysisReadin
         reasons=_dedupe(reasons),
         missing_fields=_missing_fields(quality_item.missing_fields, has_clear_shape),
         suggested_next_action=suggested_next_action,
+        suggested_research_packet_command=(
+            "python -m app.commands.prepare_codex_research "
+            f"--market-id {quality_item.market_id}"
+        ),
         suggested_refresh_snapshot_command=(
             "python -m app.commands.refresh_market_snapshots "
             f"--market-id {quality_item.market_id} --dry-run --json"
@@ -239,6 +259,46 @@ def _build_item(upcoming_item, quality_item, *, now: datetime) -> AnalysisReadin
             f"--market-id {quality_item.market_id} --dry-run --json"
         ),
     )
+
+
+def _load_readiness_sources(db: Session, market_ids) -> dict[int, str]:
+    ids = list(market_ids)
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(
+            Market.id,
+            Market.condition_id,
+            Market.clob_token_ids,
+            Market.polymarket_url,
+        ).where(Market.id.in_(ids))
+    ).all()
+    sources: dict[int, str] = {}
+    for market_id, condition_id, clob_token_ids, polymarket_url in rows:
+        has_identifiers = bool(condition_id or clob_token_ids or polymarket_url)
+        sources[int(market_id)] = (
+            "snapshot_from_discovery" if has_identifiers else "local_existing"
+        )
+    return sources
+
+
+def _ready_reason(
+    *,
+    has_snapshot: bool,
+    has_price: bool,
+    has_score: bool,
+    source: str,
+    readiness_status: str,
+) -> str:
+    if readiness_status == READY_STATUS:
+        if source == "snapshot_from_discovery":
+            return "Snapshot/precios disponibles desde identifiers publicos de discovery."
+        return "Snapshot, precios SI/NO y score disponibles."
+    if not has_snapshot or not has_price:
+        return "Falta snapshot o precio SI/NO para completar el analisis."
+    if not has_score:
+        return "Falta score calculado antes de generar el primer analisis."
+    return "Requiere revision antes de usarlo en un trial."
 
 
 def _readiness_score(

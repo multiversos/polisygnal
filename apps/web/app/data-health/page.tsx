@@ -69,6 +69,12 @@ const discoveryStatusLabels: Record<string, string> = {
   unsupported: "No soportado",
 };
 
+const readinessSourceLabels: Record<string, string> = {
+  local_existing: "Local",
+  imported_from_discovery: "Discovery",
+  snapshot_from_discovery: "Snapshot reciente",
+};
+
 function formatDate(value?: string | null): string {
   if (!value) {
     return "N/D";
@@ -107,6 +113,10 @@ function formatReadinessAction(value: string): string {
 
 function formatDiscoveryStatus(value: string): string {
   return discoveryStatusLabels[value] ?? value.replaceAll("_", " ");
+}
+
+function formatReadinessSource(value?: string | null): string {
+  return value ? readinessSourceLabels[value] ?? value.replaceAll("_", " ") : "Local";
 }
 
 function buildSnapshotCommand(marketId: number): string {
@@ -150,11 +160,11 @@ export default function DataHealthPage() {
     try {
       const results = await Promise.allSettled([
         withTimeout(fetchDataHealthOverview(), 10000, "overview"),
-        withTimeout(fetchAnalysisReadiness({ days: 7, limit: 50 }), 30000, "readiness"),
+        withTimeout(fetchAnalysisReadiness({ days: 7, limit: 12 }), 70000, "readiness"),
         withTimeout(fetchSnapshotGaps({ days: 7, limit: 50 }), 30000, "snapshot-gaps"),
         withTimeout(fetchRefreshPriorities({ days: 7, limit: 12 }), 30000, "refresh-priorities"),
         withTimeout(fetchRefreshRuns({ limit: 10 }), 10000, "refresh-runs"),
-        withTimeout(fetchLiveUpcomingDiscovery({ days: 7, limit: 25 }), 20000, "live-discovery"),
+        withTimeout(fetchLiveUpcomingDiscovery({ days: 7, limit: 25 }), 70000, "live-discovery"),
       ]);
       const [
         overviewResult,
@@ -206,6 +216,8 @@ export default function DataHealthPage() {
       setCopiedCommand(null);
     }
   };
+  const readyAnalysisItems =
+    analysisReadiness?.items.filter((item) => item.readiness_status === "ready").slice(0, 6) ?? [];
 
   return (
     <main className="dashboard-shell data-health-page">
@@ -444,6 +456,78 @@ export default function DataHealthPage() {
         )}
       </section>
 
+      <section className="dashboard-panel ready-markets-section">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Discovery a analisis</p>
+            <h2>Listos para analisis</h2>
+            <p className="section-note">
+              Mercados con snapshot, precio SI/NO, score calculado y ventana util.
+              El comando prepara un Research Packet; no se ejecuta desde la UI.
+            </p>
+          </div>
+          <span className="badge muted">{readyAnalysisItems.length} visibles</span>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">Buscando mercados listos...</div>
+        ) : readyAnalysisItems.length === 0 ? (
+          <div className="empty-state">
+            No hay mercados listos en esta ventana. Revisa candidatos de refresh o discovery.
+          </div>
+        ) : (
+          <div className="readiness-list">
+            {readyAnalysisItems.map((item) => (
+              <article className="readiness-card ready" key={`ready-highlight-${item.market_id}`}>
+                <div className="readiness-score">
+                  <span>Readiness</span>
+                  <strong>{item.readiness_score}</strong>
+                </div>
+                <div className="readiness-card-body">
+                  <div className="refresh-plan-card-header">
+                    <div>
+                      <span className="eyebrow">
+                        {formatSport(item.sport)} · {formatReadinessSource(item.source)}
+                      </span>
+                      <h3>{item.title}</h3>
+                      <p className="section-note">
+                        {item.ready_reason || "Listo para generar Research Packet manual."}
+                      </p>
+                    </div>
+                    <Link className="text-link" href={`/markets/${item.market_id}`}>
+                      Ver analisis
+                    </Link>
+                  </div>
+                  <div className="snapshot-gap-meta">
+                    <span className="readiness-status ready">Listo</span>
+                    <span className="reason-chip">SI {item.yes_price ?? "N/D"}</span>
+                    <span className="reason-chip">NO {item.no_price ?? "N/D"}</span>
+                    <span className="reason-chip">{item.time_window_label}</span>
+                    <span className="reason-chip">Cierre {formatDate(item.close_time)}</span>
+                  </div>
+                  <div className="refresh-command-list compact-command-list">
+                    <div className="command-card">
+                      <div>
+                        <span>Research Packet manual</span>
+                        <code>{item.suggested_research_packet_command}</code>
+                      </div>
+                      <button
+                        onClick={() => void copyCommand(item.suggested_research_packet_command)}
+                        type="button"
+                      >
+                        {copiedCommand === item.suggested_research_packet_command
+                          ? "Copiado"
+                          : "Copiar"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       <section className="dashboard-panel readiness-section">
         <div className="panel-heading">
           <div>
@@ -524,6 +608,7 @@ export default function DataHealthPage() {
                     <span className={`data-quality-label ${item.freshness_status}`}>
                       {formatFreshnessStatus(item.freshness_status)}
                     </span>
+                    <span className="reason-chip">{formatReadinessSource(item.source)}</span>
                     <span className="reason-chip">
                       {formatReadinessAction(item.suggested_next_action)}
                     </span>
