@@ -72,11 +72,17 @@ class PolymarketMarketPayload(BaseModel):
     closed: bool | None = None
     end_date: datetime | None = Field(default=None, alias="endDate")
     start_date: datetime | None = Field(default=None, alias="startDate")
+    liquidity: Decimal | None = None
+    volume: Decimal | None = None
     clob_token_ids: list[str] = Field(
         default_factory=list,
         validation_alias=AliasChoices("clobTokenIds", "clobTokenIDs", "clob_token_ids"),
     )
     outcomes: list[str] = Field(default_factory=list)
+    outcome_prices: list[Decimal] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("outcomePrices", "outcome_prices"),
+    )
     outcome_tokens: list[dict[str, object]] = Field(
         default_factory=list,
         validation_alias=AliasChoices("tokens", "outcomeTokens", "outcome_tokens"),
@@ -102,6 +108,35 @@ class PolymarketMarketPayload(BaseModel):
             if isinstance(parsed, list):
                 return [str(item) for item in parsed]
         return []
+
+    @field_validator("outcome_prices", mode="before")
+    @classmethod
+    def parse_decimal_list(cls, value: object) -> list[Decimal]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            raw_value = value.strip()
+            if not raw_value:
+                return []
+            try:
+                value = json.loads(raw_value)
+            except json.JSONDecodeError:
+                parsed = _parse_decimal(raw_value)
+                return [parsed] if parsed is not None else []
+        if not isinstance(value, list):
+            parsed = _parse_decimal(value)
+            return [parsed] if parsed is not None else []
+        prices: list[Decimal] = []
+        for item in value:
+            parsed = _parse_decimal(item)
+            if parsed is not None:
+                prices.append(parsed)
+        return prices
+
+    @field_validator("liquidity", "volume", mode="before")
+    @classmethod
+    def parse_base_decimal_field(cls, value: object) -> Decimal | None:
+        return _parse_decimal(value)
 
     @field_validator("outcome_tokens", mode="before")
     @classmethod
@@ -240,6 +275,10 @@ class PolymarketGammaClient:
         limit: int,
         offset: int,
         tag_id: str | None = None,
+        order: str | None = None,
+        ascending: bool | None = None,
+        end_date_min: datetime | None = None,
+        end_date_max: datetime | None = None,
     ) -> PolymarketEventsPage:
         params: dict[str, object] = {
             "active": "true",
@@ -249,6 +288,14 @@ class PolymarketGammaClient:
         }
         if tag_id:
             params["tag_id"] = tag_id
+        if order:
+            params["order"] = order
+        if ascending is not None:
+            params["ascending"] = "true" if ascending else "false"
+        if end_date_min is not None:
+            params["end_date_min"] = end_date_min.isoformat()
+        if end_date_max is not None:
+            params["end_date_max"] = end_date_max.isoformat()
 
         payload = self._get_json(
             "/events",

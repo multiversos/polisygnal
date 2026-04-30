@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.config import get_settings
+from app.clients.polymarket import PolymarketGammaClient, get_polymarket_client
 from app.db.session import get_db
 from app.models.market import Market
 from app.models.research_finding import ResearchFinding
@@ -39,6 +40,7 @@ from app.schemas.research_runs import (
     ResearchRunsResponse,
 )
 from app.schemas.research_quality_gate import ResearchQualityGateRead
+from app.schemas.live_upcoming_discovery import LiveUpcomingDiscoveryResponse
 from app.services.research.candidate_selector import list_research_candidates
 from app.services.research.analysis_readiness import list_analysis_readiness
 from app.services.research.codex_agent_adapter import (
@@ -48,6 +50,7 @@ from app.services.research.codex_agent_adapter import (
 from app.services.research.pipeline import run_market_research
 from app.services.research.upcoming_data_quality import list_upcoming_data_quality
 from app.services.research.upcoming_market_selector import list_upcoming_sports_markets
+from app.services.live_upcoming_discovery import discover_live_upcoming_markets
 from app.services.polysignal_score import build_polysignal_score
 
 router = APIRouter()
@@ -172,6 +175,33 @@ def get_analysis_readiness(
         sport=sport,
         days=days,
         limit=limit,
+    )
+
+
+@router.get(
+    "/research/live-upcoming-discovery",
+    response_model=LiveUpcomingDiscoveryResponse,
+    tags=["research"],
+)
+def get_live_upcoming_discovery(
+    sport: str | None = Query(default=None),
+    days: int = Query(default=7, ge=1, le=30),
+    limit: int = Query(default=50, ge=1, le=100),
+    include_futures: bool = Query(default=False),
+    focus: str | None = Query(default="match_winner"),
+    db: Session = Depends(get_db),
+    polymarket_client: PolymarketGammaClient = Depends(get_polymarket_client),
+) -> LiveUpcomingDiscoveryResponse:
+    settings = get_settings()
+    return discover_live_upcoming_markets(
+        db,
+        client=polymarket_client,
+        sport=sport,
+        days=days,
+        limit=limit,
+        include_futures=include_futures,
+        focus=focus,
+        source_tag_id=settings.polymarket_sports_tag_id,
     )
 
 

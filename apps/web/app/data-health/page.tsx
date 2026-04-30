@@ -7,11 +7,13 @@ import { MainNavigation } from "../components/MainNavigation";
 import {
   fetchAnalysisReadiness,
   fetchDataHealthOverview,
+  fetchLiveUpcomingDiscovery,
   fetchRefreshPriorities,
   fetchRefreshRuns,
   fetchSnapshotGaps,
   type AnalysisReadiness,
   type DataHealthOverview,
+  type LiveUpcomingDiscovery,
   type RefreshPriorities,
   type RefreshRuns,
   type SnapshotGaps,
@@ -55,6 +57,14 @@ const readinessActionLabels: Record<string, string> = {
   revisar_o_descartar_por_ahora: "Revisar o descartar por ahora",
 };
 
+const discoveryStatusLabels: Record<string, string> = {
+  already_local_ready: "Local listo",
+  already_local_missing_snapshot: "Local sin datos",
+  missing_local_market: "Falta en local",
+  remote_missing_price: "Remoto sin precio",
+  unsupported: "No soportado",
+};
+
 function formatDate(value?: string | null): string {
   if (!value) {
     return "N/D";
@@ -91,6 +101,10 @@ function formatReadinessAction(value: string): string {
   return readinessActionLabels[value] ?? value.replaceAll("_", " ");
 }
 
+function formatDiscoveryStatus(value: string): string {
+  return discoveryStatusLabels[value] ?? value.replaceAll("_", " ");
+}
+
 function buildSnapshotCommand(marketId: number): string {
   return `python -m app.commands.refresh_market_snapshots --market-id ${marketId} --dry-run --json`;
 }
@@ -105,6 +119,7 @@ export default function DataHealthPage() {
   const [snapshotGaps, setSnapshotGaps] = useState<SnapshotGaps | null>(null);
   const [refreshPriorities, setRefreshPriorities] = useState<RefreshPriorities | null>(null);
   const [refreshRuns, setRefreshRuns] = useState<RefreshRuns | null>(null);
+  const [liveDiscovery, setLiveDiscovery] = useState<LiveUpcomingDiscovery | null>(null);
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,18 +134,21 @@ export default function DataHealthPage() {
         snapshotGapsResult,
         refreshPrioritiesResult,
         refreshRunsResult,
+        liveDiscoveryResult,
       ] = await Promise.all([
         fetchDataHealthOverview(),
         fetchAnalysisReadiness({ days: 7, limit: 50 }),
         fetchSnapshotGaps({ days: 7, limit: 50 }),
         fetchRefreshPriorities({ days: 7, limit: 12 }),
         fetchRefreshRuns({ limit: 10 }),
+        fetchLiveUpcomingDiscovery({ days: 7, limit: 25 }),
       ]);
       setOverview(overviewResult);
       setAnalysisReadiness(analysisReadinessResult);
       setSnapshotGaps(snapshotGapsResult);
       setRefreshPriorities(refreshPrioritiesResult);
       setRefreshRuns(refreshRunsResult);
+      setLiveDiscovery(liveDiscoveryResult);
     } catch {
       setError("No se pudo cargar la salud de datos.");
     } finally {
@@ -219,6 +237,124 @@ export default function DataHealthPage() {
           <strong>{loading ? "..." : formatDate(overview?.latest_snapshot_at)}</strong>
           <p>Frescura local</p>
         </article>
+      </section>
+
+      <section className="dashboard-panel live-discovery-section">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Polymarket live</p>
+            <h2>Descubrimiento en vivo de mercados proximos</h2>
+            <p className="section-note">
+              Este diagnostico consulta Polymarket en modo lectura. No guarda datos,
+              no crea snapshots, no ejecuta trading ni predicciones.
+            </p>
+          </div>
+          <span className="badge muted">
+            {liveDiscovery?.summary.total_remote_checked ?? 0} remotos revisados
+          </span>
+        </div>
+
+        <div className="metric-grid compact-metrics">
+          <article className="metric-card">
+            <span>Ya en local</span>
+            <strong>{loading ? "..." : liveDiscovery?.summary.already_local_count ?? 0}</strong>
+            <p>Coinciden por id, slug o condition_id</p>
+          </article>
+          <article className="metric-card">
+            <span>Faltan en local</span>
+            <strong>{loading ? "..." : liveDiscovery?.summary.missing_local_count ?? 0}</strong>
+            <p>Podrian requerir import controlado</p>
+          </article>
+          <article className="metric-card">
+            <span>Con precio remoto</span>
+            <strong>{loading ? "..." : liveDiscovery?.summary.remote_with_price_count ?? 0}</strong>
+            <p>Payload trae precios SÍ/NO</p>
+          </article>
+          <article className="metric-card">
+            <span>Con condition_id</span>
+            <strong>
+              {loading ? "..." : liveDiscovery?.summary.remote_with_condition_id_count ?? 0}
+            </strong>
+            <p>Util para Wallet Intelligence</p>
+          </article>
+        </div>
+
+        <div className="command-card standalone-command">
+          <div>
+            <span>Discovery read-only</span>
+            <code>python -m app.commands.discover_live_upcoming_markets --days 7 --limit 50 --json</code>
+          </div>
+          <button
+            onClick={() =>
+              void copyCommand(
+                "python -m app.commands.discover_live_upcoming_markets --days 7 --limit 50 --json",
+              )
+            }
+            type="button"
+          >
+            {copiedCommand ===
+            "python -m app.commands.discover_live_upcoming_markets --days 7 --limit 50 --json"
+              ? "Copiado"
+              : "Copiar"}
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">Consultando discovery live limitado...</div>
+        ) : !liveDiscovery || liveDiscovery.items.length === 0 ? (
+          <div className="empty-state">
+            No hay mercados remotos proximos que coincidan con los filtros actuales.
+          </div>
+        ) : (
+          <div className="refresh-plan-grid">
+            {liveDiscovery.items.slice(0, 6).map((item) => (
+              <article
+                className="refresh-plan-card"
+                key={`${item.remote_id ?? item.title}-${item.close_time ?? "sin-cierre"}`}
+              >
+                <div className="refresh-plan-card-header">
+                  <div>
+                    <span className="eyebrow">{formatSport(item.sport)}</span>
+                    <h3>{item.title}</h3>
+                  </div>
+                  {item.local_market_id ? (
+                    <Link className="text-link" href={`/markets/${item.local_market_id}`}>
+                      Ver local
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="snapshot-gap-meta">
+                  <span className="reason-chip">
+                    {formatDiscoveryStatus(item.discovery_status)}
+                  </span>
+                  <span className="reason-chip">Cierre {formatDate(item.close_time)}</span>
+                  {item.has_remote_price ? (
+                    <span className="data-quality-label fresh">Precio remoto</span>
+                  ) : (
+                    <span className="warning-chip">Sin precio remoto</span>
+                  )}
+                  {item.condition_id ? (
+                    <span className="reason-chip">condition_id</span>
+                  ) : (
+                    <span className="warning-chip">Sin condition_id</span>
+                  )}
+                </div>
+                <div className="data-health-notes">
+                  {item.reasons.slice(0, 4).map((reason) => (
+                    <span className="reason-chip" key={`${item.remote_id}-${reason}`}>
+                      {reason}
+                    </span>
+                  ))}
+                  {item.warnings.slice(0, 3).map((warning) => (
+                    <span className="warning-chip" key={`${item.remote_id}-${warning}`}>
+                      {warning}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="dashboard-panel readiness-section">

@@ -4091,6 +4091,10 @@ h2 {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
+.standalone-command {
+  margin: 16px 0;
+}
+
 .refresh-plan-card {
   display: grid;
   gap: 12px;

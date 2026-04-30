@@ -131,6 +131,51 @@ export type AnalysisReadiness = {
   filters_applied: Record<string, unknown>;
 };
 
+export type LiveUpcomingDiscoverySummary = {
+  total_remote_checked: number;
+  already_local_count: number;
+  missing_local_count: number;
+  local_missing_snapshot_count: number;
+  remote_with_price_count: number;
+  remote_missing_price_count: number;
+  remote_with_condition_id_count: number;
+  remote_with_clob_token_ids_count: number;
+};
+
+export type LiveUpcomingDiscoveryItem = {
+  remote_id?: string | null;
+  local_market_id?: number | null;
+  title: string;
+  question: string;
+  event_title?: string | null;
+  sport: string;
+  market_shape: string;
+  close_time?: string | null;
+  active?: boolean | null;
+  closed?: boolean | null;
+  has_local_market: boolean;
+  has_local_snapshot: boolean;
+  has_local_price: boolean;
+  has_remote_price: boolean;
+  liquidity?: string | number | null;
+  volume?: string | number | null;
+  condition_id?: string | null;
+  clob_token_ids: string[];
+  market_slug?: string | null;
+  event_slug?: string | null;
+  discovery_status: string;
+  reasons: string[];
+  warnings: string[];
+};
+
+export type LiveUpcomingDiscovery = {
+  generated_at: string;
+  summary: LiveUpcomingDiscoverySummary;
+  items: LiveUpcomingDiscoveryItem[];
+  filters_applied: Record<string, unknown>;
+  warnings: string[];
+};
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
@@ -233,4 +278,31 @@ export async function fetchAnalysisReadiness(params?: {
     throw new Error(`/research/analysis-readiness responded ${response.status}`);
   }
   return response.json() as Promise<AnalysisReadiness>;
+}
+
+export async function fetchLiveUpcomingDiscovery(params?: {
+  sport?: string | null;
+  days?: number;
+  limit?: number;
+  include_futures?: boolean;
+  focus?: string;
+}): Promise<LiveUpcomingDiscovery> {
+  const searchParams = new URLSearchParams();
+  if (params?.sport) {
+    searchParams.set("sport", params.sport);
+  }
+  searchParams.set("days", String(params?.days ?? 7));
+  searchParams.set("limit", String(params?.limit ?? 25));
+  searchParams.set("include_futures", String(params?.include_futures ?? false));
+  searchParams.set("focus", params?.focus ?? "match_winner");
+  const response = await fetch(
+    `${API_BASE_URL}/research/live-upcoming-discovery?${searchParams.toString()}`,
+    {
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`/research/live-upcoming-discovery responded ${response.status}`);
+  }
+  return response.json() as Promise<LiveUpcomingDiscovery>;
 }
