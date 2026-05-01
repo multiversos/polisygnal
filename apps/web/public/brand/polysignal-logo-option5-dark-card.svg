@@ -1,0 +1,38 @@
+<svg width="1400" height="600" viewBox="0 0 1400 600" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">PolySignal logo dark presentation</title>
+  <desc id="desc">Presentación del logo PolySignal en fondo oscuro.</desc>
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(700 300) rotate(90) scale(360 650)">
+      <stop stop-color="#10223F"/>
+      <stop offset="1" stop-color="#050A14"/>
+    </radialGradient>
+    <linearGradient id="ps-gradient" x1="180" y1="122" x2="470" y2="460" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#18E0D1"/>
+      <stop offset="0.45" stop-color="#20D982"/>
+      <stop offset="1" stop-color="#7B4DFF"/>
+    </linearGradient>
+    <linearGradient id="text-gradient" x1="640" y1="235" x2="1040" y2="330" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="0.48" stop-color="#24D47A"/>
+      <stop offset="1" stop-color="#7B4DFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="1400" height="600" rx="48" fill="url(#bg)"/>
+  <g opacity="0.2" stroke="#38BDF8" stroke-width="1">
+    <path d="M0 120H1400M0 240H1400M0 360H1400M0 480H1400"/>
+    <path d="M140 0V600M280 0V600M420 0V600M560 0V600M700 0V600M840 0V600M980 0V600M1120 0V600M1260 0V600"/>
+  </g>
+
+  <path d="M315 105L475 198V385L315 478L155 385V198L315 105Z" stroke="url(#ps-gradient)" stroke-width="34" stroke-linejoin="round"/>
+  <path d="M224 430V210H325C405 210 452 252 452 315C452 378 405 420 325 420H274V430H224Z" fill="#07111F"/>
+  <path d="M260 392V242H322C379 242 416 270 416 315C416 360 379 386 322 386H260Z" fill="url(#ps-gradient)"/>
+  <path d="M295 350V285H330C363 285 382 298 382 315C382 334 363 350 330 350H295Z" fill="#07111F" opacity="0.95"/>
+  <rect x="190" y="382" width="34" height="70" rx="10" fill="#20D982"/>
+  <rect x="238" y="342" width="34" height="110" rx="10" fill="#22D3EE"/>
+  <rect x="286" y="302" width="34" height="150" rx="10" fill="#7B4DFF"/>
+
+  <text x="570" y="295" font-family="Inter, Montserrat, Arial, sans-serif" font-size="108" font-weight="850" letter-spacing="-4" fill="#F8FAFC">Poly</text>
+  <text x="805" y="295" font-family="Inter, Montserrat, Arial, sans-serif" font-size="108" font-weight="850" letter-spacing="-4" fill="url(#text-gradient)">Signal</text>
+  <text x="578" y="372" font-family="Inter, Montserrat, Arial, sans-serif" font-size="31" font-weight="700" letter-spacing="10" fill="#CBD5E1">DEPORTES · DATOS · MERCADOS</text>
+  <text x="580" y="430" font-family="Inter, Montserrat, Arial, sans-serif" font-size="24" font-weight="500" fill="#94A3B8">Señales inteligentes para mercados predictivos.</text>
+</svg>

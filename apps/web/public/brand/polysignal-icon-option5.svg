@@ -1,0 +1,24 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">PolySignal icon</title>
+  <desc id="desc">Icono de PolySignal con una P geométrica y barras de datos.</desc>
+  <defs>
+    <linearGradient id="ps-gradient" x1="112" y1="70" x2="400" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#18E0D1"/>
+      <stop offset="0.45" stop-color="#20D982"/>
+      <stop offset="1" stop-color="#7B4DFF"/>
+    </linearGradient>
+    <filter id="soft-shadow" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0B1220"/>
+  <g filter="url(#soft-shadow)">
+    <path d="M256 64L394 144V304L256 384L118 304V144L256 64Z" stroke="url(#ps-gradient)" stroke-width="32" stroke-linejoin="round"/>
+    <path d="M178 342V152H266C334 152 374 188 374 242C374 296 334 332 266 332H222V342H178Z" fill="#0B1220"/>
+    <path d="M208 310V180H264C313 180 344 204 344 242C344 280 313 304 264 304H208Z" fill="url(#ps-gradient)"/>
+    <path d="M238 272V216H268C296 216 314 226 314 242C314 259 296 272 268 272H238Z" fill="#0B1220" opacity="0.94"/>
+    <rect x="154" y="300" width="28" height="56" rx="8" fill="#20D982"/>
+    <rect x="194" y="268" width="28" height="88" rx="8" fill="#22D3EE"/>
+    <rect x="234" y="236" width="28" height="120" rx="8" fill="#7B4DFF"/>
+  </g>
+</svg>

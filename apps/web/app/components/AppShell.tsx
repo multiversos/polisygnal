@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type ThemePreference = "light" | "dark";
 type NavIconName =
@@ -85,14 +85,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     applyThemePreference(resolvedTheme);
   }, []);
 
-  const logoSrc = useMemo(
-    () =>
-      theme === "dark"
-        ? "/brand/polysignal-logo-dark-card.svg"
-        : "/brand/polysignal-logo.svg",
-    [theme],
-  );
-
   const toggleTheme = () => {
     setTheme((currentTheme) => {
       const nextTheme = currentTheme === "dark" ? "light" : "dark";
@@ -110,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="app-sidebar" aria-label="Navegacion principal">
         <Link className="app-logo" href="/" aria-label="Ir al dashboard de PolySignal">
-          <img src={logoSrc} alt="PolySignal" />
+          <img src="/brand/polysignal-logo-option5.svg" alt="PolySignal" />
         </Link>
         <nav className="app-nav">
           {navigationItems.map((item) => (
@@ -139,7 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <section className="app-workspace">
         <header className="app-header">
           <div className="app-header-title">
-            <img src="/brand/polysignal-icon.svg" alt="" aria-hidden="true" />
+            <img src="/brand/polysignal-icon-option5.svg" alt="" aria-hidden="true" />
             <div>
               <span>PolySignal</span>
               <strong>Mercados proximos y datos operativos</strong>
