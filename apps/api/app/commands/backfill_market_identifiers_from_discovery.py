@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -99,6 +100,7 @@ def _run(
     dry_run: bool = True,
     min_confidence: Decimal = Decimal("0.90"),
     source_tag_id: str | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     summary = backfill_market_identifiers_from_discovery(
         db,
@@ -110,6 +112,7 @@ def _run(
         dry_run=dry_run,
         min_confidence=min_confidence,
         source_tag_id=source_tag_id,
+        now=now,
     )
     payload = summary.to_payload()
     return {

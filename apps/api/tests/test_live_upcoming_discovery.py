@@ -244,6 +244,7 @@ def test_discover_live_upcoming_markets_command_is_read_only_and_json_serializab
         client=FakeGammaClient(events),  # type: ignore[arg-type]
         days=7,
         limit=10,
+        now=NOW,
     )
 
     assert payload["status"] == "ok"

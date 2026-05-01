@@ -73,6 +73,7 @@ def test_identifier_backfill_dry_run_does_not_update_market(db_session: Session)
         days=7,
         limit=10,
         dry_run=True,
+        now=NOW,
     )
     db_session.refresh(market)
 
@@ -128,6 +129,7 @@ def test_identifier_backfill_apply_updates_missing_identifiers_only(
         days=7,
         limit=10,
         dry_run=False,
+        now=NOW,
     )
     db_session.refresh(market)
 
@@ -190,6 +192,7 @@ def test_identifier_backfill_does_not_overwrite_existing_identifiers(
         days=7,
         limit=10,
         dry_run=False,
+        now=NOW,
     )
     db_session.refresh(market)
 
@@ -287,6 +290,7 @@ def test_identifier_backfill_ambiguous_match_requires_no_apply(
         days=7,
         limit=10,
         dry_run=False,
+        now=NOW,
     )
 
     assert payload["items"][0]["action"] == "no_match"
@@ -303,6 +307,7 @@ def test_identifier_backfill_market_not_found_has_stable_error(db_session: Sessi
             client=client,  # type: ignore[arg-type]
             market_id=999999,
             dry_run=True,
+            now=NOW,
         )
     except ValueError as exc:
         assert "market_id=999999 no existe" in str(exc)
@@ -343,6 +348,7 @@ def test_identifier_backfill_json_payload_is_serializable(db_session: Session) -
         days=7,
         limit=10,
         dry_run=True,
+        now=NOW,
     )
 
     assert json.dumps(payload, ensure_ascii=True, default=str)

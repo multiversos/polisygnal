@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from typing import Any
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -98,6 +99,7 @@ def _run(
     include_futures: bool = False,
     focus: str | None = "match_winner",
     source_tag_id: str | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     before_markets = db.scalar(select(func.count()).select_from(Market)) or 0
     before_snapshots = db.scalar(select(func.count()).select_from(MarketSnapshot)) or 0
@@ -112,6 +114,7 @@ def _run(
         include_futures=include_futures,
         focus=focus,
         source_tag_id=source_tag_id,
+        now=now,
     )
     after_markets = db.scalar(select(func.count()).select_from(Market)) or 0
     after_snapshots = db.scalar(select(func.count()).select_from(MarketSnapshot)) or 0
