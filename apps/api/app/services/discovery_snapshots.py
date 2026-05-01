@@ -127,6 +127,7 @@ def create_snapshots_from_discovery_pricing(
     limit: int = 50,
     dry_run: bool = True,
     max_snapshots: int = 5,
+    min_hours_to_close: float | None = None,
     source_tag_id: str | None = None,
     now: datetime | None = None,
 ) -> DiscoverySnapshotSummary:
@@ -135,6 +136,7 @@ def create_snapshots_from_discovery_pricing(
     safe_limit = max(min(limit, 100), 0)
     safe_max_snapshots = max(min(max_snapshots, 25), 0)
     normalized_sport = normalize_sport(sport) if sport else None
+    min_close_time = current_time + timedelta(hours=max(min_hours_to_close or 0, 0))
     window_end = current_time + timedelta(days=safe_days)
     page_limit = min(max(safe_limit * 2, 10), 100)
 
@@ -148,7 +150,7 @@ def create_snapshots_from_discovery_pricing(
         tag_id=source_tag_id,
         order="endDate",
         ascending=True,
-        end_date_min=current_time,
+        end_date_min=min_close_time,
         end_date_max=window_end,
     )
     entries = _flatten_remote_markets(page.events)
@@ -179,6 +181,7 @@ def create_snapshots_from_discovery_pricing(
             latest_snapshot=latest_snapshots.get(local_market.id),
             normalized_sport=normalized_sport,
             current_time=current_time,
+            min_close_time=min_close_time,
             window_end=window_end,
         )
         if item.action == "skipped":
@@ -236,6 +239,7 @@ def _build_snapshot_item(
     latest_snapshot: MarketSnapshot | None,
     normalized_sport: str | None,
     current_time: datetime,
+    min_close_time: datetime,
     window_end: datetime,
 ) -> DiscoverySnapshotItem:
     question = _safe_text(market_payload.question) or market.question
@@ -271,6 +275,8 @@ def _build_snapshot_item(
         return _skip(item, "missing_close_time")
     if close_time < current_time:
         return _skip(item, "close_time_past")
+    if close_time < min_close_time:
+        return _skip(item, "close_time_before_min_window")
     if close_time > window_end:
         return _skip(item, "close_time_outside_window")
     unsupported_reason = _unsupported_reason(

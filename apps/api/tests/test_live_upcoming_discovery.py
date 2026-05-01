@@ -171,6 +171,48 @@ def test_live_upcoming_discovery_filters_focus_and_sport(db_session: Session) ->
     assert "not_match_winner_focus" in by_remote_id["remote-prop"].reasons
 
 
+def test_live_upcoming_discovery_uses_min_hours_remote_window(db_session: Session) -> None:
+    events = [
+        _event_payload(
+            event_id="event-min-window",
+            title="Soccer upcoming games",
+            slug="soccer-min-window",
+            markets=[
+                _market_payload(
+                    market_id="remote-too-soon",
+                    question="Real Madrid vs Barcelona",
+                    slug="remote-too-soon",
+                    end_date=NOW + timedelta(hours=12),
+                    condition_id="0xtoosoon",
+                    prices=["0.58", "0.42"],
+                ),
+                _market_payload(
+                    market_id="remote-good-window",
+                    question="Manchester United vs Chelsea",
+                    slug="remote-good-window",
+                    end_date=NOW + timedelta(hours=36),
+                    condition_id="0xgoodwindow",
+                    prices=["0.52", "0.48"],
+                ),
+            ],
+        )
+    ]
+    fake_client = FakeGammaClient(events)
+
+    response = discover_live_upcoming_markets(
+        db_session,
+        client=fake_client,  # type: ignore[arg-type]
+        days=7,
+        limit=10,
+        min_hours_to_close=24,
+        now=NOW,
+    )
+
+    assert fake_client.calls[0]["end_date_min"] == NOW + timedelta(hours=24)
+    assert response.filters_applied["remote_end_date_min"] == (NOW + timedelta(hours=24)).isoformat()
+    assert {item.remote_id for item in response.items} == {"remote-good-window"}
+
+
 def test_live_upcoming_discovery_endpoint_is_read_only(
     client: TestClient,
     db_session: Session,

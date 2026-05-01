@@ -160,11 +160,19 @@ export default function DataHealthPage() {
     try {
       const results = await Promise.allSettled([
         withTimeout(fetchDataHealthOverview(), 10000, "overview"),
-        withTimeout(fetchAnalysisReadiness({ days: 7, limit: 12 }), 70000, "readiness"),
+          withTimeout(
+            fetchAnalysisReadiness({ days: 7, limit: 12, min_hours_to_close: 24 }),
+            70000,
+            "readiness",
+          ),
         withTimeout(fetchSnapshotGaps({ days: 7, limit: 50 }), 30000, "snapshot-gaps"),
         withTimeout(fetchRefreshPriorities({ days: 7, limit: 12 }), 30000, "refresh-priorities"),
         withTimeout(fetchRefreshRuns({ limit: 10 }), 10000, "refresh-runs"),
-        withTimeout(fetchLiveUpcomingDiscovery({ days: 7, limit: 25 }), 70000, "live-discovery"),
+          withTimeout(
+            fetchLiveUpcomingDiscovery({ days: 7, limit: 25, min_hours_to_close: 24 }),
+            70000,
+            "live-discovery",
+          ),
       ]);
       const [
         overviewResult,

@@ -183,6 +183,41 @@ def test_import_live_discovered_markets_does_not_duplicate_existing_market(
     assert db_session.scalar(select(func.count()).select_from(Market)) == before_markets
 
 
+def test_import_live_discovered_markets_uses_min_hours_remote_window(
+    db_session: Session,
+) -> None:
+    client = FakeGammaClient(
+        [
+            _event_payload(
+                event_id="event-min-window",
+                title="NBA min window games",
+                slug="nba-min-window-import",
+                markets=[
+                    _market_payload(
+                        market_id="remote-min-window",
+                        question="Lakers vs Warriors",
+                        slug="lakers-warriors-min-window",
+                    )
+                ],
+            )
+        ]
+    )
+
+    payload = run_live_market_import(
+        db_session,
+        client=client,  # type: ignore[arg-type]
+        days=7,
+        limit=10,
+        dry_run=True,
+        max_import=3,
+        min_hours_to_close=24,
+        now=NOW,
+    )
+
+    assert payload["would_import"] == 1
+    assert client.calls[0]["end_date_min"] == NOW + timedelta(hours=24)
+
+
 def test_import_live_discovered_markets_respects_max_import(
     db_session: Session,
 ) -> None:

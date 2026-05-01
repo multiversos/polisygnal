@@ -70,6 +70,7 @@ def discover_live_upcoming_markets(
     limit: int = 50,
     include_futures: bool = False,
     focus: str | None = DEFAULT_FOCUS,
+    min_hours_to_close: float | None = None,
     source_tag_id: str | None = None,
     now: datetime | None = None,
 ) -> LiveUpcomingDiscoveryResponse:
@@ -79,6 +80,7 @@ def discover_live_upcoming_markets(
     normalized_sport = normalize_sport(sport) if sport else None
     normalized_focus = _normalize_focus(focus)
     warnings: list[str] = []
+    min_close_time = current_time + timedelta(hours=max(min_hours_to_close or 0, 0))
 
     window_end = current_time + timedelta(days=safe_days)
     page_limit = min(max(safe_limit * 2, 10), 100)
@@ -88,7 +90,7 @@ def discover_live_upcoming_markets(
         tag_id=source_tag_id,
         order="endDate",
         ascending=True,
-        end_date_min=current_time,
+        end_date_min=min_close_time,
         end_date_max=window_end,
     )
     warnings.extend(page.errors)
@@ -116,7 +118,7 @@ def discover_live_upcoming_markets(
         if close_time is None:
             continue
         close_time = _normalize_datetime(close_time)
-        if close_time < current_time or close_time > window_end:
+        if close_time < min_close_time or close_time > window_end:
             continue
 
         local_market = _find_local_market(
@@ -231,12 +233,14 @@ def discover_live_upcoming_markets(
             "include_futures": include_futures,
             "focus": normalized_focus,
             "source_tag_id": source_tag_id,
+            "min_hours_to_close": min_hours_to_close,
             "window_start": current_time.isoformat(),
+            "remote_window_start": min_close_time.isoformat(),
             "window_end": window_end.isoformat(),
             "page_limit": page_limit,
             "remote_order": "endDate",
             "remote_ascending": True,
-            "remote_end_date_min": current_time.isoformat(),
+            "remote_end_date_min": min_close_time.isoformat(),
             "remote_end_date_max": window_end.isoformat(),
         },
         warnings=warnings,

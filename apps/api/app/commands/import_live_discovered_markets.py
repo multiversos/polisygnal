@@ -98,6 +98,7 @@ def _run(
     max_import: int = 10,
     min_hours_to_close: float = 6,
     source_tag_id: str | None = None,
+    now=None,
 ) -> dict[str, Any]:
     summary = import_live_discovered_markets(
         db,
@@ -109,6 +110,7 @@ def _run(
         max_import=max_import,
         min_hours_to_close=min_hours_to_close,
         source_tag_id=source_tag_id,
+        now=now,
     )
     payload = summary.to_payload()
     return {

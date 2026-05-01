@@ -140,7 +140,7 @@ def import_live_discovered_markets(
         tag_id=source_tag_id,
         order="endDate",
         ascending=True,
-        end_date_min=current_time,
+        end_date_min=min_close_time,
         end_date_max=window_end,
     )
     entries = _flatten_remote_markets(page.events)

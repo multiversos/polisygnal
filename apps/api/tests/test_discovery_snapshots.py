@@ -23,6 +23,7 @@ NOW = datetime(2026, 4, 29, 12, 0, tzinfo=UTC)
 class FakeGammaClient:
     def __init__(self, events: list[PolymarketEventPayload]) -> None:
         self.events = events
+        self.calls: list[dict[str, object]] = []
 
     def fetch_active_events_page(
         self,
@@ -35,7 +36,17 @@ class FakeGammaClient:
         end_date_min: datetime | None = None,
         end_date_max: datetime | None = None,
     ):
-        del limit, offset, tag_id, order, ascending, end_date_min, end_date_max
+        self.calls.append(
+            {
+                "limit": limit,
+                "offset": offset,
+                "tag_id": tag_id,
+                "order": order,
+                "ascending": ascending,
+                "end_date_min": end_date_min,
+                "end_date_max": end_date_max,
+            }
+        )
         return PolymarketEventsPage(events=self.events)
 
 
@@ -195,6 +206,41 @@ def test_discovery_snapshot_ignores_remote_market_without_local_match(
 
     assert summary.local_candidates == 0
     assert summary.snapshots_created == 0
+
+
+def test_discovery_snapshot_uses_min_hours_remote_window(db_session: Session) -> None:
+    _create_local_market(db_session, remote_id="remote-min-window", slug="min-window")
+    client = FakeGammaClient(
+        [
+            _event_payload(
+                event_id="event-min-window",
+                title="NBA min window",
+                slug="nba-min-window",
+                markets=[
+                    _market_payload(
+                        market_id="remote-min-window",
+                        question="Lakers vs Warriors",
+                        slug="min-window",
+                        prices=["0.52", "0.48"],
+                    )
+                ],
+            )
+        ]
+    )
+
+    summary = create_snapshots_from_discovery_pricing(
+        db_session,
+        client=client,  # type: ignore[arg-type]
+        days=7,
+        limit=10,
+        dry_run=True,
+        max_snapshots=3,
+        min_hours_to_close=24,
+        now=NOW,
+    )
+
+    assert summary.would_create == 1
+    assert client.calls[0]["end_date_min"] == NOW + timedelta(hours=24)
 
 
 def test_discovery_snapshot_skips_unsupported_props(db_session: Session) -> None:

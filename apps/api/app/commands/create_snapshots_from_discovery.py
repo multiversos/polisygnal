@@ -31,6 +31,7 @@ def main() -> None:
                     limit=args.limit,
                     dry_run=dry_run,
                     max_snapshots=args.max_snapshots,
+                    min_hours_to_close=args.min_hours_to_close,
                     source_tag_id=settings.polymarket_sports_tag_id,
                 )
                 if dry_run:
@@ -78,6 +79,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true", help="Solo muestra cambios. Es el default.")
     parser.add_argument("--apply", action="store_true", help="Crea snapshots validos.")
     parser.add_argument("--max-snapshots", type=int, default=5, help="Maximo de snapshots a crear.")
+    parser.add_argument(
+        "--min-hours-to-close",
+        type=float,
+        default=None,
+        help="Ventana minima antes del cierre para pedir mercados remotos.",
+    )
     parser.add_argument("--json", action="store_true", help="Imprime salida JSON.")
     return parser
 
@@ -92,6 +99,7 @@ def _run(
     limit: int = 50,
     dry_run: bool = True,
     max_snapshots: int = 5,
+    min_hours_to_close: float | None = None,
     source_tag_id: str | None = None,
 ) -> dict[str, Any]:
     summary = create_snapshots_from_discovery_pricing(
@@ -103,6 +111,7 @@ def _run(
         limit=limit,
         dry_run=dry_run,
         max_snapshots=max_snapshots,
+        min_hours_to_close=min_hours_to_close,
         source_tag_id=source_tag_id,
     )
     payload = summary.to_payload()

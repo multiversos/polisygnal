@@ -272,6 +272,7 @@ export async function fetchAnalysisReadiness(params?: {
   sport?: string | null;
   days?: number;
   limit?: number;
+  min_hours_to_close?: number;
 }): Promise<AnalysisReadiness> {
   const searchParams = new URLSearchParams();
   if (params?.sport) {
@@ -279,6 +280,9 @@ export async function fetchAnalysisReadiness(params?: {
   }
   searchParams.set("days", String(params?.days ?? 7));
   searchParams.set("limit", String(params?.limit ?? 50));
+  if (params?.min_hours_to_close !== undefined) {
+    searchParams.set("min_hours_to_close", String(params.min_hours_to_close));
+  }
   const response = await fetch(
     `${API_BASE_URL}/research/analysis-readiness?${searchParams.toString()}`,
     {
@@ -297,6 +301,7 @@ export async function fetchLiveUpcomingDiscovery(params?: {
   limit?: number;
   include_futures?: boolean;
   focus?: string;
+  min_hours_to_close?: number;
 }): Promise<LiveUpcomingDiscovery> {
   const searchParams = new URLSearchParams();
   if (params?.sport) {
@@ -306,6 +311,9 @@ export async function fetchLiveUpcomingDiscovery(params?: {
   searchParams.set("limit", String(params?.limit ?? 25));
   searchParams.set("include_futures", String(params?.include_futures ?? false));
   searchParams.set("focus", params?.focus ?? "match_winner");
+  if (params?.min_hours_to_close !== undefined) {
+    searchParams.set("min_hours_to_close", String(params.min_hours_to_close));
+  }
   const response = await fetch(
     `${API_BASE_URL}/research/live-upcoming-discovery?${searchParams.toString()}`,
     {

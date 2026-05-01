@@ -662,11 +662,12 @@ function buildUpcomingDataQualityPath(filters: UpcomingFilters): string {
   return `/research/upcoming-sports/data-quality?${params.toString()}`;
 }
 
-function buildAnalysisReadinessPath(filters: UpcomingFilters): string {
-  const params = new URLSearchParams({
-    limit: "12",
-    days: String(filters.days),
-  });
+  function buildAnalysisReadinessPath(filters: UpcomingFilters): string {
+    const params = new URLSearchParams({
+      limit: "12",
+      days: String(filters.days),
+      min_hours_to_close: "24",
+    });
   const apiSport = getSportApiFilter(filters.sport);
   if (apiSport) {
     params.set("sport", apiSport);

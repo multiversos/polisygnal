@@ -191,6 +191,7 @@ def get_live_upcoming_discovery(
     limit: int = Query(default=50, ge=1, le=100),
     include_futures: bool = Query(default=False),
     focus: str | None = Query(default="match_winner"),
+    min_hours_to_close: float | None = Query(default=None, ge=0),
     db: Session = Depends(get_db),
     polymarket_client: PolymarketGammaClient = Depends(get_polymarket_client),
 ) -> LiveUpcomingDiscoveryResponse:
@@ -203,6 +204,7 @@ def get_live_upcoming_discovery(
         limit=limit,
         include_futures=include_futures,
         focus=focus,
+        min_hours_to_close=min_hours_to_close,
         source_tag_id=settings.polymarket_sports_tag_id,
     )
 

@@ -35,6 +35,7 @@ def main() -> None:
                     limit=args.limit,
                     include_futures=args.include_futures,
                     focus=args.focus,
+                    min_hours_to_close=args.min_hours_to_close,
                     source_tag_id=settings.polymarket_sports_tag_id,
                 )
             except Exception as exc:
@@ -85,6 +86,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="match_winner",
         help="Foco operativo: match_winner o all.",
     )
+    parser.add_argument(
+        "--min-hours-to-close",
+        type=float,
+        default=None,
+        help="Ventana minima antes del cierre para pedir mercados remotos.",
+    )
     parser.add_argument("--json", action="store_true", help="Imprime salida JSON.")
     return parser
 
@@ -98,6 +105,7 @@ def _run(
     limit: int = 50,
     include_futures: bool = False,
     focus: str | None = "match_winner",
+    min_hours_to_close: float | None = None,
     source_tag_id: str | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
@@ -113,6 +121,7 @@ def _run(
         limit=limit,
         include_futures=include_futures,
         focus=focus,
+        min_hours_to_close=min_hours_to_close,
         source_tag_id=source_tag_id,
         now=now,
     )
