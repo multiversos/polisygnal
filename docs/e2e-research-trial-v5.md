@@ -186,3 +186,32 @@ Confirmado durante el trial:
 - El score actual es preliminar y de baja confianza.
 - Wallet Intelligence puede no devolver senales grandes si el umbral es alto o si el mercado tiene poca actividad publica reciente.
 - Para el siguiente trial real, usar fuentes deportivas publicas verificables y mantener dry-run de Quality Gate antes de cualquier ingesta.
+
+## Continuacion 2026-04-30
+
+Durante la tanda de seguimiento posterior al branding oficial se valido nuevamente el flujo de discovery/import/snapshots:
+
+- Live import dry-run reviso 468 mercados remotos y no encontro mercados faltantes seguros para importar en esta muestra.
+- Snapshot from discovery dry-run encontro 3 candidatos seguros con outcomes binarios `Yes`/`No` y precios remotos explicitos.
+- Snapshot apply se ejecuto de forma controlada con `--max-snapshots 3`.
+- Snapshots creados:
+  - `34402`, Will Independiente Medellin win on 2026-04-30?, SI `0.7150`, NO `0.2850`.
+  - `34404`, Will Cusco FC win on 2026-04-30?, SI `0.0950`, NO `0.9050`.
+  - `34557`, Will Club Alianza Atletico win on 2026-04-30?, SI `0.4150`, NO `0.5850`.
+- Los tres mercados pasaron a estado tecnico `ready` con score preliminar calculable, pero todos quedaron con ventana `Menos de 1h`.
+- Por esa razon no se genero un nuevo Research Packet ni un nuevo Quality Gate dry-run: la ventana era demasiado corta para un trial operativo responsable.
+
+Mercado tecnico revisado:
+
+- `market_id`: 34557
+- Deporte/shape: `soccer` / `match_winner`
+- Data quality: `Completo`
+- Freshness: `fresh`
+- PolySignal Score: `41.5%`, source `preliminary_composite`, confianza `Baja`
+- Wallet Intelligence: endpoint 200, `data_available=true`, sin operaciones grandes por encima de `10000` en la muestra limitada.
+
+Decision operativa:
+
+- El sistema ya puede crear snapshots locales desde precios remotos reales de discovery.
+- El proximo trial E2E completo debe esperar un mercado `ready` con ventana util, idealmente 24h a 7d antes del cierre.
+- No se ejecuto ingesta real, no se creo prediccion, no se ejecuto trading y no se invento evidencia.
