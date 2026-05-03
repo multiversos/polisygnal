@@ -65,6 +65,39 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 
+### Supabase como Postgres administrado
+
+La arquitectura actual no usa el SDK de Supabase en el frontend. El backend usa
+PostgreSQL directo con SQLAlchemy y Alembic, por lo que Supabase se configura como
+base Postgres mediante una variable privada de backend.
+
+Configura solo una de estas variables en el entorno del backend. Si hay mas de
+una, se aplica esta prioridad:
+
+- `DATABASE_URL`
+- `POLYSIGNAL_DATABASE_URL`
+- `SUPABASE_DATABASE_URL`
+
+Ejemplo seguro de formato, sin credenciales reales:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/postgres
+```
+
+No configures `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_SECRET_KEY` ni claves privadas
+en `apps/web/.env*`. El frontend solo necesita `NEXT_PUBLIC_API_BASE_URL` mientras
+consuma la API FastAPI.
+
+Diagnostico seguro:
+
+```powershell
+cd apps/api
+.\.venv\Scripts\python -m app.commands.check_supabase_config
+.\.venv\Scripts\python -m app.commands.check_supabase_config --connect
+```
+
+El comando enmascara credenciales y `--connect` solo ejecuta `SELECT 1`.
+
 Tests:
 
 ```powershell

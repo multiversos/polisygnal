@@ -3,12 +3,20 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlparse
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 API_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = API_DIR.parents[1]
+SUPPORTED_DATABASE_SCHEMES = {
+    "postgresql",
+    "postgresql+psycopg",
+    "postgresql+psycopg2",
+    "sqlite",
+    "sqlite+pysqlite",
+}
 
 
 def _expand_local_dev_cors_origins(origins: list[str]) -> list[str]:
@@ -30,7 +38,11 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8000, alias="POLYSIGNAL_API_PORT")
     database_url: str = Field(
         default="postgresql+psycopg://postgres:postgres@localhost:5432/polysignal",
-        alias="POLYSIGNAL_DATABASE_URL",
+        validation_alias=AliasChoices(
+            "DATABASE_URL",
+            "POLYSIGNAL_DATABASE_URL",
+            "SUPABASE_DATABASE_URL",
+        ),
     )
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"],
@@ -260,6 +272,31 @@ class Settings(BaseSettings):
             origins = [str(item).strip() for item in value if str(item).strip()]
             return _expand_local_dev_cors_origins(origins)
         return value
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def validate_database_url(cls, value: object) -> str:
+        if not isinstance(value, str):
+            raise TypeError("La URL de base de datos debe ser un string.")
+
+        database_url = value.strip()
+        if not database_url:
+            raise ValueError(
+                "Configura DATABASE_URL, POLYSIGNAL_DATABASE_URL o "
+                "SUPABASE_DATABASE_URL con una URL PostgreSQL valida."
+            )
+
+        parsed = urlparse(database_url)
+        if parsed.scheme not in SUPPORTED_DATABASE_SCHEMES:
+            raise ValueError(
+                "DATABASE_URL debe usar postgresql+psycopg://, postgresql:// "
+                "o sqlite+pysqlite://."
+            )
+
+        if parsed.scheme.startswith("postgresql") and not parsed.hostname:
+            raise ValueError("DATABASE_URL debe incluir host PostgreSQL.")
+
+        return database_url
 
     @field_validator("linear_oauth_scopes", mode="before")
     @classmethod

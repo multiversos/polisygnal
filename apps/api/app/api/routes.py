@@ -153,7 +153,16 @@ def get_app_meta() -> AppMetaResponse:
 @router.get("/health", response_model=HealthResponse, tags=["health"])
 def health() -> HealthResponse:
     settings = get_settings()
-    return HealthResponse(status="ok", environment=settings.environment)
+    return HealthResponse(
+        status="ok",
+        service=settings.app_name,
+        environment=settings.environment,
+    )
+
+
+@router.get("/healthz", response_model=HealthResponse, tags=["health"])
+def healthz() -> HealthResponse:
+    return health()
 
 
 @router.get("/status", response_model=OperationalStatusResponse, tags=["status"])

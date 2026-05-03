@@ -78,6 +78,7 @@ def test_import_live_discovered_markets_dry_run_does_not_mutate_db(
         dry_run=True,
         max_import=3,
         source_tag_id="sports",
+        now=NOW,
     )
 
     assert payload["status"] == "ok"
@@ -121,6 +122,7 @@ def test_import_live_discovered_markets_apply_creates_market_with_identifiers(
         limit=10,
         dry_run=False,
         max_import=3,
+        now=NOW,
     )
     market = db_session.scalar(
         select(Market).where(Market.polymarket_market_id == "remote-import-apply")
@@ -250,6 +252,7 @@ def test_import_live_discovered_markets_respects_max_import(
         limit=10,
         dry_run=False,
         max_import=1,
+        now=NOW,
     )
 
     assert payload["imported"] == 1
@@ -287,6 +290,7 @@ def test_import_live_discovered_markets_skips_incomplete_payload(
         limit=10,
         dry_run=False,
         max_import=3,
+        now=NOW,
     )
 
     assert payload["imported"] == 0

@@ -312,6 +312,7 @@ def test_discovery_snapshot_respects_max_snapshots(db_session: Session) -> None:
         limit=10,
         dry_run=False,
         max_snapshots=1,
+        now=NOW,
     )
 
     assert payload["snapshots_created"] == 1

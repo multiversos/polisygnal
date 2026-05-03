@@ -101,6 +101,7 @@ def _run(
     max_snapshots: int = 5,
     min_hours_to_close: float | None = None,
     source_tag_id: str | None = None,
+    now=None,
 ) -> dict[str, Any]:
     summary = create_snapshots_from_discovery_pricing(
         db,
@@ -113,6 +114,7 @@ def _run(
         max_snapshots=max_snapshots,
         min_hours_to_close=min_hours_to_close,
         source_tag_id=source_tag_id,
+        now=now,
     )
     payload = summary.to_payload()
     return {

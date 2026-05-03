@@ -62,6 +62,36 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 
+### Supabase
+
+Este backend trata Supabase como PostgreSQL administrado. No requiere
+`SUPABASE_SERVICE_ROLE_KEY` ni `SUPABASE_SECRET_KEY` para las rutas actuales; la
+conexion se hace por SQLAlchemy usando una URL privada de base de datos.
+
+Variables aceptadas para la URL de base de datos, en orden de preferencia:
+
+- `DATABASE_URL`
+- `POLYSIGNAL_DATABASE_URL`
+- `SUPABASE_DATABASE_URL`
+
+Ejemplo de placeholder:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/postgres
+```
+
+Usa el pooler de Supabase si tu entorno no tiene IPv6 o si despliegas desde una
+plataforma serverless. No pegues este valor en codigo, frontend ni logs.
+
+Diagnostico no destructivo:
+
+```powershell
+.\.venv\Scripts\python -m app.commands.check_supabase_config
+.\.venv\Scripts\python -m app.commands.check_supabase_config --connect
+```
+
+El segundo comando ejecuta solo `SELECT 1` y no imprime secretos.
+
 Tests:
 
 ```powershell
@@ -70,6 +100,10 @@ Tests:
 
 ## Variables relevantes
 
+- `DATABASE_URL`
+  URL privada de PostgreSQL para SQLAlchemy/Alembic. Puede apuntar a Postgres
+  local o al connection string de Supabase. Tambien se aceptan los aliases
+  `POLYSIGNAL_DATABASE_URL` y `SUPABASE_DATABASE_URL`.
 - `POLYSIGNAL_POLYMARKET_BASE_URL`
   Gamma API para discovery.
 - `POLYSIGNAL_CLOB_BASE_URL`
