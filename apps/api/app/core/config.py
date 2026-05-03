@@ -40,8 +40,16 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://postgres:postgres@localhost:5432/polysignal",
         validation_alias=AliasChoices(
             "DATABASE_URL",
+            "NEON_DATABASE_URL",
             "POLYSIGNAL_DATABASE_URL",
             "SUPABASE_DATABASE_URL",
+        ),
+    )
+    database_migration_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "DATABASE_MIGRATION_URL",
+            "NEON_DATABASE_DIRECT_URL",
         ),
     )
     cors_origins: Annotated[list[str], NoDecode] = Field(
@@ -276,14 +284,27 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def validate_database_url(cls, value: object) -> str:
+        return cls._validate_database_url(value)
+
+    @field_validator("database_migration_url", mode="before")
+    @classmethod
+    def validate_database_migration_url(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        return cls._validate_database_url(value)
+
+    @classmethod
+    def _validate_database_url(cls, value: object) -> str:
         if not isinstance(value, str):
             raise TypeError("La URL de base de datos debe ser un string.")
 
         database_url = value.strip()
         if not database_url:
             raise ValueError(
-                "Configura DATABASE_URL, POLYSIGNAL_DATABASE_URL o "
-                "SUPABASE_DATABASE_URL con una URL PostgreSQL valida."
+                "Configura DATABASE_URL, NEON_DATABASE_URL, POLYSIGNAL_DATABASE_URL "
+                "o SUPABASE_DATABASE_URL con una URL PostgreSQL valida."
             )
 
         parsed = urlparse(database_url)
@@ -297,6 +318,10 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL debe incluir host PostgreSQL.")
 
         return database_url
+
+    @property
+    def alembic_database_url(self) -> str:
+        return self.database_migration_url or self.database_url
 
     @field_validator("linear_oauth_scopes", mode="before")
     @classmethod

@@ -62,30 +62,47 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 
-### Supabase
+### Postgres administrado: Neon o Supabase
 
-Este backend trata Supabase como PostgreSQL administrado. No requiere
-`SUPABASE_SERVICE_ROLE_KEY` ni `SUPABASE_SECRET_KEY` para las rutas actuales; la
-conexion se hace por SQLAlchemy usando una URL privada de base de datos.
+Este backend trata Neon o Supabase como PostgreSQL administrado. No requiere
+SDKs frontend ni service keys para las rutas actuales; la conexion se hace por
+SQLAlchemy usando una URL privada de base de datos.
 
 Variables aceptadas para la URL de base de datos, en orden de preferencia:
 
 - `DATABASE_URL`
+- `NEON_DATABASE_URL`
 - `POLYSIGNAL_DATABASE_URL`
 - `SUPABASE_DATABASE_URL`
 
-Ejemplo de placeholder:
+Variables opcionales para migraciones Alembic, en orden de preferencia:
+
+- `DATABASE_MIGRATION_URL`
+- `NEON_DATABASE_DIRECT_URL`
+- fallback a la URL runtime anterior
+
+Ejemplo Neon:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST.neon.tech/postgres?sslmode=require&channel_binding=require
+```
+
+Ejemplo generico:
 
 ```env
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/postgres
 ```
 
-Usa el pooler de Supabase si tu entorno no tiene IPv6 o si despliegas desde una
-plataforma serverless. No pegues este valor en codigo, frontend ni logs.
+Para Render, usa `DATABASE_URL` como variable privada del backend. Para Neon,
+prefiere el connection string pooled para runtime y una URL directa en
+`DATABASE_MIGRATION_URL` para Alembic. No pegues estos valores en codigo,
+frontend ni logs.
 
 Diagnostico no destructivo:
 
 ```powershell
+.\.venv\Scripts\python -m app.commands.check_database_config
+.\.venv\Scripts\python -m app.commands.check_database_config --connect
 .\.venv\Scripts\python -m app.commands.check_supabase_config
 .\.venv\Scripts\python -m app.commands.check_supabase_config --connect
 ```
@@ -102,8 +119,11 @@ Tests:
 
 - `DATABASE_URL`
   URL privada de PostgreSQL para SQLAlchemy/Alembic. Puede apuntar a Postgres
-  local o al connection string de Supabase. Tambien se aceptan los aliases
+  local, Neon o Supabase. Tambien se aceptan los aliases `NEON_DATABASE_URL`,
   `POLYSIGNAL_DATABASE_URL` y `SUPABASE_DATABASE_URL`.
+- `DATABASE_MIGRATION_URL`
+  URL privada directa para Alembic. En Neon debe ser el host directo, no el
+  host pooled con `-pooler`.
 - `POLYSIGNAL_POLYMARKET_BASE_URL`
   Gamma API para discovery.
 - `POLYSIGNAL_CLOB_BASE_URL`

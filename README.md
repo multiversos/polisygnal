@@ -65,38 +65,55 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 
-### Supabase como Postgres administrado
+### Postgres administrado: Neon o Supabase
 
-La arquitectura actual no usa el SDK de Supabase en el frontend. El backend usa
-PostgreSQL directo con SQLAlchemy y Alembic, por lo que Supabase se configura como
-base Postgres mediante una variable privada de backend.
+La arquitectura actual no usa un SDK de base de datos en el frontend. El backend
+usa PostgreSQL directo con SQLAlchemy y Alembic, por lo que Neon o Supabase se
+configuran como Postgres administrado mediante una variable privada de backend.
 
 Configura solo una de estas variables en el entorno del backend. Si hay mas de
 una, se aplica esta prioridad:
 
 - `DATABASE_URL`
+- `NEON_DATABASE_URL`
 - `POLYSIGNAL_DATABASE_URL`
 - `SUPABASE_DATABASE_URL`
 
-Ejemplo seguro de formato, sin credenciales reales:
+Alembic puede usar una URL directa separada para migraciones, en esta prioridad:
+
+- `DATABASE_MIGRATION_URL`
+- `NEON_DATABASE_DIRECT_URL`
+- fallback a la URL runtime anterior
+
+Ejemplo seguro de formato Neon, sin credenciales reales:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST.neon.tech/postgres?sslmode=require&channel_binding=require
+```
+
+Ejemplo generico:
 
 ```env
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/postgres
 ```
 
-No configures `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_SECRET_KEY` ni claves privadas
-en `apps/web/.env*`. El frontend solo necesita `NEXT_PUBLIC_API_BASE_URL` mientras
-consuma la API FastAPI.
+En Render, configura `DATABASE_URL` con el connection string de Neon o Supabase.
+Para Neon, usa una URL pooled en `DATABASE_URL` y una URL directa en
+`DATABASE_MIGRATION_URL` para Alembic. En Vercel, no configures passwords de
+Postgres ni service keys. El frontend solo necesita `NEXT_PUBLIC_API_BASE_URL`
+mientras consuma la API FastAPI. Ver `docs/deploy-neon-render-vercel.md`.
 
 Diagnostico seguro:
 
 ```powershell
 cd apps/api
+.\.venv\Scripts\python -m app.commands.check_database_config
+.\.venv\Scripts\python -m app.commands.check_database_config --connect
 .\.venv\Scripts\python -m app.commands.check_supabase_config
 .\.venv\Scripts\python -m app.commands.check_supabase_config --connect
 ```
 
-El comando enmascara credenciales y `--connect` solo ejecuta `SELECT 1`.
+Los comandos enmascaran credenciales y `--connect` solo ejecuta `SELECT 1`.
 
 Tests:
 
