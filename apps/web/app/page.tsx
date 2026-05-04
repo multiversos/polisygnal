@@ -33,6 +33,7 @@ import {
 import {
   API_BASE_URL,
   API_HOST_LABEL,
+  buildBackendApiPath,
   DEFAULT_REQUEST_TIMEOUT_MS,
 } from "./lib/api";
 
@@ -465,7 +466,7 @@ async function fetchJson<T>(path: string): Promise<T> {
   );
 
   try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetch(buildBackendApiPath(path), {
       cache: "no-store",
       signal: controller.signal,
     });

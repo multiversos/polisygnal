@@ -19,6 +19,25 @@ export const API_HOST_LABEL = (() => {
 
 export const DEFAULT_REQUEST_TIMEOUT_MS = 10000;
 
+const SAFE_PROXY_GET_PREFIXES = [
+  "/alerts",
+  "/backtesting",
+  "/briefing",
+  "/dashboard",
+  "/data-health",
+  "/decisions",
+  "/external-signals",
+  "/health",
+  "/investigation-status",
+  "/manual-evidence",
+  "/markets",
+  "/outcomes",
+  "/research",
+  "/sources",
+  "/tags",
+  "/watchlist",
+];
+
 export class ApiRequestError extends Error {
   status?: number;
 
@@ -27,6 +46,42 @@ export class ApiRequestError extends Error {
     this.name = "ApiRequestError";
     this.status = status;
   }
+}
+
+function normalizeBackendPath(path: string): string {
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
+function backendPathname(path: string): string {
+  try {
+    return new URL(path, API_BASE_URL).pathname;
+  } catch {
+    return normalizeBackendPath(path).split("?")[0] || "/";
+  }
+}
+
+function isSafeProxyGetPath(path: string): boolean {
+  const pathname = backendPathname(path);
+  return SAFE_PROXY_GET_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+function shouldUseSameOriginProxy(path: string, init?: RequestInit): boolean {
+  const method = (init?.method || "GET").toUpperCase();
+  return (
+    typeof window !== "undefined" &&
+    method === "GET" &&
+    isSafeProxyGetPath(path)
+  );
+}
+
+export function buildBackendApiPath(path: string): string {
+  return `/api/backend${normalizeBackendPath(path)}`;
+}
+
+export function buildBackendDirectUrl(path: string): string {
+  return `${API_BASE_URL}${normalizeBackendPath(path)}`;
 }
 
 export async function fetchApiJson<T>(
@@ -38,7 +93,10 @@ export async function fetchApiJson<T>(
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const requestUrl = shouldUseSameOriginProxy(path, init)
+      ? buildBackendApiPath(path)
+      : buildBackendDirectUrl(path);
+    const response = await fetch(requestUrl, {
       cache: "no-store",
       ...init,
       signal: controller.signal,

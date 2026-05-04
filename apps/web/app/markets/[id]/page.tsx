@@ -71,7 +71,7 @@ import {
   type ManualEvidenceItem,
   type ManualEvidenceStance,
 } from "../../lib/manualEvidence";
-import { API_BASE_URL } from "../../lib/api";
+import { API_BASE_URL, buildBackendApiPath } from "../../lib/api";
 
 type JsonPayload = Record<string, unknown> | unknown[];
 
@@ -750,7 +750,7 @@ const marketTermTranslations: Record<string, string> = {
 };
 
 async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, { cache: "no-store" });
+  const response = await fetch(buildBackendApiPath(path), { cache: "no-store" });
   if (response.status === 404) {
     throw new Error("not_found");
   }
