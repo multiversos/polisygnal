@@ -48,10 +48,10 @@ type MarketOverviewWorkflowResponse = {
 
 const DERIVED_STATUS_LABELS: Record<InvestigationStatus, string> = {
   pending_review: "Por revisar",
-  investigating: "Con prediccion",
+  investigating: "Con predicción",
   has_evidence: "Con evidencia",
   review_required: "Requiere evidencia",
-  dismissed: "Descartado/vacio",
+  dismissed: "Descartado/vacío",
   paused: "Solo datos",
 };
 
@@ -293,10 +293,10 @@ export default function WorkflowPage() {
 
       {!loading && !error && items.length === 0 ? (
         <section className="empty-state">
-          <strong>Workflow listo, sin estados manuales todavia.</strong>
+          <strong>Workflow listo, sin estados manuales todavía.</strong>
           <p>
-            El dashboard tiene mercados reales; este tablero se llenara cuando
-            marques estados de investigacion desde el detalle de mercado.
+            El dashboard tiene mercados reales; este tablero se llenará cuando
+            marques estados de investigación desde el detalle de mercado.
           </p>
         </section>
       ) : null}

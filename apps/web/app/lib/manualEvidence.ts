@@ -45,14 +45,14 @@ export type ManualEvidencePayload = {
 };
 
 export const MANUAL_EVIDENCE_STANCE_LABELS: Record<ManualEvidenceStance, string> = {
-  favor_yes: "A favor del SI",
-  against_yes: "En contra del SI",
+  favor_yes: "A favor del SÍ",
+  against_yes: "En contra del SÍ",
   neutral: "Neutral",
   risk: "Riesgo",
 };
 
 export const MANUAL_EVIDENCE_REVIEW_STATUS_LABELS: Record<ManualEvidenceReviewStatus, string> = {
-  pending_review: "Pendiente de revision",
+  pending_review: "Pendiente de revisión",
   reviewed: "Revisada",
   rejected: "Rechazada",
 };

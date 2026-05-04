@@ -162,7 +162,7 @@ export function matchesSelectedSport(
 
 export function SportsSelectorBar({
   activeLabel = "Activo",
-  description = "Selecciona un deporte para filtrar los mercados proximos.",
+  description = "Selecciona un deporte para filtrar los mercados próximos.",
   kicker = "Filtro principal",
   onSelect,
   selectedSport,

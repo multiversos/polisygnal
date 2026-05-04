@@ -233,8 +233,13 @@ export default function DataHealthPage() {
       if (liveDiscoveryResult.status === "fulfilled") {
         setLiveDiscovery(liveDiscoveryResult.value);
       }
+      const successfulResults = results.filter((result) => result.status === "fulfilled").length;
       if (results.some((result) => result.status === "rejected")) {
-        setError("Algunos diagnosticos no se pudieron cargar. Los paneles disponibles siguen visibles.");
+        setError(
+          successfulResults > 0
+            ? "Algunos diagnósticos avanzados todavía no están conectados. Los datos principales disponibles siguen visibles."
+            : "No se pudo cargar la salud de datos. Reintenta cuando la API esté disponible.",
+        );
       }
     } catch (error) {
       setError(friendlyApiError(error, "salud de datos"));
@@ -284,6 +289,14 @@ export default function DataHealthPage() {
     .map((item) => item.latest_snapshot?.captured_at)
     .filter((value): value is string => Boolean(value))
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+  const hasAnyDataHealthPanel =
+    Boolean(marketOverview) ||
+    Boolean(overview) ||
+    Boolean(analysisReadiness) ||
+    Boolean(snapshotGaps) ||
+    Boolean(refreshPriorities) ||
+    Boolean(refreshRuns) ||
+    Boolean(liveDiscovery);
 
   return (
     <main className="dashboard-shell data-health-page">
@@ -316,7 +329,9 @@ export default function DataHealthPage() {
 
       {error ? (
         <section className="alert-panel" role="status">
-          <strong>Salud de datos no disponible</strong>
+          <strong>
+            {hasAnyDataHealthPanel ? "Diagnóstico parcial" : "Salud de datos no disponible"}
+          </strong>
           <span>{error}</span>
         </section>
       ) : null}
@@ -343,7 +358,7 @@ export default function DataHealthPage() {
             <p>Devueltos por /markets/overview</p>
           </article>
           <article className="metric-card">
-            <span>Con prediccion</span>
+            <span>Con predicción</span>
             <strong>{loading ? "..." : overviewWithPredictions}</strong>
             <p>Items con latest_prediction</p>
           </article>
@@ -363,7 +378,7 @@ export default function DataHealthPage() {
             <p>{primarySportsWithData.map((sport) => sport.label).join(", ") || "Ninguno"}</p>
           </article>
           <article className="metric-card">
-            <span>Sin datos todavia</span>
+            <span>Sin datos todavía</span>
             <strong>{loading ? "..." : primarySportsWithoutData.length}</strong>
             <p>
               {primarySportsWithoutData.map((sport) => sport.label).join(", ") ||
@@ -371,9 +386,9 @@ export default function DataHealthPage() {
             </p>
           </article>
           <article className="metric-card">
-            <span>Ultima actualizacion</span>
+            <span>Última actualización</span>
             <strong>{loading ? "..." : formatDate(latestOverviewSnapshot)}</strong>
-            <p>Snapshot mas reciente en overview</p>
+            <p>Snapshot más reciente en overview</p>
           </article>
         </div>
       </section>
@@ -415,9 +430,9 @@ export default function DataHealthPage() {
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Polymarket live</p>
-            <h2>Descubrimiento en vivo de mercados proximos</h2>
+            <h2>Descubrimiento en vivo de mercados próximos</h2>
             <p className="section-note">
-              Este diagnostico consulta Polymarket en modo lectura. No guarda datos,
+              Este diagnóstico consulta Polymarket en modo lectura. No guarda datos,
               no crea snapshots, no ejecuta trading ni predicciones.
             </p>
           </div>
@@ -435,7 +450,7 @@ export default function DataHealthPage() {
           <article className="metric-card">
             <span>Faltan en local</span>
             <strong>{loading ? "..." : liveDiscovery?.summary.missing_local_count ?? 0}</strong>
-            <p>Podrian requerir import controlado</p>
+            <p>Podrían requerir import controlado</p>
           </article>
           <article className="metric-card">
             <span>Con precio remoto</span>
@@ -447,7 +462,7 @@ export default function DataHealthPage() {
             <strong>
               {loading ? "..." : liveDiscovery?.summary.remote_with_condition_id_count ?? 0}
             </strong>
-            <p>Util para Wallet Intelligence</p>
+            <p>Útil para Wallet Intelligence</p>
           </article>
         </div>
 
@@ -478,7 +493,7 @@ export default function DataHealthPage() {
             </code>
             <p>
               No importa desde la UI. Ejecuta dry-run primero y usa --apply solo con
-              limites pequenos.
+              límites pequeños.
             </p>
           </div>
           <button
@@ -525,7 +540,7 @@ export default function DataHealthPage() {
           <div className="empty-state">Consultando discovery live limitado...</div>
         ) : !liveDiscovery || liveDiscovery.items.length === 0 ? (
           <div className="empty-state">
-            No hay mercados remotos proximos que coincidan con los filtros actuales.
+            No hay mercados remotos próximos que coincidan con los filtros actuales.
           </div>
         ) : (
           <div className="refresh-plan-grid">
@@ -582,10 +597,10 @@ export default function DataHealthPage() {
       <section className="dashboard-panel ready-markets-section">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Discovery a analisis</p>
-            <h2>Listos para analisis</h2>
+            <p className="eyebrow">Discovery a análisis</p>
+            <h2>Listos para análisis</h2>
             <p className="section-note">
-              Mercados con snapshot, precio SI/NO, score calculado y ventana util.
+              Mercados con snapshot, precio SÍ/NO, score calculado y ventana útil.
               El comando prepara un Research Packet; no se ejecuta desde la UI.
             </p>
           </div>
@@ -618,12 +633,12 @@ export default function DataHealthPage() {
                       </p>
                     </div>
                     <Link className="text-link" href={`/markets/${item.market_id}`}>
-                      Ver analisis
+                      Ver análisis
                     </Link>
                   </div>
                   <div className="snapshot-gap-meta">
                     <span className="readiness-status ready">Listo</span>
-                    <span className="reason-chip">SI {item.yes_price ?? "N/D"}</span>
+                    <span className="reason-chip">SÍ {item.yes_price ?? "N/D"}</span>
                     <span className="reason-chip">NO {item.no_price ?? "N/D"}</span>
                     <span className="reason-chip">{item.time_window_label}</span>
                     <span className="reason-chip">Cierre {formatDate(item.close_time)}</span>
@@ -654,14 +669,14 @@ export default function DataHealthPage() {
       <section className="dashboard-panel readiness-section">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Primeros analisis</p>
-            <h2>Preparacion para primeros analisis</h2>
+            <p className="eyebrow">Primeros análisis</p>
+            <h2>Preparación para primeros análisis</h2>
             <p className="section-note">
               Separa mercados listos de los que necesitan refresh o deben quedar bloqueados.
               Esta vista no ejecuta refresh, research ni predicciones.
             </p>
             <p className="section-note">
-              Para pruebas E2E, prioriza mercados con 24h a 7 dias antes del cierre.
+              Para pruebas E2E, prioriza mercados con 24h a 7 días antes del cierre.
             </p>
           </div>
           <span className="badge muted">
@@ -700,7 +715,7 @@ export default function DataHealthPage() {
           <div className="empty-state">Calculando readiness...</div>
         ) : !analysisReadiness || analysisReadiness.items.length === 0 ? (
           <div className="empty-state">
-            No hay mercados proximos para evaluar en la ventana actual.
+            No hay mercados próximos para evaluar en la ventana actual.
           </div>
         ) : (
           <div className="readiness-list">
@@ -743,9 +758,9 @@ export default function DataHealthPage() {
                   </div>
                   <div className="snapshot-gap-meta">
                     {item.yes_price !== null && item.yes_price !== undefined ? (
-                      <span className="reason-chip">SI {Number(item.yes_price) * 100}%</span>
+                      <span className="reason-chip">SÍ {Number(item.yes_price) * 100}%</span>
                     ) : (
-                      <span className="warning-chip">Falta precio SI</span>
+                      <span className="warning-chip">Falta precio SÍ</span>
                     )}
                     {item.no_price !== null && item.no_price !== undefined ? (
                       <span className="reason-chip">NO {Number(item.no_price) * 100}%</span>
@@ -796,10 +811,10 @@ export default function DataHealthPage() {
       <section className="dashboard-panel">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Diagnostico seguro</p>
+            <p className="eyebrow">Diagnóstico seguro</p>
             <h2>Gaps de snapshots</h2>
             <p className="section-note">
-              Mercados proximos que necesitan snapshots o precios. Esta vista no ejecuta sync
+              Mercados próximos que necesitan snapshots o precios. Esta vista no ejecuta sync
               ni llama Polymarket.
             </p>
           </div>
@@ -830,7 +845,7 @@ export default function DataHealthPage() {
           <div className="empty-state">Cargando gaps de snapshots...</div>
         ) : !snapshotGaps || snapshotGaps.items.length === 0 ? (
           <div className="empty-state">
-            No hay mercados proximos con los filtros actuales.
+            No hay mercados próximos con los filtros actuales.
           </div>
         ) : (
           <div className="snapshot-gap-list">
@@ -856,7 +871,7 @@ export default function DataHealthPage() {
                   ) : null}
                 </div>
                 <a className="text-link" href={`/markets/${item.market_id}`}>
-                  Ver analisis
+                  Ver análisis
                 </a>
               </article>
             ))}
@@ -867,14 +882,14 @@ export default function DataHealthPage() {
       <section className="dashboard-panel refresh-priority-section">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Priorizacion</p>
-            <h2>Prioridad de actualizacion</h2>
+            <p className="eyebrow">Priorización</p>
+            <h2>Prioridad de actualización</h2>
             <p className="section-note">
-              Ranking read-only de mercados proximos que conviene revisar primero con
+              Ranking read-only de mercados próximos que conviene revisar primero con
               refresh controlado. No ejecuta comandos desde la UI.
             </p>
             <p className="section-note">
-              Para pruebas E2E, prioriza mercados con 24h a 7 dias antes del cierre.
+              Para pruebas E2E, prioriza mercados con 24h a 7 días antes del cierre.
             </p>
           </div>
           <span className="badge muted">
@@ -967,7 +982,7 @@ export default function DataHealthPage() {
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Plan operativo</p>
-            <h2>Plan de actualizacion controlada</h2>
+            <h2>Plan de actualización controlada</h2>
             <p className="section-note">
               Usa estos comandos primero en dry-run. La UI solo los muestra y copia;
               no ejecuta refresh, sync, predicciones ni trading.
@@ -979,7 +994,7 @@ export default function DataHealthPage() {
         </div>
 
         {loading ? (
-          <div className="empty-state">Preparando plan de actualizacion...</div>
+          <div className="empty-state">Preparando plan de actualización...</div>
         ) : !snapshotGaps || snapshotGaps.items.length === 0 ? (
           <div className="empty-state">
             No hay gaps activos para planificar refresh con los filtros actuales.
@@ -1040,15 +1055,15 @@ export default function DataHealthPage() {
         <div className="refresh-run-section">
           <div className="panel-heading compact-heading">
             <div>
-              <p className="eyebrow">Auditoria</p>
+              <p className="eyebrow">Auditoría</p>
               <h3>Refresh runs recientes</h3>
             </div>
           </div>
           {loading ? (
-            <div className="empty-state">Cargando auditoria de refresh...</div>
+            <div className="empty-state">Cargando auditoría de refresh...</div>
           ) : !refreshRuns || refreshRuns.items.length === 0 ? (
             <div className="empty-state">
-              Aun no hay refresh runs auditados.
+              Aún no hay refresh runs auditados.
             </div>
           ) : (
             <div className="refresh-run-list">

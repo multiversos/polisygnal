@@ -372,7 +372,7 @@ export default function ExternalSignalMatchReviewPage() {
         loadingCandidates: false,
         candidateError: isApiNotFoundError(error)
           ? "El matcher de coincidencias se conectara en un sprint posterior."
-          : "La API no respondio para los candidatos. Reintentar.",
+          : "La API no respondió para los candidatos. Reintentar.",
       }));
     }
   }, []);
@@ -473,9 +473,9 @@ export default function ExternalSignalMatchReviewPage() {
 
       {state.error ? (
         <ApiErrorState
-          message={`${state.error} Las coincidencias externas se activaran cuando el pipeline Kalshi tenga datos persistidos.`}
+          message={`${state.error} Las coincidencias externas se activarán cuando el pipeline Kalshi tenga datos persistidos.`}
           onRetry={() => void loadSignals()}
-          title="Modulo en preparacion"
+          title="Módulo en preparación"
         />
       ) : null}
 
@@ -492,9 +492,9 @@ export default function ExternalSignalMatchReviewPage() {
           </div>
 
           {state.loadingSignals ? (
-            <LoadingState copy="Cargando senales pendientes..." />
+            <LoadingState copy="Cargando señales pendientes..." />
           ) : state.signals.length === 0 ? (
-            <ComingSoonModule copy="No hay senales Kalshi pendientes cargadas. Esta vista quedara activa cuando el pipeline de senales externas tenga datos." />
+            <ComingSoonModule copy="No hay señales Kalshi pendientes cargadas. Esta vista quedará activa cuando el pipeline de señales externas tenga datos." />
           ) : (
             <div className="match-signal-list">
               {state.signals.map((signal) => {
@@ -508,7 +508,7 @@ export default function ExternalSignalMatchReviewPage() {
                     type="button"
                   >
                     <span className="badge source-badge">{formatSourceLabel(signal.source)}</span>
-                    <strong>{signal.title || signal.source_ticker || `Senal #${signal.id}`}</strong>
+                    <strong>{signal.title || signal.source_ticker || `Señal #${signal.id}`}</strong>
                     <span>{signal.source_ticker || signal.source_market_id || "Ticker no disponible"}</span>
                     <div className="match-signal-metrics">
                       <span>Prob. SÍ {formatProbability(signal.yes_probability ?? signal.mid_price)}</span>

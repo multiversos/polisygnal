@@ -588,13 +588,13 @@ const decisionConfidenceOptions: Array<{
 
 const timelineTypeLabels: Record<string, string> = {
   price_snapshot: "Movimiento de precio",
-  research_run: "Investigacion",
+  research_run: "Investigación",
   finding: "Evidencia",
   prediction_report: "Reporte",
-  external_signal: "Senal externa",
+  external_signal: "Señal externa",
   watchlist: "Watchlist",
-  investigation_status: "Estado de investigacion",
-  decision: "Decision humana",
+  investigation_status: "Estado de investigación",
+  decision: "Decisión humana",
   outcome: "Resultado registrado",
   tag: "Etiqueta",
 };
@@ -615,10 +615,10 @@ const timelineTypeIcons: Record<string, string> = {
 const timelineFilterOptions = [
   { value: "all", label: "Todos" },
   { value: "price", label: "Precio" },
-  { value: "research", label: "Investigacion" },
+  { value: "research", label: "Investigación" },
   { value: "evidence", label: "Evidencia" },
   { value: "decisions", label: "Decisiones" },
-  { value: "external", label: "Senales externas" },
+  { value: "external", label: "Señales externas" },
 ] as const;
 
 type TimelineFilter = (typeof timelineFilterOptions)[number]["value"];
@@ -1001,16 +1001,16 @@ function getAnalysisStatus(analysis: MarketAnalysis): {
 
   if (!prediction && !score) {
     return {
-      label: "Sin prediccion",
+      label: "Sin predicción",
       tone: "neutral",
-      detail: "El mercado todavia no tiene una prediccion guardada.",
+      detail: "El mercado todavía no tiene una predicción guardada.",
     };
   }
   if (prediction?.opportunity) {
     return {
       label: "Oportunidad",
       tone: "opportunity",
-      detail: "Hay una senal marcada como oportunidad para revision manual.",
+      detail: "Hay una señal marcada como oportunidad para revisión manual.",
     };
   }
   if (edgeMagnitude !== null && edgeMagnitude >= 0.05) {
@@ -1024,13 +1024,13 @@ function getAnalysisStatus(analysis: MarketAnalysis): {
     return {
       label: "Baja confianza",
       tone: "low-confidence",
-      detail: "Hay prediccion, pero la confianza aun es limitada.",
+      detail: "Hay predicción, pero la confianza aún es limitada.",
     };
   }
   return {
     label: "Solo datos",
     tone: "data-only",
-    detail: "El mercado tiene datos utiles, sin una senal fuerte por ahora.",
+    detail: "El mercado tiene datos útiles, sin una señal fuerte por ahora.",
   };
 }
 
@@ -1045,7 +1045,7 @@ function getLatestAnalysisUpdate(analysis: MarketAnalysis): string | null {
 
 function getScoringModeLabel(analysis: MarketAnalysis): string {
   if (!analysis.latest_prediction && !analysis.polysignal_score) {
-    return "Sin prediccion";
+    return "Sin predicción";
   }
   if (analysis.latest_prediction?.prediction_family) {
     return analysis.latest_prediction.prediction_family;
@@ -1952,11 +1952,11 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
     <section className="analysis-section">
       <div className="analysis-section-heading">
         <div>
-          <span className="section-kicker">Lectura rapida</span>
-          <h2>Que revisar primero</h2>
+          <span className="section-kicker">Lectura rápida</span>
+          <h2>Qué revisar primero</h2>
           <p className="section-note">
             Estas viendo un mercado de {sportLabel} tipo {marketTypeLabel}. PolySignal
-            compara precio, snapshot y prediccion guardada para ayudar a revisar el
+            compara precio, snapshot y predicción guardada para ayudar a revisar el
             mercado con criterio humano.
           </p>
         </div>
@@ -1967,8 +1967,8 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
         <strong>{status.detail}</strong>
         <p>
           {prediction
-            ? `La confianza del modelo es ${confidenceBand}. El score combina probabilidad estimada, edge y confianza para priorizar revision manual; no es una recomendacion de apuesta ni ejecuta trading automatico.`
-            : "Todavia no hay prediccion suficiente para este mercado. Esto no es una recomendacion de apuesta ni ejecuta trading automatico."}
+            ? `La confianza del modelo es ${confidenceBand}. El score combina probabilidad estimada, edge y confianza para priorizar revisión manual; no es una recomendación de apuesta ni ejecuta trading automático.`
+            : "Todavía no hay predicción suficiente para este mercado. Esto no es una recomendación de apuesta ni ejecuta trading automático."}
         </p>
       </div>
 
@@ -1980,7 +1980,7 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
         <div><span>Confianza</span><strong>{formatProbability(confidenceValue)}</strong></div>
         <div><span>Edge</span><strong>{formatSignedProbabilityPoints(edgeValue)}</strong></div>
         <div><span>Modo</span><strong>{getScoringModeLabel(analysis)}</strong></div>
-        <div><span>Ultima actualizacion</span><strong>{formatDateTime(getLatestAnalysisUpdate(analysis))}</strong></div>
+        <div><span>Última actualización</span><strong>{formatDateTime(getLatestAnalysisUpdate(analysis))}</strong></div>
       </div>
     </section>
   );
@@ -1996,7 +1996,7 @@ function MarketTechnicalDataPanel({ analysis }: { analysis: MarketAnalysis }) {
       <div className="analysis-section-heading">
         <div>
           <span className="section-kicker">Datos del mercado</span>
-          <h2>Valores tecnicos</h2>
+          <h2>Valores técnicos</h2>
           <p className="section-note">
             Identificadores y campos usados por el dashboard. Si un valor falta,
             PolySignal lo deja como pendiente en vez de inventarlo.
@@ -2014,7 +2014,7 @@ function MarketTechnicalDataPanel({ analysis }: { analysis: MarketAnalysis }) {
         <div><span>liquidity</span><strong>{formatCompact(snapshot?.liquidity)}</strong></div>
         <div><span>volume</span><strong>{formatCompact(snapshot?.volume)}</strong></div>
         <div><span>latest_snapshot</span><strong>{snapshot ? `#${snapshot.id} - ${formatDateTime(snapshot.captured_at)}` : "Sin snapshot"}</strong></div>
-        <div><span>latest_prediction</span><strong>{prediction ? `#${prediction.id} - ${formatDateTime(prediction.run_at)}` : "Sin prediccion"}</strong></div>
+        <div><span>latest_prediction</span><strong>{prediction ? `#${prediction.id} - ${formatDateTime(prediction.run_at)}` : "Sin predicción"}</strong></div>
         <div><span>scoring_mode</span><strong>{getScoringModeLabel(analysis)}</strong></div>
         <div><span>updated_at</span><strong>{formatDateTime(market.updated_at)}</strong></div>
       </div>
@@ -2028,14 +2028,14 @@ function MarketLinksPanel({ links }: { links?: MarketLinks | null }) {
   }
 
   const apiLinks = [
-    { label: "JSON del analisis", href: `${API_BASE_URL}${links.internal_json_url}` },
+    { label: "JSON del análisis", href: `${API_BASE_URL}${links.internal_json_url}` },
     { label: "Historial de precios", href: `${API_BASE_URL}${links.price_history_url}` },
-    { label: "Markdown del analisis", href: `${API_BASE_URL}${links.markdown_url}` },
-    { label: "Senales externas", href: `${API_BASE_URL}${links.external_signals_url}` },
+    { label: "Markdown del análisis", href: `${API_BASE_URL}${links.markdown_url}` },
+    { label: "Señales externas", href: `${API_BASE_URL}${links.external_signals_url}` },
   ];
   const externalLinks = [
     links.polymarket_url ? { label: "Abrir en Polymarket", href: links.polymarket_url } : null,
-    links.clob_yes_book_url ? { label: "CLOB token SI", href: links.clob_yes_book_url } : null,
+    links.clob_yes_book_url ? { label: "CLOB token SÍ", href: links.clob_yes_book_url } : null,
     links.clob_no_book_url ? { label: "CLOB token NO", href: links.clob_no_book_url } : null,
   ].filter(Boolean) as Array<{ label: string; href: string }>;
 
@@ -2095,14 +2095,14 @@ function WalletIntelligencePanel({
   const walletWarnings = intelligence?.warnings ?? [];
   const missingConditionId = walletWarnings.includes("condition_id_unavailable");
   const emptyMessage = missingConditionId
-    ? "Falta condition_id para consultar actividad de billeteras. Refresca metadata de mercado para intentar obtener identificadores publicos."
+    ? "Falta condition_id para consultar actividad de billeteras. Refresca metadata de mercado para intentar obtener identificadores públicos."
     : "No hay actividad de billeteras disponible para este mercado.";
 
   return (
     <section className="analysis-section wallet-intelligence-section">
       <div className="analysis-section-heading">
         <div>
-          <span className="section-kicker">Senales publicas</span>
+          <span className="section-kicker">Señales públicas</span>
           <h2>Actividad de billeteras</h2>
           <p className="section-note">
             Las wallets son direcciones publicas/pseudonimas. Esta seccion muestra
@@ -2211,7 +2211,7 @@ function WalletIntelligencePanel({
 
           {hasNotableWallets ? (
             <div className="wallet-activity-list compact">
-              <h3>Wallets para revision</h3>
+              <h3>Wallets para revisión</h3>
               {intelligence.notable_wallets.slice(0, 5).map((wallet) => (
                 <article className="wallet-activity-card compact" key={wallet.wallet_short}>
                   <div className="wallet-activity-heading">
@@ -2232,7 +2232,7 @@ function WalletIntelligencePanel({
 
           {intelligence.concentration_summary.sides.length > 0 ? (
             <div className="wallet-concentration-box">
-              <h3>Concentracion por lado</h3>
+              <h3>Concentración por lado</h3>
               <div className="wallet-activity-metrics">
                 {intelligence.concentration_summary.sides.map((side) => (
                   <span key={side.side}>
@@ -2245,7 +2245,7 @@ function WalletIntelligencePanel({
 
           {!hasLargeTrades && !hasLargePositions ? (
             <div className="empty-state compact">
-              Hay datos publicos, pero no se detectaron operaciones o posiciones por encima del umbral.
+              Hay datos públicos, pero no se detectaron operaciones o posiciones por encima del umbral.
             </div>
           ) : null}
         </>
@@ -3188,14 +3188,14 @@ function MarketDecisionLogPanel({
         </div>
       </div>
       <p className="section-note">
-        Estas decisiones son notas manuales para organizar analisis. No ejecutan
+        Estas decisiones son notas manuales para organizar análisis. No ejecutan
         apuestas ni trading.
       </p>
 
       {state.loading ? <div className="empty-state compact">Cargando decisiones...</div> : null}
       {state.error ? (
         <div className="alert-panel compact" role="status">
-          <strong>Decision no disponible</strong>
+          <strong>Decisión no disponible</strong>
           <span>{state.error}</span>
         </div>
       ) : null}
@@ -3233,7 +3233,7 @@ function MarketDecisionLogPanel({
 
       <div className="watchlist-form">
         <label>
-          Decision
+          Decisión
           <select
             disabled={state.saving}
             onChange={(event) => onDecisionChange(event.target.value as MarketDecision)}
@@ -3315,7 +3315,7 @@ function ManualEvidencePanel({
         </div>
       </div>
       <p className="section-note">
-        La evidencia manual requiere revision. No crea prediccion automaticamente,
+        La evidencia manual requiere revisión. No crea predicción automáticamente,
         no ejecuta research y no ejecuta trading.
       </p>
 
@@ -3399,7 +3399,7 @@ function ManualEvidencePanel({
           <textarea
             disabled={state.saving}
             onChange={(event) => onClaimChange(event.target.value)}
-            placeholder="Resume el dato verificable sin convertirlo en prediccion."
+            placeholder="Resume el dato verificable sin convertirlo en predicción."
             rows={3}
             value={state.claimDraft}
           />
@@ -3564,7 +3564,7 @@ export default function MarketAnalysisPage() {
         error:
           message === "not_found"
             ? null
-            : "La API no respondio al cargar el analisis del mercado.",
+            : "La API no respondió al cargar el análisis del mercado.",
         notFound: message === "not_found",
       });
     }
@@ -4580,7 +4580,7 @@ export default function MarketAnalysisPage() {
                     {researchPacketState.loading ? "Generando..." : "Generar Research Packet"}
                   </button>
                   <p className="section-note">
-                    Esto no ejecuta investigacion automatica. Solo prepara
+                    Esto no ejecuta investigación automática. Solo prepara
                     archivos para revisar con Codex/ChatGPT.
                   </p>
                 </div>

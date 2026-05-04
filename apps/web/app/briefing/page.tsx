@@ -522,7 +522,7 @@ export default function DailyBriefingPage() {
         const derivedBriefing = await fetchDerivedBriefing(days, sport);
         setBriefing(derivedBriefing);
         setSourceNote(
-          "Briefing derivado desde /markets/overview porque el modulo de briefing dedicado aun no esta listo.",
+          "Briefing derivado desde /markets/overview porque el módulo de briefing dedicado aún no está listo.",
         );
       }
       setSmartAlerts(alertsResult.status === "fulfilled" ? alertsResult.value.alerts : []);
@@ -634,7 +634,7 @@ export default function DailyBriefingPage() {
       {sourceNote ? (
         <section className="safety-strip briefing-focus-note">
           <strong>Datos existentes:</strong>
-          <span>{sourceNote} No ejecuta research automatico ni crea predicciones.</span>
+          <span>{sourceNote} No ejecuta research automático ni crea predicciones.</span>
         </section>
       ) : null}
 

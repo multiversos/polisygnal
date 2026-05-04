@@ -41,8 +41,8 @@ export function EmptyState({ children, compact, copy, title }: DataStateProps) {
 export function ComingSoonModule({
   children,
   compact,
-  copy = "Esta vista se conectara en un sprint posterior.",
-  title = "Modulo en preparacion.",
+  copy = "Esta vista se conectará en un sprint posterior.",
+  title = "Módulo en preparación.",
 }: DataStateProps) {
   return (
     <EmptyState compact={compact} copy={copy} title={title}>

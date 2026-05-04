@@ -147,14 +147,14 @@ export function isApiNotFoundError(error: unknown): boolean {
 
 export function friendlyApiError(error: unknown, moduleName: string): string {
   if (isApiNotFoundError(error)) {
-    return `Este modulo (${moduleName}) se conectara en un sprint posterior.`;
+    return `Este módulo (${moduleName}) se conectará en un sprint posterior.`;
   }
   if (error instanceof ApiRequestError) {
     const status = error.status ? ` (HTTP ${error.status})` : "";
-    return `La API no respondio correctamente desde ${API_HOST_LABEL}${status}. Reintentar.`;
+    return `La API no respondió correctamente desde ${API_HOST_LABEL}${status}. Reintentar.`;
   }
   if (error instanceof Error) {
-    return `La API no respondio desde ${API_HOST_LABEL}. Reintentar.`;
+    return `La API no respondió desde ${API_HOST_LABEL}. Reintentar.`;
   }
-  return `No hay datos cargados todavia para ${moduleName}.`;
+  return `No hay datos cargados todavía para ${moduleName}.`;
 }

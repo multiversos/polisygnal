@@ -141,7 +141,7 @@ export default function DecisionsPage() {
         setDecisions(decisionsResult.value);
       } else {
         setDecisions([]);
-        setError("Las decisiones humanas aun no estan disponibles.");
+        setError("Las decisiones humanas aún no están disponibles.");
       }
       if (candidatesResult.status === "fulfilled") {
         setCandidates(candidatesResult.value);
@@ -183,7 +183,7 @@ export default function DecisionsPage() {
           <p className="eyebrow">PolySignal</p>
           <h1>Decisiones humanas</h1>
           <p className="subtitle">
-            Registro manual para organizar analisis. No ejecuta apuestas ni trading.
+            Registro manual para organizar análisis. No ejecuta apuestas ni trading.
           </p>
         </div>
         <div className="topbar-actions">
@@ -197,7 +197,7 @@ export default function DecisionsPage() {
         <strong>Manual y local:</strong>
         <span>
           Estas decisiones son notas operativas. No crean predicciones, no abren
-          ordenes y no representan recomendacion de apuesta.
+          órdenes y no representan recomendación de apuesta.
         </span>
       </section>
 
@@ -226,7 +226,7 @@ export default function DecisionsPage() {
 
       <section className="filter-panel decisions-filter-panel" aria-label="Filtros de decisiones">
         <label className="filter-group">
-          Decision
+          Decisión
           <select
             onChange={(event) => setDecisionFilter(event.target.value as MarketDecision | "")}
             value={decisionFilter}
@@ -295,7 +295,7 @@ export default function DecisionsPage() {
                     <h3>{candidate.question}</h3>
                     <p>
                       Score {formatPercent(candidate.action_score)} - Confianza{" "}
-                      {formatPercent(candidate.confidence_score)} - SI{" "}
+                      {formatPercent(candidate.confidence_score)} - SÍ{" "}
                       {formatPercent(candidate.yes_price)} / NO{" "}
                       {formatPercent(candidate.no_price)}
                     </p>

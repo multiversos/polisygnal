@@ -104,7 +104,7 @@ export default function EvidencePage() {
           .filter((item) => !statusFilter || item.review_status === statusFilter),
       );
     } catch {
-      setError("No se pudo actualizar el estado de revision.");
+      setError("No se pudo actualizar el estado de revisión.");
     } finally {
       setSavingId(null);
     }
@@ -130,10 +130,10 @@ export default function EvidencePage() {
       </header>
 
       <section className="safety-strip">
-        <strong>Revision humana:</strong>
+        <strong>Revisión humana:</strong>
         <span>
-          La evidencia manual organiza fuentes para analisis posterior. No representa
-          verificacion automatica ni recomendacion de apuesta.
+          La evidencia manual organiza fuentes para análisis posterior. No representa
+          verificación automática ni recomendación de apuesta.
         </span>
       </section>
 
@@ -146,7 +146,7 @@ export default function EvidencePage() {
         <article className="metric-card">
           <span>Pendiente</span>
           <strong>{loading ? "..." : counts.pending}</strong>
-          <p>Requiere revision</p>
+          <p>Requiere revisión</p>
         </article>
         <article className="metric-card">
           <span>Revisada</span>
@@ -191,16 +191,16 @@ export default function EvidencePage() {
 
       {error ? (
         <ApiErrorState
-          message={`${error} La evidencia externa se conectara en un sprint posterior.`}
+          message={`${error} La evidencia externa se conectará en un sprint posterior.`}
           onRetry={() => void loadEvidence()}
-          title="Modulo en preparacion"
+          title="Módulo en preparación"
         />
       ) : null}
 
       <section className="dashboard-panel">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Revision</p>
+            <p className="eyebrow">Revisión</p>
             <h2>Fuentes pendientes</h2>
           </div>
           <span className="badge muted">{items.length} items</span>

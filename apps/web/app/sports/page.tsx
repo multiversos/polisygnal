@@ -58,7 +58,7 @@ export default function SportsIndexPage() {
             </span>
             <div>
               <h2>{sport.label}</h2>
-              <p>{sportDescriptions[sport.id] ?? "Mercados deportivos proximos."}</p>
+              <p>{sportDescriptions[sport.id] ?? "Mercados deportivos próximos."}</p>
             </div>
             <Link className="analysis-link" href={`/sports/${sport.id}`}>
               Ver deporte

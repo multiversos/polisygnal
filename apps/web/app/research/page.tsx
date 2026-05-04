@@ -19,7 +19,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const modeLabels: Record<string, string> = {
-  cheap_research: "Research economico",
+  cheap_research: "Research económico",
   codex_agent: "Codex Agent",
   local_only: "Solo local",
 };
@@ -99,10 +99,10 @@ export default function ResearchDashboardPage() {
       <header className="topbar">
         <div>
           <p className="eyebrow">PolySignal</p>
-          <h1>Centro de investigacion</h1>
+          <h1>Centro de investigación</h1>
           <p className="subtitle">
-            Revisa research runs y packets generados. Esta pagina no ejecuta
-            investigacion automaticamente, no ingesta respuestas y no crea predicciones.
+            Revisa research runs y packets generados. Esta página no ejecuta
+            investigación automáticamente, no ingesta respuestas y no crea predicciones.
           </p>
         </div>
         <div className="topbar-actions">
@@ -115,8 +115,8 @@ export default function ResearchDashboardPage() {
       <section className="safety-strip">
         <strong>Solo lectura:</strong>
         <span>
-          El centro de investigacion sirve para auditar paquetes y estados. Las
-          acciones de research e ingestion siguen siendo manuales y explicitas.
+          El centro de investigación sirve para auditar paquetes y estados. Las
+          acciones de research e ingestión siguen siendo manuales y explícitas.
         </span>
       </section>
 
@@ -139,7 +139,7 @@ export default function ResearchDashboardPage() {
         <article className="metric-card">
           <span>Con salidas</span>
           <strong>{loading ? "..." : summary.withOutputs}</strong>
-          <p>Findings, reporte o prediccion guardada</p>
+          <p>Findings, reporte o predicción guardada</p>
         </article>
       </section>
 
@@ -160,7 +160,7 @@ export default function ResearchDashboardPage() {
             <option value="">Todos</option>
             <option value="codex_agent">Codex Agent</option>
             <option value="local_only">Solo local</option>
-            <option value="cheap_research">Research economico</option>
+            <option value="cheap_research">Research económico</option>
           </select>
         </label>
         <label className="filter-group">
@@ -176,9 +176,9 @@ export default function ResearchDashboardPage() {
 
       {error ? (
         <ApiErrorState
-          message={`${error} El centro de investigacion se conectara al pipeline cuando los runs esten disponibles.`}
+          message={`${error} El centro de investigación se conectará al pipeline cuando los runs estén disponibles.`}
           onRetry={() => void loadRuns()}
-          title="Modulo en preparacion"
+          title="Módulo en preparación"
         />
       ) : null}
 
@@ -194,7 +194,7 @@ export default function ResearchDashboardPage() {
         {loading ? (
           <LoadingState copy="Cargando research runs..." />
         ) : runs.length === 0 ? (
-          <ComingSoonModule copy="No hay research runs todavia. Los packets apareceran aqui cuando el pipeline de investigacion se active desde un mercado." />
+          <ComingSoonModule copy="No hay research runs todavía. Los packets aparecerán aquí cuando el pipeline de investigación se active desde un mercado." />
         ) : (
           <div className="research-run-list">
             {runs.map((run) => (

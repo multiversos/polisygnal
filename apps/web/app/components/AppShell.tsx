@@ -31,7 +31,7 @@ const navigationItems: Array<{
   { label: "Dashboard", href: "/", icon: "dashboard" },
   { label: "Deportes", href: "/sports", icon: "sports" },
   { label: "Briefing diario", href: "/briefing", icon: "briefing" },
-  { label: "Investigacion", href: "/research", icon: "research" },
+  { label: "Investigación", href: "/research", icon: "research" },
   { label: "Evidencia", href: "/evidence", icon: "evidence" },
   { label: "Mi seguimiento", href: "/#mi-seguimiento", icon: "watchlist" },
   { label: "Decisiones", href: "/decisions", icon: "decisions" },
@@ -100,7 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell">
-      <aside className="app-sidebar" aria-label="Navegacion principal">
+      <aside className="app-sidebar" aria-label="Navegación principal">
         <Link className="app-logo" href="/" aria-label="Ir al dashboard de PolySignal">
           <img src="/brand/polysignal-logo-option5.svg" alt="PolySignal" />
         </Link>
@@ -134,7 +134,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <img src="/brand/polysignal-icon-option5.svg" alt="" aria-hidden="true" />
             <div>
               <span>PolySignal</span>
-              <strong>Mercados proximos y datos operativos</strong>
+              <strong>Mercados próximos y datos operativos</strong>
             </div>
           </div>
         </header>

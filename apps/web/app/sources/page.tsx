@@ -139,9 +139,9 @@ export default function SourcesQualityPage() {
 
       {state.error ? (
         <ApiErrorState
-          message={`${state.error} La calidad de fuentes se conectara cuando haya evidencia persistida.`}
+          message={`${state.error} La calidad de fuentes se conectará cuando haya evidencia persistida.`}
           onRetry={() => void loadSources()}
-          title="Modulo en preparacion"
+          title="Módulo en preparación"
         />
       ) : null}
 

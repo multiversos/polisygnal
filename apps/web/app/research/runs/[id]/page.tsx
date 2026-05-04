@@ -20,7 +20,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const modeLabels: Record<string, string> = {
-  cheap_research: "Research economico",
+  cheap_research: "Research económico",
   codex_agent: "Codex Agent",
   local_only: "Solo local",
 };
@@ -30,7 +30,7 @@ const qualityGateLabels: Record<string, string> = {
   not_available: "No disponible",
   validation_pass: "Validacion aprobada",
   validation_rejected: "Validacion rechazada",
-  validation_review_required: "Requiere revision",
+  validation_review_required: "Requiere revisión",
 };
 
 function formatDate(value?: string | null): string {
@@ -79,10 +79,10 @@ function formatIssueLabel(issue: { code?: string | null; message: string }): str
 
 function qualityGateHelpText(statusValue?: string): string {
   if (statusValue === "validation_pass") {
-    return "La respuesta paso validacion, pero la ingesta sigue siendo una accion separada fuera de esta UI.";
+    return "La respuesta pasó validación, pero la ingesta sigue siendo una acción separada fuera de esta UI.";
   }
   if (statusValue === "validation_review_required") {
-    return "Requiere revision humana antes de ingestar. No se debe crear prediccion sin revisar fuentes y contexto.";
+    return "Requiere revisión humana antes de ingestar. No se debe crear predicción sin revisar fuentes y contexto.";
   }
   if (statusValue === "validation_rejected") {
     return "El Quality Gate rechazo la respuesta. No ingestar.";
@@ -150,7 +150,7 @@ export default function ResearchRunDetailPage() {
       await navigator.clipboard.writeText(value);
       setCopied(label);
     } catch {
-      setCopied("No se pudo copiar automaticamente; copia el comando manualmente.");
+      setCopied("No se pudo copiar automáticamente; copia el comando manualmente.");
     }
   };
 
@@ -162,7 +162,7 @@ export default function ResearchRunDetailPage() {
           <p className="eyebrow">Centro de investigacion</p>
           <h1>Research run {run ? `#${run.id}` : ""}</h1>
           <p className="subtitle">
-            Detalle operativo del packet. Esta pagina no ingesta respuestas, no
+            Detalle operativo del packet. Esta página no ingesta respuestas, no
             llama OpenAI y no crea predicciones.
           </p>
         </div>
@@ -316,7 +316,7 @@ export default function ResearchRunDetailPage() {
             </div>
             <p className="section-note">
               El Quality Gate valida fuentes, evidencia, limites de ajuste y modo
-              mock/real antes de permitir una prediccion manualmente ingestada.
+              mock/real antes de permitir una predicción manualmente ingestada.
             </p>
             <div className="quality-gate-command">
               <span>Comando dry-run</span>
@@ -380,7 +380,7 @@ export default function ResearchRunDetailPage() {
               </div>
             ) : (
               <div className="empty-state">
-                No hay reporte de validacion guardado todavia. Ejecuta dry-run para generarlo.
+                No hay reporte de validación guardado todavía. Ejecuta dry-run para generarlo.
               </div>
             )}
             {qualityGate?.errors.length ? (
@@ -429,7 +429,7 @@ export default function ResearchRunDetailPage() {
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">Salidas guardadas</p>
-                <h2>Findings, reporte y prediccion</h2>
+                <h2>Findings, reporte y predicción</h2>
               </div>
             </div>
             <div className="research-output-grid">

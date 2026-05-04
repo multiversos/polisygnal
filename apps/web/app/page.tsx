@@ -1161,7 +1161,7 @@ function overviewBucketLabel(value?: string | null): string {
     watchlist: "Vigilancia",
     review_fallback: "Baja confianza",
     fallback_only: "Solo datos",
-    no_prediction: "Sin prediccion",
+    no_prediction: "Sin predicción",
   };
   return labels[value] ?? humanizeToken(value);
 }
@@ -1173,7 +1173,7 @@ function overviewScoringModeLabel(value?: string | null): string {
   const labels: Record<string, string> = {
     evidence_backed: "Con evidencia",
     fallback_only: "Solo snapshot",
-    no_prediction: "Sin prediccion",
+    no_prediction: "Sin predicción",
   };
   return labels[value] ?? humanizeToken(value);
 }
@@ -1202,12 +1202,12 @@ const marketOverviewBucketDefinitions: Array<
   {
     key: "data-only",
     title: "Solo datos",
-    description: "Mercados con precios y snapshots utiles, sin una senal accionable por ahora.",
+    description: "Mercados con precios y snapshots útiles, sin una señal accionable por ahora.",
     tone: "data-only",
   },
   {
     key: "no-prediction",
-    title: "Sin prediccion",
+    title: "Sin predicción",
     description: "Mercados pendientes de scoring; se muestran para contexto, no para priorizar.",
     tone: "neutral",
   },
@@ -1218,7 +1218,7 @@ const dashboardReviewFilters: Array<{
   label: string;
 }> = [
   { key: "all", label: "Todos" },
-  { key: "with-prediction", label: "Con prediccion" },
+  { key: "with-prediction", label: "Con predicción" },
   { key: "opportunity", label: "Solo oportunidades" },
   { key: "watchlist", label: "Solo vigilancia" },
   { key: "low-confidence", label: "Baja confianza" },
@@ -1374,7 +1374,7 @@ function getOverviewStatus(item: MarketOverviewItem): {
   const bucket = getOverviewBucketDefinition(bucketKey);
   if (bucketKey === "no-prediction") {
     return {
-      label: "Sin prediccion",
+      label: "Sin predicción",
       tone: "neutral",
       detail: "Pendiente de scoring",
     };
@@ -1785,11 +1785,11 @@ function FirstAnalysisReadinessPanel({
 }) {
   const readyItems = items.filter((item) => item.readiness_status === "ready").slice(0, 3);
   return (
-    <section className="panel first-analysis-panel" aria-label="Mercados listos para analisis">
+    <section className="panel first-analysis-panel" aria-label="Mercados listos para análisis">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Primeros analisis</p>
-          <h2>Mercados listos para analisis</h2>
+          <p className="eyebrow">Primeros análisis</p>
+          <h2>Mercados listos para análisis</h2>
           <p>
             PolySignal separa mercados listos de los que necesitan refresh controlado.
             La UI no ejecuta refresh, research ni predicciones.
@@ -1850,7 +1850,7 @@ function FirstAnalysisReadinessPanel({
                 {item.time_window_label ? (
                   <span className="reason-chip">{item.time_window_label}</span>
                 ) : null}
-                <span className="reason-chip">SI {formatMarketPercent(item.yes_price)}</span>
+                <span className="reason-chip">SÍ {formatMarketPercent(item.yes_price)}</span>
                 <span className="reason-chip">NO {formatMarketPercent(item.no_price)}</span>
                 <a className="text-link" href={`/markets/${item.market_id}`}>
                   Ver análisis
@@ -2483,7 +2483,7 @@ function MarketOverviewPanel({
           <strong>{loading ? "..." : filteredItems.length}</strong>
         </div>
         <div>
-          <span>Con prediccion</span>
+          <span>Con predicción</span>
           <strong>{loading ? "..." : withPrediction}</strong>
         </div>
         <div>
@@ -2491,7 +2491,7 @@ function MarketOverviewPanel({
           <strong>{loading ? "..." : sportCount}</strong>
         </div>
         <div>
-          <span>Ultima senal</span>
+          <span>Última señal</span>
           <strong>{loading ? "..." : formatDateTime(latestTimestamp ?? updatedAt)}</strong>
         </div>
         <div>
@@ -2775,35 +2775,35 @@ export default function DashboardPage() {
 
     const errors: string[] = [];
     if (health.status === "rejected") {
-      errors.push("La API no respondio en /health");
+      errors.push("La API no respondió en /health");
     }
     if (overview.status === "rejected") {
       errors.push("La vista principal no pudo leer overview de mercados");
     }
     if (candidates.status === "rejected") {
-      errors.push("Candidatos en preparacion");
+      errors.push("Candidatos en preparación");
     }
     if (upcomingSports.status === "rejected") {
       errors.push("Mercados próximos en preparación");
     }
     if (upcomingDataQuality.status === "rejected") {
-      errors.push("Calidad de datos en preparacion");
+      errors.push("Calidad de datos en preparación");
     }
     if (analysisReadiness.status === "rejected") {
-      errors.push("Readiness de analisis en preparacion");
+      errors.push("Readiness de análisis en preparación");
     }
     if (externalSignals.status === "rejected") {
       errors.push("Señales externas en preparación");
     }
 
     if (watchlist.status === "rejected") {
-      errors.push("Lista de seguimiento en preparacion");
+      errors.push("Lista de seguimiento en preparación");
     }
     if (investigationStatuses.status === "rejected") {
-      errors.push("Estado de investigacion en preparacion");
+      errors.push("Estado de investigación en preparación");
     }
     if (smartAlerts.status === "rejected") {
-      errors.push("Alertas inteligentes en preparacion");
+      errors.push("Alertas inteligentes en preparación");
     }
 
     setState({
@@ -2841,7 +2841,7 @@ export default function DashboardPage() {
       setState((current) => ({
         ...current,
         loading: false,
-        error: `La API no respondio desde ${API_HOST_LABEL}. ${message}`,
+        error: `La API no respondió desde ${API_HOST_LABEL}. ${message}`,
         updatedAt: new Date(),
       }));
     }
@@ -3081,7 +3081,7 @@ export default function DashboardPage() {
           <p>{state.overview ? "Endpoint disponible" : "Sin respuesta del endpoint"}</p>
         </article>
         <article className="metric-card">
-          <span>Con prediccion</span>
+          <span>Con predicción</span>
           <strong>{state.loading ? "..." : overviewItemsWithPrediction}</strong>
           <p>Mercados con score visible en overview</p>
         </article>

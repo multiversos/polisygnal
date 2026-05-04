@@ -155,9 +155,9 @@ export default function BacktestingPage() {
 
       {state.error ? (
         <ApiErrorState
-          message={`${state.error} Backtesting se activara cuando existan outcomes manuales y predicciones evaluables.`}
+          message={`${state.error} Backtesting se activará cuando existan outcomes manuales y predicciones evaluables.`}
           onRetry={() => void loadBacktesting()}
-          title="Modulo en preparacion"
+          title="Módulo en preparación"
         />
       ) : null}
 
@@ -206,7 +206,7 @@ export default function BacktestingPage() {
         {state.loading ? (
           <LoadingState copy="Cargando resumen..." />
         ) : !summary || summary.by_prediction_family.length === 0 ? (
-          <ComingSoonModule copy="No hay outcomes con predicciones guardadas todavia. Backtesting se activara cuando existan resultados manuales resueltos." />
+          <ComingSoonModule copy="No hay outcomes con predicciones guardadas todavía. Backtesting se activará cuando existan resultados manuales resueltos." />
         ) : (
           <div className="table-shell">
             <table>
@@ -251,7 +251,7 @@ export default function BacktestingPage() {
         {state.loading ? (
           <LoadingState copy="Cargando calibracion..." />
         ) : !summary ? (
-          <ComingSoonModule copy="No hay resumen de backtesting disponible todavia." />
+          <ComingSoonModule copy="No hay resumen de backtesting disponible todavía." />
         ) : (
           <div className="backtesting-bucket-grid">
             {summary.by_confidence_bucket.map((bucket) => (
@@ -285,7 +285,7 @@ export default function BacktestingPage() {
         {state.loading ? (
           <LoadingState copy="Cargando outcomes..." />
         ) : state.outcomes.length === 0 ? (
-          <EmptyState copy="No hay outcomes manuales todavia. PolySignal no inventa resultados; esta vista queda lista para cuando se registren resoluciones." />
+          <EmptyState copy="No hay outcomes manuales todavía. PolySignal no inventa resultados; esta vista queda lista para cuando se registren resoluciones." />
         ) : (
           <div className="backtesting-outcome-list">
             {state.outcomes.map((outcome) => (

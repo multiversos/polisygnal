@@ -148,7 +148,7 @@ function deriveAlertsFromOverview(overview: MarketOverviewAlertsResponse): Smart
     const question = item.market?.question ?? `Mercado #${marketId}`;
     const base = {
       market_id: marketId,
-      action_label: "Ver analisis",
+      action_label: "Ver análisis",
       action_url: `/markets/${marketId}`,
       data: {},
     };
@@ -158,7 +158,7 @@ function deriveAlertsFromOverview(overview: MarketOverviewAlertsResponse): Smart
         id: `derived-no-prediction-${marketId}`,
         type: "missing_data",
         severity: "critical",
-        title: "Mercado sin prediccion",
+        title: "Mercado sin predicción",
         description: question,
         reason: "No hay latest_prediction disponible para este mercado.",
         created_from: "market_overview",
@@ -275,7 +275,7 @@ export default function AlertsPage() {
         setCounts(buildDerivedAlertCounts(derivedAlerts));
         setGeneratedAt(new Date().toISOString());
         setSourceNote(
-          "Alertas derivadas desde /markets/overview porque el modulo de alertas dedicado aun no esta listo.",
+          "Alertas derivadas desde /markets/overview porque el módulo de alertas dedicado aún no está listo.",
         );
       } catch {
         setError("No se pudieron cargar alertas ni derivarlas desde market overview.");

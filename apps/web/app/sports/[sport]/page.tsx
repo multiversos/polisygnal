@@ -388,7 +388,7 @@ function SportMarketCard({
 
       <div className="sports-market-metrics">
         <div>
-          <span>Precio SI</span>
+          <span>Precio SÍ</span>
           <strong>{formatPercent(market.market_yes_price)}</strong>
         </div>
         <div>
@@ -409,7 +409,7 @@ function SportMarketCard({
 
       <div className="sports-market-actions">
         <Link className="analysis-link" href={`/markets/${market.market_id}`}>
-          Ver analisis
+          Ver análisis
         </Link>
       </div>
     </article>
@@ -543,7 +543,7 @@ export default function SportDetailPage() {
 
       {!sportIsEnabled && sportOption.id !== "all" ? (
         <section className="alert-panel" role="status">
-          <strong>{sportOption.statusLabel ?? "No disponible todavia"}</strong>
+          <strong>{sportOption.statusLabel ?? "No disponible todavía"}</strong>
           <span>
             {sportOption.disabledMessage ??
               "Este deporte estará disponible más adelante."}
@@ -617,7 +617,7 @@ export default function SportDetailPage() {
           <LoadingState copy={`Cargando mercados de ${sportOption.label}...`} />
         ) : state.items.length === 0 ? (
           <EmptyState
-            copy="El backend respondio correctamente con total_count=0 para este deporte. Ejecuta el pipeline limitado cuando quieras poblarlo; no se muestran datos inventados."
+            copy="El backend respondió correctamente con total_count=0 para este deporte. Ejecuta el pipeline limitado cuando quieras poblarlo; no se muestran datos inventados."
             title={`Todavía no hay mercados cargados para ${sportOption.label}.`}
           />
         ) : (

@@ -35,7 +35,7 @@ export type MarketDecisionPayload = {
 
 export const MARKET_DECISION_LABELS: Record<MarketDecision, string> = {
   monitor: "Seguir observando",
-  investigate_more: "Investigar mas",
+  investigate_more: "Investigar más",
   ignore: "Ignorar",
   possible_opportunity: "Posible oportunidad",
   dismissed: "Descartado",
