@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
+import { fetchApiJson } from "../lib/api";
 import {
   DECISION_CONFIDENCE_LABELS,
   MARKET_DECISION_LABELS,
@@ -12,6 +13,40 @@ import {
   type MarketDecision,
   type MarketDecisionItem,
 } from "../lib/marketDecisions";
+
+type MarketOverviewDecisionItem = {
+  priority_bucket?: string | null;
+  market?: {
+    id?: number | null;
+    question?: string | null;
+    sport_type?: string | null;
+    market_type?: string | null;
+  } | null;
+  latest_snapshot?: {
+    yes_price?: string | number | null;
+    no_price?: string | number | null;
+  } | null;
+  latest_prediction?: {
+    action_score?: string | number | null;
+    confidence_score?: string | number | null;
+  } | null;
+};
+
+type MarketOverviewDecisionResponse = {
+  items?: MarketOverviewDecisionItem[];
+};
+
+type DerivedDecisionCandidate = {
+  market_id: number;
+  question: string;
+  sport?: string | null;
+  market_shape?: string | null;
+  yes_price?: string | number | null;
+  no_price?: string | number | null;
+  action_score?: string | number | null;
+  confidence_score?: string | number | null;
+  priority_bucket?: string | null;
+};
 
 const decisionOptions: Array<{ value: MarketDecision | ""; label: string }> = [
   { value: "", label: "Todas" },
@@ -46,6 +81,18 @@ function formatDate(value?: string | null): string {
   }).format(date);
 }
 
+function formatPercent(value?: string | number | null): string {
+  if (value === null || value === undefined) {
+    return "N/D";
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "N/D";
+  }
+  const percent = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+  return `${percent.toFixed(1)}%`;
+}
+
 function decisionLabel(value: MarketDecision): string {
   return MARKET_DECISION_LABELS[value] ?? value.replaceAll("_", " ");
 }
@@ -54,8 +101,29 @@ function confidenceLabel(value?: DecisionConfidenceLabel | null): string {
   return value ? DECISION_CONFIDENCE_LABELS[value] ?? value : "Sin confianza";
 }
 
+async function fetchDecisionCandidates(): Promise<DerivedDecisionCandidate[]> {
+  const response = await fetchApiJson<MarketOverviewDecisionResponse>(
+    "/markets/overview?limit=20",
+  );
+  return (response.items ?? [])
+    .filter((item) => item.market?.id)
+    .map((item) => ({
+      market_id: item.market?.id ?? 0,
+      question: item.market?.question ?? "Mercado sin titulo",
+      sport: item.market?.sport_type,
+      market_shape: item.market?.market_type,
+      yes_price: item.latest_snapshot?.yes_price,
+      no_price: item.latest_snapshot?.no_price,
+      action_score: item.latest_prediction?.action_score,
+      confidence_score: item.latest_prediction?.confidence_score,
+      priority_bucket: item.priority_bucket,
+    }))
+    .slice(0, 6);
+}
+
 export default function DecisionsPage() {
   const [decisions, setDecisions] = useState<MarketDecisionItem[]>([]);
+  const [candidates, setCandidates] = useState<DerivedDecisionCandidate[]>([]);
   const [decisionFilter, setDecisionFilter] = useState<MarketDecision | "">("");
   const [confidenceFilter, setConfidenceFilter] = useState<DecisionConfidenceLabel | "">("");
   const [loading, setLoading] = useState(true);
@@ -65,7 +133,19 @@ export default function DecisionsPage() {
     setLoading(true);
     setError(null);
     try {
-      setDecisions(await fetchAllMarketDecisions(200));
+      const [decisionsResult, candidatesResult] = await Promise.allSettled([
+        fetchAllMarketDecisions(200),
+        fetchDecisionCandidates(),
+      ]);
+      if (decisionsResult.status === "fulfilled") {
+        setDecisions(decisionsResult.value);
+      } else {
+        setDecisions([]);
+        setError("Las decisiones humanas aun no estan disponibles.");
+      }
+      if (candidatesResult.status === "fulfilled") {
+        setCandidates(candidatesResult.value);
+      }
     } catch {
       setError("No se pudieron cargar las decisiones humanas.");
     } finally {
@@ -195,11 +275,41 @@ export default function DecisionsPage() {
           <div className="empty-state">Cargando decisiones...</div>
         ) : visibleDecisions.length === 0 ? (
           <div className="empty-state">
-            <strong>No hay decisiones humanas todavia.</strong>
+            <strong>Sin decisiones registradas.</strong>
             <p>
-              El dashboard ya muestra mercados reales; esta vista se llenara
-              cuando marques decisiones desde el analisis de un mercado.
+              Las decisiones humanas se activaran en un sprint posterior. Mientras
+              tanto, puedes usar estos candidatos derivados para decidir que
+              mercados revisar primero; no se guarda ninguna decision real.
             </p>
+            {candidates.length > 0 ? (
+              <div className="decision-dashboard-list">
+                {candidates.map((candidate) => (
+                  <article className="decision-dashboard-card" key={candidate.market_id}>
+                    <div className="decision-dashboard-header">
+                      <span className="badge">Candidato</span>
+                      <span className="badge muted">
+                        {candidate.priority_bucket ?? "market overview"}
+                      </span>
+                      <span className="badge">#{candidate.market_id}</span>
+                    </div>
+                    <h3>{candidate.question}</h3>
+                    <p>
+                      Score {formatPercent(candidate.action_score)} - Confianza{" "}
+                      {formatPercent(candidate.confidence_score)} - SI{" "}
+                      {formatPercent(candidate.yes_price)} / NO{" "}
+                      {formatPercent(candidate.no_price)}
+                    </p>
+                    <p className="section-note">
+                      {candidate.sport ?? "Sin deporte"} -{" "}
+                      {candidate.market_shape ?? "Sin shape"}
+                    </p>
+                    <Link className="analysis-link" href={`/markets/${candidate.market_id}`}>
+                      Revisar mercado
+                    </Link>
+                  </article>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="decision-dashboard-list">
