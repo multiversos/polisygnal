@@ -3,11 +3,37 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
+import { fetchApiJson } from "../lib/api";
 import {
   fetchSmartAlerts,
   type SmartAlert,
   type SmartAlertSeverity,
 } from "../lib/smartAlerts";
+
+type MarketOverviewAlertItem = {
+  priority_bucket?: string | null;
+  scoring_mode?: string | null;
+  evidence_summary?: {
+    evidence_count?: number | null;
+  } | null;
+  market?: {
+    id?: number | null;
+    question?: string | null;
+    sport_type?: string | null;
+    close_time?: string | null;
+    end_date?: string | null;
+  } | null;
+  latest_snapshot?: {
+    captured_at?: string | null;
+  } | null;
+  latest_prediction?: {
+    confidence_score?: string | number | null;
+  } | null;
+};
+
+type MarketOverviewAlertsResponse = {
+  items?: MarketOverviewAlertItem[];
+};
 
 const severityLabels: Record<SmartAlertSeverity, string> = {
   info: "Info",
@@ -75,6 +101,135 @@ function buildActionHref(alert: SmartAlert): string | null {
   return null;
 }
 
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function hoursUntil(value?: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return (date.getTime() - Date.now()) / 36e5;
+}
+
+async function fetchMarketOverviewAlerts(sport: string): Promise<MarketOverviewAlertsResponse> {
+  const params = new URLSearchParams({ limit: "50" });
+  if (sport) {
+    params.set("sport_type", sport);
+  }
+  return fetchApiJson<MarketOverviewAlertsResponse>(`/markets/overview?${params.toString()}`);
+}
+
+function buildDerivedAlertCounts(alerts: SmartAlert[]): Record<string, number> {
+  return alerts.reduce<Record<string, number>>((counts, alert) => {
+    counts[alert.severity] = (counts[alert.severity] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function deriveAlertsFromOverview(overview: MarketOverviewAlertsResponse): SmartAlert[] {
+  const alerts: SmartAlert[] = [];
+  for (const item of overview.items ?? []) {
+    const marketId = item.market?.id;
+    if (!marketId) {
+      continue;
+    }
+    const question = item.market?.question ?? `Mercado #${marketId}`;
+    const base = {
+      market_id: marketId,
+      action_label: "Ver analisis",
+      action_url: `/markets/${marketId}`,
+      data: {},
+    };
+    if (!item.latest_prediction) {
+      alerts.push({
+        ...base,
+        id: `derived-no-prediction-${marketId}`,
+        type: "missing_data",
+        severity: "critical",
+        title: "Mercado sin prediccion",
+        description: question,
+        reason: "No hay latest_prediction disponible para este mercado.",
+        created_from: "market_overview",
+      });
+    }
+    if (!item.latest_snapshot) {
+      alerts.push({
+        ...base,
+        id: `derived-no-snapshot-${marketId}`,
+        type: "missing_data",
+        severity: "warning",
+        title: "Mercado sin snapshot",
+        description: question,
+        reason: "No hay latest_snapshot disponible para revisar precios.",
+        created_from: "market_overview",
+      });
+    }
+    if (item.scoring_mode === "fallback_only") {
+      alerts.push({
+        ...base,
+        id: `derived-fallback-${marketId}`,
+        type: "low_data_quality",
+        severity: "warning",
+        title: "Score solo informativo",
+        description: question,
+        reason: "El scoring_mode es fallback_only.",
+        created_from: "market_overview",
+      });
+    }
+    const confidence = toNumber(item.latest_prediction?.confidence_score);
+    if (confidence !== null && confidence < 0.35) {
+      alerts.push({
+        ...base,
+        id: `derived-low-confidence-${marketId}`,
+        type: "low_data_quality",
+        severity: "warning",
+        title: "Baja confianza",
+        description: question,
+        reason: "La confianza del modelo esta por debajo del umbral conservador.",
+        created_from: "market_overview",
+      });
+    }
+    const closeHours = hoursUntil(item.market?.close_time ?? item.market?.end_date);
+    if (closeHours !== null && closeHours >= 0 && closeHours <= 48) {
+      alerts.push({
+        ...base,
+        id: `derived-close-${marketId}`,
+        type: "upcoming_close_soon",
+        severity: "info",
+        title: "Cierre proximo",
+        description: question,
+        reason: `Cierra en ${closeHours.toFixed(1)} horas.`,
+        created_from: "market_overview",
+      });
+    }
+    if ((item.evidence_summary?.evidence_count ?? 0) === 0) {
+      alerts.push({
+        ...base,
+        id: `derived-no-evidence-${marketId}`,
+        type: "no_research",
+        severity: "info",
+        title: "Sin evidencia externa guardada",
+        description: question,
+        reason: "La evidencia externa se agregara en un sprint posterior.",
+        created_from: "market_overview",
+      });
+    }
+  }
+  return alerts.slice(0, 50);
+}
+
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<SmartAlert[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -84,21 +239,47 @@ export default function AlertsPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sourceNote, setSourceNote] = useState<string | null>(null);
 
   const loadAlerts = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setSourceNote(null);
     try {
       const response = await fetchSmartAlerts({
         limit: 50,
         severity: severity || null,
         sport: sport || null,
       });
-      setAlerts(response.alerts);
-      setCounts(response.counts);
-      setGeneratedAt(response.generated_at);
+      if (response.alerts.length > 0) {
+        setAlerts(response.alerts);
+        setCounts(response.counts);
+        setGeneratedAt(response.generated_at);
+      } else {
+        const overview = await fetchMarketOverviewAlerts(sport);
+        const derivedAlerts = deriveAlertsFromOverview(overview).filter((alert) =>
+          severity ? alert.severity === severity : true,
+        );
+        setAlerts(derivedAlerts);
+        setCounts(buildDerivedAlertCounts(derivedAlerts));
+        setGeneratedAt(new Date().toISOString());
+        setSourceNote("Alertas derivadas desde /markets/overview porque no hay alertas inteligentes guardadas.");
+      }
     } catch {
-      setError("No se pudieron cargar las alertas inteligentes.");
+      try {
+        const overview = await fetchMarketOverviewAlerts(sport);
+        const derivedAlerts = deriveAlertsFromOverview(overview).filter((alert) =>
+          severity ? alert.severity === severity : true,
+        );
+        setAlerts(derivedAlerts);
+        setCounts(buildDerivedAlertCounts(derivedAlerts));
+        setGeneratedAt(new Date().toISOString());
+        setSourceNote(
+          "Alertas derivadas desde /markets/overview porque el modulo de alertas dedicado aun no esta listo.",
+        );
+      } catch {
+        setError("No se pudieron cargar alertas ni derivarlas desde market overview.");
+      }
     } finally {
       setLoading(false);
     }
@@ -213,6 +394,13 @@ export default function AlertsPage() {
         <section className="alert-panel" role="status">
           <strong>Alertas no disponibles</strong>
           <span>{error}</span>
+        </section>
+      ) : null}
+
+      {sourceNote ? (
+        <section className="safety-strip">
+          <strong>Datos existentes:</strong>
+          <span>{sourceNote} No ejecuta research, discovery, scoring ni trading.</span>
         </section>
       ) : null}
 
