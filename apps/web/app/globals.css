@@ -789,6 +789,30 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.market-overview-card-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.market-overview-card-readout strong {
+  color: var(--foreground);
+  font-size: 0.9rem;
+}
+
+.market-overview-card-readout span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 .market-overview-price-block {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -801,6 +825,16 @@ h2 {
 
 .market-overview-metrics {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.market-overview-metric.primary {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.market-overview-metric.primary strong,
+.market-price-row strong {
+  font-size: 1.05rem;
 }
 
 .market-overview-foot {

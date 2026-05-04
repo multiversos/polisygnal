@@ -2646,20 +2646,26 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
   const confidence = formatMarketPercent(prediction?.confidence_score);
   const actionScore = formatMarketPercent(prediction?.action_score);
   const edge = formatPercentDelta(prediction?.edge_signed);
+  const sportLabel = formatSportLabel(market.sport_type);
+  const marketTypeLabel = formatMarketShapeLabel(market.market_type);
   const barWidth = getProbabilityBarWidth(
     prediction?.yes_probability ?? snapshot.yes_price,
     prediction?.no_probability ?? snapshot.no_price,
   );
   const closeTime = market.close_time ?? market.end_date ?? null;
+  const closeLabel = formatDateTime(closeTime);
+  const snapshotLabel = formatDateTime(snapshot.captured_at);
+  const liquidityLabel = formatMarketMetric(snapshot.liquidity);
+  const evidenceCount = item.evidence_summary?.evidence_count ?? 0;
 
   return (
     <article className={`market-overview-card ${status.tone}`}>
       <div className="market-overview-card-header">
         <div className="candidate-main-copy">
           <div className="badge-row">
-            <span className="badge muted">#{item.priority_rank ?? marketId ?? "N/D"}</span>
-            <span className="badge">{formatSportLabel(market.sport_type)}</span>
-            <span className="badge muted">{formatMarketShapeLabel(market.market_type)}</span>
+            <span className="badge muted">Prioridad #{item.priority_rank ?? marketId ?? "N/D"}</span>
+            <span className="badge">{sportLabel}</span>
+            <span className="badge muted">{marketTypeLabel}</span>
           </div>
           <h3>{title}</h3>
           {originalTitle ? <p className="original-market-title">{originalTitle}</p> : null}
@@ -2667,13 +2673,20 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
         <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
       </div>
 
+      <div className="market-overview-card-readout">
+        <strong>{status.detail}</strong>
+        <span>
+          Cierre: {closeLabel} | Snapshot: {snapshotLabel}
+        </span>
+      </div>
+
       <div className="market-overview-price-block">
         <div className="market-price-row">
-          <span>YES</span>
+          <span>Precio YES</span>
           <strong>{yesPrice === "--" ? "Sin dato" : yesPrice}</strong>
         </div>
         <div className="market-price-row">
-          <span>NO</span>
+          <span>Precio NO</span>
           <strong>{noPrice === "--" ? "Sin dato" : noPrice}</strong>
         </div>
         <div className={`probability-bar ${barWidth === null ? "neutral" : ""}`}>
@@ -2686,19 +2699,19 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
       </div>
 
       <div className="market-overview-metrics">
-        <div>
-          <span>Modelo</span>
+        <div className="market-overview-metric primary">
+          <span>Probabilidad modelo</span>
           <strong>{modelProbability === "--" ? "No calculado" : modelProbability}</strong>
         </div>
-        <div>
-          <span>Score</span>
+        <div className="market-overview-metric primary">
+          <span>Score revision</span>
           <strong>{actionScore === "--" ? "Pendiente" : actionScore}</strong>
         </div>
-        <div>
+        <div className="market-overview-metric">
           <span>Confianza</span>
           <strong>{confidence === "--" ? "Pendiente" : confidence}</strong>
         </div>
-        <div>
+        <div className="market-overview-metric">
           <span>Edge</span>
           <strong>{edge === "N/D" ? "Sin dato" : edge}</strong>
         </div>
@@ -2725,8 +2738,7 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
 
       <div className="market-overview-actions">
         <span className="quiet-text">
-          Evidencia: {item.evidence_summary?.evidence_count ?? 0} | Liquidez{" "}
-          {formatMarketMetric(snapshot.liquidity)}
+          Evidencia: {evidenceCount} | Liquidez {liquidityLabel === "--" ? "Sin dato" : liquidityLabel}
         </span>
         {marketId ? (
           <a className="analysis-link" href={`/markets/${marketId}`}>
