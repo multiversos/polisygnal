@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
-import { friendlyApiError } from "../lib/api";
+import { primarySportOptions } from "../components/SportsSelectorBar";
+import { fetchApiJson, friendlyApiError } from "../lib/api";
 import {
   fetchAnalysisReadiness,
   fetchDataHealthOverview,
@@ -19,6 +20,22 @@ import {
   type RefreshRuns,
   type SnapshotGaps,
 } from "../lib/dataHealth";
+
+type MarketOverviewHealthItem = {
+  scoring_mode?: string | null;
+  market?: {
+    sport_type?: string | null;
+  } | null;
+  latest_snapshot?: {
+    captured_at?: string | null;
+  } | null;
+  latest_prediction?: unknown | null;
+};
+
+type MarketOverviewHealthResponse = {
+  total_count?: number;
+  items?: MarketOverviewHealthItem[];
+};
 
 const sportLabels: Record<string, string> = {
   nba: "Baloncesto",
@@ -144,11 +161,16 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
   });
 }
 
+function fetchMarketOverviewHealth(): Promise<MarketOverviewHealthResponse> {
+  return fetchApiJson<MarketOverviewHealthResponse>("/markets/overview?limit=100");
+}
+
 function isClosingTooSoon(label?: string | null): boolean {
   return label === "Menos de 1h" || label === "1-6h";
 }
 
 export default function DataHealthPage() {
+  const [marketOverview, setMarketOverview] = useState<MarketOverviewHealthResponse | null>(null);
   const [overview, setOverview] = useState<DataHealthOverview | null>(null);
   const [analysisReadiness, setAnalysisReadiness] = useState<AnalysisReadiness | null>(null);
   const [snapshotGaps, setSnapshotGaps] = useState<SnapshotGaps | null>(null);
@@ -164,6 +186,7 @@ export default function DataHealthPage() {
     setError(null);
     try {
       const results = await Promise.allSettled([
+        withTimeout(fetchMarketOverviewHealth(), 10000, "market-overview"),
         withTimeout(fetchDataHealthOverview(), 10000, "overview"),
           withTimeout(
             fetchAnalysisReadiness({ days: 7, limit: 12, min_hours_to_close: 24 }),
@@ -180,6 +203,7 @@ export default function DataHealthPage() {
           ),
       ]);
       const [
+        marketOverviewResult,
         overviewResult,
         analysisReadinessResult,
         snapshotGapsResult,
@@ -188,6 +212,9 @@ export default function DataHealthPage() {
         liveDiscoveryResult,
       ] = results;
 
+      if (marketOverviewResult.status === "fulfilled") {
+        setMarketOverview(marketOverviewResult.value);
+      }
       if (overviewResult.status === "fulfilled") {
         setOverview(overviewResult.value);
       }
@@ -231,6 +258,32 @@ export default function DataHealthPage() {
   };
   const readyAnalysisItems =
     analysisReadiness?.items.filter((item) => item.readiness_status === "ready").slice(0, 6) ?? [];
+  const marketOverviewItems = marketOverview?.items ?? [];
+  const overviewTotalMarkets = marketOverview?.total_count ?? marketOverviewItems.length;
+  const overviewWithPredictions = marketOverviewItems.filter((item) =>
+    Boolean(item.latest_prediction),
+  ).length;
+  const overviewWithSnapshots = marketOverviewItems.filter((item) =>
+    Boolean(item.latest_snapshot),
+  ).length;
+  const overviewFallbackOnly = marketOverviewItems.filter(
+    (item) => item.scoring_mode === "fallback_only",
+  ).length;
+  const sportsWithData = new Set(
+    marketOverviewItems
+      .map((item) => item.market?.sport_type)
+      .filter((sport): sport is string => Boolean(sport)),
+  );
+  const primarySportsWithData = primarySportOptions.filter((sport) =>
+    sportsWithData.has(sport.apiValue),
+  );
+  const primarySportsWithoutData = primarySportOptions.filter(
+    (sport) => !sportsWithData.has(sport.apiValue),
+  );
+  const latestOverviewSnapshot = marketOverviewItems
+    .map((item) => item.latest_snapshot?.captured_at)
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
 
   return (
     <main className="dashboard-shell data-health-page">
@@ -267,6 +320,63 @@ export default function DataHealthPage() {
           <span>{error}</span>
         </section>
       ) : null}
+
+      <section className="dashboard-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Market overview</p>
+            <h2>Resumen real del dashboard</h2>
+            <p className="section-note">
+              Fuente: /markets/overview. Este bloque solo lee datos ya cargados;
+              no ejecuta discovery, imports, snapshots ni scoring.
+            </p>
+          </div>
+          <span className="badge muted">
+            {loading ? "Cargando" : `${overviewTotalMarkets} mercados`}
+          </span>
+        </div>
+
+        <div className="metric-grid compact-metrics">
+          <article className="metric-card">
+            <span>Markets visibles</span>
+            <strong>{loading ? "..." : overviewTotalMarkets}</strong>
+            <p>Devueltos por /markets/overview</p>
+          </article>
+          <article className="metric-card">
+            <span>Con prediccion</span>
+            <strong>{loading ? "..." : overviewWithPredictions}</strong>
+            <p>Items con latest_prediction</p>
+          </article>
+          <article className="metric-card">
+            <span>Con snapshot</span>
+            <strong>{loading ? "..." : overviewWithSnapshots}</strong>
+            <p>Items con latest_snapshot</p>
+          </article>
+          <article className="metric-card">
+            <span>Fallback only</span>
+            <strong>{loading ? "..." : overviewFallbackOnly}</strong>
+            <p>Score informativo o datos parciales</p>
+          </article>
+          <article className="metric-card">
+            <span>Deportes con datos</span>
+            <strong>{loading ? "..." : primarySportsWithData.length}</strong>
+            <p>{primarySportsWithData.map((sport) => sport.label).join(", ") || "Ninguno"}</p>
+          </article>
+          <article className="metric-card">
+            <span>Sin datos todavia</span>
+            <strong>{loading ? "..." : primarySportsWithoutData.length}</strong>
+            <p>
+              {primarySportsWithoutData.map((sport) => sport.label).join(", ") ||
+                "Todos los principales tienen datos"}
+            </p>
+          </article>
+          <article className="metric-card">
+            <span>Ultima actualizacion</span>
+            <strong>{loading ? "..." : formatDate(latestOverviewSnapshot)}</strong>
+            <p>Snapshot mas reciente en overview</p>
+          </article>
+        </div>
+      </section>
 
       <section className="metric-grid" aria-label="Resumen de salud de datos">
         <article className="metric-card">
