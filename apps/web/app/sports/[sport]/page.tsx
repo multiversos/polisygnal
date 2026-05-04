@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  ApiErrorState,
+  ComingSoonModule,
+  EmptyState,
+  LoadingState,
+} from "../../components/DataState";
 import { MainNavigation } from "../../components/MainNavigation";
 import {
   SportsSelectorBar,
@@ -546,10 +552,11 @@ export default function SportDetailPage() {
       ) : null}
 
       {state.error ? (
-        <section className="alert-panel" role="status">
-          <strong>Datos no disponibles</strong>
-          <span>{state.error}</span>
-        </section>
+        <ApiErrorState
+          message={state.error}
+          onRetry={() => void loadSport()}
+          title="Datos no disponibles"
+        />
       ) : null}
 
       <section className="data-quality-summary" aria-label="Calidad de datos">
@@ -602,24 +609,17 @@ export default function SportDetailPage() {
         </div>
 
         {!sportIsEnabled ? (
-          <div className="empty-state">
-            <strong>{sportOption.label} esta en preparacion.</strong>
-            <p>
-              La categoria se muestra como roadmap, pero no carga mercados,
-              discovery, scoring ni datos remotos todavia.
-            </p>
-          </div>
+          <ComingSoonModule
+            copy="La categoria se muestra como roadmap, pero no carga mercados, discovery, scoring ni datos remotos todavia."
+            title={`${sportOption.label} esta en preparacion.`}
+          />
         ) : state.loading ? (
-          <div className="empty-state">Cargando mercados de {sportOption.label}...</div>
+          <LoadingState copy={`Cargando mercados de ${sportOption.label}...`} />
         ) : state.items.length === 0 ? (
-          <div className="empty-state">
-            <strong>Todavia no hay mercados cargados para {sportOption.label}.</strong>
-            <p>
-              El backend respondio correctamente con total_count=0 para este
-              deporte. Ejecuta el pipeline limitado cuando quieras poblarlo; no
-              se muestran datos inventados.
-            </p>
-          </div>
+          <EmptyState
+            copy="El backend respondio correctamente con total_count=0 para este deporte. Ejecuta el pipeline limitado cuando quieras poblarlo; no se muestran datos inventados."
+            title={`Todavia no hay mercados cargados para ${sportOption.label}.`}
+          />
         ) : (
           <div className="sports-market-grid">
             {state.items.map((market) => (
