@@ -121,6 +121,37 @@ type DailyBriefing = {
   price_movers: BriefingPriceMover[];
 };
 
+type MarketOverviewBriefingItem = {
+  priority_bucket?: string | null;
+  priority_rank?: number | null;
+  scoring_mode?: string | null;
+  market?: {
+    id?: number | null;
+    question?: string | null;
+    event_title?: string | null;
+    sport_type?: string | null;
+    market_type?: string | null;
+    close_time?: string | null;
+    end_date?: string | null;
+  } | null;
+  latest_snapshot?: {
+    yes_price?: string | number | null;
+    no_price?: string | number | null;
+    liquidity?: string | number | null;
+    volume?: string | number | null;
+    captured_at?: string | null;
+  } | null;
+  latest_prediction?: {
+    action_score?: string | number | null;
+    confidence_score?: string | number | null;
+  } | null;
+};
+
+type MarketOverviewBriefingResponse = {
+  total_count?: number;
+  items?: MarketOverviewBriefingItem[];
+};
+
 type DailyBriefingMarkdownResponse = {
   markdown: string;
 };
@@ -317,6 +348,125 @@ async function fetchDailyBriefing(params: URLSearchParams): Promise<DailyBriefin
   return fetchApiJson<DailyBriefing>(`/briefing/daily?${params.toString()}`);
 }
 
+function buildMarketOverviewParams(sport: string): URLSearchParams {
+  const params = new URLSearchParams({ limit: "20" });
+  const apiSport = getSportApiFilter(sport);
+  if (apiSport) {
+    params.set("sport_type", apiSport);
+  }
+  return params;
+}
+
+function overviewItemScore(item: MarketOverviewBriefingItem): number {
+  return toNumber(item.latest_prediction?.action_score) ?? 0;
+}
+
+function overviewItemConfidence(item: MarketOverviewBriefingItem): number | null {
+  return toNumber(item.latest_prediction?.confidence_score);
+}
+
+function overviewWarnings(item: MarketOverviewBriefingItem): string[] {
+  const warnings = new Set<string>();
+  if (item.priority_bucket) {
+    warnings.add(item.priority_bucket);
+  }
+  if (item.scoring_mode) {
+    warnings.add(item.scoring_mode);
+  }
+  if (!item.latest_prediction) {
+    warnings.add("sin_prediccion");
+  }
+  const confidence = overviewItemConfidence(item);
+  if (confidence !== null && confidence < 0.35) {
+    warnings.add("baja_confianza");
+  }
+  return Array.from(warnings);
+}
+
+function buildDerivedBriefing(
+  overview: MarketOverviewBriefingResponse,
+  days: number,
+  sport: string,
+): DailyBriefing {
+  const items = (overview.items ?? [])
+    .filter((item) => item.market?.id)
+    .sort((a, b) => overviewItemScore(b) - overviewItemScore(a));
+  const upcoming = items.map((item) => {
+    const market = item.market;
+    const snapshot = item.latest_snapshot ?? {};
+    const hasSnapshot = Boolean(item.latest_snapshot);
+    return {
+      market_id: market?.id ?? 0,
+      question: market?.question ?? "Mercado sin titulo",
+      event_title: market?.event_title,
+      sport: market?.sport_type,
+      market_shape: market?.market_type,
+      close_time: market?.close_time ?? market?.end_date ?? null,
+      event_time: market?.close_time ?? market?.end_date ?? null,
+      market_yes_price: snapshot.yes_price,
+      market_no_price: snapshot.no_price,
+      liquidity: snapshot.liquidity,
+      volume: snapshot.volume,
+      urgency_score: item.latest_prediction?.action_score ?? item.priority_rank ?? null,
+      warnings: overviewWarnings(item),
+      freshness: {
+        freshness_status: hasSnapshot ? "fresh" : "incomplete",
+        reasons: hasSnapshot ? [] : ["missing_snapshot"],
+        latest_snapshot_at: snapshot.captured_at,
+        close_time: market?.close_time ?? market?.end_date ?? null,
+        age_hours: null,
+        recommended_action: hasSnapshot ? "ok" : "needs_snapshot",
+      },
+    } satisfies BriefingUpcomingMarket;
+  });
+  const gaps = items
+    .filter((item) => {
+      const confidence = overviewItemConfidence(item);
+      return !item.latest_prediction || item.scoring_mode === "fallback_only" ||
+        (confidence !== null && confidence < 0.35);
+    })
+    .slice(0, 8)
+    .map((item) => ({
+      market_id: item.market?.id ?? 0,
+      question: item.market?.question ?? "Mercado sin titulo",
+      sport: item.market?.sport_type,
+      market_shape: item.market?.market_type,
+      source_section: "market_overview",
+      reasons: overviewWarnings(item),
+    }));
+
+  return {
+    summary: {
+      generated_at: new Date().toISOString(),
+      sport: getSportApiFilter(sport),
+      days,
+      limit: 20,
+      counts: {
+        upcoming_count: upcoming.length,
+        watchlist_count: 0,
+        unmatched_external_signals_count: 0,
+        candidates_count: overview.total_count ?? upcoming.length,
+        research_gaps_count: gaps.length,
+        price_movers_count: 0,
+      },
+      warnings: ["derivado_desde_market_overview"],
+    },
+    upcoming_markets: upcoming,
+    watchlist: [],
+    unmatched_external_signals: [],
+    research_gaps: gaps,
+    price_movers: [],
+  };
+}
+
+async function fetchDerivedBriefing(days: number, sport: string): Promise<DailyBriefing> {
+  const params = buildMarketOverviewParams(sport);
+  const overview = await fetchApiJson<MarketOverviewBriefingResponse>(
+    `/markets/overview?${params.toString()}`,
+  );
+  return buildDerivedBriefing(overview, days, sport);
+}
+
 async function fetchDailyBriefingMarkdown(params: URLSearchParams): Promise<string> {
   const payload = await fetchApiJson<DailyBriefingMarkdownResponse>(
     `/briefing/daily/markdown?${params.toString()}`,
@@ -344,6 +494,7 @@ export default function DailyBriefingPage() {
   const [smartAlerts, setSmartAlerts] = useState<SmartAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sourceNote, setSourceNote] = useState<string | null>(null);
   const [markdownCopyStatus, setMarkdownCopyStatus] = useState<MarkdownCopyStatus>("idle");
   const [markdownFallback, setMarkdownFallback] = useState<string | null>(null);
   const handleSelectSport = useCallback((nextSport: string) => {
@@ -356,6 +507,7 @@ export default function DailyBriefingPage() {
   const loadBriefing = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setSourceNote(null);
     setMarkdownFallback(null);
     const params = buildDailyBriefingParams(days, sport);
     const alertSport = getSportApiFilter(sport);
@@ -364,10 +516,15 @@ export default function DailyBriefingPage() {
         fetchDailyBriefing(params),
         fetchSmartAlerts({ limit: 5, sport: alertSport }),
       ]);
-      if (briefingResult.status === "rejected") {
-        throw briefingResult.reason;
+      if (briefingResult.status === "fulfilled") {
+        setBriefing(briefingResult.value);
+      } else {
+        const derivedBriefing = await fetchDerivedBriefing(days, sport);
+        setBriefing(derivedBriefing);
+        setSourceNote(
+          "Briefing derivado desde /markets/overview porque el modulo de briefing dedicado aun no esta listo.",
+        );
       }
-      setBriefing(briefingResult.value);
       setSmartAlerts(alertsResult.status === "fulfilled" ? alertsResult.value.alerts : []);
     } catch (error) {
       setError(friendlyApiError(error, "el briefing diario"));
@@ -473,6 +630,13 @@ export default function DailyBriefingPage() {
       </section>
 
       {error ? <div className="alert-panel error">{error}</div> : null}
+
+      {sourceNote ? (
+        <section className="safety-strip briefing-focus-note">
+          <strong>Datos existentes:</strong>
+          <span>{sourceNote} No ejecuta research automatico ni crea predicciones.</span>
+        </section>
+      ) : null}
 
       {markdownFallback ? (
         <section className="panel briefing-markdown-fallback" aria-label="Markdown del briefing">
