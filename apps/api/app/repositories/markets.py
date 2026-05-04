@@ -13,7 +13,7 @@ def list_markets(db: Session) -> list[Market]:
         .options(joinedload(Market.event), selectinload(Market.snapshots))
         .order_by(Market.created_at.desc())
     )
-    return list(db.scalars(stmt).all())
+    return list(db.scalars(stmt).unique().all())
 
 
 def get_market_by_id(db: Session, market_id: int) -> Market | None:
