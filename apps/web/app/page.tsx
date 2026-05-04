@@ -101,6 +101,21 @@ type MarketOverviewItem = {
   evidence_summary?: MarketOverviewEvidenceSummary | null;
 };
 
+type MarketOverviewBucketKey =
+  | "opportunity"
+  | "watchlist"
+  | "low-confidence"
+  | "data-only"
+  | "no-prediction";
+
+type MarketOverviewBucketSection = {
+  key: MarketOverviewBucketKey;
+  title: string;
+  description: string;
+  tone: string;
+  items: MarketOverviewItem[];
+};
+
 type DashboardMetaResponse = {
   artifact_available?: boolean;
   dashboard_available?: boolean;
@@ -1224,47 +1239,206 @@ function overviewScoringModeLabel(value?: string | null): string {
   return labels[value] ?? humanizeToken(value);
 }
 
+const marketOverviewBucketDefinitions: Array<
+  Omit<MarketOverviewBucketSection, "items">
+> = [
+  {
+    key: "opportunity",
+    title: "Mejores oportunidades",
+    description: "Senales con mejor combinacion de score, confianza y precio para revisar primero.",
+    tone: "opportunity",
+  },
+  {
+    key: "watchlist",
+    title: "Watchlist",
+    description: "Mercados con score medio, edge interesante o movimiento que merece seguimiento.",
+    tone: "watchlist",
+  },
+  {
+    key: "low-confidence",
+    title: "Baja confianza",
+    description: "Hay prediccion, pero los datos disponibles todavia no sostienen una lectura fuerte.",
+    tone: "low-confidence",
+  },
+  {
+    key: "data-only",
+    title: "Solo datos",
+    description: "Mercados con precios y snapshots utiles, sin una senal accionable por ahora.",
+    tone: "data-only",
+  },
+  {
+    key: "no-prediction",
+    title: "Sin prediccion",
+    description: "Mercados pendientes de scoring; se muestran para contexto, no para priorizar.",
+    tone: "neutral",
+  },
+];
+
+function getOverviewScoreValue(item: MarketOverviewItem): number | null {
+  return normalizeProbability(item.latest_prediction?.action_score);
+}
+
+function getOverviewConfidenceValue(item: MarketOverviewItem): number | null {
+  return normalizeProbability(item.latest_prediction?.confidence_score);
+}
+
+function getOverviewEdgeMagnitudeValue(item: MarketOverviewItem): number | null {
+  return normalizeProbability(item.latest_prediction?.edge_magnitude);
+}
+
+function getOverviewLiquidityValue(item: MarketOverviewItem): number | null {
+  return toNumber(item.latest_snapshot?.liquidity);
+}
+
+function getOverviewCloseTimeValue(item: MarketOverviewItem): number | null {
+  const value = item.market?.close_time ?? item.market?.end_date;
+  if (!value) {
+    return null;
+  }
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function compareNullableDesc(a: number | null, b: number | null): number {
+  if (a === null && b === null) {
+    return 0;
+  }
+  if (a === null) {
+    return 1;
+  }
+  if (b === null) {
+    return -1;
+  }
+  return b - a;
+}
+
+function compareNullableAsc(a: number | null, b: number | null): number {
+  if (a === null && b === null) {
+    return 0;
+  }
+  if (a === null) {
+    return 1;
+  }
+  if (b === null) {
+    return -1;
+  }
+  return a - b;
+}
+
+function compareOverviewItems(a: MarketOverviewItem, b: MarketOverviewItem): number {
+  return (
+    compareNullableDesc(getOverviewScoreValue(a), getOverviewScoreValue(b)) ||
+    compareNullableDesc(getOverviewConfidenceValue(a), getOverviewConfidenceValue(b)) ||
+    compareNullableDesc(getOverviewLiquidityValue(a), getOverviewLiquidityValue(b)) ||
+    compareNullableAsc(getOverviewCloseTimeValue(a), getOverviewCloseTimeValue(b)) ||
+    compareNullableAsc(toNumber(a.priority_rank), toNumber(b.priority_rank))
+  );
+}
+
+function getOverviewBucketKey(item: MarketOverviewItem): MarketOverviewBucketKey {
+  const prediction = item.latest_prediction;
+  const backendBucket = (item.priority_bucket ?? "").toLowerCase();
+  const scoringMode = (item.scoring_mode ?? "").toLowerCase();
+
+  if (!prediction || backendBucket === "no_prediction" || scoringMode === "no_prediction") {
+    return "no-prediction";
+  }
+  if (backendBucket === "priority" || backendBucket === "opportunity") {
+    return "opportunity";
+  }
+  if (backendBucket === "watchlist") {
+    return "watchlist";
+  }
+  if (backendBucket === "review_fallback" || backendBucket === "low_confidence") {
+    return "low-confidence";
+  }
+  if (backendBucket === "fallback_only" || backendBucket === "data_only") {
+    return "data-only";
+  }
+
+  const score = getOverviewScoreValue(item);
+  const confidence = getOverviewConfidenceValue(item);
+  const edgeMagnitude = getOverviewEdgeMagnitudeValue(item);
+
+  if (confidence !== null && confidence < 0.3) {
+    return "low-confidence";
+  }
+  if (prediction.opportunity || (score !== null && score >= 0.7 && (confidence ?? 0) >= 0.45)) {
+    return "opportunity";
+  }
+  if (scoringMode === "fallback_only") {
+    return "data-only";
+  }
+  if (
+    (score !== null && score >= 0.55) ||
+    (edgeMagnitude !== null && edgeMagnitude >= 0.05)
+  ) {
+    return "watchlist";
+  }
+  return "data-only";
+}
+
+function getOverviewBucketDefinition(key: MarketOverviewBucketKey) {
+  return marketOverviewBucketDefinitions.find((section) => section.key === key);
+}
+
+function buildMarketOverviewSections(
+  items: MarketOverviewItem[],
+): MarketOverviewBucketSection[] {
+  const grouped = new Map<MarketOverviewBucketKey, MarketOverviewItem[]>();
+  for (const item of items) {
+    const key = getOverviewBucketKey(item);
+    const bucketItems = grouped.get(key) ?? [];
+    bucketItems.push(item);
+    grouped.set(key, bucketItems);
+  }
+
+  return marketOverviewBucketDefinitions
+    .map((definition) => ({
+      ...definition,
+      items: [...(grouped.get(definition.key) ?? [])].sort(compareOverviewItems),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
 function getOverviewStatus(item: MarketOverviewItem): {
   label: string;
   tone: string;
   detail: string;
 } {
-  const prediction = item.latest_prediction;
-  const confidence = normalizeProbability(prediction?.confidence_score);
-  const edgeMagnitude = normalizeProbability(prediction?.edge_magnitude);
-  const bucket = item.priority_bucket ?? "";
-
-  if (!prediction) {
+  const bucketKey = getOverviewBucketKey(item);
+  const bucket = getOverviewBucketDefinition(bucketKey);
+  if (bucketKey === "no-prediction") {
     return {
       label: "Sin prediccion",
       tone: "neutral",
       detail: "Pendiente de scoring",
     };
   }
-  if (prediction.opportunity || bucket === "priority") {
+  if (bucketKey === "opportunity") {
     return {
       label: "Oportunidad",
-      tone: "opportunity",
+      tone: bucket?.tone ?? "opportunity",
       detail: "Revisar primero",
     };
   }
-  if (bucket === "watchlist" || (edgeMagnitude !== null && edgeMagnitude >= 0.05)) {
+  if (bucketKey === "watchlist") {
     return {
       label: "Vigilancia",
-      tone: "watchlist",
+      tone: bucket?.tone ?? "watchlist",
       detail: "Hay diferencia que mirar",
     };
   }
-  if (bucket === "review_fallback" || (confidence !== null && confidence < 0.3)) {
+  if (bucketKey === "low-confidence") {
     return {
       label: "Baja confianza",
-      tone: "low-confidence",
+      tone: bucket?.tone ?? "low-confidence",
       detail: "Datos limitados",
     };
   }
   return {
     label: "Solo datos",
-    tone: "data-only",
+    tone: bucket?.tone ?? "data-only",
     detail: overviewScoringModeLabel(item.scoring_mode),
   };
 }
@@ -2311,6 +2485,7 @@ function MarketOverviewPanel({
   const sportCount = countOverviewSports(items);
   const latestTimestamp = getLatestOverviewTimestamp(items);
   const sportLabel = getSportSelectorOption(selectedSport).label;
+  const sections = buildMarketOverviewSections(items);
 
   return (
     <section className="panel market-overview-panel" aria-label="Mercados destacados">
@@ -2370,12 +2545,30 @@ function MarketOverviewPanel({
           </p>
         </div>
       ) : (
-        <div className="market-overview-grid">
-          {items.map((item, index) => (
-            <MarketOverviewCard
-              item={item}
-              key={item.market?.id ?? `${item.market?.question ?? "market"}-${index}`}
-            />
+        <div className="market-overview-bucket-stack">
+          {sections.map((section) => (
+            <section
+              className={`market-overview-bucket ${section.tone}`}
+              key={section.key}
+            >
+              <div className="market-overview-bucket-heading">
+                <div>
+                  <h3>{section.title}</h3>
+                  <p>{section.description}</p>
+                </div>
+                <span className={`market-status-badge ${section.tone}`}>
+                  {section.items.length}
+                </span>
+              </div>
+              <div className="market-overview-grid">
+                {section.items.map((item, index) => (
+                  <MarketOverviewCard
+                    item={item}
+                    key={item.market?.id ?? `${section.key}-${item.market?.question ?? "market"}-${index}`}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}

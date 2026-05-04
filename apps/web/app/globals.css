@@ -677,6 +677,46 @@ h2 {
   gap: 12px;
 }
 
+.market-overview-bucket-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.market-overview-bucket {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.market-overview-bucket:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.market-overview-bucket-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.market-overview-bucket-heading h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 1rem;
+}
+
+.market-overview-bucket-heading p {
+  max-width: 760px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .market-overview-card {
   display: grid;
   gap: 13px;
