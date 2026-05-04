@@ -12,7 +12,12 @@ import {
   sportsSelectorOptions,
   type SportSelectorOption,
 } from "../../components/SportsSelectorBar";
-import { API_BASE_URL, fetchApiJson, friendlyApiError } from "../../lib/api";
+import {
+  API_BASE_URL,
+  API_HOST_LABEL,
+  fetchApiJson,
+  friendlyApiError,
+} from "../../lib/api";
 
 type PolySignalScore = {
   score_probability?: string | number | null;
@@ -318,8 +323,8 @@ function PolySignalMiniScore({
       <span>PolySignal SI</span>
       <strong>{formatPercent(score.score_probability)}</strong>
       <p>
-        Mercado SI {formatPercent(score.market_yes_price)} · Diferencia{" "}
-        {formatPercentPoints(score.edge_percent_points)} · Confianza{" "}
+        Mercado SI {formatPercent(score.market_yes_price)} | Diferencia{" "}
+        {formatPercentPoints(score.edge_percent_points)} | Confianza{" "}
         {score.confidence_label ?? "N/D"}
       </p>
     </div>
@@ -485,10 +490,11 @@ export default function SportDetailPage() {
       <header className="topbar">
         <div>
           <p className="eyebrow">Deportes</p>
-          <h1>Proximos partidos de {sportOption.label}</h1>
+          <h1>Mercados de {sportOption.label}</h1>
           <p className="subtitle">
-            Mercados reales filtrados desde /markets/overview. Si un deporte
-            principal aun no tiene datos, veras un estado vacio limpio.
+            Mercados reales filtrados desde /markets/overview mediante el proxy
+            same-origin. Si un deporte principal aun no tiene datos, veras un
+            estado vacio limpio.
           </p>
         </div>
         <div className="topbar-actions">
@@ -549,7 +555,9 @@ export default function SportDetailPage() {
       <section className="data-quality-summary" aria-label="Calidad de datos">
         <div>
           <span>Mercados</span>
-          <strong>{state.loading ? "..." : state.items.length}</strong>
+          <strong>
+            {state.loading ? "..." : state.counts?.total_count ?? state.items.length}
+          </strong>
         </div>
         <div>
           <span>Completos</span>
@@ -564,7 +572,8 @@ export default function SportDetailPage() {
           <strong>{state.loading ? "..." : state.qualitySummary?.missing_price_count ?? 0}</strong>
         </div>
         <p>
-          Actualizado {state.updatedAt ? formatDateTime(state.updatedAt.toISOString()) : "al cargar"}.
+          Fuente: {API_HOST_LABEL} via /api/backend/markets/overview. Actualizado{" "}
+          {state.updatedAt ? formatDateTime(state.updatedAt.toISOString()) : "al cargar"}.
           La calidad de datos explica por que un score puede quedar pendiente.
         </p>
       </section>
@@ -574,8 +583,8 @@ export default function SportDetailPage() {
           <div>
             <h2>Mercados proximos</h2>
             <p>
-              Filtro activo: {sportOption.label} - fuente primaria:
-              /markets/overview.
+              Filtro activo: {sportOption.label}. Esta vista no importa datos,
+              discovery ni scoring; solo lee mercados disponibles.
             </p>
           </div>
           {sportIsEnabled ? (
@@ -606,7 +615,7 @@ export default function SportDetailPage() {
           <div className="empty-state">
             <strong>Todavia no hay mercados cargados para {sportOption.label}.</strong>
             <p>
-              El backend respondio correctamente, pero no hay items para este
+              El backend respondio correctamente con total_count=0 para este
               deporte. Ejecuta el pipeline limitado cuando quieras poblarlo; no
               se muestran datos inventados.
             </p>
