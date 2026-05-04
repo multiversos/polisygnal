@@ -364,9 +364,21 @@ type UpcomingFilters = {
   includeFutures: boolean;
 };
 
+const DEFAULT_API_BASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "https://polisygnal.onrender.com"
+    : "http://127.0.0.1:8000";
 const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
+  process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL
 ).replace(/\/$/, "");
+const API_HOST_LABEL = (() => {
+  try {
+    return new URL(API_BASE_URL).host;
+  } catch {
+    return API_BASE_URL;
+  }
+})();
+const DASHBOARD_REQUEST_TIMEOUT_MS = 10000;
 
 const marketShapeOptions = [
   "all",
@@ -440,15 +452,47 @@ const commandCenterLinks = [
 ];
 
 async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    cache: "no-store",
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    DASHBOARD_REQUEST_TIMEOUT_MS,
+  );
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`${path} responded ${response.status}`);
+    }
+
+    return response.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`${path} timed out after ${DASHBOARD_REQUEST_TIMEOUT_MS / 1000}s`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function withDashboardTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error(`${label} timed out after ${DASHBOARD_REQUEST_TIMEOUT_MS / 1000}s`)),
+      DASHBOARD_REQUEST_TIMEOUT_MS,
+    );
   });
 
-  if (!response.ok) {
-    throw new Error(`${path} responded ${response.status}`);
-  }
-
-  return response.json() as Promise<T>;
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  });
 }
 
 function toNumber(value: unknown): number | null {
@@ -2485,6 +2529,7 @@ export default function DashboardPage() {
   const loadDashboard = useCallback(async () => {
     setState((current) => ({ ...current, loading: true, error: null }));
 
+    try {
     const overviewPath = buildMarketOverviewPath(upcomingFilters.sport);
     const candidatesPath = buildCandidatesPath(filters);
     const upcomingPath = buildUpcomingPath(upcomingFilters);
@@ -2505,17 +2550,29 @@ export default function DashboardPage() {
       smartAlerts,
     ] =
       await Promise.allSettled([
-        fetchJson<HealthResponse>("/health"),
-        fetchJson<MarketsOverviewResponse>(overviewPath),
-        fetchJson<CandidatesResponse>(candidatesPath),
-        fetchJson<UpcomingSportsResponse>(upcomingPath),
-        fetchJson<UpcomingDataQualityResponse>(upcomingDataQualityPath),
-        fetchJson<AnalysisReadinessResponse>(analysisReadinessPath),
-        fetchJson<DashboardMetaResponse>("/dashboard/latest/meta"),
-        fetchJson<ExternalSignalsResponse>("/external-signals/kalshi?limit=10"),
-        fetchWatchlistItems(),
-        fetchInvestigationStatuses(),
-        fetchSmartAlerts({ limit: 8, sport: alertSport }),
+        withDashboardTimeout(fetchJson<HealthResponse>("/health"), "/health"),
+        withDashboardTimeout(fetchJson<MarketsOverviewResponse>(overviewPath), overviewPath),
+        withDashboardTimeout(fetchJson<CandidatesResponse>(candidatesPath), candidatesPath),
+        withDashboardTimeout(fetchJson<UpcomingSportsResponse>(upcomingPath), upcomingPath),
+        withDashboardTimeout(
+          fetchJson<UpcomingDataQualityResponse>(upcomingDataQualityPath),
+          upcomingDataQualityPath,
+        ),
+        withDashboardTimeout(
+          fetchJson<AnalysisReadinessResponse>(analysisReadinessPath),
+          analysisReadinessPath,
+        ),
+        withDashboardTimeout(
+          fetchJson<DashboardMetaResponse>("/dashboard/latest/meta"),
+          "/dashboard/latest/meta",
+        ),
+        withDashboardTimeout(
+          fetchJson<ExternalSignalsResponse>("/external-signals/kalshi?limit=10"),
+          "/external-signals/kalshi?limit=10",
+        ),
+        withDashboardTimeout(fetchWatchlistItems(), "/watchlist"),
+        withDashboardTimeout(fetchInvestigationStatuses(), "/investigation-statuses"),
+        withDashboardTimeout(fetchSmartAlerts({ limit: 8, sport: alertSport }), "/smart-alerts"),
       ]);
 
     const errors: string[] = [];
@@ -2581,6 +2638,15 @@ export default function DashboardPage() {
       error: errors.length > 0 ? errors.join(". ") : null,
       updatedAt: new Date(),
     });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      setState((current) => ({
+        ...current,
+        loading: false,
+        error: `No se pudo cargar el dashboard desde ${API_HOST_LABEL}. ${message}`,
+        updatedAt: new Date(),
+      }));
+    }
   }, [filters, upcomingFilters]);
 
   useEffect(() => {
@@ -2749,6 +2815,15 @@ export default function DashboardPage() {
             <span className="status-dot" />
             {state.loading ? "Cargando API" : apiOnline ? "API en línea" : "API desconectada"}
           </div>
+          <span className="badge muted">API: {API_HOST_LABEL}</span>
+          <button
+            className="text-link"
+            disabled={state.loading}
+            onClick={() => void loadDashboard()}
+            type="button"
+          >
+            {state.loading ? "Cargando" : "Reintentar"}
+          </button>
         </div>
       </header>
 
@@ -2781,7 +2856,18 @@ export default function DashboardPage() {
       {state.error ? (
         <section className="alert-panel" role="status">
           <strong>Datos parciales</strong>
-          <span>{state.error}. Revisa que FastAPI este corriendo en {API_BASE_URL}.</span>
+          <span>
+            {state.error}. Host API usado: {API_HOST_LABEL}. Revisa que FastAPI este
+            corriendo en {API_BASE_URL}.
+          </span>
+          <button
+            className="refresh-button"
+            disabled={state.loading}
+            onClick={() => void loadDashboard()}
+            type="button"
+          >
+            {state.loading ? "Cargando" : "Reintentar"}
+          </button>
         </section>
       ) : null}
 
