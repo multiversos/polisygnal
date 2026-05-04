@@ -36,75 +36,14 @@ import {
   buildBackendApiPath,
   DEFAULT_REQUEST_TIMEOUT_MS,
 } from "./lib/api";
+import type {
+  MarketOverviewItem,
+  MarketOverviewResponse,
+} from "./lib/marketOverview";
 
 type HealthResponse = {
   status?: string;
   environment?: string;
-};
-
-type MarketsOverviewResponse = {
-  filters?: Record<string, unknown>;
-  total_count?: number;
-  items?: unknown[];
-};
-
-type MarketOverviewMarket = {
-  id?: number;
-  question?: string | null;
-  sport_type?: string | null;
-  market_type?: string | null;
-  active?: boolean | null;
-  closed?: boolean | null;
-  end_date?: string | null;
-  close_time?: string | null;
-  evidence_eligible?: boolean | null;
-  evidence_shape?: string | null;
-  evidence_skip_reason?: string | null;
-};
-
-type MarketOverviewSnapshot = {
-  captured_at?: string | null;
-  yes_price?: string | number | null;
-  no_price?: string | number | null;
-  spread?: string | number | null;
-  volume?: string | number | null;
-  liquidity?: string | number | null;
-};
-
-type MarketOverviewPrediction = {
-  id?: number;
-  run_at?: string | null;
-  model_version?: string | null;
-  yes_probability?: string | number | null;
-  no_probability?: string | number | null;
-  confidence_score?: string | number | null;
-  action_score?: string | number | null;
-  edge_signed?: string | number | null;
-  edge_magnitude?: string | number | null;
-  edge_class?: string | null;
-  opportunity?: boolean | null;
-  review_confidence?: boolean | null;
-  review_edge?: boolean | null;
-  used_odds_count?: number | null;
-  used_news_count?: number | null;
-  used_evidence_in_scoring?: boolean | null;
-};
-
-type MarketOverviewEvidenceSummary = {
-  evidence_count?: number | null;
-  odds_evidence_count?: number | null;
-  news_evidence_count?: number | null;
-  latest_evidence_at?: string | null;
-};
-
-type MarketOverviewItem = {
-  priority_rank?: number | null;
-  priority_bucket?: string | null;
-  scoring_mode?: string | null;
-  market?: MarketOverviewMarket | null;
-  latest_snapshot?: MarketOverviewSnapshot | null;
-  latest_prediction?: MarketOverviewPrediction | null;
-  evidence_summary?: MarketOverviewEvidenceSummary | null;
 };
 
 type MarketOverviewBucketKey =
@@ -362,7 +301,7 @@ type ExternalSignalsResponse = {
 
 type DashboardState = {
   health: HealthResponse | null;
-  overview: MarketsOverviewResponse | null;
+  overview: MarketOverviewResponse | null;
   dashboardMeta: DashboardMetaResponse | null;
   candidates: ResearchCandidate[];
   upcomingMarkets: UpcomingSportsMarket[];
@@ -1206,7 +1145,7 @@ function isMarketOverviewItem(value: unknown): value is MarketOverviewItem {
   return isRecord(value) && isRecord(value.market);
 }
 
-function getMarketOverviewItems(overview: MarketsOverviewResponse | null): MarketOverviewItem[] {
+function getMarketOverviewItems(overview: MarketOverviewResponse | null): MarketOverviewItem[] {
   if (!Array.isArray(overview?.items)) {
     return [];
   }
@@ -2810,7 +2749,7 @@ export default function DashboardPage() {
     ] =
       await Promise.allSettled([
         withDashboardTimeout(fetchJson<HealthResponse>("/health"), "/health"),
-        withDashboardTimeout(fetchJson<MarketsOverviewResponse>(overviewPath), overviewPath),
+        withDashboardTimeout(fetchJson<MarketOverviewResponse>(overviewPath), overviewPath),
         withDashboardTimeout(fetchJson<CandidatesResponse>(candidatesPath), candidatesPath),
         withDashboardTimeout(fetchJson<UpcomingSportsResponse>(upcomingPath), upcomingPath),
         withDashboardTimeout(
