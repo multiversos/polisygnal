@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
+import { fetchApiJson, friendlyApiError } from "../lib/api";
 
 type SourceQualityItem = {
   source_id: number;
@@ -25,18 +26,8 @@ type SourceQualityResponse = {
   items: SourceQualityItem[];
 };
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
-
 async function fetchSourceQuality(): Promise<SourceQualityResponse> {
-  const response = await fetch(`${API_BASE_URL}/sources/quality?limit=200`, {
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new Error(`sources_quality_${response.status}`);
-  }
-  return response.json() as Promise<SourceQualityResponse>;
+  return fetchApiJson<SourceQualityResponse>("/sources/quality?limit=200");
 }
 
 function formatPercent(value?: string | number | null): string {
@@ -85,11 +76,11 @@ export default function SourcesQualityPage() {
     try {
       const data = await fetchSourceQuality();
       setState((current) => ({ ...current, data, loading: false, error: null }));
-    } catch {
+    } catch (error) {
       setState((current) => ({
         ...current,
         loading: false,
-        error: "No se pudo cargar la calidad de fuentes.",
+        error: friendlyApiError(error, "calidad de fuentes"),
       }));
     }
   }, []);
@@ -203,7 +194,11 @@ export default function SourcesQualityPage() {
           <div className="empty-state">Cargando fuentes...</div>
         ) : items.length === 0 ? (
           <div className="empty-state">
-            No hay fuentes guardadas con el filtro actual.
+            <strong>Modulo en preparacion.</strong>
+            <p>
+              No hay fuentes guardadas con el filtro actual. Esta vista se
+              conectara al pipeline de evidencia cuando haya fuentes persistidas.
+            </p>
           </div>
         ) : (
           <div className="source-quality-grid">

@@ -12,6 +12,7 @@ import {
   sportsSelectorOptions,
   type SportSelectorOption,
 } from "../../components/SportsSelectorBar";
+import { API_BASE_URL, fetchApiJson, friendlyApiError } from "../../lib/api";
 
 type PolySignalScore = {
   score_probability?: string | number | null;
@@ -73,9 +74,40 @@ type PageState = {
   updatedAt: Date | null;
 };
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
+type MarketOverviewItem = {
+  priority_rank?: number | null;
+  priority_bucket?: string | null;
+  scoring_mode?: string | null;
+  market?: {
+    id?: number | null;
+    question?: string | null;
+    event_title?: string | null;
+    sport_type?: string | null;
+    market_type?: string | null;
+    close_time?: string | null;
+    end_date?: string | null;
+  } | null;
+  latest_snapshot?: {
+    yes_price?: string | number | null;
+    no_price?: string | number | null;
+    liquidity?: string | number | null;
+    volume?: string | number | null;
+    captured_at?: string | null;
+  } | null;
+  latest_prediction?: {
+    yes_probability?: string | number | null;
+    no_probability?: string | number | null;
+    confidence_score?: string | number | null;
+    action_score?: string | number | null;
+    edge_signed?: string | number | null;
+    edge_magnitude?: string | number | null;
+  } | null;
+};
+
+type MarketsOverviewResponse = {
+  total_count?: number;
+  items?: MarketOverviewItem[];
+};
 
 const supportedSportIds = new Set<string>(
   sportsSelectorOptions
@@ -190,14 +222,11 @@ function formatMarketShape(value: string): string {
 function buildUpcomingPath(option: SportSelectorOption): string {
   const params = new URLSearchParams({
     limit: "20",
-    days: "7",
-    include_futures: "false",
-    focus: "match_winner",
   });
   if (option.apiValue) {
-    params.set("sport", option.apiValue);
+    params.set("sport_type", option.apiValue);
   }
-  return `/research/upcoming-sports?${params.toString()}`;
+  return `/markets/overview?${params.toString()}`;
 }
 
 function buildDataQualityPath(option: SportSelectorOption): string {
@@ -212,11 +241,55 @@ function buildDataQualityPath(option: SportSelectorOption): string {
 }
 
 async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`${path} responded ${response.status}`);
+  return fetchApiJson<T>(path);
+}
+
+function mapOverviewItem(item: MarketOverviewItem): UpcomingSportsMarket | null {
+  const market = item.market;
+  if (!market?.id) {
+    return null;
   }
-  return response.json() as Promise<T>;
+  const snapshot = item.latest_snapshot ?? {};
+  const prediction = item.latest_prediction;
+  const edgeSigned = toNumber(prediction?.edge_signed);
+  return {
+    market_id: market.id,
+    question: market.question || "Mercado sin titulo",
+    event_title: market.event_title,
+    sport: market.sport_type || "unknown",
+    market_shape: market.market_type || "match_winner",
+    close_time: market.close_time ?? market.end_date ?? null,
+    event_time: market.close_time ?? market.end_date ?? null,
+    market_yes_price: snapshot.yes_price,
+    market_no_price: snapshot.no_price,
+    liquidity: snapshot.liquidity,
+    volume: snapshot.volume,
+    urgency_score: prediction?.action_score ?? item.priority_rank ?? null,
+    warnings: item.priority_bucket ? [item.priority_bucket] : [],
+    polysignal_score: prediction
+      ? {
+          score_probability: prediction.yes_probability,
+          market_yes_price: snapshot.yes_price,
+          edge_percent_points: edgeSigned === null ? null : edgeSigned * 100,
+          confidence_label: formatPercent(prediction.confidence_score),
+          color_hint: item.priority_bucket === "fallback_only" ? "neutral" : "positive",
+          label: item.scoring_mode,
+        }
+      : null,
+  };
+}
+
+function buildQualityItem(market: UpcomingSportsMarket): UpcomingDataQualityItem {
+  return {
+    market_id: market.market_id,
+    quality_label: market.polysignal_score ? "Completo" : "Parcial",
+    has_snapshot: market.market_yes_price !== null && market.market_yes_price !== undefined,
+    has_yes_price: market.market_yes_price !== null && market.market_yes_price !== undefined,
+    has_no_price: market.market_no_price !== null && market.market_no_price !== undefined,
+    has_polysignal_score: Boolean(market.polysignal_score),
+    missing_fields: [],
+    warnings: market.warnings ?? [],
+  };
 }
 
 function PolySignalMiniScore({
@@ -365,15 +438,18 @@ export default function SportDetailPage() {
     }
     setState((current) => ({ ...current, loading: true, error: null }));
     try {
-      const [upcoming, quality] = await Promise.all([
-        fetchJson<UpcomingSportsResponse>(buildUpcomingPath(sportOption)),
-        fetchJson<UpcomingDataQualityResponse>(buildDataQualityPath(sportOption)),
-      ]);
+      const overview = await fetchJson<MarketsOverviewResponse>(buildUpcomingPath(sportOption));
+      const items = (overview.items ?? []).map(mapOverviewItem).filter(Boolean) as UpcomingSportsMarket[];
+      const qualityItems = items.map(buildQualityItem);
       setState({
-        items: upcoming.items ?? [],
-        counts: upcoming.counts ?? null,
-        qualitySummary: quality.summary ?? null,
-        qualityItems: quality.items ?? [],
+        items,
+        counts: { total_count: overview.total_count ?? items.length },
+        qualitySummary: {
+          complete_count: qualityItems.filter((item) => item.has_polysignal_score).length,
+          partial_count: qualityItems.filter((item) => !item.has_polysignal_score).length,
+          missing_price_count: qualityItems.filter((item) => !item.has_yes_price || !item.has_no_price).length,
+        },
+        qualityItems,
         loading: false,
         error: null,
         updatedAt: new Date(),
@@ -382,7 +458,7 @@ export default function SportDetailPage() {
       setState((current) => ({
         ...current,
         loading: false,
-        error: error instanceof Error ? error.message : "No se pudo cargar el deporte.",
+        error: friendlyApiError(error, `datos de ${sportOption.label}`),
       }));
     }
   }, [sportIsEnabled, sportOption]);
@@ -411,8 +487,8 @@ export default function SportDetailPage() {
           <p className="eyebrow">Deportes</p>
           <h1>Proximos partidos de {sportOption.label}</h1>
           <p className="subtitle">
-            Solo proximos 7 dias, ganador/perdedor del partido. Los mercados se
-            muestran desde datos reales ya sincronizados en PolySignal.
+            Mercados reales filtrados desde /markets/overview. Si un deporte
+            principal aun no tiene datos, veras un estado vacio limpio.
           </p>
         </div>
         <div className="topbar-actions">
@@ -498,8 +574,8 @@ export default function SportDetailPage() {
           <div>
             <h2>Mercados proximos</h2>
             <p>
-              Filtro activo: {sportOption.label} · ventana 7 dias · futuros
-              pausados.
+              Filtro activo: {sportOption.label} - fuente primaria:
+              /markets/overview.
             </p>
           </div>
           {sportIsEnabled ? (
@@ -528,10 +604,10 @@ export default function SportDetailPage() {
           <div className="empty-state">Cargando mercados de {sportOption.label}...</div>
         ) : state.items.length === 0 ? (
           <div className="empty-state">
-            <strong>No hay mercados proximos para {sportOption.label}.</strong>
+            <strong>Todavia no hay mercados cargados para {sportOption.label}.</strong>
             <p>
-              Puede que falten datos sincronizados recientes o que Polymarket no
-              tenga partidos disponibles para este deporte dentro de 7 dias. No
+              El backend respondio correctamente, pero no hay items para este
+              deporte. Ejecuta el pipeline limitado cuando quieras poblarlo; no
               se muestran datos inventados.
             </p>
           </div>

@@ -122,7 +122,7 @@ export default function ResearchRunDetailPage() {
       setRun(detail);
       setQualityGate(gate);
     } catch {
-      setError("No se pudo cargar el detalle del research run.");
+      setError("Detalle de research run en preparacion.");
     } finally {
       setLoading(false);
     }

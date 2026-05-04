@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
+import { friendlyApiError } from "../lib/api";
 import {
   INVESTIGATION_STATUS_LABELS,
   INVESTIGATION_STATUS_ORDER,
@@ -73,8 +74,8 @@ export default function WorkflowPage() {
     setError(null);
     try {
       setItems(await fetchInvestigationStatuses());
-    } catch {
-      setError("No se pudo cargar el tablero de investigación.");
+    } catch (error) {
+      setError(friendlyApiError(error, "workflow de investigacion"));
     } finally {
       setLoading(false);
     }
@@ -153,6 +154,16 @@ export default function WorkflowPage() {
         <section className="alert-panel" role="status">
           <strong>Workflow no disponible</strong>
           <span>{error}</span>
+        </section>
+      ) : null}
+
+      {!loading && !error && items.length === 0 ? (
+        <section className="empty-state">
+          <strong>Workflow listo, sin estados manuales todavia.</strong>
+          <p>
+            El dashboard tiene mercados reales; este tablero se llenara cuando
+            marques estados de investigacion desde el detalle de mercado.
+          </p>
         </section>
       ) : null}
 

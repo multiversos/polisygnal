@@ -1,5 +1,7 @@
 "use client";
 
+import { API_BASE_URL } from "./api";
+
 export type DataHealthSportCoverage = {
   sport: string;
   total: number;
@@ -182,10 +184,6 @@ export type LiveUpcomingDiscovery = {
   filters_applied: Record<string, unknown>;
   warnings: string[];
 };
-
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
 
 export async function fetchDataHealthOverview(): Promise<DataHealthOverview> {
   const response = await fetch(`${API_BASE_URL}/data-health/overview`, {

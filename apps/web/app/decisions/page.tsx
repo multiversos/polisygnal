@@ -195,7 +195,11 @@ export default function DecisionsPage() {
           <div className="empty-state">Cargando decisiones...</div>
         ) : visibleDecisions.length === 0 ? (
           <div className="empty-state">
-            No hay decisiones humanas con los filtros actuales.
+            <strong>No hay decisiones humanas todavia.</strong>
+            <p>
+              El dashboard ya muestra mercados reales; esta vista se llenara
+              cuando marques decisiones desde el analisis de un mercado.
+            </p>
           </div>
         ) : (
           <div className="decision-dashboard-list">

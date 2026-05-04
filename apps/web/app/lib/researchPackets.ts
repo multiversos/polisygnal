@@ -1,5 +1,7 @@
 "use client";
 
+import { API_BASE_URL } from "./api";
+
 export type ResearchPacketResult = {
   status: string;
   market_id: number;
@@ -13,10 +15,6 @@ export type ResearchPacketResult = {
   ingest_dry_run_command: string;
   notes?: string | null;
 };
-
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
 
 export async function generateResearchPacket(
   marketId: number | string,

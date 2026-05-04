@@ -9,6 +9,7 @@ import {
   getSportApiFilter,
   isSportBackendEnabled,
 } from "../components/SportsSelectorBar";
+import { fetchApiJson, friendlyApiError } from "../lib/api";
 import { fetchSmartAlerts, type SmartAlert } from "../lib/smartAlerts";
 import { WATCHLIST_STATUS_LABELS, type WatchlistStatus } from "../lib/watchlist";
 
@@ -125,10 +126,6 @@ type DailyBriefingMarkdownResponse = {
 };
 
 type MarkdownCopyStatus = "idle" | "copying" | "copied" | "error";
-
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
 
 const dayOptions = [1, 3, 7];
 
@@ -317,25 +314,16 @@ function translateMarketTitleToSpanish(title: string): string {
 }
 
 async function fetchDailyBriefing(params: URLSearchParams): Promise<DailyBriefing> {
-  const response = await fetch(`${API_BASE_URL}/briefing/daily?${params.toString()}`, {
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new Error(`/briefing/daily respondió ${response.status}`);
-  }
-  return response.json() as Promise<DailyBriefing>;
+  return fetchApiJson<DailyBriefing>(`/briefing/daily?${params.toString()}`);
 }
 
 async function fetchDailyBriefingMarkdown(params: URLSearchParams): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/briefing/daily/markdown?${params.toString()}`, {
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new Error(`/briefing/daily/markdown responded ${response.status}`);
-  }
-  const payload = (await response.json()) as DailyBriefingMarkdownResponse;
+  const payload = await fetchApiJson<DailyBriefingMarkdownResponse>(
+    `/briefing/daily/markdown?${params.toString()}`,
+  );
   return payload.markdown;
 }
+
 
 function buildDailyBriefingParams(days: number, sport: string): URLSearchParams {
   const params = new URLSearchParams({
@@ -381,8 +369,8 @@ export default function DailyBriefingPage() {
       }
       setBriefing(briefingResult.value);
       setSmartAlerts(alertsResult.status === "fulfilled" ? alertsResult.value.alerts : []);
-    } catch {
-      setError("No se pudo cargar el briefing. Revisa que la API esté en línea.");
+    } catch (error) {
+      setError(friendlyApiError(error, "el briefing diario"));
     } finally {
       setLoading(false);
     }

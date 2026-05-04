@@ -189,8 +189,11 @@ export default function ResearchDashboardPage() {
           <div className="empty-state">Cargando research runs...</div>
         ) : runs.length === 0 ? (
           <div className="empty-state">
-            No hay research runs con los filtros actuales. Los packets apareceran
-            aqui cuando se generen de forma explicita desde un mercado.
+            <strong>Modulo en preparacion.</strong>
+            <p>
+              No hay research runs todavia. Los packets apareceran aqui cuando
+              el pipeline de investigacion se active desde un mercado.
+            </p>
           </div>
         ) : (
           <div className="research-run-list">

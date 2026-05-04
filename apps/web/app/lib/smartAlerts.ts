@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchApiJson } from "./api";
+
 export type SmartAlertSeverity = "info" | "warning" | "critical";
 
 export type SmartAlert = {
@@ -22,10 +24,6 @@ export type SmartAlertsResponse = {
   counts: Record<string, number>;
 };
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
-
 export async function fetchSmartAlerts(params?: {
   limit?: number;
   sport?: string | null;
@@ -40,11 +38,5 @@ export async function fetchSmartAlerts(params?: {
   if (params?.severity) {
     search.set("severity", params.severity);
   }
-  const response = await fetch(`${API_BASE_URL}/alerts/smart?${search.toString()}`, {
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new Error(`/alerts/smart responded ${response.status}`);
-  }
-  return response.json() as Promise<SmartAlertsResponse>;
+  return fetchApiJson<SmartAlertsResponse>(`/alerts/smart?${search.toString()}`);
 }

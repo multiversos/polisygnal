@@ -9,6 +9,7 @@ import {
   type BacktestingSummary,
   type MarketOutcome,
 } from "../lib/backtesting";
+import { friendlyApiError } from "../lib/api";
 
 function formatPercent(value?: string | number | null): string {
   if (value === null || value === undefined) {
@@ -104,11 +105,11 @@ export default function BacktestingPage() {
         loading: false,
         error: null,
       });
-    } catch {
+    } catch (error) {
       setState((current) => ({
         ...current,
         loading: false,
-        error: "No se pudo cargar backtesting.",
+        error: friendlyApiError(error, "backtesting"),
       }));
     }
   }, []);
@@ -199,7 +200,11 @@ export default function BacktestingPage() {
           <div className="empty-state">Cargando resumen...</div>
         ) : !summary || summary.by_prediction_family.length === 0 ? (
           <div className="empty-state">
-            No hay outcomes con predicciones guardadas todavía.
+            <strong>Modulo en preparacion.</strong>
+            <p>
+              No hay outcomes con predicciones guardadas todavia. Backtesting se
+              activara cuando existan resultados manuales resueltos.
+            </p>
           </div>
         ) : (
           <div className="table-shell">
@@ -280,7 +285,8 @@ export default function BacktestingPage() {
           <div className="empty-state">Cargando outcomes...</div>
         ) : state.outcomes.length === 0 ? (
           <div className="empty-state">
-            No hay outcomes manuales todavía. PolySignal no inventa resultados.
+            No hay outcomes manuales todavia. PolySignal no inventa resultados;
+            esta vista queda lista para cuando se registren resoluciones.
           </div>
         ) : (
           <div className="backtesting-outcome-list">

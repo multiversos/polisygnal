@@ -71,6 +71,7 @@ import {
   type ManualEvidenceItem,
   type ManualEvidenceStance,
 } from "../../lib/manualEvidence";
+import { API_BASE_URL } from "../../lib/api";
 
 type JsonPayload = Record<string, unknown> | unknown[];
 
@@ -555,10 +556,6 @@ type ManualEvidencePanelState = {
   stanceDraft: ManualEvidenceStance;
   notesDraft: string;
 };
-
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
 
 const UPCOMING_MATCH_WINDOW_DAYS = 7;
 const PAUSED_FUTURE_SHAPES = new Set(["championship", "futures"]);
@@ -3544,12 +3541,12 @@ export default function MarketAnalysisPage() {
         priceHistory: historyResult.status === "fulfilled" ? historyResult.value : null,
         priceHistoryError:
           historyResult.status === "rejected"
-            ? "No se pudo cargar el historial de precio."
+            ? "Historial de precio en preparacion."
             : null,
         walletIntelligence: walletResult.status === "fulfilled" ? walletResult.value : null,
         walletIntelligenceError:
           walletResult.status === "rejected"
-            ? "No se pudo cargar actividad de billeteras."
+            ? "Actividad de billeteras en preparacion."
             : null,
         loading: false,
         error: null,
@@ -3564,7 +3561,10 @@ export default function MarketAnalysisPage() {
         walletIntelligence: null,
         walletIntelligenceError: null,
         loading: false,
-        error: message === "not_found" ? null : "No se pudo cargar el análisis del mercado.",
+        error:
+          message === "not_found"
+            ? null
+            : "La API no respondio al cargar el analisis del mercado.",
         notFound: message === "not_found",
       });
     }
@@ -3586,7 +3586,7 @@ export default function MarketAnalysisPage() {
       setWatchlistState((current) => ({
         ...current,
         loading: false,
-        error: "No se pudo cargar el estado de seguimiento.",
+        error: "Estado de seguimiento en preparacion.",
       }));
     }
   }, [marketId]);
@@ -3609,7 +3609,7 @@ export default function MarketAnalysisPage() {
       setInvestigationState((current) => ({
         ...current,
         loading: false,
-        error: "No se pudo cargar el estado de investigación.",
+        error: "Estado de investigacion en preparacion.",
       }));
     }
   }, [marketId]);
@@ -3653,7 +3653,7 @@ export default function MarketAnalysisPage() {
         item: null,
         loading: false,
         saving: false,
-        error: "No se pudo cargar outcome.",
+        error: "Outcome manual en preparacion.",
         outcomeDraft: "unknown",
         sourceDraft: "manual",
         notesDraft: "",
@@ -3694,7 +3694,7 @@ export default function MarketAnalysisPage() {
       setTimelineState({
         items: [],
         loading: false,
-        error: "No se pudo cargar la linea de tiempo.",
+        error: "Linea de tiempo en preparacion.",
       });
     }
   }, [marketId]);
@@ -4059,7 +4059,7 @@ export default function MarketAnalysisPage() {
       setManualEvidenceState((current) => ({
         ...current,
         loading: false,
-        error: "No se pudo cargar evidencia manual.",
+        error: "Evidencia manual en preparacion.",
       }));
     }
   }, [marketId]);
@@ -4319,8 +4319,8 @@ export default function MarketAnalysisPage() {
         </section>
       ) : state.error ? (
         <section className="alert-panel" role="status">
-          <strong>API desconectada</strong>
-          <span>{state.error} Revisa que FastAPI esté corriendo en {API_BASE_URL}.</span>
+          <strong>API sin respuesta</strong>
+          <span>{state.error} Host API usado: {API_BASE_URL}.</span>
         </section>
       ) : analysis ? (
         <>

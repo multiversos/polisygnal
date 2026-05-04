@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
+import { friendlyApiError } from "../lib/api";
 import {
   fetchAnalysisReadiness,
   fetchDataHealthOverview,
@@ -208,8 +209,8 @@ export default function DataHealthPage() {
       if (results.some((result) => result.status === "rejected")) {
         setError("Algunos diagnosticos no se pudieron cargar. Los paneles disponibles siguen visibles.");
       }
-    } catch {
-      setError("No se pudo cargar la salud de datos.");
+    } catch (error) {
+      setError(friendlyApiError(error, "salud de datos"));
     } finally {
       setLoading(false);
     }

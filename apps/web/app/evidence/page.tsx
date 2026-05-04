@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
+import { friendlyApiError } from "../lib/api";
 import {
   MANUAL_EVIDENCE_REVIEW_STATUS_LABELS,
   MANUAL_EVIDENCE_STANCE_LABELS,
@@ -67,8 +68,8 @@ export default function EvidencePage() {
         limit: 100,
       });
       setItems(response.items);
-    } catch {
-      setError("No se pudo cargar la evidencia manual.");
+    } catch (error) {
+      setError(friendlyApiError(error, "evidencia manual"));
     } finally {
       setLoading(false);
     }
@@ -202,7 +203,13 @@ export default function EvidencePage() {
         {loading ? (
           <div className="empty-state">Cargando evidencia manual...</div>
         ) : items.length === 0 ? (
-          <div className="empty-state">No hay evidencia manual con los filtros actuales.</div>
+          <div className="empty-state">
+            <strong>Modulo en preparacion.</strong>
+            <p>
+              No hay evidencia manual con los filtros actuales. La evidencia
+              externa se conectara en un sprint posterior.
+            </p>
+          </div>
         ) : (
           <div className="evidence-dashboard-list">
             {items.map((item) => (

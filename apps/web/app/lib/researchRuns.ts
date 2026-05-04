@@ -1,5 +1,7 @@
 "use client";
 
+import { API_BASE_URL } from "./api";
+
 export type ResearchRunMarketSummary = {
   id: number;
   question: string;
@@ -73,10 +75,6 @@ export type ResearchQualityGate = {
   instructions: string[];
   system_warnings: string[];
 };
-
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
 
 export async function fetchResearchRuns(filters?: {
   status?: string | null;

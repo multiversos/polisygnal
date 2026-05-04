@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchApiJson, isApiNotFoundError } from "./api";
+
 export type ResolvedOutcome = "yes" | "no" | "cancelled" | "invalid" | "unknown";
 
 export type MarketOutcome = {
@@ -57,29 +59,8 @@ export type BacktestingSummary = {
   by_confidence_bucket: BacktestingConfidenceBucket[];
 };
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
-
 async function requestBacktesting<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    cache: "no-store",
-    ...init,
-    headers: {
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
-    },
-  });
-  if (response.status === 404) {
-    throw new Error("not_found");
-  }
-  if (!response.ok) {
-    throw new Error(`${path} responded ${response.status}`);
-  }
-  if (response.status === 204) {
-    return null as T;
-  }
-  return response.json() as Promise<T>;
+  return fetchApiJson<T>(path, init);
 }
 
 export function fetchBacktestingSummary(): Promise<BacktestingSummary> {
@@ -96,7 +77,7 @@ export async function fetchMarketOutcome(
   try {
     return await requestBacktesting<MarketOutcome>(`/markets/${marketId}/outcome`);
   } catch (error) {
-    if (error instanceof Error && error.message === "not_found") {
+    if (isApiNotFoundError(error)) {
       return null;
     }
     throw error;

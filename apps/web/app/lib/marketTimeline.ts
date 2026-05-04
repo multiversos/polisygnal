@@ -1,5 +1,7 @@
 "use client";
 
+import { API_BASE_URL } from "./api";
+
 export type MarketTimelineItem = {
   timestamp: string;
   type: string;
@@ -16,10 +18,6 @@ export type MarketTimelineResponse = {
   market_id: number;
   items: MarketTimelineItem[];
 };
-
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
 
 export async function fetchMarketTimeline(
   marketId: number | string,

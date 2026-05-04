@@ -30,6 +30,11 @@ import {
   fetchSmartAlerts,
   type SmartAlert,
 } from "./lib/smartAlerts";
+import {
+  API_BASE_URL,
+  API_HOST_LABEL,
+  DEFAULT_REQUEST_TIMEOUT_MS,
+} from "./lib/api";
 
 type HealthResponse = {
   status?: string;
@@ -379,21 +384,7 @@ type UpcomingFilters = {
   includeFutures: boolean;
 };
 
-const DEFAULT_API_BASE_URL =
-  process.env.NODE_ENV === "production"
-    ? "https://polisygnal.onrender.com"
-    : "http://127.0.0.1:8000";
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL
-).replace(/\/$/, "");
-const API_HOST_LABEL = (() => {
-  try {
-    return new URL(API_BASE_URL).host;
-  } catch {
-    return API_BASE_URL;
-  }
-})();
-const DASHBOARD_REQUEST_TIMEOUT_MS = 10000;
+const DASHBOARD_REQUEST_TIMEOUT_MS = DEFAULT_REQUEST_TIMEOUT_MS;
 
 const marketShapeOptions = [
   "all",
@@ -2770,35 +2761,35 @@ export default function DashboardPage() {
 
     const errors: string[] = [];
     if (health.status === "rejected") {
-      errors.push("API desconectada o /health no disponible");
+      errors.push("La API no respondio en /health");
     }
     if (overview.status === "rejected") {
-      errors.push("No se pudo cargar overview de mercados");
+      errors.push("La vista principal no pudo leer overview de mercados");
     }
     if (candidates.status === "rejected") {
-      errors.push("No se pudieron cargar candidatos");
+      errors.push("Candidatos en preparacion");
     }
     if (upcomingSports.status === "rejected") {
-      errors.push("No se pudieron cargar mercados próximos");
+      errors.push("Mercados proximos en preparacion");
     }
     if (upcomingDataQuality.status === "rejected") {
-      errors.push("No se pudo cargar calidad de datos");
+      errors.push("Calidad de datos en preparacion");
     }
     if (analysisReadiness.status === "rejected") {
-      errors.push("No se pudo cargar readiness de analisis");
+      errors.push("Readiness de analisis en preparacion");
     }
     if (externalSignals.status === "rejected") {
-      errors.push("No se pudieron cargar señales externas");
+      errors.push("Senales externas en preparacion");
     }
 
     if (watchlist.status === "rejected") {
-      errors.push("No se pudo cargar lista de seguimiento");
+      errors.push("Lista de seguimiento en preparacion");
     }
     if (investigationStatuses.status === "rejected") {
-      errors.push("No se pudo cargar estado de investigaciÃ³n");
+      errors.push("Estado de investigacion en preparacion");
     }
     if (smartAlerts.status === "rejected") {
-      errors.push("No se pudieron cargar alertas inteligentes");
+      errors.push("Alertas inteligentes en preparacion");
     }
 
     setState({
@@ -2836,7 +2827,7 @@ export default function DashboardPage() {
       setState((current) => ({
         ...current,
         loading: false,
-        error: `No se pudo cargar el dashboard desde ${API_HOST_LABEL}. ${message}`,
+        error: `La API no respondio desde ${API_HOST_LABEL}. ${message}`,
         updatedAt: new Date(),
       }));
     }
@@ -3006,7 +2997,7 @@ export default function DashboardPage() {
             aria-live="polite"
           >
             <span className="status-dot" />
-            {state.loading ? "Cargando API" : apiOnline ? "API en línea" : "API desconectada"}
+            {state.loading ? "Cargando API" : apiOnline ? "API en linea" : "API sin respuesta"}
           </div>
           <span className="badge muted">API: {API_HOST_LABEL}</span>
           <button
@@ -3050,8 +3041,8 @@ export default function DashboardPage() {
         <section className="alert-panel" role="status">
           <strong>Datos parciales</strong>
           <span>
-            {state.error}. Host API usado: {API_HOST_LABEL}. Revisa que FastAPI este
-            corriendo en {API_BASE_URL}.
+            {state.error}. Host API usado: {API_HOST_LABEL}. Los datos principales
+            siguen visibles cuando estan disponibles.
           </span>
           <button
             className="refresh-button"

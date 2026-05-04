@@ -1,5 +1,7 @@
 "use client";
 
+import { API_BASE_URL, fetchApiJson } from "./api";
+
 export type ManualEvidenceStance = "favor_yes" | "against_yes" | "neutral" | "risk";
 export type ManualEvidenceReviewStatus = "pending_review" | "reviewed" | "rejected";
 
@@ -55,23 +57,8 @@ export const MANUAL_EVIDENCE_REVIEW_STATUS_LABELS: Record<ManualEvidenceReviewSt
   rejected: "Rechazada",
 };
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
-
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    cache: "no-store",
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!response.ok) {
-    throw new Error(`${path} responded ${response.status}`);
-  }
-  return response.json() as Promise<T>;
+  return fetchApiJson<T>(path, init);
 }
 
 export async function fetchMarketManualEvidence(marketId: number): Promise<ManualEvidenceItem[]> {

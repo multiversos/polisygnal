@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { MainNavigation } from "../../components/MainNavigation";
+import { API_BASE_URL, fetchApiJson, friendlyApiError, isApiNotFoundError } from "../../lib/api";
 
 type ExternalMarketSignal = {
   id: number;
@@ -76,10 +77,6 @@ type ThemePreference = "light" | "dark";
 
 const THEME_STORAGE_KEY = "polysignal-theme";
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
-
 const sportLabels: Record<string, string> = {
   nba: "baloncesto",
   basketball: "baloncesto",
@@ -137,14 +134,7 @@ const marketTermTranslations: Record<string, string> = {
 };
 
 async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, { cache: "no-store" });
-  if (response.status === 404) {
-    throw new Error("not_found");
-  }
-  if (!response.ok) {
-    throw new Error(`${path} responded ${response.status}`);
-  }
-  return response.json() as Promise<T>;
+  return fetchApiJson<T>(path);
 }
 
 function applyStoredThemePreference() {
@@ -369,12 +359,14 @@ export default function ExternalSignalMatchReviewPage() {
         loadingCandidates: false,
         candidateError: null,
       }));
-    } catch {
+    } catch (error) {
       setState((current) => ({
         ...current,
         matchResponse: null,
         loadingCandidates: false,
-        candidateError: "No se pudieron cargar candidatos para esta senal.",
+        candidateError: isApiNotFoundError(error)
+          ? "El matcher de coincidencias se conectara en un sprint posterior."
+          : "La API no respondio para los candidatos. Reintentar.",
       }));
     }
   }, []);
@@ -403,14 +395,14 @@ export default function ExternalSignalMatchReviewPage() {
       } else {
         setState((current) => ({ ...current, matchResponse: null }));
       }
-    } catch {
+    } catch (error) {
       setState((current) => ({
         ...current,
         signals: [],
         selectedSignalId: null,
         matchResponse: null,
         loadingSignals: false,
-        error: `No se pudieron cargar senales pendientes desde ${API_BASE_URL}.`,
+        error: friendlyApiError(error, "coincidencias Kalshi"),
       }));
     }
   }, [loadCandidates]);
@@ -475,7 +467,7 @@ export default function ExternalSignalMatchReviewPage() {
 
       {state.error ? (
         <section className="alert-panel" role="status">
-          <strong>API desconectada</strong>
+          <strong>Modulo en preparacion</strong>
           <span>{state.error}</span>
         </section>
       ) : null}
@@ -496,10 +488,10 @@ export default function ExternalSignalMatchReviewPage() {
             <div className="empty-state">Cargando señales pendientes...</div>
           ) : state.signals.length === 0 ? (
             <div className="empty-state">
-              <strong>No hay senales pendientes.</strong>
+              <strong>Modulo en preparacion.</strong>
               <p>
-                Las señales Kalshi guardadas ya están vinculadas o no hay datos
-                externos cargados localmente.
+                No hay senales Kalshi pendientes cargadas. Esta vista quedara
+                activa cuando el pipeline de senales externas tenga datos.
               </p>
             </div>
           ) : (
