@@ -1967,7 +1967,7 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
         <strong>{status.detail}</strong>
         <p>
           {prediction
-            ? `La confianza del modelo es ${confidenceBand}. Esto no es una recomendacion de apuesta ni ejecuta trading automatico.`
+            ? `La confianza del modelo es ${confidenceBand}. El score combina probabilidad estimada, edge y confianza para priorizar revision manual; no es una recomendacion de apuesta ni ejecuta trading automatico.`
             : "Todavia no hay prediccion suficiente para este mercado. Esto no es una recomendacion de apuesta ni ejecuta trading automatico."}
         </p>
       </div>
@@ -4272,6 +4272,9 @@ export default function MarketAnalysisPage() {
   const ingestDryRunCommand = "python -m app.commands.ingest_codex_research --run-id <RUN_ID> --dry-run";
   const pausedFutureMarket = analysis ? isPausedFutureMarket(analysis) : false;
   const upcomingMatchMarket = analysis ? isUpcomingMatchMarket(analysis) : false;
+  const sportDetailHref = analysis?.market.sport_type
+    ? `/sports/${analysis.market.sport_type}`
+    : "/sports";
 
   const marketBadges = useMemo(() => {
     if (!analysis) {
@@ -4300,6 +4303,9 @@ export default function MarketAnalysisPage() {
         <div className="topbar-actions">
           <Link className="text-link" href="/sports">
             Volver a Deportes
+          </Link>
+          <Link className="text-link" href={sportDetailHref}>
+            Ver deporte
           </Link>
           <a className="text-link" href={analysisJsonUrl} target="_blank" rel="noreferrer">
             Ver JSON del análisis
