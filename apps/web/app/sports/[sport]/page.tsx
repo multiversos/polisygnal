@@ -225,7 +225,7 @@ function formatMarketShape(value: string): string {
     futures: "Futuro",
     player_prop: "Jugador",
     team_prop: "Equipo",
-    yes_no_generic: "SI/NO",
+    yes_no_generic: "SÍ/NO",
   };
   return labels[value] ?? value.replaceAll("_", " ");
 }
@@ -265,7 +265,7 @@ function mapOverviewItem(item: MarketOverviewItem): UpcomingSportsMarket | null 
   const edgeSigned = toNumber(prediction?.edge_signed);
   return {
     market_id: market.id,
-    question: market.question || "Mercado sin titulo",
+    question: market.question || "Mercado sin título",
     event_title: market.event_title,
     sport: market.sport_type || "unknown",
     market_shape: market.market_type || "match_winner",
@@ -313,7 +313,7 @@ function PolySignalMiniScore({
   if (!score?.score_probability) {
     return (
       <div className="sports-market-score warning">
-        <span>PolySignal SI</span>
+        <span>PolySignal SÍ</span>
         <strong>pendiente</strong>
         <p>
           {dataQuality?.has_snapshot === false || dataQuality?.has_yes_price === false
@@ -326,10 +326,10 @@ function PolySignalMiniScore({
 
   return (
     <div className={`sports-market-score ${score.color_hint ?? "neutral"}`}>
-      <span>PolySignal SI</span>
+      <span>PolySignal SÍ</span>
       <strong>{formatPercent(score.score_probability)}</strong>
       <p>
-        Mercado SI {formatPercent(score.market_yes_price)} | Diferencia{" "}
+        Mercado SÍ {formatPercent(score.market_yes_price)} | Diferencia{" "}
         {formatPercentPoints(score.edge_percent_points)} | Confianza{" "}
         {score.confidence_label ?? "N/D"}
       </p>
@@ -382,7 +382,7 @@ function SportMarketCard({
         </div>
         <span className="urgency-pill medium">{formatScore(market.urgency_score)}</span>
       </div>
-      <h2>{market.question || "Mercado sin titulo"}</h2>
+      <h2>{market.question || "Mercado sin título"}</h2>
       {market.event_title ? <p>{market.event_title}</p> : null}
       <DataQualityMiniBadges item={dataQuality} />
 
@@ -499,8 +499,8 @@ export default function SportDetailPage() {
           <h1>Mercados de {sportOption.label}</h1>
           <p className="subtitle">
             Mercados reales filtrados desde /markets/overview mediante el proxy
-            same-origin. Si un deporte principal aun no tiene datos, veras un
-            estado vacio limpio.
+            same-origin. Si un deporte principal aún no tiene datos, verás un
+            estado vacío limpio.
           </p>
         </div>
         <div className="topbar-actions">
@@ -516,16 +516,16 @@ export default function SportDetailPage() {
       </header>
 
       <section className="safety-strip">
-        <strong>No es recomendacion de apuesta:</strong>
+        <strong>No es recomendación de apuesta:</strong>
         <span>
-          Esta vista organiza mercados deportivos para revision manual. No
-          ejecuta research, predicciones, ordenes ni trading.
+          Esta vista organiza mercados deportivos para revisión manual. No
+          ejecuta research, predicciones, órdenes ni trading.
         </span>
       </section>
 
       <SportsSelectorBar
         activeLabel="Deporte"
-        description="Cambia de deporte sin salir de la vista de proximos partidos."
+        description="Cambia de deporte sin salir de la vista de próximos partidos."
         kicker="Vista por deporte"
         onSelect={handleSelectSport}
         selectedSport={selectedSport}
@@ -536,7 +536,7 @@ export default function SportDetailPage() {
         <section className="alert-panel" role="status">
           <strong>Deporte no reconocido</strong>
           <span>
-            Vuelve al indice de deportes o selecciona un chip soportado.
+            Vuelve al índice de deportes o selecciona un chip soportado.
           </span>
         </section>
       ) : null}
@@ -546,7 +546,7 @@ export default function SportDetailPage() {
           <strong>{sportOption.statusLabel ?? "No disponible todavia"}</strong>
           <span>
             {sportOption.disabledMessage ??
-              "Este deporte estara disponible mas adelante."}
+              "Este deporte estará disponible más adelante."}
           </span>
         </section>
       ) : null}
@@ -579,16 +579,16 @@ export default function SportDetailPage() {
           <strong>{state.loading ? "..." : state.qualitySummary?.missing_price_count ?? 0}</strong>
         </div>
         <p>
-          Fuente: {API_HOST_LABEL} via /api/backend/markets/overview. Actualizado{" "}
+          Fuente: {API_HOST_LABEL} vía /api/backend/markets/overview. Actualizado{" "}
           {state.updatedAt ? formatDateTime(state.updatedAt.toISOString()) : "al cargar"}.
-          La calidad de datos explica por que un score puede quedar pendiente.
+          La calidad de datos explica por qué un score puede quedar pendiente.
         </p>
       </section>
 
       <section className="panel sports-market-section">
         <div className="panel-heading">
           <div>
-            <h2>Mercados proximos</h2>
+            <h2>Mercados próximos</h2>
             <p>
               Filtro activo: {sportOption.label}. Esta vista no importa datos,
               discovery ni scoring; solo lee mercados disponibles.
@@ -601,7 +601,7 @@ export default function SportDetailPage() {
               rel="noreferrer"
               target="_blank"
             >
-              Ver JSON
+            Ver JSON
             </a>
           ) : (
             <span className="badge muted">Sin consulta al backend</span>
@@ -610,15 +610,15 @@ export default function SportDetailPage() {
 
         {!sportIsEnabled ? (
           <ComingSoonModule
-            copy="La categoria se muestra como roadmap, pero no carga mercados, discovery, scoring ni datos remotos todavia."
-            title={`${sportOption.label} esta en preparacion.`}
+            copy="La categoría se muestra como roadmap, pero no carga mercados, discovery, scoring ni datos remotos todavía."
+            title={`${sportOption.label} está en preparación.`}
           />
         ) : state.loading ? (
           <LoadingState copy={`Cargando mercados de ${sportOption.label}...`} />
         ) : state.items.length === 0 ? (
           <EmptyState
             copy="El backend respondio correctamente con total_count=0 para este deporte. Ejecuta el pipeline limitado cuando quieras poblarlo; no se muestran datos inventados."
-            title={`Todavia no hay mercados cargados para ${sportOption.label}.`}
+            title={`Todavía no hay mercados cargados para ${sportOption.label}.`}
           />
         ) : (
           <div className="sports-market-grid">

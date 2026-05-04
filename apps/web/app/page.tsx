@@ -1184,7 +1184,7 @@ const marketOverviewBucketDefinitions: Array<
   {
     key: "opportunity",
     title: "Mejores oportunidades",
-    description: "Senales con mejor combinacion de score, confianza y precio para revisar primero.",
+    description: "Señales con mejor combinación de score, confianza y precio para revisar primero.",
     tone: "opportunity",
   },
   {
@@ -1196,7 +1196,7 @@ const marketOverviewBucketDefinitions: Array<
   {
     key: "low-confidence",
     title: "Baja confianza",
-    description: "Hay prediccion, pero los datos disponibles todavia no sostienen una lectura fuerte.",
+    description: "Hay predicción, pero los datos disponibles todavía no sostienen una lectura fuerte.",
     tone: "low-confidence",
   },
   {
@@ -1821,7 +1821,7 @@ function FirstAnalysisReadinessPanel({
         <div className="empty-state compact">Calculando readiness...</div>
       ) : readyItems.length === 0 ? (
         <div className="empty-state compact">
-          <strong>No hay mercados completamente listos todavia.</strong>
+          <strong>No hay mercados completamente listos todavía.</strong>
           <p>
             Revisa Data Health para ver candidatos que necesitan snapshot/precio y
             comandos dry-run de refresh controlado.
@@ -1853,7 +1853,7 @@ function FirstAnalysisReadinessPanel({
                 <span className="reason-chip">SI {formatMarketPercent(item.yes_price)}</span>
                 <span className="reason-chip">NO {formatMarketPercent(item.no_price)}</span>
                 <a className="text-link" href={`/markets/${item.market_id}`}>
-                  Ver analisis
+                  Ver análisis
                 </a>
               </div>
             </article>
@@ -2500,7 +2500,7 @@ function MarketOverviewPanel({
         </div>
       </div>
 
-      <div className="market-overview-review-filters" aria-label="Filtros de revision">
+      <div className="market-overview-review-filters" aria-label="Filtros de revisión">
         {dashboardReviewFilters.map((filter) => (
           <button
             aria-pressed={filter.key === reviewFilter}
@@ -2521,8 +2521,8 @@ function MarketOverviewPanel({
         <div className="empty-state">
           <strong>
             {selectedSport === "all"
-              ? "Todavia no hay mercados cargados."
-              : `Todavia no hay mercados cargados para ${sportLabel}.`}
+              ? "Todavía no hay mercados cargados."
+              : `Todavía no hay mercados cargados para ${sportLabel}.`}
           </strong>
           <p>
             Ejecuta el pipeline limitado para poblar este deporte. La pantalla
@@ -2533,7 +2533,7 @@ function MarketOverviewPanel({
         <div className="empty-state">
           <strong>No hay mercados en el filtro {selectedFilterLabel}.</strong>
           <p>
-            Cambia el filtro de revision para ver otros mercados cargados. Este
+            Cambia el filtro de revisión para ver otros mercados cargados. Este
             filtro es local y no dispara llamadas nuevas al backend.
           </p>
         </div>
@@ -2643,7 +2643,7 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
           <strong>{modelProbability === "--" ? "No calculado" : modelProbability}</strong>
         </div>
         <div className="market-overview-metric primary">
-          <span>Score revision</span>
+          <span>Score revisión</span>
           <strong>{actionScore === "--" ? "Pendiente" : actionScore}</strong>
         </div>
         <div className="market-overview-metric">
@@ -2681,7 +2681,7 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
         </span>
         {marketId ? (
           <a className="analysis-link" href={`/markets/${marketId}`}>
-            Ver analisis
+            Ver análisis
           </a>
         ) : null}
       </div>
@@ -2784,7 +2784,7 @@ export default function DashboardPage() {
       errors.push("Candidatos en preparacion");
     }
     if (upcomingSports.status === "rejected") {
-      errors.push("Mercados proximos en preparacion");
+      errors.push("Mercados próximos en preparación");
     }
     if (upcomingDataQuality.status === "rejected") {
       errors.push("Calidad de datos en preparacion");
@@ -2793,7 +2793,7 @@ export default function DashboardPage() {
       errors.push("Readiness de analisis en preparacion");
     }
     if (externalSignals.status === "rejected") {
-      errors.push("Senales externas en preparacion");
+      errors.push("Señales externas en preparación");
     }
 
     if (watchlist.status === "rejected") {
@@ -3011,7 +3011,7 @@ export default function DashboardPage() {
             aria-live="polite"
           >
             <span className="status-dot" />
-            {state.loading ? "Cargando API" : apiOnline ? "API en linea" : "API sin respuesta"}
+            {state.loading ? "Cargando API" : apiOnline ? "API en línea" : "API sin respuesta"}
           </div>
           <span className="badge muted">API: {API_HOST_LABEL}</span>
           <button
@@ -3093,7 +3093,7 @@ export default function DashboardPage() {
         <article className="metric-card">
           <span>Modo actual</span>
           <strong>solo lectura</strong>
-          <p>No trading automatico ni scoring desde la UI</p>
+          <p>No trading automático ni scoring desde la UI</p>
         </article>
         <article className="metric-card">
           <span>Actualizacion local</span>

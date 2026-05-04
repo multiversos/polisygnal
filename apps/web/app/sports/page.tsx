@@ -11,12 +11,12 @@ import {
 const sportDescriptions: Record<string, string> = {
   basketball: "Partidos de baloncesto con la liga como metadata separada.",
   nfl: "Partidos NFL y mercados cercanos de ganador del juego.",
-  soccer: "Futbol global: clubes, ligas y cruces proximos.",
+  soccer: "Fútbol global: clubes, ligas y cruces próximos.",
   tennis: "Cruces de tenis ATP/WTA y torneos principales.",
-  baseball: "Beisbol y mercados de ganador de partido.",
+  baseball: "Béisbol y mercados de ganador de partido.",
   horse_racing: "Carreras de caballos y mercados de ganador de carrera.",
-  ufc: "UFC/MMA se activara cuando el pipeline tenga soporte operativo.",
-  cricket: "Criquet se mantiene visible como categoria futura.",
+  ufc: "UFC/MMA se activará cuando el pipeline tenga soporte operativo.",
+  cricket: "Críquet se mantiene visible como categoría futura.",
   nhl: "Hockey/NHL queda pausado hasta activar datos dedicados.",
 };
 
@@ -29,8 +29,8 @@ export default function SportsIndexPage() {
           <p className="eyebrow">Deportes</p>
           <h1>Deportes en PolySignal</h1>
           <p className="subtitle">
-            Vista por deporte de mercados proximos. En esta etapa priorizamos
-            partidos de los proximos 7 dias y ganador/perdedor del partido.
+            Vista por deporte de mercados próximos. En esta etapa priorizamos
+            partidos de los próximos 7 días y ganador/perdedor del partido.
           </p>
         </div>
       </header>
@@ -38,8 +38,8 @@ export default function SportsIndexPage() {
       <section className="safety-strip">
         <strong>Solo lectura:</strong>
         <span>
-          Estas paginas organizan mercados ya sincronizados. No crean datos,
-          research, predicciones, ordenes ni apuestas.
+          Estas páginas organizan mercados ya sincronizados. No crean datos,
+          research, predicciones, órdenes ni apuestas.
         </span>
       </section>
 
@@ -47,7 +47,7 @@ export default function SportsIndexPage() {
         <div className="panel-heading">
           <div>
             <h2>Deportes principales</h2>
-            <p>Activos para navegacion, filtros y llamadas controladas al backend.</p>
+            <p>Activos para navegación, filtros y llamadas controladas al backend.</p>
           </div>
         </div>
         <div className="sports-index-grid">
@@ -72,7 +72,7 @@ export default function SportsIndexPage() {
         <div className="panel-heading">
           <div>
             <h2>Otros</h2>
-            <p>Visibles como roadmap, sin carga de datos ni llamadas al backend.</p>
+          <p>Visibles como roadmap, sin carga de datos ni llamadas al backend.</p>
           </div>
         </div>
         <div className="sports-index-grid secondary">

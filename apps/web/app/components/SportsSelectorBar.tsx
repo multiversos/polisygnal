@@ -13,7 +13,7 @@ export type SportSelectorOption = {
   disabledMessage?: string;
 };
 
-const comingSoonMessage = "Este deporte estara disponible mas adelante.";
+const comingSoonMessage = "Este deporte estará disponible más adelante.";
 
 export const allSportsOption = {
   id: "all",
@@ -44,7 +44,7 @@ export const primarySportOptions = [
   {
     id: "soccer",
     apiValue: "soccer",
-    label: "Futbol",
+    label: "Fútbol",
     icon: "F",
     tone: "soccer",
     backendSupported: true,
@@ -60,7 +60,7 @@ export const primarySportOptions = [
   {
     id: "baseball",
     apiValue: "baseball",
-    label: "Beisbol",
+    label: "Béisbol",
     icon: "BB",
     tone: "baseball",
     backendSupported: true,
@@ -83,17 +83,17 @@ export const secondarySportOptions = [
     icon: "U",
     tone: "ufc",
     backendSupported: false,
-    statusLabel: "Proximamente",
+    statusLabel: "Próximamente",
     disabledMessage: comingSoonMessage,
   },
   {
     id: "cricket",
     apiValue: null,
-    label: "Criquet",
+    label: "Críquet",
     icon: "C",
     tone: "cricket",
     backendSupported: false,
-    statusLabel: "Proximamente",
+    statusLabel: "Próximamente",
     disabledMessage: comingSoonMessage,
   },
   {
@@ -103,7 +103,7 @@ export const secondarySportOptions = [
     icon: "HK",
     tone: "nhl",
     backendSupported: false,
-    statusLabel: "Proximamente",
+    statusLabel: "Próximamente",
     disabledMessage: comingSoonMessage,
   },
 ] as const satisfies readonly SportSelectorOption[];
@@ -223,7 +223,7 @@ export function SportsSelectorBar({
               onClick={() =>
                 setDisabledNotice(
                   `${option.label}: ${
-                    option.disabledMessage ?? "No disponible todavia."
+                    option.disabledMessage ?? "No disponible todavía."
                   }`,
                 )
               }
