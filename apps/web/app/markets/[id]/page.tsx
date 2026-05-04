@@ -978,6 +978,86 @@ function formatFreshnessAction(value?: string | null): string {
   return freshnessActionLabels[value] ?? humanizeToken(value);
 }
 
+function getConfidenceBand(value: unknown): string {
+  const confidence = normalizeProbability(value);
+  if (confidence === null) {
+    return "sin confianza";
+  }
+  if (confidence >= 0.7) {
+    return "alta";
+  }
+  if (confidence >= 0.4) {
+    return "media";
+  }
+  return "baja";
+}
+
+function getAnalysisStatus(analysis: MarketAnalysis): {
+  label: string;
+  tone: "opportunity" | "watchlist" | "low-confidence" | "data-only" | "neutral";
+  detail: string;
+} {
+  const prediction = analysis.latest_prediction;
+  const score = analysis.polysignal_score;
+  const confidence = normalizeProbability(prediction?.confidence_score ?? score?.confidence);
+  const edgeMagnitude = normalizeProbability(prediction?.edge_magnitude);
+
+  if (!prediction && !score) {
+    return {
+      label: "Sin prediccion",
+      tone: "neutral",
+      detail: "El mercado todavia no tiene una prediccion guardada.",
+    };
+  }
+  if (prediction?.opportunity) {
+    return {
+      label: "Oportunidad",
+      tone: "opportunity",
+      detail: "Hay una senal marcada como oportunidad para revision manual.",
+    };
+  }
+  if (edgeMagnitude !== null && edgeMagnitude >= 0.05) {
+    return {
+      label: "Vigilancia",
+      tone: "watchlist",
+      detail: "La diferencia contra el precio de mercado merece seguimiento.",
+    };
+  }
+  if (confidence !== null && confidence < 0.3) {
+    return {
+      label: "Baja confianza",
+      tone: "low-confidence",
+      detail: "Hay prediccion, pero la confianza aun es limitada.",
+    };
+  }
+  return {
+    label: "Solo datos",
+    tone: "data-only",
+    detail: "El mercado tiene datos utiles, sin una senal fuerte por ahora.",
+  };
+}
+
+function getLatestAnalysisUpdate(analysis: MarketAnalysis): string | null {
+  return (
+    analysis.latest_prediction?.run_at ||
+    analysis.latest_snapshot?.captured_at ||
+    analysis.market.updated_at ||
+    null
+  );
+}
+
+function getScoringModeLabel(analysis: MarketAnalysis): string {
+  if (!analysis.latest_prediction && !analysis.polysignal_score) {
+    return "Sin prediccion";
+  }
+  if (analysis.latest_prediction?.prediction_family) {
+    return analysis.latest_prediction.prediction_family;
+  }
+  return analysis.polysignal_score?.source
+    ? humanizeToken(analysis.polysignal_score.source)
+    : "Modo no definido";
+}
+
 function formatSportLabel(value?: string | null): string {
   return value ? sportLabels[value] ?? humanizeToken(value) : "deporte no definido";
 }
@@ -1855,6 +1935,96 @@ function FreshnessPanel({ freshness }: { freshness?: MarketFreshness | null }) {
   );
 }
 
+function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
+  const prediction = analysis.latest_prediction;
+  const snapshot = analysis.latest_snapshot;
+  const score = analysis.polysignal_score;
+  const status = getAnalysisStatus(analysis);
+  const sportLabel = formatSportLabel(analysis.candidate_context?.sport || analysis.market.sport_type);
+  const marketTypeLabel = formatMarketShapeLabel(
+    analysis.candidate_context?.market_shape ||
+      analysis.market.evidence_shape ||
+      analysis.market.market_type,
+  );
+  const confidenceValue = prediction?.confidence_score ?? score?.confidence ?? null;
+  const confidenceBand = getConfidenceBand(confidenceValue);
+  const yesModelProbability = prediction?.yes_probability ?? score?.score_probability ?? null;
+  const edgeValue = prediction?.edge_signed ?? score?.edge_signed ?? null;
+
+  return (
+    <section className="analysis-section">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Lectura rapida</span>
+          <h2>Que revisar primero</h2>
+          <p className="section-note">
+            Estas viendo un mercado de {sportLabel} tipo {marketTypeLabel}. PolySignal
+            compara precio, snapshot y prediccion guardada para ayudar a revisar el
+            mercado con criterio humano.
+          </p>
+        </div>
+        <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+      </div>
+
+      <div className="empty-state compact">
+        <strong>{status.detail}</strong>
+        <p>
+          {prediction
+            ? `La confianza del modelo es ${confidenceBand}. Esto no es una recomendacion de apuesta ni ejecuta trading automatico.`
+            : "Todavia no hay prediccion suficiente para este mercado. Esto no es una recomendacion de apuesta ni ejecuta trading automatico."}
+        </p>
+      </div>
+
+      <div className="analysis-stat-grid">
+        <div><span>Precio YES</span><strong>{formatProbability(snapshot?.yes_price)}</strong></div>
+        <div><span>Precio NO</span><strong>{formatProbability(snapshot?.no_price)}</strong></div>
+        <div><span>Modelo YES</span><strong>{formatProbability(yesModelProbability)}</strong></div>
+        <div><span>Score</span><strong>{score?.score_percent !== undefined && score?.score_percent !== null ? `${score.score_percent}%` : formatProbability(score?.score_probability)}</strong></div>
+        <div><span>Confianza</span><strong>{formatProbability(confidenceValue)}</strong></div>
+        <div><span>Edge</span><strong>{formatSignedProbabilityPoints(edgeValue)}</strong></div>
+        <div><span>Modo</span><strong>{getScoringModeLabel(analysis)}</strong></div>
+        <div><span>Ultima actualizacion</span><strong>{formatDateTime(getLatestAnalysisUpdate(analysis))}</strong></div>
+      </div>
+    </section>
+  );
+}
+
+function MarketTechnicalDataPanel({ analysis }: { analysis: MarketAnalysis }) {
+  const market = analysis.market;
+  const snapshot = analysis.latest_snapshot;
+  const prediction = analysis.latest_prediction;
+
+  return (
+    <section className="analysis-section">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Datos del mercado</span>
+          <h2>Valores tecnicos</h2>
+          <p className="section-note">
+            Identificadores y campos usados por el dashboard. Si un valor falta,
+            PolySignal lo deja como pendiente en vez de inventarlo.
+          </p>
+        </div>
+      </div>
+
+      <div className="analysis-stat-grid">
+        <div><span>market_id</span><strong>{market.id}</strong></div>
+        <div><span>remote_id</span><strong>{shortIdentifier(market.polymarket_market_id)}</strong></div>
+        <div><span>sport_type</span><strong>{market.sport_type || "N/D"}</strong></div>
+        <div><span>market_type</span><strong>{market.market_type || market.evidence_shape || "N/D"}</strong></div>
+        <div><span>close_time</span><strong>{formatDateTime(market.end_date)}</strong></div>
+        <div><span>Estado</span><strong>{market.active && !market.closed ? "Activo" : "Cerrado/inactivo"}</strong></div>
+        <div><span>liquidity</span><strong>{formatCompact(snapshot?.liquidity)}</strong></div>
+        <div><span>volume</span><strong>{formatCompact(snapshot?.volume)}</strong></div>
+        <div><span>latest_snapshot</span><strong>{snapshot ? `#${snapshot.id} - ${formatDateTime(snapshot.captured_at)}` : "Sin snapshot"}</strong></div>
+        <div><span>latest_prediction</span><strong>{prediction ? `#${prediction.id} - ${formatDateTime(prediction.run_at)}` : "Sin prediccion"}</strong></div>
+        <div><span>scoring_mode</span><strong>{getScoringModeLabel(analysis)}</strong></div>
+        <div><span>updated_at</span><strong>{formatDateTime(market.updated_at)}</strong></div>
+      </div>
+    </section>
+  );
+}
+
 function MarketLinksPanel({ links }: { links?: MarketLinks | null }) {
   if (!links) {
     return null;
@@ -2099,8 +2269,8 @@ function MarketTimelinePanel({ state }: { state: MarketTimelineState }) {
     <section className="analysis-section market-timeline-section">
       <div className="analysis-section-heading">
         <div>
-          <span className="section-kicker">Actividad</span>
-          <h2>Linea de tiempo</h2>
+          <span className="section-kicker">Historial</span>
+          <h2>Historial</h2>
           <p className="section-note">
             Eventos relevantes del mercado reunidos en modo solo lectura. No
             crea research, predicciones ni datos nuevos.
@@ -2130,7 +2300,7 @@ function MarketTimelinePanel({ state }: { state: MarketTimelineState }) {
       ) : null}
       {!state.loading && state.items.length === 0 ? (
         <div className="empty-state compact">
-          No hay eventos registrados para este mercado todavia.
+          Todavia no hay historial suficiente para este mercado.
         </div>
       ) : null}
       {!state.loading && state.items.length > 0 && filteredItems.length === 0 ? (
@@ -2472,7 +2642,7 @@ function EvidencePanel({ analysis }: { analysis: MarketAnalysis }) {
         </div>
       </div>
       {items.length === 0 ? (
-        <div className="empty-state">No hay evidencia externa guardada todavía para este mercado.</div>
+        <div className="empty-state">La evidencia externa se agregara en un sprint posterior.</div>
       ) : (
         <div className="evidence-groups">
           <div>
@@ -4128,6 +4298,9 @@ export default function MarketAnalysisPage() {
           Volver al dashboard
         </Link>
         <div className="topbar-actions">
+          <Link className="text-link" href="/sports">
+            Volver a Deportes
+          </Link>
           <a className="text-link" href={analysisJsonUrl} target="_blank" rel="noreferrer">
             Ver JSON del análisis
           </a>
@@ -4225,6 +4398,8 @@ export default function MarketAnalysisPage() {
 
           <div className="analysis-layout">
             <div className="analysis-main">
+              <QuickReadPanel analysis={analysis} />
+              <MarketTechnicalDataPanel analysis={analysis} />
               <PricePanel snapshot={analysis.latest_snapshot} />
               <PolySignalScorePanel score={analysis.polysignal_score} />
               <DataQualityPanel
