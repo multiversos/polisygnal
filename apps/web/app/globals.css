@@ -671,6 +671,37 @@ h2 {
   line-height: 1.2;
 }
 
+.market-overview-review-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.market-overview-review-filters button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.market-overview-review-filters button:hover,
+.market-overview-review-filters button.active {
+  border-color: var(--line-strong);
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.market-overview-review-filters button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .market-overview-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));

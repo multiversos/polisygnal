@@ -122,6 +122,14 @@ type MarketOverviewBucketSection = {
   items: MarketOverviewItem[];
 };
 
+type DashboardReviewFilter =
+  | "all"
+  | "with-prediction"
+  | "opportunity"
+  | "watchlist"
+  | "low-confidence"
+  | "data-only";
+
 type DashboardMetaResponse = {
   artifact_available?: boolean;
   dashboard_available?: boolean;
@@ -1266,6 +1274,18 @@ const marketOverviewBucketDefinitions: Array<
   },
 ];
 
+const dashboardReviewFilters: Array<{
+  key: DashboardReviewFilter;
+  label: string;
+}> = [
+  { key: "all", label: "Todos" },
+  { key: "with-prediction", label: "Con prediccion" },
+  { key: "opportunity", label: "Solo oportunidades" },
+  { key: "watchlist", label: "Solo vigilancia" },
+  { key: "low-confidence", label: "Baja confianza" },
+  { key: "data-only", label: "Solo datos" },
+];
+
 function getOverviewScoreValue(item: MarketOverviewItem): number | null {
   return normalizeProbability(item.latest_prediction?.action_score);
 }
@@ -1391,6 +1411,19 @@ function buildMarketOverviewSections(
       items: [...(grouped.get(definition.key) ?? [])].sort(compareOverviewItems),
     }))
     .filter((section) => section.items.length > 0);
+}
+
+function matchesDashboardReviewFilter(
+  item: MarketOverviewItem,
+  filter: DashboardReviewFilter,
+): boolean {
+  if (filter === "all") {
+    return true;
+  }
+  if (filter === "with-prediction") {
+    return Boolean(item.latest_prediction);
+  }
+  return getOverviewBucketKey(item) === filter;
 }
 
 function getOverviewStatus(item: MarketOverviewItem): {
@@ -2473,11 +2506,17 @@ function MarketOverviewPanel({
   totalCount: number | null;
   updatedAt: Date | null;
 }) {
+  const [reviewFilter, setReviewFilter] = useState<DashboardReviewFilter>("all");
   const withPrediction = getOverviewItemsWithPrediction(items);
   const sportCount = countOverviewSports(items);
   const latestTimestamp = getLatestOverviewTimestamp(items);
   const sportLabel = getSportSelectorOption(selectedSport).label;
-  const sections = buildMarketOverviewSections(items);
+  const filteredItems = items.filter((item) =>
+    matchesDashboardReviewFilter(item, reviewFilter),
+  );
+  const sections = buildMarketOverviewSections(filteredItems);
+  const selectedFilterLabel =
+    dashboardReviewFilters.find((filter) => filter.key === reviewFilter)?.label ?? "Todos";
 
   return (
     <section className="panel market-overview-panel" aria-label="Mercados destacados">
@@ -2502,7 +2541,7 @@ function MarketOverviewPanel({
       <div className="market-overview-kpis" aria-label="Resumen de mercados destacados">
         <div>
           <span>Total visible</span>
-          <strong>{loading ? "..." : totalCount ?? items.length}</strong>
+          <strong>{loading ? "..." : filteredItems.length}</strong>
         </div>
         <div>
           <span>Con prediccion</span>
@@ -2522,6 +2561,21 @@ function MarketOverviewPanel({
         </div>
       </div>
 
+      <div className="market-overview-review-filters" aria-label="Filtros de revision">
+        {dashboardReviewFilters.map((filter) => (
+          <button
+            aria-pressed={filter.key === reviewFilter}
+            className={filter.key === reviewFilter ? "active" : ""}
+            disabled={loading}
+            key={filter.key}
+            onClick={() => setReviewFilter(filter.key)}
+            type="button"
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="empty-state">Cargando mercados destacados...</div>
       ) : items.length === 0 ? (
@@ -2534,6 +2588,14 @@ function MarketOverviewPanel({
           <p>
             Ejecuta el pipeline limitado para poblar este deporte. La pantalla
             queda en modo solo lectura y no dispara imports, discovery ni scoring.
+          </p>
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="empty-state">
+          <strong>No hay mercados en el filtro {selectedFilterLabel}.</strong>
+          <p>
+            Cambia el filtro de revision para ver otros mercados cargados. Este
+            filtro es local y no dispara llamadas nuevas al backend.
           </p>
         </div>
       ) : (
