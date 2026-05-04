@@ -37,8 +37,68 @@ type HealthResponse = {
 };
 
 type MarketsOverviewResponse = {
+  filters?: Record<string, unknown>;
   total_count?: number;
   items?: unknown[];
+};
+
+type MarketOverviewMarket = {
+  id?: number;
+  question?: string | null;
+  sport_type?: string | null;
+  market_type?: string | null;
+  active?: boolean | null;
+  closed?: boolean | null;
+  end_date?: string | null;
+  close_time?: string | null;
+  evidence_eligible?: boolean | null;
+  evidence_shape?: string | null;
+  evidence_skip_reason?: string | null;
+};
+
+type MarketOverviewSnapshot = {
+  captured_at?: string | null;
+  yes_price?: string | number | null;
+  no_price?: string | number | null;
+  spread?: string | number | null;
+  volume?: string | number | null;
+  liquidity?: string | number | null;
+};
+
+type MarketOverviewPrediction = {
+  id?: number;
+  run_at?: string | null;
+  model_version?: string | null;
+  yes_probability?: string | number | null;
+  no_probability?: string | number | null;
+  confidence_score?: string | number | null;
+  action_score?: string | number | null;
+  edge_signed?: string | number | null;
+  edge_magnitude?: string | number | null;
+  edge_class?: string | null;
+  opportunity?: boolean | null;
+  review_confidence?: boolean | null;
+  review_edge?: boolean | null;
+  used_odds_count?: number | null;
+  used_news_count?: number | null;
+  used_evidence_in_scoring?: boolean | null;
+};
+
+type MarketOverviewEvidenceSummary = {
+  evidence_count?: number | null;
+  odds_evidence_count?: number | null;
+  news_evidence_count?: number | null;
+  latest_evidence_at?: string | null;
+};
+
+type MarketOverviewItem = {
+  priority_rank?: number | null;
+  priority_bucket?: string | null;
+  scoring_mode?: string | null;
+  market?: MarketOverviewMarket | null;
+  latest_snapshot?: MarketOverviewSnapshot | null;
+  latest_prediction?: MarketOverviewPrediction | null;
+  evidence_summary?: MarketOverviewEvidenceSummary | null;
 };
 
 type DashboardMetaResponse = {
@@ -622,6 +682,17 @@ function compareSignalToCandidate(
   return { diff, label: "Alineado", tone: "aligned" };
 }
 
+function buildMarketOverviewPath(sport: string): string {
+  const params = new URLSearchParams({
+    limit: "20",
+  });
+  const apiSport = getSportApiFilter(sport);
+  if (apiSport) {
+    params.set("sport_type", apiSport);
+  }
+  return `/markets/overview?${params.toString()}`;
+}
+
 function buildCandidatesPath(filters: DashboardFilters): string {
   const params = new URLSearchParams({
     vertical: "sports",
@@ -1066,6 +1137,132 @@ function formatReadinessAction(value: string): string {
     return "Revisar o descartar por ahora";
   }
   return humanizeToken(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isMarketOverviewItem(value: unknown): value is MarketOverviewItem {
+  return isRecord(value) && isRecord(value.market);
+}
+
+function getMarketOverviewItems(overview: MarketsOverviewResponse | null): MarketOverviewItem[] {
+  if (!Array.isArray(overview?.items)) {
+    return [];
+  }
+  return overview.items.filter(isMarketOverviewItem);
+}
+
+function overviewBucketLabel(value?: string | null): string {
+  if (!value) {
+    return "Sin bucket";
+  }
+  const labels: Record<string, string> = {
+    priority: "Oportunidad",
+    watchlist: "Vigilancia",
+    review_fallback: "Baja confianza",
+    fallback_only: "Solo datos",
+    no_prediction: "Sin prediccion",
+  };
+  return labels[value] ?? humanizeToken(value);
+}
+
+function overviewScoringModeLabel(value?: string | null): string {
+  if (!value) {
+    return "Sin modo";
+  }
+  const labels: Record<string, string> = {
+    evidence_backed: "Con evidencia",
+    fallback_only: "Solo snapshot",
+    no_prediction: "Sin prediccion",
+  };
+  return labels[value] ?? humanizeToken(value);
+}
+
+function getOverviewStatus(item: MarketOverviewItem): {
+  label: string;
+  tone: string;
+  detail: string;
+} {
+  const prediction = item.latest_prediction;
+  const confidence = normalizeProbability(prediction?.confidence_score);
+  const edgeMagnitude = normalizeProbability(prediction?.edge_magnitude);
+  const bucket = item.priority_bucket ?? "";
+
+  if (!prediction) {
+    return {
+      label: "Sin prediccion",
+      tone: "neutral",
+      detail: "Pendiente de scoring",
+    };
+  }
+  if (prediction.opportunity || bucket === "priority") {
+    return {
+      label: "Oportunidad",
+      tone: "opportunity",
+      detail: "Revisar primero",
+    };
+  }
+  if (bucket === "watchlist" || (edgeMagnitude !== null && edgeMagnitude >= 0.05)) {
+    return {
+      label: "Vigilancia",
+      tone: "watchlist",
+      detail: "Hay diferencia que mirar",
+    };
+  }
+  if (bucket === "review_fallback" || (confidence !== null && confidence < 0.3)) {
+    return {
+      label: "Baja confianza",
+      tone: "low-confidence",
+      detail: "Datos limitados",
+    };
+  }
+  return {
+    label: "Solo datos",
+    tone: "data-only",
+    detail: overviewScoringModeLabel(item.scoring_mode),
+  };
+}
+
+function getOverviewTimestamp(item: MarketOverviewItem): string | null {
+  return (
+    item.latest_prediction?.run_at ??
+    item.latest_snapshot?.captured_at ??
+    item.evidence_summary?.latest_evidence_at ??
+    null
+  );
+}
+
+function getLatestOverviewTimestamp(items: MarketOverviewItem[]): string | null {
+  let latest: Date | null = null;
+  for (const item of items) {
+    const timestamp = getOverviewTimestamp(item);
+    if (!timestamp) {
+      continue;
+    }
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      continue;
+    }
+    if (latest === null || date > latest) {
+      latest = date;
+    }
+  }
+  return latest?.toISOString() ?? null;
+}
+
+function countOverviewSports(items: MarketOverviewItem[]): number {
+  const sports = new Set(
+    items
+      .map((item) => item.market?.sport_type)
+      .filter((sport): sport is string => Boolean(sport)),
+  );
+  return sports.size;
+}
+
+function getOverviewItemsWithPrediction(items: MarketOverviewItem[]): number {
+  return items.filter((item) => Boolean(item.latest_prediction)).length;
 }
 
 function formatReadinessSource(value?: string | null): string {
@@ -2051,6 +2248,205 @@ function ExternalSignalCard({
   );
 }
 
+function MarketOverviewPanel({
+  items,
+  loading,
+  overviewPath,
+  selectedSport,
+  totalCount,
+  updatedAt,
+}: {
+  items: MarketOverviewItem[];
+  loading: boolean;
+  overviewPath: string;
+  selectedSport: string;
+  totalCount: number | null;
+  updatedAt: Date | null;
+}) {
+  const withPrediction = getOverviewItemsWithPrediction(items);
+  const sportCount = countOverviewSports(items);
+  const latestTimestamp = getLatestOverviewTimestamp(items);
+  const sportLabel = getSportSelectorOption(selectedSport).label;
+
+  return (
+    <section className="panel market-overview-panel" aria-label="Mercados destacados">
+      <div className="panel-heading">
+        <div>
+          <h2>Mercados destacados</h2>
+          <p>
+            Lectura directa de /markets/overview: precios, score, confianza y
+            estado operativo para decidir que revisar primero.
+          </p>
+        </div>
+        <a
+          className="text-link"
+          href={`${API_BASE_URL}${overviewPath}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Ver JSON
+        </a>
+      </div>
+
+      <div className="market-overview-kpis" aria-label="Resumen de mercados destacados">
+        <div>
+          <span>Total visible</span>
+          <strong>{loading ? "..." : totalCount ?? items.length}</strong>
+        </div>
+        <div>
+          <span>Con prediccion</span>
+          <strong>{loading ? "..." : withPrediction}</strong>
+        </div>
+        <div>
+          <span>Deportes disponibles</span>
+          <strong>{loading ? "..." : sportCount}</strong>
+        </div>
+        <div>
+          <span>Ultima senal</span>
+          <strong>{loading ? "..." : formatDateTime(latestTimestamp ?? updatedAt)}</strong>
+        </div>
+        <div>
+          <span>Modo</span>
+          <strong>Solo lectura</strong>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="empty-state">Cargando mercados destacados...</div>
+      ) : items.length === 0 ? (
+        <div className="empty-state">
+          <strong>
+            {selectedSport === "all"
+              ? "Todavia no hay mercados cargados."
+              : `Todavia no hay mercados cargados para ${sportLabel}.`}
+          </strong>
+          <p>
+            Ejecuta el pipeline limitado para poblar este deporte. La pantalla
+            queda en modo solo lectura y no dispara imports, discovery ni scoring.
+          </p>
+        </div>
+      ) : (
+        <div className="market-overview-grid">
+          {items.map((item, index) => (
+            <MarketOverviewCard
+              item={item}
+              key={item.market?.id ?? `${item.market?.question ?? "market"}-${index}`}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
+  const market = item.market ?? {};
+  const snapshot = item.latest_snapshot ?? {};
+  const prediction = item.latest_prediction ?? null;
+  const status = getOverviewStatus(item);
+  const marketId = market.id;
+  const title = market.question
+    ? humanizeMarketTitle(market.question)
+    : "Mercado sin titulo";
+  const originalTitle = market.question && title !== market.question ? market.question : null;
+  const yesPrice = formatMarketPercent(snapshot.yes_price);
+  const noPrice = formatMarketPercent(snapshot.no_price);
+  const modelProbability = formatMarketPercent(prediction?.yes_probability);
+  const confidence = formatMarketPercent(prediction?.confidence_score);
+  const actionScore = formatMarketPercent(prediction?.action_score);
+  const edge = formatPercentDelta(prediction?.edge_signed);
+  const barWidth = getProbabilityBarWidth(
+    prediction?.yes_probability ?? snapshot.yes_price,
+    prediction?.no_probability ?? snapshot.no_price,
+  );
+  const closeTime = market.close_time ?? market.end_date ?? null;
+
+  return (
+    <article className={`market-overview-card ${status.tone}`}>
+      <div className="market-overview-card-header">
+        <div className="candidate-main-copy">
+          <div className="badge-row">
+            <span className="badge muted">#{item.priority_rank ?? marketId ?? "N/D"}</span>
+            <span className="badge">{formatSportLabel(market.sport_type)}</span>
+            <span className="badge muted">{formatMarketShapeLabel(market.market_type)}</span>
+          </div>
+          <h3>{title}</h3>
+          {originalTitle ? <p className="original-market-title">{originalTitle}</p> : null}
+        </div>
+        <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+      </div>
+
+      <div className="market-overview-price-block">
+        <div className="market-price-row">
+          <span>YES</span>
+          <strong>{yesPrice === "--" ? "Sin dato" : yesPrice}</strong>
+        </div>
+        <div className="market-price-row">
+          <span>NO</span>
+          <strong>{noPrice === "--" ? "Sin dato" : noPrice}</strong>
+        </div>
+        <div className={`probability-bar ${barWidth === null ? "neutral" : ""}`}>
+          <span
+            className="probability-bar-yes"
+            style={{ width: `${barWidth ?? 50}%` }}
+          />
+          <span className="probability-bar-no" />
+        </div>
+      </div>
+
+      <div className="market-overview-metrics">
+        <div>
+          <span>Modelo</span>
+          <strong>{modelProbability === "--" ? "No calculado" : modelProbability}</strong>
+        </div>
+        <div>
+          <span>Score</span>
+          <strong>{actionScore === "--" ? "Pendiente" : actionScore}</strong>
+        </div>
+        <div>
+          <span>Confianza</span>
+          <strong>{confidence === "--" ? "Pendiente" : confidence}</strong>
+        </div>
+        <div>
+          <span>Edge</span>
+          <strong>{edge === "N/D" ? "Sin dato" : edge}</strong>
+        </div>
+      </div>
+
+      <div className="market-overview-foot">
+        <div>
+          <span>Bucket</span>
+          <strong>{overviewBucketLabel(item.priority_bucket)}</strong>
+        </div>
+        <div>
+          <span>Modo</span>
+          <strong>{status.detail}</strong>
+        </div>
+        <div>
+          <span>Cierre</span>
+          <strong>{formatDateTime(closeTime)}</strong>
+        </div>
+        <div>
+          <span>Snapshot</span>
+          <strong>{formatDateTime(snapshot.captured_at)}</strong>
+        </div>
+      </div>
+
+      <div className="market-overview-actions">
+        <span className="quiet-text">
+          Evidencia: {item.evidence_summary?.evidence_count ?? 0} | Liquidez{" "}
+          {formatMarketMetric(snapshot.liquidity)}
+        </span>
+        {marketId ? (
+          <a className="analysis-link" href={`/markets/${marketId}`}>
+            Ver analisis
+          </a>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 export default function DashboardPage() {
   const [filters, setFilters] = useState<DashboardFilters>({
     sport: "all",
@@ -2089,6 +2485,7 @@ export default function DashboardPage() {
   const loadDashboard = useCallback(async () => {
     setState((current) => ({ ...current, loading: true, error: null }));
 
+    const overviewPath = buildMarketOverviewPath(upcomingFilters.sport);
     const candidatesPath = buildCandidatesPath(filters);
     const upcomingPath = buildUpcomingPath(upcomingFilters);
     const upcomingDataQualityPath = buildUpcomingDataQualityPath(upcomingFilters);
@@ -2109,7 +2506,7 @@ export default function DashboardPage() {
     ] =
       await Promise.allSettled([
         fetchJson<HealthResponse>("/health"),
-        fetchJson<MarketsOverviewResponse>("/markets/overview"),
+        fetchJson<MarketsOverviewResponse>(overviewPath),
         fetchJson<CandidatesResponse>(candidatesPath),
         fetchJson<UpcomingSportsResponse>(upcomingPath),
         fetchJson<UpcomingDataQualityResponse>(upcomingDataQualityPath),
@@ -2124,6 +2521,9 @@ export default function DashboardPage() {
     const errors: string[] = [];
     if (health.status === "rejected") {
       errors.push("API desconectada o /health no disponible");
+    }
+    if (overview.status === "rejected") {
+      errors.push("No se pudo cargar overview de mercados");
     }
     if (candidates.status === "rejected") {
       errors.push("No se pudieron cargar candidatos");
@@ -2210,11 +2610,24 @@ export default function DashboardPage() {
     }
     return null;
   }, [state.overview]);
+  const overviewItems = useMemo(
+    () => getMarketOverviewItems(state.overview),
+    [state.overview],
+  );
+  const overviewItemsWithPrediction = useMemo(
+    () => getOverviewItemsWithPrediction(overviewItems),
+    [overviewItems],
+  );
+  const overviewSportCount = useMemo(
+    () => countOverviewSports(overviewItems),
+    [overviewItems],
+  );
 
   const filteredCandidates = state.candidates.filter((candidate) =>
     matchesSelectedSport(candidate.sport, filters.sport),
   );
   const topCandidates = filteredCandidates.slice(0, filters.limit);
+  const overviewPath = buildMarketOverviewPath(upcomingFilters.sport);
   const candidatesPath = buildCandidatesPath(filters);
   const upcomingPath = buildUpcomingPath(upcomingFilters);
   const filteredUpcomingMarkets = state.upcomingMarkets.filter((market) =>
@@ -2384,14 +2797,19 @@ export default function DashboardPage() {
           <p>{state.overview ? "Endpoint disponible" : "Sin respuesta del endpoint"}</p>
         </article>
         <article className="metric-card">
-          <span>Candidatos de investigación</span>
-          <strong>{state.loading ? "..." : topCandidates.length}</strong>
-          <p>Lectura de solo consulta del selector</p>
+          <span>Con prediccion</span>
+          <strong>{state.loading ? "..." : overviewItemsWithPrediction}</strong>
+          <p>Mercados con score visible en overview</p>
         </article>
         <article className="metric-card">
-          <span>Señales externas</span>
-          <strong>{state.loading ? "..." : state.externalSignals.length}</strong>
-          <p>Señales guardadas localmente; no fetch remoto desde la UI</p>
+          <span>Deportes disponibles</span>
+          <strong>{state.loading ? "..." : overviewSportCount}</strong>
+          <p>Solo deportes principales activos en los filtros</p>
+        </article>
+        <article className="metric-card">
+          <span>Modo actual</span>
+          <strong>solo lectura</strong>
+          <p>No trading automatico ni scoring desde la UI</p>
         </article>
         <article className="metric-card">
           <span>Actualizacion local</span>
@@ -2413,6 +2831,15 @@ export default function DashboardPage() {
       <SportsSelectorBar
         selectedSport={upcomingFilters.sport}
         onSelect={handleSelectSport}
+      />
+
+      <MarketOverviewPanel
+        items={overviewItems}
+        loading={state.loading}
+        overviewPath={overviewPath}
+        selectedSport={upcomingFilters.sport}
+        totalCount={marketCount}
+        updatedAt={state.updatedAt}
       />
 
       <FirstAnalysisReadinessPanel

@@ -620,6 +620,158 @@ h2 {
   line-height: 1.45;
 }
 
+.market-overview-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 16px;
+}
+
+.market-overview-kpis,
+.market-overview-metrics,
+.market-overview-foot {
+  display: grid;
+  gap: 10px;
+}
+
+.market-overview-kpis {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.market-overview-kpis div,
+.market-overview-metrics div,
+.market-overview-foot div,
+.market-price-row {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.market-overview-kpis span,
+.market-overview-metrics span,
+.market-overview-foot span,
+.market-price-row span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.market-overview-kpis strong,
+.market-overview-metrics strong,
+.market-overview-foot strong,
+.market-price-row strong {
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.market-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+.market-overview-card {
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.market-overview-card.opportunity {
+  border-left-color: var(--accent);
+}
+
+.market-overview-card.watchlist {
+  border-left-color: var(--blue);
+}
+
+.market-overview-card.low-confidence {
+  border-left-color: var(--amber);
+}
+
+.market-overview-card.data-only,
+.market-overview-card.neutral {
+  border-left-color: var(--line-strong);
+}
+
+.market-overview-card-header,
+.market-overview-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.market-overview-card-header h3 {
+  overflow-wrap: anywhere;
+}
+
+.market-overview-price-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.market-overview-price-block .probability-bar {
+  grid-column: 1 / -1;
+}
+
+.market-overview-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.market-overview-foot {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.market-status-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 28px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.market-status-badge.opportunity {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+.market-status-badge.watchlist {
+  color: var(--blue-ink);
+  background: var(--blue-soft);
+}
+
+.market-status-badge.low-confidence {
+  color: var(--amber-ink);
+  background: var(--amber-soft);
+}
+
+.market-status-badge.data-only,
+.market-status-badge.neutral {
+  color: var(--muted-strong);
+  background: var(--surface-muted);
+}
+
+.market-overview-actions {
+  align-items: center;
+}
+
 .filter-panel {
   display: grid;
   grid-template-columns: repeat(3, minmax(160px, 1fr)) auto;
@@ -5262,6 +5414,7 @@ h2 {
   }
 
   .metric-grid,
+  .market-overview-kpis,
   .dashboard-grid,
   .analysis-layout,
   .match-review-layout,
@@ -5346,6 +5499,10 @@ h2 {
   }
 
   .metric-grid,
+  .market-overview-kpis,
+  .market-overview-metrics,
+  .market-overview-foot,
+  .market-overview-price-block,
   .dashboard-grid,
   .filter-panel,
   .outcome-management-form,
