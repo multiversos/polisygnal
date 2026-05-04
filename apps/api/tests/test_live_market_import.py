@@ -299,6 +299,62 @@ def test_import_live_discovered_markets_skips_incomplete_payload(
     assert json.dumps(payload, ensure_ascii=True, default=str)
 
 
+def test_import_live_discovered_markets_dry_run_reports_skip_diagnostics(
+    db_session: Session,
+) -> None:
+    before_markets = db_session.scalar(select(func.count()).select_from(Market))
+    long_question = (
+        "Both teams to score in Real Madrid vs Barcelona with a very long debug title "
+        "that should be truncated before it appears in skip diagnostics?"
+    )
+    client = FakeGammaClient(
+        [
+            _event_payload(
+                event_id="event-skip-diagnostics",
+                title="Soccer upcoming games",
+                slug="soccer-upcoming-games-skip-diagnostics",
+                markets=[
+                    _market_payload(
+                        market_id=f"remote-skip-diagnostics-{index}",
+                        question=long_question if index == 0 else "Both teams to score in Real Madrid vs Barcelona?",
+                        slug=f"skip-diagnostics-{index}",
+                    )
+                    for index in range(4)
+                ],
+            )
+        ]
+    )
+
+    payload = run_live_market_import(
+        db_session,
+        client=client,  # type: ignore[arg-type]
+        sport="soccer",
+        days=30,
+        limit=100,
+        dry_run=True,
+        max_import=10,
+        include_skip_reasons=True,
+        now=NOW,
+    )
+
+    assert payload["dry_run"] is True
+    assert payload["requested_sport"] == "soccer"
+    assert payload["requested_days"] == 30
+    assert payload["requested_limit"] == 100
+    assert "remote events page size" in payload["applied_limit_meaning"]
+    assert payload["would_import"] == 0
+    assert payload["skipped"] == 4
+    assert payload["skip_reasons_count"] == {"not_match_winner_focus": 4}
+    assert payload["detected_sports_count"] == {"soccer": 4}
+    assert payload["detected_market_types_count"] == {"yes_no_generic": 4}
+    examples = payload["skip_examples"]["not_match_winner_focus"]
+    assert len(examples) == 3
+    assert len(examples[0]["title"]) <= 120
+    assert examples[0]["sport"] == "soccer"
+    assert db_session.scalar(select(func.count()).select_from(Market)) == before_markets
+    assert json.dumps(payload, ensure_ascii=True, default=str)
+
+
 def _event_payload(
     *,
     event_id: str,

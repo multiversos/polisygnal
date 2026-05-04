@@ -32,6 +32,7 @@ def main() -> None:
                     max_import=args.max_import,
                     min_hours_to_close=args.min_hours_to_close,
                     source_tag_id=settings.polymarket_sports_tag_id,
+                    include_skip_reasons=args.debug_skips,
                 )
                 if dry_run:
                     db.rollback()
@@ -84,6 +85,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Ventana minima antes del cierre para importar.",
     )
     parser.add_argument("--json", action="store_true", help="Imprime salida JSON.")
+    parser.add_argument(
+        "--debug-skips",
+        "--include-skip-reasons",
+        action="store_true",
+        dest="debug_skips",
+        help=(
+            "Incluye razones de descarte y hasta 3 ejemplos truncados por razon. "
+            "Seguro para dry-run; no imprime secretos ni payloads completos."
+        ),
+    )
     return parser
 
 
@@ -98,6 +109,7 @@ def _run(
     max_import: int = 10,
     min_hours_to_close: float = 6,
     source_tag_id: str | None = None,
+    include_skip_reasons: bool = False,
     now=None,
 ) -> dict[str, Any]:
     summary = import_live_discovered_markets(
@@ -110,6 +122,7 @@ def _run(
         max_import=max_import,
         min_hours_to_close=min_hours_to_close,
         source_tag_id=source_tag_id,
+        include_skip_reasons=include_skip_reasons,
         now=now,
     )
     payload = summary.to_payload()
@@ -129,6 +142,20 @@ def _print_human(payload: dict[str, Any]) -> None:
         "snapshots_created={snapshots_created} predictions_created={predictions_created} "
         "research_runs_created={research_runs_created}".format(**payload)
     )
+    print(
+        "requested_sport={requested_sport} normalized_sport={normalized_sport} "
+        "requested_days={requested_days} requested_limit={requested_limit} "
+        "remote_page_limit={remote_page_limit}".format(**payload)
+    )
+    if payload.get("skip_reasons_count"):
+        print("skip_reasons_count=" + json.dumps(payload["skip_reasons_count"], sort_keys=True))
+    if payload.get("detected_sports_count"):
+        print("detected_sports_count=" + json.dumps(payload["detected_sports_count"], sort_keys=True))
+    if payload.get("detected_market_types_count"):
+        print(
+            "detected_market_types_count="
+            + json.dumps(payload["detected_market_types_count"], sort_keys=True)
+        )
     if not payload["items"]:
         print("No import candidates found.")
         return

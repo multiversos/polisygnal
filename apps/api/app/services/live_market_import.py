@@ -71,11 +71,23 @@ class LiveMarketImportSummary:
     dry_run: bool
     apply: bool
     max_import: int
+    requested_sport: str | None = None
+    normalized_sport: str | None = None
+    requested_days: int = 7
+    requested_limit: int = 50
+    requested_min_hours_to_close: float = 6
+    remote_page_limit: int = 50
+    applied_limit_meaning: str = ""
     total_remote_checked: int = 0
     missing_local: int = 0
     would_import: int = 0
     imported: int = 0
     skipped: int = 0
+    include_skip_reasons: bool = False
+    skip_reasons_count: dict[str, int] = field(default_factory=dict)
+    skip_examples: dict[str, list[dict[str, object]]] = field(default_factory=dict)
+    detected_sports_count: dict[str, int] = field(default_factory=dict)
+    detected_market_types_count: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     items: list[LiveMarketImportItem] = field(default_factory=list)
     events_created: int = 0
@@ -90,11 +102,26 @@ class LiveMarketImportSummary:
             "dry_run": self.dry_run,
             "apply": self.apply,
             "max_import": self.max_import,
+            "requested_sport": self.requested_sport,
+            "normalized_sport": self.normalized_sport,
+            "requested_days": self.requested_days,
+            "requested_limit": self.requested_limit,
+            "requested_min_hours_to_close": self.requested_min_hours_to_close,
+            "remote_page_limit": self.remote_page_limit,
+            "applied_limit_meaning": self.applied_limit_meaning,
             "total_remote_checked": self.total_remote_checked,
             "missing_local": self.missing_local,
             "would_import": self.would_import,
             "imported": self.imported,
             "skipped": self.skipped,
+            "skip_reasons_count": dict(sorted(self.skip_reasons_count.items())),
+            "skip_examples": {
+                reason: examples
+                for reason, examples in sorted(self.skip_examples.items())
+                if examples
+            },
+            "detected_sports_count": dict(sorted(self.detected_sports_count.items())),
+            "detected_market_types_count": dict(sorted(self.detected_market_types_count.items())),
             "warnings": list(self.warnings),
             "events_created": self.events_created,
             "markets_created": self.markets_created,
@@ -117,6 +144,7 @@ def import_live_discovered_markets(
     max_import: int = 10,
     min_hours_to_close: float = 6,
     source_tag_id: str | None = None,
+    include_skip_reasons: bool = False,
     now: datetime | None = None,
 ) -> LiveMarketImportSummary:
     current_time = _normalize_datetime(now or datetime.now(tz=UTC))
@@ -149,7 +177,18 @@ def import_live_discovered_markets(
         dry_run=dry_run,
         apply=not dry_run,
         max_import=safe_max_import,
+        requested_sport=sport,
+        normalized_sport=normalized_sport,
+        requested_days=days,
+        requested_limit=limit,
+        requested_min_hours_to_close=min_hours_to_close,
+        remote_page_limit=page_limit,
+        applied_limit_meaning=(
+            "--limit clamps the remote events page size, not the flattened market count; "
+            "total_remote_checked can be higher because each event can contain many markets."
+        ),
         total_remote_checked=len(entries),
+        include_skip_reasons=include_skip_reasons,
         warnings=list(page.errors),
     )
 
@@ -164,16 +203,20 @@ def import_live_discovered_markets(
             min_close_time=min_close_time,
             window_end=window_end,
         )
+        _record_detected(summary, item)
         if item.action == "skipped":
             summary.skipped += 1
+            _record_skip(summary, item)
             if _include_skipped_item(item):
                 summary.items.append(item)
             continue
         summary.missing_local += 1
         if imports_remaining <= 0:
             item.action = "skipped"
+            item.reasons.append("max_import_reached")
             item.warnings.append("max_import_reached")
             summary.skipped += 1
+            _record_skip(summary, item)
             summary.items.append(item)
             continue
         if dry_run:
@@ -205,6 +248,40 @@ def import_live_discovered_markets(
     summary.predictions_created = after_predictions_count - before_predictions_count
     summary.research_runs_created = after_research_runs_count - before_research_runs_count
     return summary
+
+
+def _record_detected(summary: LiveMarketImportSummary, item: LiveMarketImportItem) -> None:
+    sport = item.sport or "unknown"
+    market_shape = item.market_shape or "unknown"
+    summary.detected_sports_count[sport] = summary.detected_sports_count.get(sport, 0) + 1
+    summary.detected_market_types_count[market_shape] = (
+        summary.detected_market_types_count.get(market_shape, 0) + 1
+    )
+
+
+def _record_skip(summary: LiveMarketImportSummary, item: LiveMarketImportItem) -> None:
+    reasons = item.reasons or ["unknown"]
+    for reason in reasons:
+        summary.skip_reasons_count[reason] = summary.skip_reasons_count.get(reason, 0) + 1
+        if not summary.include_skip_reasons:
+            continue
+        examples = summary.skip_examples.setdefault(reason, [])
+        if len(examples) >= 3:
+            continue
+        examples.append(_skip_example(item))
+
+
+def _skip_example(item: LiveMarketImportItem) -> dict[str, object]:
+    return {
+        "remote_id": item.remote_id,
+        "title": _truncate(item.title, 120),
+        "sport": item.sport,
+        "market_shape": item.market_shape,
+        "close_time": item.close_time.isoformat() if item.close_time else None,
+        "market_slug": _truncate(item.market_slug, 80),
+        "event_slug": _truncate(item.event_slug, 80),
+        "warnings": list(item.warnings[:5]),
+    }
 
 
 def _build_import_item(
@@ -486,6 +563,13 @@ def _safe_text(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _truncate(value: str | None, limit: int) -> str | None:
+    text = _safe_text(value)
+    if text is None or len(text) <= limit:
+        return text
+    return f"{text[: max(limit - 3, 0)]}..."
 
 
 def _combined_text(*values: str | None) -> str:

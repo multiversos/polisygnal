@@ -44,6 +44,18 @@ For each primary sport, run discovery/import dry-run with explicit caps:
 ```
 
 If dry-run reports `would_import=0`, stop for that sport. That is not an error.
+Use `--debug-skips` when you need to understand why candidates were rejected:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.import_live_discovered_markets --dry-run --sport soccer --days 30 --limit 100 --max-import 10 --json --debug-skips
+```
+
+The debug output includes `skip_reasons_count`, up to three truncated
+`skip_examples` per reason, `detected_sports_count`,
+`detected_market_types_count`, and the requested parameters. The `--limit`
+value currently clamps the remote events page size, not the flattened market
+count; `total_remote_checked` can be higher because one event can contain many
+markets.
 
 ## Snapshot Dry-Run
 
