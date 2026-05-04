@@ -8,6 +8,7 @@ import { MainNavigation } from "../../components/MainNavigation";
 import {
   SportsSelectorBar,
   getSportSelectorOption,
+  isSportBackendEnabled,
   sportsSelectorOptions,
   type SportSelectorOption,
 } from "../../components/SportsSelectorBar";
@@ -78,13 +79,22 @@ const API_BASE_URL = (
 
 const supportedSportIds = new Set<string>(
   sportsSelectorOptions
+    .filter((option) => option.id !== "all" && option.backendSupported)
+    .map((option) => option.id),
+);
+const knownSportIds = new Set<string>(
+  sportsSelectorOptions
     .filter((option) => option.id !== "all")
     .map((option) => option.id),
 );
 
 function resolveSportOption(value: string): SportSelectorOption {
-  if (supportedSportIds.has(value)) {
-    return getSportSelectorOption(value);
+  const option = getSportSelectorOption(value);
+  if (
+    option.id !== "all" &&
+    (supportedSportIds.has(option.id) || knownSportIds.has(option.id))
+  ) {
+    return option;
   }
   return getSportSelectorOption("all");
 }
@@ -328,6 +338,7 @@ export default function SportDetailPage() {
   const sportId = String(params.sport ?? "all");
   const sportOption = useMemo(() => resolveSportOption(sportId), [sportId]);
   const selectedSport = sportOption.id === "all" ? "all" : sportOption.id;
+  const sportIsEnabled = isSportBackendEnabled(selectedSport);
   const [state, setState] = useState<PageState>({
     items: [],
     counts: null,
@@ -339,6 +350,19 @@ export default function SportDetailPage() {
   });
 
   const loadSport = useCallback(async () => {
+    if (!sportIsEnabled) {
+      setState((current) => ({
+        ...current,
+        items: [],
+        counts: null,
+        qualitySummary: null,
+        qualityItems: [],
+        loading: false,
+        error: null,
+        updatedAt: null,
+      }));
+      return;
+    }
     setState((current) => ({ ...current, loading: true, error: null }));
     try {
       const [upcoming, quality] = await Promise.all([
@@ -361,7 +385,7 @@ export default function SportDetailPage() {
         error: error instanceof Error ? error.message : "No se pudo cargar el deporte.",
       }));
     }
-  }, [sportOption]);
+  }, [sportIsEnabled, sportOption]);
 
   useEffect(() => {
     void loadSport();
@@ -392,7 +416,12 @@ export default function SportDetailPage() {
           </p>
         </div>
         <div className="topbar-actions">
-          <button className="refresh-button" disabled={state.loading} onClick={() => void loadSport()} type="button">
+          <button
+            className="refresh-button"
+            disabled={state.loading || !sportIsEnabled}
+            onClick={() => void loadSport()}
+            type="button"
+          >
             {state.loading ? "Cargando" : "Actualizar"}
           </button>
         </div>
@@ -420,6 +449,16 @@ export default function SportDetailPage() {
           <strong>Deporte no reconocido</strong>
           <span>
             Vuelve al indice de deportes o selecciona un chip soportado.
+          </span>
+        </section>
+      ) : null}
+
+      {!sportIsEnabled && sportOption.id !== "all" ? (
+        <section className="alert-panel" role="status">
+          <strong>{sportOption.statusLabel ?? "No disponible todavia"}</strong>
+          <span>
+            {sportOption.disabledMessage ??
+              "Este deporte estara disponible mas adelante."}
           </span>
         </section>
       ) : null}
@@ -463,17 +502,29 @@ export default function SportDetailPage() {
               pausados.
             </p>
           </div>
-          <a
-            className="text-link"
-            href={`${API_BASE_URL}${buildUpcomingPath(sportOption)}`}
-            rel="noreferrer"
-            target="_blank"
-          >
-            Ver JSON
-          </a>
+          {sportIsEnabled ? (
+            <a
+              className="text-link"
+              href={`${API_BASE_URL}${buildUpcomingPath(sportOption)}`}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Ver JSON
+            </a>
+          ) : (
+            <span className="badge muted">Sin consulta al backend</span>
+          )}
         </div>
 
-        {state.loading ? (
+        {!sportIsEnabled ? (
+          <div className="empty-state">
+            <strong>{sportOption.label} esta en preparacion.</strong>
+            <p>
+              La categoria se muestra como roadmap, pero no carga mercados,
+              discovery, scoring ni datos remotos todavia.
+            </p>
+          </div>
+        ) : state.loading ? (
           <div className="empty-state">Cargando mercados de {sportOption.label}...</div>
         ) : state.items.length === 0 ? (
           <div className="empty-state">

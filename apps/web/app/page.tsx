@@ -9,6 +9,7 @@ import {
   SportsSelectorBar,
   getSportApiFilter,
   getSportSelectorOption,
+  isSportBackendEnabled,
   matchesSelectedSport,
   sportsSelectorOptions,
 } from "./components/SportsSelectorBar";
@@ -691,9 +692,11 @@ const sportLabels: Record<string, string> = {
   horse_racing: "carreras de caballos",
   nhl: "NHL",
   mlb: "béisbol",
+  baseball: "béisbol",
   tennis: "tenis",
   cricket: "cricket",
   mma: "UFC",
+  ufc: "UFC",
   other: "otro",
 };
 
@@ -2257,6 +2260,9 @@ export default function DashboardPage() {
     return new Set(ids);
   }, [state.externalSignals]);
   const handleSelectSport = useCallback((sport: string) => {
+    if (!isSportBackendEnabled(sport)) {
+      return;
+    }
     setFilters((current) => ({ ...current, sport }));
     setUpcomingFilters((current) => ({ ...current, sport }));
   }, []);

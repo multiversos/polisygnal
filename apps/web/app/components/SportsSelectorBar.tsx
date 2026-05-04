@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 export type SportSelectorOption = {
   id: string;
   apiValue: string | null;
@@ -7,22 +9,27 @@ export type SportSelectorOption = {
   icon: string;
   tone: string;
   backendSupported: boolean;
+  statusLabel?: string;
+  disabledMessage?: string;
 };
 
-export const sportsSelectorOptions = [
-  {
-    id: "all",
-    apiValue: null,
-    label: "Todos",
-    icon: "✦",
-    tone: "all",
-    backendSupported: true,
-  },
+const comingSoonMessage = "Este deporte estara disponible mas adelante.";
+
+export const allSportsOption = {
+  id: "all",
+  apiValue: null,
+  label: "Todos",
+  icon: "*",
+  tone: "all",
+  backendSupported: true,
+} as const satisfies SportSelectorOption;
+
+export const primarySportOptions = [
   {
     id: "basketball",
     apiValue: "basketball",
     label: "Baloncesto",
-    icon: "🏀",
+    icon: "B",
     tone: "basketball",
     backendSupported: true,
   },
@@ -30,65 +37,97 @@ export const sportsSelectorOptions = [
     id: "nfl",
     apiValue: "nfl",
     label: "NFL",
-    icon: "🏈",
+    icon: "N",
     tone: "nfl",
     backendSupported: true,
   },
   {
     id: "soccer",
     apiValue: "soccer",
-    label: "Fútbol",
-    icon: "⚽",
+    label: "Futbol",
+    icon: "F",
     tone: "soccer",
-    backendSupported: true,
-  },
-  {
-    id: "nhl",
-    apiValue: "nhl",
-    label: "NHL",
-    icon: "🏒",
-    tone: "nhl",
-    backendSupported: true,
-  },
-  {
-    id: "mma",
-    apiValue: "mma",
-    label: "UFC",
-    icon: "🥊",
-    tone: "mma",
     backendSupported: true,
   },
   {
     id: "tennis",
     apiValue: "tennis",
     label: "Tenis",
-    icon: "🎾",
+    icon: "T",
     tone: "tennis",
     backendSupported: true,
   },
   {
-    id: "cricket",
-    apiValue: "cricket",
-    label: "Cricket",
-    icon: "🏏",
-    tone: "cricket",
+    id: "baseball",
+    apiValue: "baseball",
+    label: "Beisbol",
+    icon: "BB",
+    tone: "baseball",
     backendSupported: true,
   },
   {
-    id: "mlb",
-    apiValue: "mlb",
-    label: "Béisbol",
-    icon: "⚾",
-    tone: "mlb",
+    id: "horse_racing",
+    apiValue: "horse_racing",
+    label: "Carreras de caballos",
+    icon: "H",
+    tone: "horse-racing",
     backendSupported: true,
   },
 ] as const satisfies readonly SportSelectorOption[];
 
+export const secondarySportOptions = [
+  {
+    id: "ufc",
+    apiValue: null,
+    label: "UFC",
+    icon: "U",
+    tone: "ufc",
+    backendSupported: false,
+    statusLabel: "Proximamente",
+    disabledMessage: comingSoonMessage,
+  },
+  {
+    id: "cricket",
+    apiValue: null,
+    label: "Criquet",
+    icon: "C",
+    tone: "cricket",
+    backendSupported: false,
+    statusLabel: "Proximamente",
+    disabledMessage: comingSoonMessage,
+  },
+  {
+    id: "nhl",
+    apiValue: null,
+    label: "NHL / Hockey",
+    icon: "HK",
+    tone: "nhl",
+    backendSupported: false,
+    statusLabel: "Proximamente",
+    disabledMessage: comingSoonMessage,
+  },
+] as const satisfies readonly SportSelectorOption[];
+
+export const sportsSelectorOptions = [
+  allSportsOption,
+  ...primarySportOptions,
+  ...secondarySportOptions,
+] as const satisfies readonly SportSelectorOption[];
+
+const sportAliases: Record<string, string> = {
+  nba: "basketball",
+  mlb: "baseball",
+  baseball: "baseball",
+  mma: "ufc",
+  ufc: "ufc",
+  hockey: "nhl",
+};
+
 export function getSportSelectorOption(value: string): SportSelectorOption {
-  const normalizedValue = value === "nba" ? "basketball" : value;
+  const normalizedValue = sportAliases[value] ?? value;
   return (
     sportsSelectorOptions.find((option) => option.id === normalizedValue) ??
-    sportsSelectorOptions[0]
+    allSportsOption
   );
 }
 
@@ -98,6 +137,10 @@ export function getSportApiFilter(value: string): string | null {
     return null;
   }
   return option.apiValue;
+}
+
+export function isSportBackendEnabled(value: string): boolean {
+  return getSportSelectorOption(value).backendSupported;
 }
 
 export function matchesSelectedSport(
@@ -111,12 +154,15 @@ export function matchesSelectedSport(
   if (apiValue === "basketball") {
     return sport === "basketball" || sport === "nba";
   }
+  if (apiValue === "baseball") {
+    return sport === "baseball" || sport === "mlb";
+  }
   return sport === apiValue;
 }
 
 export function SportsSelectorBar({
   activeLabel = "Activo",
-  description = "Selecciona un deporte para filtrar los mercados próximos.",
+  description = "Selecciona un deporte para filtrar los mercados proximos.",
   kicker = "Filtro principal",
   onSelect,
   selectedSport,
@@ -130,6 +176,8 @@ export function SportsSelectorBar({
   title?: string;
 }) {
   const activeOption = getSportSelectorOption(selectedSport);
+  const primaryOptions = [allSportsOption, ...primarySportOptions];
+  const [disabledNotice, setDisabledNotice] = useState<string | null>(null);
 
   return (
     <section className="sports-selector-panel" aria-label={title}>
@@ -143,8 +191,8 @@ export function SportsSelectorBar({
           {activeLabel}: {activeOption.label}
         </span>
       </div>
-      <div className="sports-selector-scroll" role="list">
-        {sportsSelectorOptions.map((option) => {
+      <div className="sports-selector-group" role="list">
+        {primaryOptions.map((option) => {
           const selected = option.id === selectedSport;
           return (
             <button
@@ -163,6 +211,38 @@ export function SportsSelectorBar({
             </button>
           );
         })}
+      </div>
+      <div className="sports-selector-secondary" aria-label="Otros deportes">
+        <span>Otros</span>
+        <div className="sports-selector-group secondary" role="list">
+          {secondarySportOptions.map((option) => (
+            <button
+              aria-disabled="true"
+              className={`sport-selector-chip disabled tone-${option.tone}`}
+              key={option.id}
+              onClick={() =>
+                setDisabledNotice(
+                  `${option.label}: ${
+                    option.disabledMessage ?? "No disponible todavia."
+                  }`,
+                )
+              }
+              title={option.disabledMessage}
+              type="button"
+            >
+              <span className="sport-selector-icon" aria-hidden="true">
+                {option.icon}
+              </span>
+              <span>{option.label}</span>
+              <span className="sport-selector-status">{option.statusLabel}</span>
+            </button>
+          ))}
+        </div>
+        {disabledNotice ? (
+          <p className="sports-selector-disabled-note" role="status">
+            {disabledNotice}
+          </p>
+        ) : null}
       </div>
     </section>
   );

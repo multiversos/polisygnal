@@ -4,45 +4,23 @@ import Link from "next/link";
 
 import { MainNavigation } from "../components/MainNavigation";
 import {
-  sportsSelectorOptions,
-  type SportSelectorOption,
+  primarySportOptions,
+  secondarySportOptions,
 } from "../components/SportsSelectorBar";
-
-const visibleSports = [
-  "basketball",
-  "nfl",
-  "soccer",
-  "mma",
-  "tennis",
-  "cricket",
-  "mlb",
-  "nhl",
-];
 
 const sportDescriptions: Record<string, string> = {
   basketball: "Partidos de baloncesto con la liga como metadata separada.",
   nfl: "Partidos NFL y mercados cercanos de ganador del juego.",
   soccer: "Futbol global: clubes, ligas y cruces proximos.",
-  mma: "Eventos UFC/MMA cercanos con mercados de ganador de pelea.",
   tennis: "Cruces de tenis ATP/WTA y torneos principales.",
-  cricket: "Partidos de cricket cercanos, T20, ODI o ligas.",
-  mlb: "Beisbol MLB y mercados de ganador de partido.",
-  nhl: "Hockey NHL y mercados de ganador de partido.",
+  baseball: "Beisbol y mercados de ganador de partido.",
+  horse_racing: "Carreras de caballos y mercados de ganador de carrera.",
+  ufc: "UFC/MMA se activara cuando el pipeline tenga soporte operativo.",
+  cricket: "Criquet se mantiene visible como categoria futura.",
+  nhl: "Hockey/NHL queda pausado hasta activar datos dedicados.",
 };
 
-function getVisibleSportOptions(): SportSelectorOption[] {
-  return visibleSports.reduce<SportSelectorOption[]>((items, id) => {
-    const option = sportsSelectorOptions.find((sport) => sport.id === id);
-    if (option) {
-      items.push(option);
-    }
-    return items;
-  }, []);
-}
-
 export default function SportsIndexPage() {
-  const sports = getVisibleSportOptions();
-
   return (
     <main className="dashboard-shell sports-page">
       <MainNavigation />
@@ -65,8 +43,15 @@ export default function SportsIndexPage() {
         </span>
       </section>
 
-      <section className="sports-index-grid" aria-label="Deportes disponibles">
-        {sports.map((sport) => (
+      <section className="sports-index-section" aria-label="Deportes principales">
+        <div className="panel-heading">
+          <div>
+            <h2>Deportes principales</h2>
+            <p>Activos para navegacion, filtros y llamadas controladas al backend.</p>
+          </div>
+        </div>
+        <div className="sports-index-grid">
+          {primarySportOptions.map((sport) => (
           <article className={`sport-overview-card tone-${sport.tone}`} key={sport.id}>
             <span className="sport-overview-icon" aria-hidden="true">
               {sport.icon}
@@ -79,7 +64,34 @@ export default function SportsIndexPage() {
               Ver deporte
             </Link>
           </article>
-        ))}
+          ))}
+        </div>
+      </section>
+
+      <section className="sports-index-section" aria-label="Otros deportes">
+        <div className="panel-heading">
+          <div>
+            <h2>Otros</h2>
+            <p>Visibles como roadmap, sin carga de datos ni llamadas al backend.</p>
+          </div>
+        </div>
+        <div className="sports-index-grid secondary">
+          {secondarySportOptions.map((sport) => (
+            <article
+              className={`sport-overview-card disabled tone-${sport.tone}`}
+              key={sport.id}
+            >
+              <span className="sport-overview-icon" aria-hidden="true">
+                {sport.icon}
+              </span>
+              <div>
+                <h2>{sport.label}</h2>
+                <p>{sportDescriptions[sport.id] ?? sport.disabledMessage}</p>
+              </div>
+              <span className="badge muted">{sport.statusLabel}</span>
+            </article>
+          ))}
+        </div>
       </section>
     </main>
   );

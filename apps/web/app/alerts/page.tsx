@@ -27,11 +27,12 @@ const sportOptions = [
   { value: "basketball", label: "Baloncesto" },
   { value: "nfl", label: "NFL" },
   { value: "soccer", label: "Fútbol" },
-  { value: "mma", label: "UFC" },
-  { value: "nhl", label: "NHL" },
   { value: "tennis", label: "Tenis" },
-  { value: "cricket", label: "Cricket" },
-  { value: "mlb", label: "Béisbol" },
+  { value: "baseball", label: "Béisbol" },
+  { value: "horse_racing", label: "Carreras de caballos" },
+  { value: "ufc", label: "UFC (próximamente)", disabled: true },
+  { value: "cricket", label: "Críquet (próximamente)", disabled: true },
+  { value: "nhl", label: "NHL / Hockey (próximamente)", disabled: true },
 ];
 
 const typeLabels: Record<string, string> = {
@@ -162,7 +163,11 @@ export default function AlertsPage() {
           Deporte
           <select onChange={(event) => setSport(event.target.value)} value={sport}>
             {sportOptions.map((option) => (
-              <option key={option.value || "all"} value={option.value}>
+              <option
+                disabled={"disabled" in option ? option.disabled : false}
+                key={option.value || "all"}
+                value={option.value}
+              >
                 {option.label}
               </option>
             ))}

@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
-import { SportsSelectorBar, getSportApiFilter } from "../components/SportsSelectorBar";
+import {
+  SportsSelectorBar,
+  getSportApiFilter,
+  isSportBackendEnabled,
+} from "../components/SportsSelectorBar";
 import { fetchSmartAlerts, type SmartAlert } from "../lib/smartAlerts";
 import { WATCHLIST_STATUS_LABELS, type WatchlistStatus } from "../lib/watchlist";
 
@@ -133,11 +137,14 @@ const sportLabels: Record<string, string> = {
   nfl: "NFL",
   nhl: "NHL",
   mlb: "Béisbol",
+  baseball: "Béisbol",
   soccer: "Fútbol",
   tennis: "Tenis",
   cricket: "Cricket",
   mma: "UFC",
+  ufc: "UFC",
   basketball: "Baloncesto",
+  horse_racing: "Carreras de caballos",
 };
 
 const marketShapeLabels: Record<string, string> = {
@@ -351,6 +358,12 @@ export default function DailyBriefingPage() {
   const [error, setError] = useState<string | null>(null);
   const [markdownCopyStatus, setMarkdownCopyStatus] = useState<MarkdownCopyStatus>("idle");
   const [markdownFallback, setMarkdownFallback] = useState<string | null>(null);
+  const handleSelectSport = useCallback((nextSport: string) => {
+    if (!isSportBackendEnabled(nextSport)) {
+      return;
+    }
+    setSport(nextSport);
+  }, []);
 
   const loadBriefing = useCallback(async () => {
     setLoading(true);
@@ -431,7 +444,7 @@ export default function DailyBriefingPage() {
       <SportsSelectorBar
         activeLabel="Activo"
         description="Selecciona un deporte para filtrar el briefing diario."
-        onSelect={setSport}
+        onSelect={handleSelectSport}
         selectedSport={sport}
       />
 

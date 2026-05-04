@@ -658,8 +658,10 @@ const sportLabels: Record<string, string> = {
   soccer: "fútbol",
   horse_racing: "carreras de caballos",
   mlb: "MLB",
+  baseball: "béisbol",
   tennis: "tenis",
   mma: "MMA",
+  ufc: "UFC",
   other: "otro",
 };
 
