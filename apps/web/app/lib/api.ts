@@ -39,16 +39,24 @@ const SAFE_PROXY_GET_PREFIXES = [
 ];
 
 export class ApiRequestError extends Error {
+  path?: string;
   status?: number;
 
-  constructor(message: string, status?: number) {
+  constructor(message: string, status?: number, path?: string) {
     super(message);
     this.name = "ApiRequestError";
     this.status = status;
+    this.path = path;
   }
 }
 
 function normalizeBackendPath(path: string): string {
+  try {
+    const url = new URL(path);
+    return `${url.pathname}${url.search}`;
+  } catch {
+    // Keep handling relative paths below.
+  }
   return path.startsWith("/") ? path : `/${path}`;
 }
 
@@ -81,7 +89,20 @@ export function buildBackendApiPath(path: string): string {
 }
 
 export function buildBackendDirectUrl(path: string): string {
+  try {
+    return new URL(path).toString();
+  } catch {
+    // Relative backend paths are joined to the configured API host.
+  }
   return `${API_BASE_URL}${normalizeBackendPath(path)}`;
+}
+
+function buildRequestHeaders(init?: RequestInit): Headers {
+  const headers = new Headers(init?.headers);
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  return headers;
 }
 
 export async function fetchApiJson<T>(
@@ -90,24 +111,21 @@ export async function fetchApiJson<T>(
   timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  const requestUrl = shouldUseSameOriginProxy(path, init)
+    ? buildBackendApiPath(path)
+    : buildBackendDirectUrl(path);
 
   try {
-    const requestUrl = shouldUseSameOriginProxy(path, init)
-      ? buildBackendApiPath(path)
-      : buildBackendDirectUrl(path);
     const response = await fetch(requestUrl, {
       cache: "no-store",
       ...init,
       signal: controller.signal,
-      headers: {
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
-        ...init?.headers,
-      },
+      headers: buildRequestHeaders(init),
     });
 
     if (!response.ok) {
-      throw new ApiRequestError(`${path} responded ${response.status}`, response.status);
+      throw new ApiRequestError(`${path} responded ${response.status}`, response.status, path);
     }
     if (response.status === 204) {
       return null as T;
@@ -115,11 +133,11 @@ export async function fetchApiJson<T>(
     return response.json() as Promise<T>;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new ApiRequestError(`${path} timed out after ${timeoutMs / 1000}s`);
+      throw new ApiRequestError(`${path} timed out after ${timeoutMs / 1000}s`, undefined, path);
     }
     throw error;
   } finally {
-    window.clearTimeout(timeoutId);
+    globalThis.clearTimeout(timeoutId);
   }
 }
 
@@ -132,7 +150,8 @@ export function friendlyApiError(error: unknown, moduleName: string): string {
     return `Este modulo (${moduleName}) se conectara en un sprint posterior.`;
   }
   if (error instanceof ApiRequestError) {
-    return `La API no respondio correctamente desde ${API_HOST_LABEL}. Reintentar.`;
+    const status = error.status ? ` (HTTP ${error.status})` : "";
+    return `La API no respondio correctamente desde ${API_HOST_LABEL}${status}. Reintentar.`;
   }
   if (error instanceof Error) {
     return `La API no respondio desde ${API_HOST_LABEL}. Reintentar.`;
