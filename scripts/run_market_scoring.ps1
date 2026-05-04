@@ -1,6 +1,9 @@
 [CmdletBinding()]
 param(
-    [int]$Limit = 0,
+    [int]$Limit = 25,
+    [string]$SportType = "",
+    [string]$MarketType = "",
+    [switch]$DryRun,
     [string]$PythonPath = "",
     [string]$ApiDir = "",
     [string]$LogDir = ""
@@ -55,10 +58,20 @@ $summaryPath = Join-Path $LogDir "$runId.summary.json"
 $latestSummaryPath = Join-Path $LogDir "latest-summary.json"
 $historyPath = Join-Path $LogDir "runs.log"
 
-$commandArgs = @("-m", "app.commands.score_nba_winner_markets")
-if ($Limit -gt 0) {
-    $commandArgs += "--limit"
-    $commandArgs += $Limit.ToString()
+$commandArgs = @("-m", "app.commands.score_missing_markets", "--limit", $Limit.ToString(), "--json")
+if (-not [string]::IsNullOrWhiteSpace($SportType)) {
+    $commandArgs += "--sport-type"
+    $commandArgs += $SportType
+}
+if (-not [string]::IsNullOrWhiteSpace($MarketType)) {
+    $commandArgs += "--market-type"
+    $commandArgs += $MarketType
+}
+if ($DryRun) {
+    $commandArgs += "--dry-run"
+}
+else {
+    $commandArgs += "--apply"
 }
 
 Push-Location $ApiDir

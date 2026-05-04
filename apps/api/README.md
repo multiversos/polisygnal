@@ -1592,7 +1592,9 @@ Nota importante:
 
 ## Scoring v1 MVP
 
-Scoring v1 aplica solo a mercados `sports / nba / winner`.
+Scoring v1 puede correr sobre mercados deportivos activos con snapshot reciente.
+El comando operativo recomendado puntua solo mercados que todavia no tienen
+`prediction` de familia `scoring_v1`.
 
 Persistencia:
 
@@ -1625,15 +1627,31 @@ Comandos manuales:
 ```
 
 ```powershell
-.\.venv\Scripts\python -m app.commands.score_nba_winner_markets --limit 25
+.\.venv\Scripts\python -m app.commands.score_missing_markets --limit 20 --json
 ```
 
-El batch de scoring recorre el subconjunto operativo del MVP:
+```powershell
+.\.venv\Scripts\python -m app.commands.score_missing_markets --sport-type soccer --market-type match_winner --limit 20 --json
+```
 
-- `sport_type = nba`
-- `market_type = winner`
-- `active = true`
-- `closed = false`
+```powershell
+.\.venv\Scripts\python -m app.commands.score_missing_markets --apply --limit 20 --json
+```
+
+Por seguridad, `score_missing_markets` es dry-run si no se pasa `--apply`.
+`--limit` es obligatorio para evitar scoring masivo accidental. El comando:
+
+- recorre mercados `active = true` y `closed = false`
+- respeta filtros opcionales `--sport-type` y `--market-type`
+- salta mercados que no tienen snapshot
+- no duplica mercados que ya tienen prediction `scoring_v1`
+- solo persiste rows en `predictions` cuando se ejecuta con `--apply`
+
+El comando legacy sigue disponible para compatibilidad:
+
+```powershell
+.\.venv\Scripts\python -m app.commands.score_nba_winner_markets --limit 25
+```
 
 Wrapper operativo recomendado:
 
@@ -1660,6 +1678,10 @@ Salida util:
 - `partial_errors`
 - `partial_error_count`
 - `predictions_updated`
+- `candidates_checked`
+- `candidates_without_prediction`
+- `candidates_with_snapshot`
+- `skipped_reasons`
 
 Notas:
 
@@ -1671,7 +1693,7 @@ Notas:
 - `data_quality_score` queda visible en `explanation_json.data_quality` y puede dar un apoyo menor a `confidence_score`; no cambia probabilidad
 - `action_score` queda visible en `explanation_json.action`; sirve solo para priorizacion/orden operativo y no cambia probabilidad ni `opportunity`
 - el scoring no se dispara automaticamente desde evidence pipeline en esta fase
-- el scoring sigue corriendo para todo `nba / winner`, pero ignora evidence en mercados no elegibles para este pipeline
+- el scoring generico usa los filtros pedidos por comando y mantiene aliases deportivos legacy como `nba -> basketball`
 - `explanation_json` deja trazabilidad simple de inputs, bonuses, penalties, counts y summary
 - Todavia no hay WebSockets, tiempo real ni clasificacion con IA de noticias
 

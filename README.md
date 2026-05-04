@@ -177,18 +177,22 @@ Scoring manual por mercado:
 .\.venv\Scripts\python -m app.commands.score_market --market-id 155
 ```
 
-Scoring manual por lote NBA winner:
+Scoring seguro de mercados faltantes:
 
 ```powershell
-.\.venv\Scripts\python -m app.commands.score_nba_winner_markets --limit 25
+.\.venv\Scripts\python -m app.commands.score_missing_markets --limit 20 --json
+.\.venv\Scripts\python -m app.commands.score_missing_markets --sport-type soccer --market-type match_winner --limit 20 --json
+.\.venv\Scripts\python -m app.commands.score_missing_markets --apply --limit 20 --json
 ```
 
-El batch de scoring usa el subconjunto operativo del MVP:
+Por defecto es dry-run. Solo escribe predictions si se pasa `--apply`.
+El batch generico:
 
-- mercados `sport_type = nba`
-- `market_type = winner`
 - `active = true`
 - `closed = false`
+- requiere `--limit`
+- salta mercados sin snapshot
+- no duplica mercados que ya tienen prediction `scoring_v1`
 
 Scoring manual por wrapper:
 
