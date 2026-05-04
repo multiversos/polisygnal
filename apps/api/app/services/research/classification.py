@@ -9,7 +9,7 @@ from app.services.nba_team_matching import extract_nba_teams
 
 SUPPORTED_VERTICALS = {"sports", "other"}
 SUPPORTED_SPORTS = {
-    "nba",
+    "basketball",
     "nfl",
     "soccer",
     "nhl",
@@ -132,7 +132,7 @@ FOOTBALL_CONTEXT_TERMS = (
 )
 
 SPORT_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "nba": (
+    "basketball": (
         "nba",
         "basketball",
         "euroleague",
@@ -341,7 +341,7 @@ SPORT_INFERENCE_ORDER = (
     "mlb",
     "nhl",
     "nfl",
-    "nba",
+    "basketball",
     "soccer",
     "tennis",
     "horse_racing",
@@ -525,9 +525,9 @@ def select_research_template(
     normalized_sport = normalize_sport(sport)
     normalized_shape = normalize_market_shape(market_shape)
     if normalized_vertical == "sports":
-        if normalized_sport == "nba" and normalized_shape == "match_winner":
+        if normalized_sport == "basketball" and normalized_shape == "match_winner":
             return "sports_nba_match_winner"
-        if normalized_sport == "nba" and normalized_shape in {"championship", "futures"}:
+        if normalized_sport == "basketball" and normalized_shape in {"championship", "futures"}:
             return "sports_nba_futures"
         return "sports_generic"
     return "generic_market"
@@ -552,7 +552,8 @@ def normalize_sport(value: str | None) -> str:
         "horse_race": "horse_racing",
         "horse_racing": "horse_racing",
         "horses": "horse_racing",
-        "basketball": "nba",
+        "nba": "basketball",
+        "basketball": "basketball",
         "baseball": "mlb",
     }
     parsed = aliases.get(parsed, parsed)
@@ -632,10 +633,10 @@ def _infer_sport_from_text(*, text: str, normalized_text: str) -> tuple[str, str
 
     nba_teams = extract_nba_teams(text)
     if nba_teams:
-        return "nba", "sport=nba from NBA team names"
+        return "basketball", "sport=basketball from NBA team names"
 
-    if _contains_any(normalized_text, SPORT_KEYWORDS["nba"]):
-        return "nba", "sport=nba from keyword match"
+    if _contains_any(normalized_text, SPORT_KEYWORDS["basketball"]):
+        return "basketball", "sport=basketball from keyword match"
     return "other", "sport=other because no sport-specific keywords matched"
 
 

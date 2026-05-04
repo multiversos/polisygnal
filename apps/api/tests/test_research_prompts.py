@@ -74,7 +74,7 @@ def test_build_cheap_research_prompt_is_template_routed() -> None:
     prompt = build_cheap_research_prompt(market, screening, snapshot=snapshot)
 
     assert prompt["research_template"] == "sports_nba_match_winner"
-    assert "Sport: nba" in prompt["user"]
+    assert "Sport: basketball" in prompt["user"]
     assert "Market shape: match_winner" in prompt["user"]
     assert "Classification reason:" in prompt["user"]
     assert "offensive/defensive statistics" in prompt["user"]

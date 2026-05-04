@@ -11,8 +11,8 @@ from app.schemas.research import UpcomingSportsMarketRead
 
 
 class BriefingFilters(BaseModel):
-    sport_type: str | None = "nba"
-    market_type: str | None = "winner"
+    sport_type: str | None = None
+    market_type: str | None = None
     active: bool | None = True
     top_limit: int = 5
     watchlist_limit: int = 5

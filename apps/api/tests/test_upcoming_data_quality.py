@@ -167,7 +167,7 @@ def test_upcoming_data_quality_endpoint_responds_without_mutating_db(
         "stale",
         "unknown",
     }
-    assert payload["filters_applied"]["sport"] == "nba"
+    assert payload["filters_applied"]["sport"] == "basketball"
     assert payload["filters_applied"]["days"] == 7
     assert db_session.scalar(select(func.count()).select_from(Prediction)) == before_predictions
     assert db_session.scalar(select(func.count()).select_from(ResearchRun)) == before_runs

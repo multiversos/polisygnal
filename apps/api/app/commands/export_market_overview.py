@@ -40,8 +40,8 @@ def main() -> None:
         default=None,
         help="Ruta de salida. Si se omite, imprime a stdout.",
     )
-    parser.add_argument("--sport-type", type=str, default="nba")
-    parser.add_argument("--market-type", type=str, default="winner")
+    parser.add_argument("--sport-type", type=str, default=None)
+    parser.add_argument("--market-type", type=str, default=None)
     parser.add_argument(
         "--active",
         choices=["true", "false", "any"],

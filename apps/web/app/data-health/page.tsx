@@ -20,7 +20,8 @@ import {
 } from "../lib/dataHealth";
 
 const sportLabels: Record<string, string> = {
-  nba: "NBA",
+  nba: "Baloncesto",
+  basketball: "Baloncesto",
   nfl: "NFL",
   soccer: "Fútbol",
   mma: "UFC",

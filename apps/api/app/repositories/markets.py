@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.event import Event
@@ -35,12 +35,26 @@ def list_markets_for_overview(
 ) -> list[Market]:
     stmt = select(Market).order_by(Market.id.asc())
     if sport_type is not None:
-        stmt = stmt.where(Market.sport_type == sport_type)
+        stmt = stmt.where(func.lower(Market.sport_type).in_(_sport_filter_values(sport_type)))
     if market_type is not None:
         stmt = stmt.where(Market.market_type == market_type)
     if active is not None:
         stmt = stmt.where(Market.active.is_(active))
     return list(db.scalars(stmt).all())
+
+
+def _sport_filter_values(value: str) -> tuple[str, ...]:
+    normalized = value.strip().lower()
+    aliases = {
+        "basketball": ("basketball", "nba"),
+        "nba": ("basketball", "nba"),
+        "football": ("football", "nfl"),
+        "american_football": ("football", "nfl"),
+        "nfl": ("football", "nfl"),
+        "baseball": ("baseball", "mlb"),
+        "mlb": ("baseball", "mlb"),
+    }
+    return aliases.get(normalized, (normalized,))
 
 
 def list_snapshot_candidates(
@@ -62,7 +76,7 @@ def list_snapshot_candidates(
     )
 
     if discovery_scope == "nba":
-        stmt = stmt.where(Market.sport_type == "nba")
+        stmt = stmt.where(func.lower(Market.sport_type).in_(_sport_filter_values("basketball")))
     elif discovery_scope == "sports":
         stmt = stmt.join(Market.event).where(
             or_(Market.sport_type.is_not(None), Event.category == "sports")
@@ -88,7 +102,7 @@ def list_nba_winner_evidence_candidates(
         .where(
             Market.active.is_(True),
             Market.closed.is_(False),
-            Market.sport_type == "nba",
+            func.lower(Market.sport_type).in_(_sport_filter_values("basketball")),
             Market.market_type == "winner",
         )
         .order_by(Market.id.asc())

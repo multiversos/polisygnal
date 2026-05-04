@@ -217,8 +217,8 @@ def get_markets(db: Session = Depends(get_db)) -> list[MarketListItem]:
 
 @router.get("/briefing", response_model=OperationalBriefingResponse, tags=["briefing"])
 def get_operational_briefing(
-    sport_type: str | None = Query(default="nba"),
-    market_type: str | None = Query(default="winner"),
+    sport_type: str | None = Query(default=None),
+    market_type: str | None = Query(default=None),
     active: bool | None = Query(default=True),
     top_limit: int = Query(default=5, ge=1, le=20),
     watchlist_limit: int = Query(default=5, ge=1, le=20),
@@ -455,8 +455,8 @@ def get_scoring_run(run_id: str) -> StageArtifactResponse:
 
 @router.get("/markets/overview", response_model=MarketOverviewResponse, tags=["markets"])
 def get_markets_overview(
-    sport_type: str | None = Query(default="nba"),
-    market_type: str | None = Query(default="winner"),
+    sport_type: str | None = Query(default=None),
+    market_type: str | None = Query(default=None),
     active: bool | None = Query(default=None),
     opportunity_only: bool = Query(default=False),
     evidence_eligible_only: bool = Query(default=False),

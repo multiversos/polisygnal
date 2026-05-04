@@ -684,7 +684,8 @@ function formatOptionLabel(value: string): string {
 
 const sportLabels: Record<string, string> = {
   all: "todos",
-  nba: "NBA",
+  nba: "baloncesto",
+  basketball: "baloncesto",
   nfl: "NFL",
   soccer: "fútbol",
   horse_racing: "carreras de caballos",

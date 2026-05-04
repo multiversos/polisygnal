@@ -217,7 +217,7 @@ def test_analysis_readiness_uses_remote_slug_context_for_imported_euroleague(
 
     assert response.summary.ready_count == 1
     assert response.items[0].market_id == market.id
-    assert response.items[0].sport == "nba"
+    assert response.items[0].sport == "basketball"
     assert response.items[0].market_shape == "match_winner"
     assert response.items[0].source == "snapshot_from_discovery"
     assert "discovery" in (response.items[0].ready_reason or "")

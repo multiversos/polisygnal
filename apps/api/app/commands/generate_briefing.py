@@ -19,8 +19,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Genera un briefing operativo compacto para el subset del MVP."
     )
-    parser.add_argument("--sport-type", type=str, default="nba")
-    parser.add_argument("--market-type", type=str, default="winner")
+    parser.add_argument("--sport-type", type=str, default=None)
+    parser.add_argument("--market-type", type=str, default=None)
     parser.add_argument(
         "--active",
         choices=["true", "false", "any"],

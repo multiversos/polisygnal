@@ -19,11 +19,11 @@ export const sportsSelectorOptions = [
     backendSupported: true,
   },
   {
-    id: "nba",
-    apiValue: "nba",
-    label: "NBA",
+    id: "basketball",
+    apiValue: "basketball",
+    label: "Baloncesto",
     icon: "🏀",
-    tone: "nba",
+    tone: "basketball",
     backendSupported: true,
   },
   {
@@ -75,14 +75,6 @@ export const sportsSelectorOptions = [
     backendSupported: true,
   },
   {
-    id: "basketball",
-    apiValue: "nba",
-    label: "Baloncesto",
-    icon: "🏀",
-    tone: "basketball",
-    backendSupported: true,
-  },
-  {
     id: "mlb",
     apiValue: "mlb",
     label: "Béisbol",
@@ -93,8 +85,9 @@ export const sportsSelectorOptions = [
 ] as const satisfies readonly SportSelectorOption[];
 
 export function getSportSelectorOption(value: string): SportSelectorOption {
+  const normalizedValue = value === "nba" ? "basketball" : value;
   return (
-    sportsSelectorOptions.find((option) => option.id === value) ??
+    sportsSelectorOptions.find((option) => option.id === normalizedValue) ??
     sportsSelectorOptions[0]
   );
 }
@@ -114,7 +107,11 @@ export function matchesSelectedSport(
   if (selectedSport === "all") {
     return true;
   }
-  return sport === getSportSelectorOption(selectedSport).apiValue;
+  const apiValue = getSportSelectorOption(selectedSport).apiValue;
+  if (apiValue === "basketball") {
+    return sport === "basketball" || sport === "nba";
+  }
+  return sport === apiValue;
 }
 
 export function SportsSelectorBar({

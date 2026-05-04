@@ -24,7 +24,7 @@ const severityOptions: Array<{ value: SmartAlertSeverity | ""; label: string }> 
 
 const sportOptions = [
   { value: "", label: "Todos" },
-  { value: "nba", label: "NBA" },
+  { value: "basketball", label: "Baloncesto" },
   { value: "nfl", label: "NFL" },
   { value: "soccer", label: "Fútbol" },
   { value: "mma", label: "UFC" },

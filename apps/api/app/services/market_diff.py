@@ -22,8 +22,8 @@ class MaterialChangeThresholds:
 def build_market_diff_snapshot(
     db: Session,
     *,
-    sport_type: str | None = "nba",
-    market_type: str | None = "winner",
+    sport_type: str | None = None,
+    market_type: str | None = None,
     active: bool | None = True,
     generated_at: datetime | None = None,
     run_id: str | None = None,

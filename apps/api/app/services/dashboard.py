@@ -62,8 +62,8 @@ class DashboardArtifact:
 def build_dashboard_artifact(
     db: Session,
     *,
-    sport_type: str | None = "nba",
-    market_type: str | None = "winner",
+    sport_type: str | None = None,
+    market_type: str | None = None,
     active: bool | None = True,
     top_limit: int = DEFAULT_DASHBOARD_TOP_LIMIT,
     watchlist_limit: int = DEFAULT_DASHBOARD_WATCHLIST_LIMIT,

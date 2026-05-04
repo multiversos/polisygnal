@@ -13,7 +13,8 @@ import {
 } from "../lib/investigationStatus";
 
 const sportLabels: Record<string, string> = {
-  nba: "NBA",
+  nba: "Baloncesto",
+  basketball: "Baloncesto",
   nfl: "NFL",
   soccer: "Fútbol",
   mma: "UFC",

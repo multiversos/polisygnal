@@ -53,7 +53,7 @@ def test_prepare_codex_research_request_writes_safe_json(
     assert payload["run_id"] == prepared.research_run.id
     assert payload["market_id"] == market.id
     assert payload["vertical"] == "sports"
-    assert payload["sport"] == "nba"
+    assert payload["sport"] == "basketball"
     assert payload["market_shape"] == "match_winner"
     assert payload["research_template_name"] == "sports_nba_match_winner"
     assert payload["classification_reason"]

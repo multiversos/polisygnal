@@ -186,8 +186,8 @@ def test_get_briefing_returns_compact_operational_summary(
     payload = response.json()
 
     assert payload["filters"] == {
-        "sport_type": "nba",
-        "market_type": "winner",
+        "sport_type": None,
+        "market_type": None,
         "active": True,
         "top_limit": 3,
         "watchlist_limit": 2,

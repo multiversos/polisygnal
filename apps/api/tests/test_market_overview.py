@@ -30,7 +30,7 @@ def test_get_markets_overview_returns_aggregated_items_in_operational_order(
         question="NBA Playoffs: Who Will Win Series? - Lakers vs. Rockets",
     )
     empty_market = _create_market(db_session, suffix="overview-empty")
-    _create_market(db_session, suffix="overview-excluded", sport_type="nfl")
+    football_market = _create_market(db_session, suffix="overview-excluded", sport_type="nfl")
 
     _add_snapshot(
         db_session,
@@ -113,13 +113,14 @@ def test_get_markets_overview_returns_aggregated_items_in_operational_order(
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["filters"]["sport_type"] == "nba"
-    assert payload["filters"]["market_type"] == "winner"
-    assert payload["total_count"] == 3
+    assert payload["filters"]["sport_type"] is None
+    assert payload["filters"]["market_type"] is None
+    assert payload["total_count"] == 4
     assert [item["market"]["id"] for item in payload["items"]] == [
         primary_market.id,
         secondary_market.id,
         empty_market.id,
+        football_market.id,
     ]
 
     first_item = payload["items"][0]
@@ -314,7 +315,7 @@ def test_get_markets_overview_supports_filters_and_pagination(
     pagination_response = client.get("/markets/overview", params={"limit": 1, "offset": 1})
     assert pagination_response.status_code == 200
     pagination_payload = pagination_response.json()
-    assert pagination_payload["total_count"] == 4
+    assert pagination_payload["total_count"] == 5
     assert len(pagination_payload["items"]) == 1
     assert pagination_payload["items"][0]["market"]["id"] == inactive_market.id
 

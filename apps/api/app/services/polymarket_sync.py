@@ -125,7 +125,7 @@ def should_sync_event(event_payload: PolymarketEventPayload, discovery_scope: st
         return True
     if discovery_scope == "sports":
         return is_sports_event(event_payload)
-    return classify_sport_type(event_payload) == "nba"
+    return classify_sport_type(event_payload) == "basketball"
 
 
 def _sync_single_event(db: Session, event_payload: PolymarketEventPayload) -> EventSyncResult:
@@ -272,7 +272,7 @@ def is_sports_event(event_payload: PolymarketEventPayload) -> bool:
     }
     if "sports" in tags or "sports" in tag_labels:
         return True
-    if classify_sport_type(event_payload) == "nba":
+    if classify_sport_type(event_payload) == "basketball":
         return True
 
     haystack = " ".join(
@@ -290,9 +290,9 @@ def is_sports_event(event_payload: PolymarketEventPayload) -> bool:
 def classify_sport_type(event_payload: PolymarketEventPayload) -> str | None:
     for tag in event_payload.tags:
         if (tag.slug or "").lower() == "nba":
-            return "nba"
+            return "basketball"
         if (tag.label or "").strip().lower() == "nba":
-            return "nba"
+            return "basketball"
 
     haystack = " ".join(
         part
@@ -304,7 +304,7 @@ def classify_sport_type(event_payload: PolymarketEventPayload) -> str | None:
         if part
     ).lower()
     if "nba" in haystack:
-        return "nba"
+        return "basketball"
     return None
 
 

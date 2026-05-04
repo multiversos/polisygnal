@@ -129,7 +129,7 @@ const API_BASE_URL = (
 const dayOptions = [1, 3, 7];
 
 const sportLabels: Record<string, string> = {
-  nba: "NBA",
+  nba: "Baloncesto",
   nfl: "NFL",
   nhl: "NHL",
   mlb: "Béisbol",

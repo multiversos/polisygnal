@@ -76,7 +76,7 @@ def test_data_health_overview_counts_coverage(
     assert payload["sport_other_count"] == 1
     assert payload["latest_snapshot_at"] is not None
     coverage = {item["sport"]: item for item in payload["coverage_by_sport"]}
-    assert coverage["nba"]["with_snapshot"] == 1
+    assert coverage["basketball"]["with_snapshot"] == 1
     assert coverage["soccer"]["missing_price"] == 1
     assert coverage["other"]["missing_close_time"] == 1
     assert db_session.scalar(select(func.count()).select_from(Prediction)) == before_predictions

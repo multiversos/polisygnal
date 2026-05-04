@@ -25,8 +25,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Genera un diff compacto entre la corrida actual y la corrida previa del MVP."
     )
-    parser.add_argument("--sport-type", type=str, default="nba")
-    parser.add_argument("--market-type", type=str, default="winner")
+    parser.add_argument("--sport-type", type=str, default=None)
+    parser.add_argument("--market-type", type=str, default=None)
     parser.add_argument(
         "--active",
         choices=["true", "false", "any"],

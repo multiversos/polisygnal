@@ -9,7 +9,7 @@ import {
 } from "../components/SportsSelectorBar";
 
 const visibleSports = [
-  "nba",
+  "basketball",
   "nfl",
   "soccer",
   "mma",
@@ -20,7 +20,7 @@ const visibleSports = [
 ];
 
 const sportDescriptions: Record<string, string> = {
-  nba: "Partidos de baloncesto NBA con enfoque en ganador/perdedor.",
+  basketball: "Partidos de baloncesto con la liga como metadata separada.",
   nfl: "Partidos NFL y mercados cercanos de ganador del juego.",
   soccer: "Futbol global: clubes, ligas y cruces proximos.",
   mma: "Eventos UFC/MMA cercanos con mercados de ganador de pelea.",

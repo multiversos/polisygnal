@@ -146,7 +146,7 @@ def build_snapshot_gaps(
         .limit(safe_limit)
     )
     if requested_sport:
-        statement = statement.where(func.lower(Market.sport_type) == requested_sport)
+        statement = statement.where(func.lower(Market.sport_type).in_(_sport_filter_values(requested_sport)))
 
     rows = db.execute(statement).all()
     snapshots = _list_latest_snapshot_summaries(db)
@@ -202,7 +202,21 @@ def build_snapshot_gaps(
 
 def _normalize_sport(value: str | None) -> str:
     normalized = (value or "other").strip().lower()
-    return normalized or "other"
+    aliases = {
+        "nba": "basketball",
+        "nfl": "football",
+        "mlb": "baseball",
+    }
+    return aliases.get(normalized, normalized or "other")
+
+
+def _sport_filter_values(value: str) -> tuple[str, ...]:
+    aliases = {
+        "basketball": ("basketball", "nba"),
+        "football": ("football", "nfl"),
+        "baseball": ("baseball", "mlb"),
+    }
+    return aliases.get(value, (value,))
 
 
 def _list_latest_snapshot_summaries(db: Session) -> dict[int, _LatestSnapshotSummary]:

@@ -15,43 +15,43 @@ from app.services.research.classification import (
     [
         (
             "Will the Lakers beat the Warriors?",
-            "nba",
+            "basketball",
             "match_winner",
             "sports_nba_match_winner",
         ),
         (
             "Lakers vs Warriors",
-            "nba",
+            "basketball",
             "match_winner",
             "sports_nba_match_winner",
         ),
         (
             "Lakers v Warriors",
-            "nba",
+            "basketball",
             "match_winner",
             "sports_nba_match_winner",
         ),
         (
             "Will Lakers defeat Warriors?",
-            "nba",
+            "basketball",
             "match_winner",
             "sports_nba_match_winner",
         ),
         (
             "Will Lakers win against Warriors?",
-            "nba",
+            "basketball",
             "match_winner",
             "sports_nba_match_winner",
         ),
         (
             "Will the Boston Celtics win the NBA Finals?",
-            "nba",
+            "basketball",
             "championship",
             "sports_nba_futures",
         ),
         (
             "Will the Denver Nuggets win the NBA Championship?",
-            "nba",
+            "basketball",
             "championship",
             "sports_nba_futures",
         ),
@@ -213,7 +213,7 @@ from app.services.research.classification import (
         ),
         (
             "Will LeBron James score over 25.5 points?",
-            "nba",
+            "basketball",
             "player_prop",
             "sports_generic",
         ),
@@ -225,7 +225,7 @@ from app.services.research.classification import (
         ),
         (
             "NBA Playoffs: Suns vs. Thunder Total Games O/U 4.5",
-            "nba",
+            "basketball",
             "team_prop",
             "sports_generic",
         ),
@@ -272,7 +272,7 @@ def test_euroleague_slug_overrides_soccer_club_name_collision() -> None:
         event_category="sports",
     )
 
-    assert classification.sport == "nba"
+    assert classification.sport == "basketball"
     assert classification.market_shape == "match_winner"
 
 

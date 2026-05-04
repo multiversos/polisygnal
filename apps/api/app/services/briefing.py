@@ -45,8 +45,8 @@ BRIEFING_OVERVIEW_LIMIT = 10_000
 def build_operational_briefing(
     db: Session,
     *,
-    sport_type: str | None = "nba",
-    market_type: str | None = "winner",
+    sport_type: str | None = None,
+    market_type: str | None = None,
     active: bool | None = True,
     top_limit: int = 5,
     watchlist_limit: int = 5,

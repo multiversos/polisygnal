@@ -83,7 +83,7 @@ def test_candidate_selector_uses_research_classification(db_session: Session) ->
 
     assert candidate.market_id == market.id
     assert candidate.vertical == "sports"
-    assert candidate.sport == "nba"
+    assert candidate.sport == "basketball"
     assert candidate.market_shape == "match_winner"
     assert candidate.research_template_name == "sports_nba_match_winner"
 

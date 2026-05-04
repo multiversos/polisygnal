@@ -81,7 +81,8 @@ const API_BASE_URL = (
 ).replace(/\/$/, "");
 
 const sportLabels: Record<string, string> = {
-  nba: "NBA",
+  nba: "baloncesto",
+  basketball: "baloncesto",
   nfl: "NFL",
   soccer: "fútbol",
   horse_racing: "carreras de caballos",

@@ -322,7 +322,7 @@ def infer_participants_from_market(
         market.question,
         market.event.title if market.event is not None else None,
     )
-    if classification.sport == "nba":
+    if classification.sport == "basketball":
         teams = extract_nba_teams(text)
         if teams:
             return [
@@ -506,9 +506,10 @@ def _load_fallback_market_ids(
 
 def _apply_metadata_prefilters(stmt, *, vertical: str | None, sport: str | None):
     if sport and sport != "other":
+        sport_aliases = _sport_filter_values(sport)
         stmt = stmt.where(
             or_(
-                Market.sport_type == sport,
+                func.lower(Market.sport_type).in_(sport_aliases),
                 Market.question.ilike(f"%{sport}%"),
             )
         )
@@ -520,6 +521,15 @@ def _apply_metadata_prefilters(stmt, *, vertical: str | None, sport: str | None)
             )
         )
     return stmt
+
+
+def _sport_filter_values(value: str) -> tuple[str, ...]:
+    aliases = {
+        "basketball": ("basketball", "nba"),
+        "football": ("football", "nfl"),
+        "baseball": ("baseball", "mlb"),
+    }
+    return aliases.get(value, (value,))
 
 
 def _score_market_depth(

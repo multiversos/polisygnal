@@ -170,7 +170,7 @@ def test_sync_polymarket_creates_records(client: TestClient, db_session: Session
 
     stored_market = db_session.scalar(select(Market).where(Market.polymarket_market_id == "553856"))
     assert stored_market is not None
-    assert stored_market.sport_type == "nba"
+    assert stored_market.sport_type == "basketball"
     assert stored_market.market_type == "winner"
     assert stored_market.condition_id == "0xsynccondition"
     assert stored_market.question_id == "sync-question-id"
