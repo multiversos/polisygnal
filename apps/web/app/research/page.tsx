@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  ApiErrorState,
+  ComingSoonModule,
+  LoadingState,
+} from "../components/DataState";
 import { MainNavigation } from "../components/MainNavigation";
 import { fetchResearchRuns, type ResearchRunItem } from "../lib/researchRuns";
 
@@ -170,10 +175,11 @@ export default function ResearchDashboardPage() {
       </section>
 
       {error ? (
-        <section className="alert-panel" role="status">
-          <strong>Research no disponible</strong>
-          <span>{error}</span>
-        </section>
+        <ApiErrorState
+          message={`${error} El centro de investigacion se conectara al pipeline cuando los runs esten disponibles.`}
+          onRetry={() => void loadRuns()}
+          title="Modulo en preparacion"
+        />
       ) : null}
 
       <section className="dashboard-panel">
@@ -186,15 +192,9 @@ export default function ResearchDashboardPage() {
         </div>
 
         {loading ? (
-          <div className="empty-state">Cargando research runs...</div>
+          <LoadingState copy="Cargando research runs..." />
         ) : runs.length === 0 ? (
-          <div className="empty-state">
-            <strong>Modulo en preparacion.</strong>
-            <p>
-              No hay research runs todavia. Los packets apareceran aqui cuando
-              el pipeline de investigacion se active desde un mercado.
-            </p>
-          </div>
+          <ComingSoonModule copy="No hay research runs todavia. Los packets apareceran aqui cuando el pipeline de investigacion se active desde un mercado." />
         ) : (
           <div className="research-run-list">
             {runs.map((run) => (

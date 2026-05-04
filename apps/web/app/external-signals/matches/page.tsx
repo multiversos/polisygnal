@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  ApiErrorState,
+  ComingSoonModule,
+  EmptyState,
+  LoadingState,
+} from "../../components/DataState";
 import { MainNavigation } from "../../components/MainNavigation";
 import { API_BASE_URL, fetchApiJson, friendlyApiError, isApiNotFoundError } from "../../lib/api";
 
@@ -466,10 +472,11 @@ export default function ExternalSignalMatchReviewPage() {
       </section>
 
       {state.error ? (
-        <section className="alert-panel" role="status">
-          <strong>Modulo en preparacion</strong>
-          <span>{state.error}</span>
-        </section>
+        <ApiErrorState
+          message={`${state.error} Las coincidencias externas se activaran cuando el pipeline Kalshi tenga datos persistidos.`}
+          onRetry={() => void loadSignals()}
+          title="Modulo en preparacion"
+        />
       ) : null}
 
       <section className="match-review-layout">
@@ -485,15 +492,9 @@ export default function ExternalSignalMatchReviewPage() {
           </div>
 
           {state.loadingSignals ? (
-            <div className="empty-state">Cargando señales pendientes...</div>
+            <LoadingState copy="Cargando senales pendientes..." />
           ) : state.signals.length === 0 ? (
-            <div className="empty-state">
-              <strong>Modulo en preparacion.</strong>
-              <p>
-                No hay senales Kalshi pendientes cargadas. Esta vista quedara
-                activa cuando el pipeline de senales externas tenga datos.
-              </p>
-            </div>
+            <ComingSoonModule copy="No hay senales Kalshi pendientes cargadas. Esta vista quedara activa cuando el pipeline de senales externas tenga datos." />
           ) : (
             <div className="match-signal-list">
               {state.signals.map((signal) => {
@@ -552,14 +553,11 @@ export default function ExternalSignalMatchReviewPage() {
           ) : null}
 
           {state.loadingCandidates ? (
-            <div className="empty-state">Calculando candidatos de match...</div>
+            <LoadingState copy="Calculando candidatos de match..." />
           ) : state.candidateError ? (
-            <div className="alert-panel" role="status">
-              <strong>Error</strong>
-              <span>{state.candidateError}</span>
-            </div>
+            <ApiErrorState message={state.candidateError} title="Matcher en preparacion" />
           ) : !selectedSignal ? (
-            <div className="empty-state">Selecciona una señal pendiente para revisar candidatos.</div>
+            <EmptyState title="Selecciona una senal pendiente para revisar candidatos." />
           ) : state.matchResponse && state.matchResponse.candidates.length > 0 ? (
             <div className="match-candidate-list">
               {state.matchResponse.candidates.map((candidate) => {
@@ -605,13 +603,10 @@ export default function ExternalSignalMatchReviewPage() {
               })}
             </div>
           ) : (
-            <div className="empty-state">
-              <strong>Sin candidatos disponibles.</strong>
-              <p>
-                No hay mercados Polymarket locales para comparar o el matcher no
-                encontró candidatos para esta señal.
-              </p>
-            </div>
+            <EmptyState
+              copy="No hay mercados Polymarket locales para comparar o el matcher no encontro candidatos para esta senal."
+              title="Sin candidatos disponibles."
+            />
           )}
         </section>
       </section>

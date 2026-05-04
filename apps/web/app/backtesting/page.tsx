@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import {
+  ApiErrorState,
+  ComingSoonModule,
+  EmptyState,
+  LoadingState,
+} from "../components/DataState";
 import { MainNavigation } from "../components/MainNavigation";
 import {
   fetchBacktestingSummary,
@@ -148,10 +154,11 @@ export default function BacktestingPage() {
       </section>
 
       {state.error ? (
-        <section className="alert-panel" role="status">
-          <strong>Backtesting no disponible</strong>
-          <span>{state.error}</span>
-        </section>
+        <ApiErrorState
+          message={`${state.error} Backtesting se activara cuando existan outcomes manuales y predicciones evaluables.`}
+          onRetry={() => void loadBacktesting()}
+          title="Modulo en preparacion"
+        />
       ) : null}
 
       <section className="metric-grid" aria-label="Resumen de backtesting">
@@ -197,15 +204,9 @@ export default function BacktestingPage() {
         </div>
 
         {state.loading ? (
-          <div className="empty-state">Cargando resumen...</div>
+          <LoadingState copy="Cargando resumen..." />
         ) : !summary || summary.by_prediction_family.length === 0 ? (
-          <div className="empty-state">
-            <strong>Modulo en preparacion.</strong>
-            <p>
-              No hay outcomes con predicciones guardadas todavia. Backtesting se
-              activara cuando existan resultados manuales resueltos.
-            </p>
-          </div>
+          <ComingSoonModule copy="No hay outcomes con predicciones guardadas todavia. Backtesting se activara cuando existan resultados manuales resueltos." />
         ) : (
           <div className="table-shell">
             <table>
@@ -248,9 +249,9 @@ export default function BacktestingPage() {
         </div>
 
         {state.loading ? (
-          <div className="empty-state">Cargando calibración...</div>
+          <LoadingState copy="Cargando calibracion..." />
         ) : !summary ? (
-          <div className="empty-state">No hay resumen de backtesting disponible.</div>
+          <ComingSoonModule copy="No hay resumen de backtesting disponible todavia." />
         ) : (
           <div className="backtesting-bucket-grid">
             {summary.by_confidence_bucket.map((bucket) => (
@@ -282,12 +283,9 @@ export default function BacktestingPage() {
         </div>
 
         {state.loading ? (
-          <div className="empty-state">Cargando outcomes...</div>
+          <LoadingState copy="Cargando outcomes..." />
         ) : state.outcomes.length === 0 ? (
-          <div className="empty-state">
-            No hay outcomes manuales todavia. PolySignal no inventa resultados;
-            esta vista queda lista para cuando se registren resoluciones.
-          </div>
+          <EmptyState copy="No hay outcomes manuales todavia. PolySignal no inventa resultados; esta vista queda lista para cuando se registren resoluciones." />
         ) : (
           <div className="backtesting-outcome-list">
             {state.outcomes.map((outcome) => (

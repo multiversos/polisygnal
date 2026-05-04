@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  ApiErrorState,
+  ComingSoonModule,
+  LoadingState,
+} from "../components/DataState";
 import { MainNavigation } from "../components/MainNavigation";
 import { fetchApiJson, friendlyApiError } from "../lib/api";
 
@@ -133,10 +138,11 @@ export default function SourcesQualityPage() {
       </section>
 
       {state.error ? (
-        <section className="alert-panel" role="status">
-          <strong>Fuentes no disponibles</strong>
-          <span>{state.error}</span>
-        </section>
+        <ApiErrorState
+          message={`${state.error} La calidad de fuentes se conectara cuando haya evidencia persistida.`}
+          onRetry={() => void loadSources()}
+          title="Modulo en preparacion"
+        />
       ) : null}
 
       <section className="metric-grid" aria-label="Resumen de fuentes">
@@ -191,15 +197,9 @@ export default function SourcesQualityPage() {
         </div>
 
         {state.loading ? (
-          <div className="empty-state">Cargando fuentes...</div>
+          <LoadingState copy="Cargando fuentes..." />
         ) : items.length === 0 ? (
-          <div className="empty-state">
-            <strong>Modulo en preparacion.</strong>
-            <p>
-              No hay fuentes guardadas con el filtro actual. Esta vista se
-              conectara al pipeline de evidencia cuando haya fuentes persistidas.
-            </p>
-          </div>
+          <ComingSoonModule copy="No hay fuentes guardadas con el filtro actual. Esta vista se conectara al pipeline de evidencia cuando haya fuentes persistidas." />
         ) : (
           <div className="source-quality-grid">
             {items.map((item) => (

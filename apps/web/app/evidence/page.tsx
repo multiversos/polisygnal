@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  ApiErrorState,
+  ComingSoonModule,
+  LoadingState,
+} from "../components/DataState";
 import { MainNavigation } from "../components/MainNavigation";
 import { friendlyApiError } from "../lib/api";
 import {
@@ -185,10 +190,11 @@ export default function EvidencePage() {
       </section>
 
       {error ? (
-        <section className="alert-panel" role="status">
-          <strong>Evidencia no disponible</strong>
-          <span>{error}</span>
-        </section>
+        <ApiErrorState
+          message={`${error} La evidencia externa se conectara en un sprint posterior.`}
+          onRetry={() => void loadEvidence()}
+          title="Modulo en preparacion"
+        />
       ) : null}
 
       <section className="dashboard-panel">
@@ -201,15 +207,9 @@ export default function EvidencePage() {
         </div>
 
         {loading ? (
-          <div className="empty-state">Cargando evidencia manual...</div>
+          <LoadingState copy="Cargando evidencia manual..." />
         ) : items.length === 0 ? (
-          <div className="empty-state">
-            <strong>Modulo en preparacion.</strong>
-            <p>
-              No hay evidencia manual con los filtros actuales. La evidencia
-              externa se conectara en un sprint posterior.
-            </p>
-          </div>
+          <ComingSoonModule copy="No hay evidencia manual con los filtros actuales. La evidencia externa se conectara en un sprint posterior." />
         ) : (
           <div className="evidence-dashboard-list">
             {items.map((item) => (
