@@ -35,6 +35,13 @@ logs/
 .claude/
 .linear/
 
+# OpenClaw local agent state and private local notes
+.openclaw/
+HEARTBEAT.md
+SOUL.md
+TOOLS.md
+USER.md
+
 # Test validation artifacts
 **/.validation/
 
