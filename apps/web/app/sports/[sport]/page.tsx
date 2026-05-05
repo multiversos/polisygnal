@@ -557,7 +557,7 @@ export default function SportDetailPage() {
         <ApiErrorState
           message={state.error}
           onRetry={() => void loadSport()}
-          title="Datos no disponibles"
+          title="No se pudo cargar este deporte"
         />
       ) : null}
 
