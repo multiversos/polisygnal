@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "smoke:production": "node scripts/smoke-production.mjs",
     "start": "next start"
   },
   "dependencies": {

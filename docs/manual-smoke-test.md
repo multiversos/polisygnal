@@ -45,6 +45,26 @@ Use these checks after a production deploy. Correct domains:
 5. Confirm UFC, cricket, and NHL/Hockey remain disabled and do not navigate as active filters.
 6. Confirm `/sports/soccer` does not show `La API no respondió` or `Datos no disponibles`.
 
+## Critical Regression: Soccer Must Render Data
+
+Run the automated production smoke test from the repo root:
+
+```powershell
+npm.cmd --workspace apps/web run smoke:production
+```
+
+The test must confirm:
+
+1. `/api/build-info` returns the current production build metadata.
+2. `/api/backend/markets/overview?sport_type=soccer&limit=20` returns
+   `total_count=20` and 20 `items`.
+3. `/sports/soccer` renders at least 20 market cards in headless Chrome.
+4. `/sports/soccer?debug_ts=<timestamp>` also renders market cards.
+5. The rendered page does not contain `Datos no disponibles`,
+   `La API no respondió`, or `Todavía no hay mercados`.
+
+If this test fails, stop feature work and treat it as a production regression.
+
 ## Cache Troubleshooting
 
 If a normal browser shows `Datos no disponibles` but backend/proxy checks pass:
@@ -57,6 +77,8 @@ If a normal browser shows `Datos no disponibles` but backend/proxy checks pass:
 5. Confirm the proxy returns `total_count=20` and 20 `items`.
 6. If the proxy works and incognito works, treat the issue as local browser cache
    or an old tab rather than a backend outage.
+7. Re-run `npm.cmd --workspace apps/web run smoke:production` to compare the
+   user browser with a clean headless render.
 
 ## Market Detail
 
