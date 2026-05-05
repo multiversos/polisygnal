@@ -19,6 +19,15 @@ Use these checks after a production deploy. Correct domains:
 2. Confirm it returns the same shape as backend `/markets/overview`.
 3. Confirm no browser CORS error is needed for visible pages.
 
+## Build Diagnostics
+
+1. Open `https://polisygnal-web.vercel.app/api/build-info`.
+2. Confirm it returns `app: polisygnal-web`, `proxy: enabled`, and
+   `api_host: polisygnal.onrender.com`.
+3. If the page looks stale, compare `commit` with the latest Vercel production
+   deployment, then hard refresh with `Ctrl+F5` or open an incognito window.
+4. Re-check the proxy endpoint above before treating the UI as disconnected.
+
 ## Dashboard
 
 1. Open `https://polisygnal-web.vercel.app/`.
