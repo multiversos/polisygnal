@@ -115,6 +115,8 @@ SOCCER_COMPETITION_TERMS = (
     "mls",
     "premier league",
     "champions league",
+    "ucl",
+    "uefa champions league",
     "europa league",
     "la liga",
     "serie a",
@@ -278,6 +280,10 @@ SPORT_KEYWORDS: dict[str, tuple[str, ...]] = {
 }
 
 PLAYER_PROP_HINTS = (
+    "anytime goalscorer",
+    "goal scorer",
+    "goalscorer",
+    "shots on target",
     "score over",
     "score under",
     "points",

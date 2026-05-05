@@ -53,6 +53,37 @@ class FakeGammaClient:
         return PolymarketEventsPage(events=self.events)
 
 
+class PagedFakeGammaClient(FakeGammaClient):
+    def __init__(self, pages_by_offset: dict[int, list[PolymarketEventPayload]]) -> None:
+        super().__init__([])
+        self.pages_by_offset = pages_by_offset
+
+    def fetch_active_events_page(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        tag_id: str | None = None,
+        order: str | None = None,
+        ascending: bool | None = None,
+        end_date_min: datetime | None = None,
+        end_date_max: datetime | None = None,
+    ):
+        self.calls.append(
+            {
+                "limit": limit,
+                "offset": offset,
+                "tag_id": tag_id,
+                "order": order,
+                "ascending": ascending,
+                "end_date_min": end_date_min,
+                "end_date_max": end_date_max,
+            }
+        )
+        next_offset = offset + limit if offset + limit in self.pages_by_offset else None
+        return PolymarketEventsPage(events=self.pages_by_offset.get(offset, []), next_offset=next_offset)
+
+
 def test_live_upcoming_discovery_classifies_remote_and_local_items(
     db_session: Session,
 ) -> None:
@@ -300,6 +331,143 @@ def test_discover_live_upcoming_markets_command_is_read_only_and_json_serializab
     assert json.dumps(payload, ensure_ascii=True, default=str)
     assert db_session.scalar(select(func.count()).select_from(Market)) == before_markets
     assert db_session.scalar(select(func.count()).select_from(MarketSnapshot)) == before_snapshots
+
+
+def test_live_upcoming_discovery_debug_groups_soccer_events(db_session: Session) -> None:
+    events = [
+        _event_payload(
+            event_id="event-ucl-ars-atm",
+            title="UCL: Arsenal FC vs Club Atletico de Madrid",
+            slug="ucl-ars-atm1-2026-05-05",
+            markets=[
+                _market_payload(
+                    market_id="remote-ars",
+                    question="Will Arsenal FC win on 2026-05-05?",
+                    slug="ucl-ars-atm1-2026-05-05-ars",
+                    end_date=NOW + timedelta(days=1),
+                    condition_id="0xars",
+                    prices=["0.61", "0.39"],
+                ),
+                _market_payload(
+                    market_id="remote-draw",
+                    question="Will Arsenal FC vs. Club Atletico de Madrid end in a draw?",
+                    slug="ucl-ars-atm1-2026-05-05-draw",
+                    end_date=NOW + timedelta(days=1),
+                    condition_id="0xdraw",
+                    prices=["0.23", "0.77"],
+                ),
+                _market_payload(
+                    market_id="remote-atm",
+                    question="Will Club Atletico de Madrid win on 2026-05-05?",
+                    slug="ucl-ars-atm1-2026-05-05-atm1",
+                    end_date=NOW + timedelta(days=1),
+                    condition_id="0xatm",
+                    prices=["0.18", "0.82"],
+                ),
+                _market_payload(
+                    market_id="remote-ags",
+                    question="Bukayo Saka: Anytime Goalscorer",
+                    slug="ucl-ars-atm1-2026-05-05-ags-bukayo-saka",
+                    end_date=NOW + timedelta(days=1),
+                    condition_id="0xags",
+                    prices=["0.35", "0.65"],
+                ),
+            ],
+        )
+    ]
+
+    response = discover_live_upcoming_markets(
+        db_session,
+        client=FakeGammaClient(events),  # type: ignore[arg-type]
+        sport="soccer",
+        days=3,
+        limit=10,
+        include_debug=True,
+        now=NOW,
+    )
+
+    assert len(response.event_groups) == 1
+    group = response.event_groups[0]
+    assert group.event_slug == "ucl-ars-atm1-2026-05-05"
+    assert group.league == "UCL"
+    assert group.teams == ["Arsenal FC", "Club Atletico de Madrid"]
+    assert group.has_draw_market is True
+    assert group.total_markets == 4
+    assert group.market_shape_counts["match_winner"] == 2
+    assert group.market_shape_counts["yes_no_generic"] == 1
+    assert group.market_shape_counts["player_prop"] == 1
+    assert group.skip_reasons_count["not_match_winner_focus"] == 2
+    assert [item.title for item in group.main_markets] == [
+        "Will Arsenal FC win on 2026-05-05?",
+        "Will Club Atletico de Madrid win on 2026-05-05?",
+        "Will Arsenal FC vs. Club Atletico de Madrid end in a draw?",
+    ]
+
+
+def test_live_upcoming_discovery_reads_multiple_pages_for_debug_discovery(
+    db_session: Session,
+) -> None:
+    first_page = [
+        _event_payload(
+            event_id="event-empty-page",
+            title="Other sports page",
+            slug="other-sports-page",
+            markets=[],
+        )
+    ]
+    second_page = [
+        _event_payload(
+            event_id="event-ucl-bay-psg",
+            title="UCL: Bayern Munchen vs Paris Saint-Germain",
+            slug="ucl-bay-psg-2026-05-06",
+            markets=[
+                _market_payload(
+                    market_id="remote-bay",
+                    question="Will FC Bayern Munchen win on 2026-05-06?",
+                    slug="ucl-bay-psg-2026-05-06-bay",
+                    end_date=NOW + timedelta(days=2),
+                    condition_id="0xbay",
+                    prices=["0.42", "0.58"],
+                ),
+                _market_payload(
+                    market_id="remote-psg",
+                    question="Will Paris Saint-Germain FC win on 2026-05-06?",
+                    slug="ucl-bay-psg-2026-05-06-psg",
+                    end_date=NOW + timedelta(days=2),
+                    condition_id="0xpsg",
+                    prices=["0.34", "0.66"],
+                ),
+                _market_payload(
+                    market_id="remote-bay-psg-draw",
+                    question="Will FC Bayern Munchen vs. Paris Saint-Germain FC end in a draw?",
+                    slug="ucl-bay-psg-2026-05-06-draw",
+                    end_date=NOW + timedelta(days=2),
+                    condition_id="0xbaypsgdraw",
+                    prices=["0.24", "0.76"],
+                ),
+            ],
+        )
+    ]
+    fake_client = PagedFakeGammaClient({0: first_page, 100: second_page})
+
+    response = discover_live_upcoming_markets(
+        db_session,
+        client=fake_client,  # type: ignore[arg-type]
+        sport="soccer",
+        days=3,
+        limit=50,
+        pages=2,
+        include_debug=True,
+        now=NOW,
+    )
+
+    assert [call["offset"] for call in fake_client.calls] == [0, 100]
+    assert response.filters_applied["remote_pages_fetched"] == 2
+    assert response.filters_applied["remote_page_limit"] == 100
+    assert response.summary.total_remote_checked == 3
+    assert response.event_groups[0].event_slug == "ucl-bay-psg-2026-05-06"
+    assert response.event_groups[0].teams == ["FC Bayern Munchen", "Paris Saint-Germain FC"]
+    assert response.event_groups[0].has_draw_market is True
 
 
 def test_live_upcoming_discovery_endpoint_is_documented(client: TestClient) -> None:

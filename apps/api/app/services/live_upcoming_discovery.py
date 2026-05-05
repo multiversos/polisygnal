@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+import re
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
@@ -14,6 +15,8 @@ from app.clients.polymarket import (
 from app.models.market import Market
 from app.repositories.market_snapshots import list_latest_market_snapshots_for_markets
 from app.schemas.live_upcoming_discovery import (
+    LiveUpcomingEventGroup,
+    LiveUpcomingEventMarketSummary,
     LiveUpcomingDiscoveryItem,
     LiveUpcomingDiscoveryResponse,
     LiveUpcomingDiscoverySummary,
@@ -68,15 +71,18 @@ def discover_live_upcoming_markets(
     sport: str | None = None,
     days: int = 7,
     limit: int = 50,
+    pages: int = 1,
     include_futures: bool = False,
     focus: str | None = DEFAULT_FOCUS,
     min_hours_to_close: float | None = None,
     source_tag_id: str | None = None,
+    include_debug: bool = False,
     now: datetime | None = None,
 ) -> LiveUpcomingDiscoveryResponse:
     current_time = _normalize_datetime(now or datetime.now(tz=UTC))
     safe_days = max(days, 1)
     safe_limit = max(min(limit, 100), 0)
+    safe_pages = max(min(pages, 10), 1)
     normalized_sport = normalize_sport(sport) if sport else None
     normalized_focus = _normalize_focus(focus)
     warnings: list[str] = []
@@ -84,17 +90,24 @@ def discover_live_upcoming_markets(
 
     window_end = current_time + timedelta(days=safe_days)
     page_limit = min(max(safe_limit * 2, 10), 100)
-    page = client.fetch_active_events_page(
-        limit=page_limit,
-        offset=0,
-        tag_id=source_tag_id,
-        order="endDate",
-        ascending=True,
-        end_date_min=min_close_time,
-        end_date_max=window_end,
-    )
-    warnings.extend(page.errors)
-    remote_entries = _flatten_remote_markets(page.events)
+    remote_events: list[PolymarketEventPayload] = []
+    next_offset: int | None = 0
+    pages_fetched = 0
+    while next_offset is not None and pages_fetched < safe_pages:
+        page = client.fetch_active_events_page(
+            limit=page_limit,
+            offset=next_offset,
+            tag_id=source_tag_id,
+            order="endDate",
+            ascending=True,
+            end_date_min=min_close_time,
+            end_date_max=window_end,
+        )
+        pages_fetched += 1
+        warnings.extend(page.errors)
+        remote_events.extend(page.events)
+        next_offset = page.next_offset
+    remote_entries = _flatten_remote_markets(remote_events)
     local_markets = _load_matching_local_markets(db, remote_entries)
     snapshots = list_latest_market_snapshots_for_markets(
         db,
@@ -197,6 +210,8 @@ def discover_live_upcoming_markets(
                 has_local_snapshot=has_local_snapshot,
                 has_local_price=has_local_price,
                 has_remote_price=has_remote_price,
+                yes_price=remote_prices[0] if len(remote_prices) >= 1 else None,
+                no_price=remote_prices[1] if len(remote_prices) >= 2 else None,
                 liquidity=market_payload.liquidity,
                 volume=market_payload.volume,
                 condition_id=_safe_text(market_payload.condition_id),
@@ -226,12 +241,17 @@ def discover_live_upcoming_markets(
         generated_at=current_time,
         summary=summary,
         items=selected,
+        event_groups=_build_event_groups(items) if include_debug else [],
         filters_applied={
             "sport": normalized_sport,
             "days": safe_days,
             "limit": safe_limit,
+            "pages": safe_pages,
+            "remote_page_limit": page_limit,
+            "remote_pages_fetched": pages_fetched,
             "include_futures": include_futures,
             "focus": normalized_focus,
+            "debug_skips": include_debug,
             "source_tag_id": source_tag_id,
             "min_hours_to_close": min_hours_to_close,
             "window_start": current_time.isoformat(),
@@ -361,6 +381,165 @@ def _remote_prices(market_payload: PolymarketMarketPayload) -> list[Decimal]:
         except Exception:
             continue
     return prices
+
+
+def _build_event_groups(items: list[LiveUpcomingDiscoveryItem]) -> list[LiveUpcomingEventGroup]:
+    grouped: dict[str, list[LiveUpcomingDiscoveryItem]] = {}
+    for item in items:
+        key = item.event_slug or item.market_slug or f"remote:{item.remote_id or item.title}"
+        grouped.setdefault(key, []).append(item)
+
+    groups = [_event_group(slug, event_items) for slug, event_items in grouped.items()]
+    groups.sort(
+        key=lambda group: (
+            group.close_time is None,
+            _timestamp(group.close_time),
+            -(group.volume or ZERO),
+            group.event_slug,
+        )
+    )
+    return groups
+
+
+def _event_group(
+    event_slug: str,
+    items: list[LiveUpcomingDiscoveryItem],
+) -> LiveUpcomingEventGroup:
+    close_time = min((item.close_time for item in items if item.close_time), default=None)
+    teams = _detect_event_teams(items)
+    main_markets = [item for item in items if _is_primary_soccer_market(item, teams)]
+    draw_markets = [item for item in items if _is_draw_market(item)]
+    market_shape_counts = _count_by(items, lambda item: item.market_shape)
+    status_counts = _count_by(items, lambda item: item.discovery_status)
+    skip_reasons_count: dict[str, int] = {}
+    for item in items:
+        for reason in item.reasons:
+            if item.discovery_status in {"missing_local_market", "already_local_ready"}:
+                continue
+            skip_reasons_count[reason] = skip_reasons_count.get(reason, 0) + 1
+    main_summaries = [_market_summary(item) for item in [*main_markets, *draw_markets]]
+    main_ids = {item.remote_id for item in [*main_markets, *draw_markets]}
+    return LiveUpcomingEventGroup(
+        event_slug=event_slug,
+        event_title=next((item.event_title for item in items if item.event_title), None),
+        league=_league_from_event_slug(event_slug),
+        close_time=close_time,
+        teams=teams,
+        has_draw_market=bool(draw_markets),
+        total_markets=len(items),
+        main_markets=main_summaries,
+        secondary_markets_count=len([item for item in items if item.remote_id not in main_ids]),
+        market_shape_counts=market_shape_counts,
+        status_counts=status_counts,
+        skip_reasons_count=dict(sorted(skip_reasons_count.items())),
+        liquidity=_sum_decimal(item.liquidity for item in items),
+        volume=_sum_decimal(item.volume for item in items),
+    )
+
+
+def _market_summary(item: LiveUpcomingDiscoveryItem) -> LiveUpcomingEventMarketSummary:
+    prices = _price_pair_from_item(item)
+    return LiveUpcomingEventMarketSummary(
+        remote_id=item.remote_id,
+        title=item.title,
+        market_shape=item.market_shape,
+        discovery_status=item.discovery_status,
+        has_remote_price=item.has_remote_price,
+        yes_price=prices[0],
+        no_price=prices[1],
+        liquidity=item.liquidity,
+        volume=item.volume,
+        market_slug=item.market_slug,
+        reasons=item.reasons,
+    )
+
+
+def _price_pair_from_item(item: LiveUpcomingDiscoveryItem) -> tuple[Decimal | None, Decimal | None]:
+    return item.yes_price, item.no_price
+
+
+def _detect_event_teams(items: list[LiveUpcomingDiscoveryItem]) -> list[str]:
+    for item in items:
+        teams = _teams_from_draw_title(item.title)
+        if len(teams) == 2:
+            return teams
+    exact_teams: list[str] = []
+    for item in items:
+        teams = _teams_from_exact_score_title(item.title)
+        for team in teams:
+            if team not in exact_teams:
+                exact_teams.append(team)
+        if len(exact_teams) >= 2:
+            return exact_teams[:2]
+    win_teams: list[str] = []
+    for item in items:
+        team = _team_from_win_title(item.title)
+        if team and team not in win_teams:
+            win_teams.append(team)
+        if len(win_teams) >= 2:
+            return win_teams[:2]
+    return win_teams
+
+
+def _is_primary_soccer_market(item: LiveUpcomingDiscoveryItem, teams: list[str]) -> bool:
+    if item.market_shape != "match_winner":
+        return False
+    team = _team_from_win_title(item.title)
+    return bool(team and (not teams or team in teams))
+
+
+def _is_draw_market(item: LiveUpcomingDiscoveryItem) -> bool:
+    return bool(_teams_from_draw_title(item.title))
+
+
+def _team_from_win_title(title: str) -> str | None:
+    match = re.match(
+        r"^Will\s+(.+?)\s+win(?:\s+on\s+\d{4}-\d{2}-\d{2})?\?$",
+        title,
+        flags=re.IGNORECASE,
+    )
+    return match.group(1).strip() if match else None
+
+
+def _teams_from_draw_title(title: str) -> list[str]:
+    match = re.match(
+        r"^Will\s+(.+?)\s+vs\.?\s+(.+?)\s+end in a draw\?$",
+        title,
+        flags=re.IGNORECASE,
+    )
+    return [match.group(1).strip(), match.group(2).strip()] if match else []
+
+
+def _teams_from_exact_score_title(title: str) -> list[str]:
+    match = re.match(
+        r"^Exact Score:\s*(.+?)\s+\d+\s*-\s*\d+\s+(.+?)\?$",
+        title,
+        flags=re.IGNORECASE,
+    )
+    return [match.group(1).strip(), match.group(2).strip()] if match else []
+
+
+def _league_from_event_slug(event_slug: str) -> str | None:
+    prefix = event_slug.split("-", 1)[0].upper()
+    if not prefix or prefix == event_slug.upper():
+        return None
+    return prefix
+
+
+def _count_by(items: list[LiveUpcomingDiscoveryItem], getter) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        value = str(getter(item))
+        counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _sum_decimal(values) -> Decimal | None:
+    total = ZERO
+    for value in values:
+        if value is not None:
+            total += value
+    return total if total > ZERO else None
 
 
 def _local_missing_reasons(has_snapshot: bool, has_price: bool) -> list[str]:

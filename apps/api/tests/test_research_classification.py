@@ -289,6 +289,18 @@ def test_ambiguous_city_does_not_force_soccer() -> None:
     assert classification.vertical == "other"
 
 
+def test_soccer_anytime_goalscorer_is_player_prop_with_event_context() -> None:
+    classification = classify_market_research_context(
+        question="Bukayo Saka: Anytime Goalscorer",
+        event_title="ucl-ars-atm1-2026-05-05-player-props",
+        event_category="sports",
+    )
+
+    assert classification.vertical == "sports"
+    assert classification.sport == "soccer"
+    assert classification.market_shape == "player_prop"
+
+
 def test_euroleague_slug_overrides_soccer_club_name_collision() -> None:
     classification = classify_market_research_context(
         question="Valencia vs. Panathinaikos",

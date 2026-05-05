@@ -33,10 +33,12 @@ def main() -> None:
                     sport=args.sport,
                     days=args.days,
                     limit=args.limit,
+                    pages=args.pages,
                     include_futures=args.include_futures,
                     focus=args.focus,
                     min_hours_to_close=args.min_hours_to_close,
                     source_tag_id=settings.polymarket_sports_tag_id,
+                    include_debug=args.debug_skips,
                 )
             except Exception as exc:
                 print(
@@ -84,6 +86,17 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--pages",
+        "--max-pages",
+        type=int,
+        default=1,
+        help=(
+            "Cantidad maxima de paginas remotas /events a leer. Default 1 para "
+            "mantener el comportamiento historico; usa 3-5 para diagnosticar "
+            "carteleras soccer mas profundas sin escribir datos."
+        ),
+    )
+    parser.add_argument(
         "--include-futures",
         action="store_true",
         help="Incluye futures/championships. Por defecto se excluyen.",
@@ -101,6 +114,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Ventana minima antes del cierre para pedir mercados remotos.",
     )
     parser.add_argument("--json", action="store_true", help="Imprime salida JSON.")
+    parser.add_argument(
+        "--debug-skips",
+        "--include-event-groups",
+        action="store_true",
+        dest="debug_skips",
+        help=(
+            "Incluye grupos por evento con equipos detectados, draw, mercados "
+            "principales/secundarios y razones agregadas de descarte."
+        ),
+    )
     return parser
 
 
@@ -111,10 +134,12 @@ def _run(
     sport: str | None = None,
     days: int = 7,
     limit: int = 50,
+    pages: int = 1,
     include_futures: bool = False,
     focus: str | None = "match_winner",
     min_hours_to_close: float | None = None,
     source_tag_id: str | None = None,
+    include_debug: bool = False,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     before_markets = db.scalar(select(func.count()).select_from(Market)) or 0
@@ -127,10 +152,12 @@ def _run(
         sport=sport,
         days=days,
         limit=limit,
+        pages=pages,
         include_futures=include_futures,
         focus=focus,
         min_hours_to_close=min_hours_to_close,
         source_tag_id=source_tag_id,
+        include_debug=include_debug,
         now=now,
     )
     after_markets = db.scalar(select(func.count()).select_from(Market)) or 0
@@ -161,6 +188,19 @@ def _print_human(payload: dict[str, Any]) -> None:
     )
     if payload.get("warnings"):
         print("warnings: " + ", ".join(payload["warnings"]))
+    if payload.get("event_groups"):
+        print("event_groups:")
+        for group in payload["event_groups"]:
+            teams = " vs ".join(group.get("teams") or []) or "teams_unknown"
+            print(
+                "  {slug} | {teams} | markets={markets} draw={draw} close={close}".format(
+                    slug=group.get("event_slug"),
+                    teams=teams,
+                    markets=group.get("total_markets"),
+                    draw=group.get("has_draw_market"),
+                    close=group.get("close_time"),
+                )
+            )
     if not payload["items"]:
         print("No upcoming remote markets matched the current filters.")
         return
