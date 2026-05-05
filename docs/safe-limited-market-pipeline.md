@@ -95,6 +95,16 @@ Only for sports where import dry-run shows viable candidates:
 .\.venv\Scripts\python.exe -m app.commands.create_snapshots_from_discovery --dry-run --sport <sport> --days 30 --limit 100 --max-snapshots 10 --json
 ```
 
+When import used deeper Polymarket pages, snapshots should use the same
+remote depth so newly imported events can be found again:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.create_snapshots_from_discovery --dry-run --sport soccer --days 7 --pages 5 --limit 100 --max-snapshots 30 --json
+```
+
+Use the matching `--pages` / `--max-pages` value from the reviewed import
+dry-run. The default remains `1` for compatibility.
+
 ## Scoring Dry-Run
 
 Only for markets that already exist and have snapshots:

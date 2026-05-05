@@ -29,6 +29,7 @@ def main() -> None:
                     sport=args.sport,
                     days=args.days,
                     limit=args.limit,
+                    pages=args.pages,
                     dry_run=dry_run,
                     max_snapshots=args.max_snapshots,
                     min_hours_to_close=args.min_hours_to_close,
@@ -76,6 +77,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sport", type=str, default=None, help="Filtro opcional de deporte.")
     parser.add_argument("--days", type=int, default=7, help="Ventana de proximos dias.")
     parser.add_argument("--limit", type=int, default=50, help="Limite remoto revisado.")
+    parser.add_argument(
+        "--pages",
+        "--max-pages",
+        type=int,
+        default=1,
+        help=(
+            "Cantidad maxima de paginas remotas /events a leer. Default 1 conserva "
+            "el comportamiento historico; usa el mismo valor que import para mercados profundos."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true", help="Solo muestra cambios. Es el default.")
     parser.add_argument("--apply", action="store_true", help="Crea snapshots validos.")
     parser.add_argument("--max-snapshots", type=int, default=5, help="Maximo de snapshots a crear.")
@@ -97,6 +108,7 @@ def _run(
     sport: str | None = None,
     days: int = 7,
     limit: int = 50,
+    pages: int = 1,
     dry_run: bool = True,
     max_snapshots: int = 5,
     min_hours_to_close: float | None = None,
@@ -110,6 +122,7 @@ def _run(
         sport=sport,
         days=days,
         limit=limit,
+        pages=pages,
         dry_run=dry_run,
         max_snapshots=max_snapshots,
         min_hours_to_close=min_hours_to_close,
@@ -132,6 +145,10 @@ def _print_human(payload: dict[str, Any]) -> None:
         "would_create={would_create} snapshots_created={snapshots_created} "
         "skipped={snapshots_skipped} predictions_created={predictions_created} "
         "research_runs_created={research_runs_created}".format(**payload)
+    )
+    print(
+        "requested_pages={requested_pages} remote_pages_fetched={remote_pages_fetched} "
+        "remote_page_limit={remote_page_limit}".format(**payload)
     )
     if not payload["items"]:
         print("No discovery snapshot candidates found.")

@@ -87,6 +87,9 @@ class DiscoverySnapshotSummary:
     dry_run: bool
     apply: bool
     max_snapshots: int
+    requested_pages: int = 1
+    remote_page_limit: int = 50
+    remote_pages_fetched: int = 1
     total_remote_checked: int = 0
     local_candidates: int = 0
     would_create: int = 0
@@ -103,6 +106,9 @@ class DiscoverySnapshotSummary:
             "dry_run": self.dry_run,
             "apply": self.apply,
             "max_snapshots": self.max_snapshots,
+            "requested_pages": self.requested_pages,
+            "remote_page_limit": self.remote_page_limit,
+            "remote_pages_fetched": self.remote_pages_fetched,
             "total_remote_checked": self.total_remote_checked,
             "local_candidates": self.local_candidates,
             "would_create": self.would_create,
@@ -125,6 +131,7 @@ def create_snapshots_from_discovery_pricing(
     sport: str | None = None,
     days: int = 7,
     limit: int = 50,
+    pages: int = 1,
     dry_run: bool = True,
     max_snapshots: int = 5,
     min_hours_to_close: float | None = None,
@@ -134,6 +141,7 @@ def create_snapshots_from_discovery_pricing(
     current_time = _normalize_datetime(now or datetime.now(tz=UTC))
     safe_days = max(days, 1)
     safe_limit = max(min(limit, 100), 0)
+    safe_pages = max(min(pages, 10), 1)
     safe_max_snapshots = max(min(max_snapshots, 25), 0)
     normalized_sport = normalize_sport(sport) if sport else None
     min_close_time = current_time + timedelta(hours=max(min_hours_to_close or 0, 0))
@@ -144,16 +152,25 @@ def create_snapshots_from_discovery_pricing(
     before_predictions = db.scalar(select(func.count()).select_from(Prediction)) or 0
     before_research_runs = db.scalar(select(func.count()).select_from(ResearchRun)) or 0
 
-    page = client.fetch_active_events_page(
-        limit=page_limit,
-        offset=0,
-        tag_id=source_tag_id,
-        order="endDate",
-        ascending=True,
-        end_date_min=min_close_time,
-        end_date_max=window_end,
-    )
-    entries = _flatten_remote_markets(page.events)
+    remote_events: list[PolymarketEventPayload] = []
+    partial_errors: list[str] = []
+    next_offset: int | None = 0
+    pages_fetched = 0
+    while next_offset is not None and pages_fetched < safe_pages:
+        page = client.fetch_active_events_page(
+            limit=page_limit,
+            offset=next_offset,
+            tag_id=source_tag_id,
+            order="endDate",
+            ascending=True,
+            end_date_min=min_close_time,
+            end_date_max=window_end,
+        )
+        pages_fetched += 1
+        partial_errors.extend(page.errors)
+        remote_events.extend(page.events)
+        next_offset = page.next_offset
+    entries = _flatten_remote_markets(remote_events)
     local_markets = _load_matching_local_markets(db, entries, market_id=market_id)
     latest_snapshots = list_latest_market_snapshots_for_markets(
         db,
@@ -163,8 +180,11 @@ def create_snapshots_from_discovery_pricing(
         dry_run=dry_run,
         apply=not dry_run,
         max_snapshots=safe_max_snapshots,
+        requested_pages=pages,
+        remote_page_limit=page_limit,
+        remote_pages_fetched=pages_fetched,
         total_remote_checked=len(entries),
-        partial_errors=list(page.errors),
+        partial_errors=partial_errors,
     )
 
     snapshots_remaining = safe_max_snapshots

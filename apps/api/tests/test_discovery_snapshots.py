@@ -8,7 +8,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.clients.polymarket import PolymarketEventPayload, PolymarketEventsPage
-from app.commands.create_snapshots_from_discovery import _run as run_discovery_snapshots
+from app.commands.create_snapshots_from_discovery import (
+    _run as run_discovery_snapshots,
+    build_parser,
+)
 from app.models.event import Event
 from app.models.market import Market
 from app.models.market_snapshot import MarketSnapshot
@@ -50,6 +53,37 @@ class FakeGammaClient:
         return PolymarketEventsPage(events=self.events)
 
 
+class PagedFakeGammaClient(FakeGammaClient):
+    def __init__(self, pages_by_offset: dict[int, list[PolymarketEventPayload]]) -> None:
+        super().__init__([])
+        self.pages_by_offset = pages_by_offset
+
+    def fetch_active_events_page(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        tag_id: str | None = None,
+        order: str | None = None,
+        ascending: bool | None = None,
+        end_date_min: datetime | None = None,
+        end_date_max: datetime | None = None,
+    ):
+        self.calls.append(
+            {
+                "limit": limit,
+                "offset": offset,
+                "tag_id": tag_id,
+                "order": order,
+                "ascending": ascending,
+                "end_date_min": end_date_min,
+                "end_date_max": end_date_max,
+            }
+        )
+        next_offset = offset + limit if offset + limit in self.pages_by_offset else None
+        return PolymarketEventsPage(events=self.pages_by_offset.get(offset, []), next_offset=next_offset)
+
+
 def test_discovery_snapshot_dry_run_does_not_create_snapshot(db_session: Session) -> None:
     _create_local_market(db_session, remote_id="remote-dry-run", slug="lakers-warriors")
     before_snapshots = db_session.scalar(select(func.count()).select_from(MarketSnapshot))
@@ -83,6 +117,9 @@ def test_discovery_snapshot_dry_run_does_not_create_snapshot(db_session: Session
 
     assert summary.would_create == 1
     assert summary.snapshots_created == 0
+    assert summary.requested_pages == 1
+    assert summary.remote_pages_fetched == 1
+    assert [call["offset"] for call in client.calls] == [0]
     assert summary.items[0].action == "would_create_snapshot"
     assert summary.items[0].yes_price == Decimal("0.6200")
     assert db_session.scalar(select(func.count()).select_from(MarketSnapshot)) == before_snapshots
@@ -317,6 +354,107 @@ def test_discovery_snapshot_respects_max_snapshots(db_session: Session) -> None:
 
     assert payload["snapshots_created"] == 1
     assert any("max_snapshots_reached" in item["warnings"] for item in payload["items"])
+    assert json.dumps(payload, ensure_ascii=True, default=str)
+
+
+def test_discovery_snapshot_reads_multiple_pages_for_deep_markets(
+    db_session: Session,
+) -> None:
+    _create_local_market(db_session, remote_id="remote-page-two", slug="page-two-market")
+    before_snapshots = db_session.scalar(select(func.count()).select_from(MarketSnapshot))
+    client = PagedFakeGammaClient(
+        {
+            0: [
+                _event_payload(
+                    event_id="event-page-one",
+                    title="Page one event",
+                    slug="page-one-event",
+                    markets=[],
+                )
+            ],
+            100: [
+                _event_payload(
+                    event_id="event-page-two",
+                    title="Soccer page two event",
+                    slug="soccer-page-two-event",
+                    markets=[
+                        _market_payload(
+                            market_id="remote-page-two",
+                            question="Will Arsenal FC win on 2026-05-05?",
+                            slug="page-two-market",
+                            prices=["0.61", "0.39"],
+                        )
+                    ],
+                )
+            ],
+        }
+    )
+
+    summary = create_snapshots_from_discovery_pricing(
+        db_session,
+        client=client,  # type: ignore[arg-type]
+        sport="soccer",
+        days=7,
+        limit=50,
+        pages=2,
+        dry_run=True,
+        max_snapshots=3,
+        now=NOW,
+    )
+
+    assert [call["offset"] for call in client.calls] == [0, 100]
+    assert summary.requested_pages == 2
+    assert summary.remote_page_limit == 100
+    assert summary.remote_pages_fetched == 2
+    assert summary.total_remote_checked == 1
+    assert summary.would_create == 1
+    assert summary.items[0].remote_id == "remote-page-two"
+    assert db_session.scalar(select(func.count()).select_from(MarketSnapshot)) == before_snapshots
+
+
+def test_discovery_snapshot_command_accepts_max_pages_alias(
+    db_session: Session,
+) -> None:
+    args = build_parser().parse_args(["--max-pages", "2"])
+    assert args.pages == 2
+
+    _create_local_market(db_session, remote_id="remote-alias-page", slug="alias-page-market")
+    client = PagedFakeGammaClient(
+        {
+            0: [],
+            100: [
+                _event_payload(
+                    event_id="event-alias-page",
+                    title="Soccer alias page",
+                    slug="soccer-alias-page",
+                    markets=[
+                        _market_payload(
+                            market_id="remote-alias-page",
+                            question="Will Arsenal FC win on 2026-05-05?",
+                            slug="alias-page-market",
+                            prices=["0.62", "0.38"],
+                        )
+                    ],
+                )
+            ],
+        }
+    )
+
+    payload = run_discovery_snapshots(
+        db_session,
+        client=client,  # type: ignore[arg-type]
+        sport="soccer",
+        days=7,
+        limit=50,
+        pages=args.pages,
+        dry_run=True,
+        max_snapshots=3,
+        now=NOW,
+    )
+
+    assert payload["requested_pages"] == 2
+    assert payload["remote_pages_fetched"] == 2
+    assert payload["would_create"] == 1
     assert json.dumps(payload, ensure_ascii=True, default=str)
 
 
