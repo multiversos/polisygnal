@@ -2,11 +2,14 @@
 
 ## Snapshot
 
-- fecha de corte: `2026-05-03`
+- fecha de corte: `2026-05-04`
 - etapa: `visible_product_mvp`
 - foco actual: hacer la app navegable, conectada y util con datos reales
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
+- ultimo deploy production verificado: `72fbb368593de448bc94b47c1951f591e4df513b`
+- proxy same-origin: activo en `/api/backend/[...path]`
+- diagnostico de build: `/api/build-info`
 
 No usar estos dominios incorrectos:
 
@@ -31,6 +34,15 @@ Endpoints backend sanos:
 - `/markets`
 - `/markets/overview`
 - `/markets/overview?sport_type=soccer&limit=20`
+
+Estado visible verificado:
+
+- dashboard muestra mercados reales.
+- `/sports/soccer` renderiza 20 cards en produccion limpia/headless.
+- `/sports/basketball` muestra empty state limpio porque `total_count=0`.
+- modulos futuros aparecen como "Modulo en preparacion".
+- si un navegador normal muestra datos viejos, revisar cache con
+  `/api/build-info` y el checklist manual.
 
 ## Sprints Completados 1-11
 
@@ -64,12 +76,17 @@ Sprints completados en esta ronda:
 - SPRINT 25: tipos compartidos de market overview.
 - SPRINT 26: helper API endurecido.
 - SPRINT 27: checklist manual de smoke test.
+- SPRINT 33: diagnostico seguro de build/deploy.
+- SPRINT 34: diagnosticos de dry-run del importador con `--debug-skips`.
+- SPRINT 35: limites de discovery/import aclarados.
+- SPRINT 36: clasificacion de market types comunes para nuevos imports.
 
 Sprints pendientes inmediatos:
 
-- SPRINT 29: plan de normalizacion de `market_type`.
-- SPRINT 30: documentar pipeline limitado dry-run.
-- SPRINT 31: pulir copy visible en espanol.
+- Ejecutar dry-run diagnostics por deporte con `--debug-skips`.
+- Validar el impacto de la normalizacion de `market_type` en nuevos imports.
+- Mejorar discovery por deporte antes de poblar deportes vacios.
+- Poblar deportes principales solo cuando `would_import > 0` y con limites.
 
 ## Guardrails
 
@@ -83,7 +100,7 @@ Sprints pendientes inmediatos:
 
 Prioridad recomendada:
 
-1. Verificar deploy de Vercel con el checklist manual.
-2. Confirmar `/sports/soccer` y dashboard en produccion.
-3. Decidir si se poblara otro deporte con un importador nuevo o si se mejora discovery por categoria.
-4. Completar docs de normalizacion de market types y pipeline dry-run.
+1. Ejecutar import dry-run diagnostics para `basketball`, `nfl`, `tennis`, `baseball` y `horse_racing`.
+2. Revisar si los descartes vienen de deporte mal normalizado, `market_type`, fechas, outcomes o precios.
+3. Ajustar discovery por deporte con tests antes de cualquier `--apply`.
+4. Poblar deportes solo con `would_import > 0`, `max-import` explicito y smoke test posterior.
