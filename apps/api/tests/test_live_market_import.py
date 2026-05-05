@@ -48,6 +48,37 @@ class FakeGammaClient:
         return PolymarketEventsPage(events=self.events)
 
 
+class PagedFakeGammaClient(FakeGammaClient):
+    def __init__(self, pages_by_offset: dict[int, list[PolymarketEventPayload]]) -> None:
+        super().__init__([])
+        self.pages_by_offset = pages_by_offset
+
+    def fetch_active_events_page(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        tag_id: str | None = None,
+        order: str | None = None,
+        ascending: bool | None = None,
+        end_date_min: datetime | None = None,
+        end_date_max: datetime | None = None,
+    ):
+        self.calls.append(
+            {
+                "limit": limit,
+                "offset": offset,
+                "tag_id": tag_id,
+                "order": order,
+                "ascending": ascending,
+                "end_date_min": end_date_min,
+                "end_date_max": end_date_max,
+            }
+        )
+        next_offset = offset + limit if offset + limit in self.pages_by_offset else None
+        return PolymarketEventsPage(events=self.pages_by_offset.get(offset, []), next_offset=next_offset)
+
+
 def test_import_live_discovered_markets_dry_run_does_not_mutate_db(
     db_session: Session,
 ) -> None:
@@ -355,6 +386,133 @@ def test_import_live_discovered_markets_dry_run_reports_skip_diagnostics(
     assert json.dumps(payload, ensure_ascii=True, default=str)
 
 
+def test_import_live_discovered_markets_dry_run_groups_soccer_games_by_event(
+    db_session: Session,
+) -> None:
+    before_markets = db_session.scalar(select(func.count()).select_from(Market))
+    first_page = [
+        _event_payload(
+            event_id="event-low-volume",
+            title="Egypt: Smouha SC vs Zamalek SC",
+            slug="egy1-sms-zas-2026-05-05",
+            markets=[
+                _market_payload(
+                    market_id="remote-smouha",
+                    question="Will Smouha SC win on 2026-05-05?",
+                    slug="egy1-sms-zas-2026-05-05-sms",
+                    volume="25",
+                    liquidity="10",
+                ),
+                _market_payload(
+                    market_id="remote-zamalek",
+                    question="Will Zamalek SC win on 2026-05-05?",
+                    slug="egy1-sms-zas-2026-05-05-zas",
+                    volume="25",
+                    liquidity="10",
+                ),
+            ],
+        )
+    ]
+    second_page = [
+        _event_payload(
+            event_id="event-ucl-bay-psg",
+            title="UCL: Bayern Munchen vs Paris Saint-Germain",
+            slug="ucl-bay-psg-2026-05-06",
+            markets=[
+                _market_payload(
+                    market_id="remote-bay",
+                    question="Will FC Bayern Munchen win on 2026-05-06?",
+                    slug="ucl-bay-psg-2026-05-06-bay",
+                    volume="4000",
+                    liquidity="2500",
+                ),
+                _market_payload(
+                    market_id="remote-bay-psg-draw",
+                    question="Will FC Bayern Munchen vs. Paris Saint-Germain FC end in a draw?",
+                    slug="ucl-bay-psg-2026-05-06-draw",
+                    volume="3000",
+                    liquidity="2000",
+                ),
+                _market_payload(
+                    market_id="remote-psg",
+                    question="Will Paris Saint-Germain FC win on 2026-05-06?",
+                    slug="ucl-bay-psg-2026-05-06-psg",
+                    volume="4200",
+                    liquidity="2600",
+                ),
+                _market_payload(
+                    market_id="remote-bay-player-prop",
+                    question="Harry Kane: Anytime Goalscorer",
+                    slug="ucl-bay-psg-2026-05-06-ags-harry-kane",
+                    volume="5000",
+                    liquidity="4000",
+                ),
+            ],
+        ),
+        _event_payload(
+            event_id="event-ucl-bay-psg-exact-score",
+            title="UCL: Bayern Munchen vs Paris Saint-Germain - Exact Score",
+            slug="ucl-bay-psg-2026-05-06-exact-score",
+            markets=[
+                _market_payload(
+                    market_id="remote-bay-exact-score",
+                    question="Exact Score: FC Bayern Munchen 2 - 1 Paris Saint-Germain FC?",
+                    slug="ucl-bay-psg-2026-05-06-exact-score-2-1",
+                    volume="1000",
+                    liquidity="900",
+                ),
+            ],
+        )
+    ]
+    client = PagedFakeGammaClient({0: first_page, 100: second_page})
+
+    payload = run_live_market_import(
+        db_session,
+        client=client,  # type: ignore[arg-type]
+        sport="soccer",
+        days=3,
+        limit=50,
+        pages=2,
+        dry_run=True,
+        max_import=10,
+        max_events=1,
+        include_skip_reasons=True,
+        min_hours_to_close=0,
+        now=NOW,
+    )
+
+    assert [call["offset"] for call in client.calls] == [0, 100]
+    assert payload["remote_pages_fetched"] == 2
+    assert payload["max_events"] == 1
+    assert payload["would_import"] == 3
+    assert payload["imported"] == 0
+    assert payload["markets_created"] == 0
+    assert payload["skip_reasons_count"]["not_match_winner_focus"] == 2
+    assert payload["detected_market_types_count"]["player_prop"] == 1
+    assert payload["detected_market_types_count"]["exact_score"] == 1
+    event_groups = payload["event_groups"]
+    assert len(event_groups) == 1
+    assert event_groups[0]["event_slug"] == "ucl-bay-psg-2026-05-06"
+    assert event_groups[0]["teams"] == ["FC Bayern Munchen", "Paris Saint-Germain FC"]
+    assert event_groups[0]["has_draw_market"] is True
+    assert event_groups[0]["would_import_markets_count"] == 3
+    assert event_groups[0]["secondary_markets_count"] == 2
+    assert [item["import_role"] for item in event_groups[0]["primary_markets"]] == [
+        "team_a_win",
+        "draw",
+        "team_b_win",
+    ]
+    would_import_titles = {item["title"] for item in payload["items"] if item["action"] == "would_import"}
+    assert would_import_titles == {
+        "Will FC Bayern Munchen win on 2026-05-06?",
+        "Will FC Bayern Munchen vs. Paris Saint-Germain FC end in a draw?",
+        "Will Paris Saint-Germain FC win on 2026-05-06?",
+    }
+    assert any("max_events_reached" in item["warnings"] for item in payload["items"])
+    assert db_session.scalar(select(func.count()).select_from(Market)) == before_markets
+    assert json.dumps(payload, ensure_ascii=True, default=str)
+
+
 def _event_payload(
     *,
     event_id: str,
@@ -376,7 +534,14 @@ def _event_payload(
     )
 
 
-def _market_payload(*, market_id: str, question: str, slug: str) -> dict[str, object]:
+def _market_payload(
+    *,
+    market_id: str,
+    question: str,
+    slug: str,
+    volume: str = "1200.50",
+    liquidity: str = "2200.25",
+) -> dict[str, object]:
     return {
         "id": market_id,
         "question": question,
@@ -389,8 +554,8 @@ def _market_payload(*, market_id: str, question: str, slug: str) -> dict[str, ob
         "clobTokenIds": [f"{market_id}-yes", f"{market_id}-no"],
         "outcomes": ["Yes", "No"],
         "outcomePrices": ["0.55", "0.45"],
-        "volume": "1200.50",
-        "liquidity": "2200.25",
+        "volume": volume,
+        "liquidity": liquidity,
     }
 
 

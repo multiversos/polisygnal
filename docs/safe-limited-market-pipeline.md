@@ -62,6 +62,31 @@ For import dry-runs, treat `--limit` as a remote event/page guard and
 changed to `--apply`. Do not interpret `--limit 100` as "review exactly 100
 remote markets"; one remote event can carry many markets.
 
+## Soccer Upcoming Games Dry-Run
+
+For soccer, use event-limited dry-run before any import. This reads more remote
+`/events` pages, groups markets by match, and caps the number of games before
+the market cap is applied:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.import_live_discovered_markets --dry-run --sport soccer --days 3 --pages 5 --max-events 3 --max-import 10 --json --debug-skips
+```
+
+Interpretation:
+
+- `--pages` controls how many remote Polymarket `/events` pages are read.
+- `--max-events` / `--max-games` limits event or match groups.
+- `--max-import` still limits individual markets inside the selected events.
+- For soccer game groups, primary markets are team A win, draw when present,
+  and team B win.
+- Exact score, halftime, totals, spreads, and player props are secondary
+  markets and should not drive the main import decision.
+
+Review `event_groups` first. It should show `event_slug`, teams, close time,
+draw availability, `primary_markets`, `secondary_markets_count`, and
+`would_import_markets_count`. Do not switch to `--apply` until the dry-run
+clearly matches the intended upcoming games.
+
 ## Snapshot Dry-Run
 
 Only for sports where import dry-run shows viable candidates:

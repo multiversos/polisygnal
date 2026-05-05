@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+import re
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -29,20 +30,28 @@ from app.services.research.classification import (
     normalize_sport,
 )
 
+ZERO = Decimal("0")
+
 
 @dataclass(slots=True)
 class LiveMarketImportItem:
     action: str
     remote_id: str | None
     title: str
+    event_title: str | None = None
     sport: str | None = None
     market_shape: str | None = None
+    import_role: str | None = None
     close_time: datetime | None = None
     condition_id: str | None = None
     clob_token_ids: list[str] = field(default_factory=list)
     market_slug: str | None = None
     event_slug: str | None = None
     polymarket_url: str | None = None
+    yes_price: Decimal | None = None
+    no_price: Decimal | None = None
+    liquidity: Decimal | None = None
+    volume: Decimal | None = None
     local_market_id: int | None = None
     reasons: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -52,14 +61,20 @@ class LiveMarketImportItem:
             "action": self.action,
             "remote_id": self.remote_id,
             "title": self.title,
+            "event_title": self.event_title,
             "sport": self.sport,
             "market_shape": self.market_shape,
+            "import_role": self.import_role,
             "close_time": self.close_time.isoformat() if self.close_time else None,
             "condition_id": self.condition_id,
             "clob_token_ids": list(self.clob_token_ids),
             "market_slug": self.market_slug,
             "event_slug": self.event_slug,
             "polymarket_url": self.polymarket_url,
+            "yes_price": str(self.yes_price) if self.yes_price is not None else None,
+            "no_price": str(self.no_price) if self.no_price is not None else None,
+            "liquidity": str(self.liquidity) if self.liquidity is not None else None,
+            "volume": str(self.volume) if self.volume is not None else None,
             "local_market_id": self.local_market_id,
             "reasons": list(self.reasons),
             "warnings": list(self.warnings),
@@ -67,16 +82,64 @@ class LiveMarketImportItem:
 
 
 @dataclass(slots=True)
+class LiveMarketImportEventGroup:
+    event_slug: str
+    event_title: str | None = None
+    league: str | None = None
+    close_time: datetime | None = None
+    teams: list[str] = field(default_factory=list)
+    has_draw_market: bool = False
+    total_markets: int = 0
+    primary_markets: list[LiveMarketImportItem] = field(default_factory=list)
+    secondary_markets: list[LiveMarketImportItem] = field(default_factory=list)
+    would_import_markets_count: int = 0
+    skipped_markets_count: int = 0
+    skip_reasons_count: dict[str, int] = field(default_factory=dict)
+    liquidity: Decimal | None = None
+    volume: Decimal | None = None
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "event_slug": self.event_slug,
+            "event_title": self.event_title,
+            "league": self.league,
+            "close_time": self.close_time.isoformat() if self.close_time else None,
+            "teams": list(self.teams),
+            "has_draw_market": self.has_draw_market,
+            "total_markets": self.total_markets,
+            "primary_markets": [item.to_payload() for item in self.primary_markets],
+            "secondary_markets": [item.to_payload() for item in self.secondary_markets[:5]],
+            "secondary_markets_count": len(self.secondary_markets),
+            "would_import_markets_count": self.would_import_markets_count,
+            "skipped_markets_count": self.skipped_markets_count,
+            "skip_reasons_count": dict(sorted(self.skip_reasons_count.items())),
+            "liquidity": str(self.liquidity) if self.liquidity is not None else None,
+            "volume": str(self.volume) if self.volume is not None else None,
+        }
+
+
+@dataclass(slots=True)
+class _ImportCandidate:
+    event_payload: PolymarketEventPayload
+    market_payload: PolymarketMarketPayload
+    item: LiveMarketImportItem
+    order: int
+
+
+@dataclass(slots=True)
 class LiveMarketImportSummary:
     dry_run: bool
     apply: bool
     max_import: int
+    max_events: int | None = None
     requested_sport: str | None = None
     normalized_sport: str | None = None
     requested_days: int = 7
     requested_limit: int = 50
+    requested_pages: int = 1
     requested_min_hours_to_close: float = 6
     remote_page_limit: int = 50
+    remote_pages_fetched: int = 1
     applied_limit_meaning: str = ""
     total_remote_checked: int = 0
     missing_local: int = 0
@@ -96,18 +159,22 @@ class LiveMarketImportSummary:
     predictions_created: int = 0
     research_runs_created: int = 0
     trading_executed: bool = False
+    event_groups: list[LiveMarketImportEventGroup] = field(default_factory=list)
 
     def to_payload(self) -> dict[str, object]:
         return {
             "dry_run": self.dry_run,
             "apply": self.apply,
             "max_import": self.max_import,
+            "max_events": self.max_events,
             "requested_sport": self.requested_sport,
             "normalized_sport": self.normalized_sport,
             "requested_days": self.requested_days,
             "requested_limit": self.requested_limit,
+            "requested_pages": self.requested_pages,
             "requested_min_hours_to_close": self.requested_min_hours_to_close,
             "remote_page_limit": self.remote_page_limit,
+            "remote_pages_fetched": self.remote_pages_fetched,
             "applied_limit_meaning": self.applied_limit_meaning,
             "total_remote_checked": self.total_remote_checked,
             "missing_local": self.missing_local,
@@ -129,6 +196,7 @@ class LiveMarketImportSummary:
             "predictions_created": self.predictions_created,
             "research_runs_created": self.research_runs_created,
             "trading_executed": self.trading_executed,
+            "event_groups": [group.to_payload() for group in self.event_groups],
             "items": [item.to_payload() for item in self.items],
         }
 
@@ -140,8 +208,10 @@ def import_live_discovered_markets(
     sport: str | None = None,
     days: int = 7,
     limit: int = 50,
+    pages: int = 1,
     dry_run: bool = True,
     max_import: int = 10,
+    max_events: int | None = None,
     min_hours_to_close: float = 6,
     source_tag_id: str | None = None,
     include_skip_reasons: bool = False,
@@ -150,7 +220,9 @@ def import_live_discovered_markets(
     current_time = _normalize_datetime(now or datetime.now(tz=UTC))
     safe_days = max(days, 1)
     safe_limit = max(min(limit, 100), 0)
+    safe_pages = max(min(pages, 10), 1)
     safe_max_import = max(min(max_import, 25), 0)
+    safe_max_events = None if max_events is None else max(min(max_events, 25), 0)
     min_close_time = current_time + timedelta(hours=max(min_hours_to_close, 0))
     window_end = current_time + timedelta(days=safe_days)
     normalized_sport = normalize_sport(sport) if sport else None
@@ -162,38 +234,54 @@ def import_live_discovered_markets(
     before_predictions_count = db.scalar(select(func.count()).select_from(Prediction)) or 0
     before_research_runs_count = db.scalar(select(func.count()).select_from(ResearchRun)) or 0
 
-    page = client.fetch_active_events_page(
-        limit=page_limit,
-        offset=0,
-        tag_id=source_tag_id,
-        order="endDate",
-        ascending=True,
-        end_date_min=min_close_time,
-        end_date_max=window_end,
-    )
-    entries = _flatten_remote_markets(page.events)
+    remote_events: list[PolymarketEventPayload] = []
+    warnings: list[str] = []
+    next_offset: int | None = 0
+    pages_fetched = 0
+    while next_offset is not None and pages_fetched < safe_pages:
+        page = client.fetch_active_events_page(
+            limit=page_limit,
+            offset=next_offset,
+            tag_id=source_tag_id,
+            order="endDate",
+            ascending=True,
+            end_date_min=min_close_time,
+            end_date_max=window_end,
+        )
+        pages_fetched += 1
+        warnings.extend(page.errors)
+        remote_events.extend(page.events)
+        next_offset = page.next_offset
+    entries = _flatten_remote_markets(remote_events)
     local_markets = _load_local_markets(db, entries)
     summary = LiveMarketImportSummary(
         dry_run=dry_run,
         apply=not dry_run,
         max_import=safe_max_import,
+        max_events=safe_max_events,
         requested_sport=sport,
         normalized_sport=normalized_sport,
         requested_days=days,
         requested_limit=limit,
+        requested_pages=pages,
         requested_min_hours_to_close=min_hours_to_close,
         remote_page_limit=page_limit,
+        remote_pages_fetched=pages_fetched,
         applied_limit_meaning=(
             "--limit clamps the remote events page size, not the flattened market count; "
-            "total_remote_checked can be higher because each event can contain many markets."
+            "total_remote_checked can be higher because each event can contain many markets. "
+            "--pages controls how many remote /events pages are read. --max-events limits "
+            "eligible event/game groups before --max-import limits individual markets."
         ),
         total_remote_checked=len(entries),
         include_skip_reasons=include_skip_reasons,
-        warnings=list(page.errors),
+        warnings=warnings,
     )
 
-    imports_remaining = safe_max_import
-    for event_payload, market_payload in entries:
+    all_candidates: list[_ImportCandidate] = []
+    eligible_candidates: list[_ImportCandidate] = []
+    allow_soccer_draws = normalized_sport == "soccer" and safe_max_events is not None
+    for order, (event_payload, market_payload) in enumerate(entries):
         item = _build_import_item(
             event_payload=event_payload,
             market_payload=market_payload,
@@ -202,7 +290,15 @@ def import_live_discovered_markets(
             current_time=current_time,
             min_close_time=min_close_time,
             window_end=window_end,
+            allow_soccer_draws=allow_soccer_draws,
         )
+        candidate = _ImportCandidate(
+            event_payload=event_payload,
+            market_payload=market_payload,
+            item=item,
+            order=order,
+        )
+        all_candidates.append(candidate)
         _record_detected(summary, item)
         if item.action == "skipped":
             summary.skipped += 1
@@ -211,6 +307,31 @@ def import_live_discovered_markets(
                 summary.items.append(item)
             continue
         summary.missing_local += 1
+        eligible_candidates.append(candidate)
+
+    selected_candidates = _limit_candidates_by_events(
+        eligible_candidates,
+        max_events=safe_max_events,
+        normalized_sport=normalized_sport,
+    )
+    selected_ids = {id(candidate) for candidate in selected_candidates}
+    for candidate in eligible_candidates:
+        if safe_max_events is None or id(candidate) in selected_ids:
+            continue
+        item = candidate.item
+        item.action = "skipped"
+        item.reasons.append("max_events_reached")
+        item.warnings.append("max_events_reached")
+        summary.skipped += 1
+        _record_skip(summary, item)
+        if include_skip_reasons:
+            summary.items.append(item)
+
+    imports_remaining = safe_max_import
+    for candidate in selected_candidates:
+        event_payload = candidate.event_payload
+        market_payload = candidate.market_payload
+        item = candidate.item
         if imports_remaining <= 0:
             item.action = "skipped"
             item.reasons.append("max_import_reached")
@@ -237,6 +358,9 @@ def import_live_discovered_markets(
         if created_market.condition_id:
             local_markets[f"condition:{created_market.condition_id}"] = created_market
 
+    if selected_candidates and (safe_max_events is not None or include_skip_reasons):
+        summary.event_groups = _build_import_event_groups(all_candidates, selected_candidates)
+
     after_events_count = db.scalar(select(func.count()).select_from(Event)) or 0
     after_markets_count = db.scalar(select(func.count()).select_from(Market)) or 0
     after_snapshots_count = db.scalar(select(func.count()).select_from(MarketSnapshot)) or 0
@@ -248,6 +372,296 @@ def import_live_discovered_markets(
     summary.predictions_created = after_predictions_count - before_predictions_count
     summary.research_runs_created = after_research_runs_count - before_research_runs_count
     return summary
+
+
+def _limit_candidates_by_events(
+    candidates: list[_ImportCandidate],
+    *,
+    max_events: int | None,
+    normalized_sport: str | None,
+) -> list[_ImportCandidate]:
+    if max_events is None:
+        return candidates
+    if max_events <= 0:
+        return []
+
+    groups = _group_import_candidates(candidates)
+    ranked_groups = sorted(
+        groups.values(),
+        key=lambda group: _event_selection_key(group, normalized_sport=normalized_sport),
+    )
+    selected_groups = ranked_groups[:max_events]
+    selected: list[_ImportCandidate] = []
+    for group in selected_groups:
+        teams = _detect_candidate_teams(group)
+        selected.extend(sorted(group, key=lambda candidate: _candidate_market_order(candidate, teams)))
+    return selected
+
+
+def _build_import_event_groups(
+    all_candidates: list[_ImportCandidate],
+    selected_candidates: list[_ImportCandidate],
+) -> list[LiveMarketImportEventGroup]:
+    selected_slugs = {_event_key(candidate) for candidate in selected_candidates}
+    groups = _group_import_candidates(all_candidates)
+    event_groups: list[LiveMarketImportEventGroup] = []
+    for event_slug, candidates in groups.items():
+        if selected_slugs and event_slug not in selected_slugs:
+            continue
+        teams = _detect_candidate_teams(candidates)
+        primary_markets = [
+            candidate.item for candidate in candidates if _is_primary_soccer_market(candidate.item, teams)
+        ]
+        secondary_markets = [
+            candidate.item for candidate in candidates if candidate.item not in primary_markets
+        ]
+        _assign_roles(primary_markets, teams)
+        skip_reasons_count: dict[str, int] = {}
+        for candidate in candidates:
+            if candidate.item.action != "skipped":
+                continue
+            for reason in candidate.item.reasons or ["unknown"]:
+                skip_reasons_count[reason] = skip_reasons_count.get(reason, 0) + 1
+        event_groups.append(
+            LiveMarketImportEventGroup(
+                event_slug=event_slug,
+                event_title=next(
+                    (candidate.item.event_title for candidate in candidates if candidate.item.event_title),
+                    None,
+                ),
+                league=_league_from_event_slug(event_slug),
+                close_time=min(
+                    (candidate.item.close_time for candidate in candidates if candidate.item.close_time),
+                    default=None,
+                ),
+                teams=teams,
+                has_draw_market=any(_is_draw_market(candidate.item) for candidate in candidates),
+                total_markets=len(candidates),
+                primary_markets=sorted(
+                    primary_markets,
+                    key=lambda item: _primary_item_order(item, teams),
+                ),
+                secondary_markets=sorted(
+                    secondary_markets,
+                    key=lambda item: (
+                        item.action == "skipped",
+                        item.market_shape or "",
+                        item.title,
+                    ),
+                ),
+                would_import_markets_count=sum(
+                    1 for candidate in candidates if candidate.item.action in {"would_import", "imported"}
+                ),
+                skipped_markets_count=sum(
+                    1 for candidate in candidates if candidate.item.action == "skipped"
+                ),
+                skip_reasons_count=skip_reasons_count,
+                liquidity=_sum_decimal(candidate.item.liquidity for candidate in candidates),
+                volume=_sum_decimal(candidate.item.volume for candidate in candidates),
+            )
+        )
+    event_groups.sort(
+        key=lambda group: (
+            group.event_slug not in selected_slugs,
+            -float(group.volume or ZERO),
+            group.close_time is None,
+            _timestamp(group.close_time),
+            group.event_slug,
+        )
+    )
+    return event_groups
+
+
+def _group_import_candidates(
+    candidates: list[_ImportCandidate],
+) -> dict[str, list[_ImportCandidate]]:
+    groups: dict[str, list[_ImportCandidate]] = {}
+    for candidate in candidates:
+        groups.setdefault(_event_key(candidate), []).append(candidate)
+    return groups
+
+
+def _event_selection_key(
+    candidates: list[_ImportCandidate],
+    *,
+    normalized_sport: str | None,
+) -> tuple[object, ...]:
+    teams = _detect_candidate_teams(candidates)
+    has_two_teams = len(teams) >= 2
+    has_draw = any(_is_draw_market(candidate.item) for candidate in candidates)
+    primary_count = sum(
+        1 for candidate in candidates if _is_primary_soccer_market(candidate.item, teams)
+    )
+    volume = _sum_decimal(candidate.item.volume for candidate in candidates) or ZERO
+    liquidity = _sum_decimal(candidate.item.liquidity for candidate in candidates) or ZERO
+    close_time = min(
+        (candidate.item.close_time for candidate in candidates if candidate.item.close_time),
+        default=None,
+    )
+    if normalized_sport == "soccer":
+        return (
+            not has_two_teams,
+            primary_count < 2,
+            not has_draw,
+            -volume,
+            -liquidity,
+            close_time is None,
+            _timestamp(close_time),
+            _event_key(candidates[0]),
+        )
+    return (
+        close_time is None,
+        _timestamp(close_time),
+        -volume,
+        -liquidity,
+        _event_key(candidates[0]),
+    )
+
+
+def _candidate_market_order(candidate: _ImportCandidate, teams: list[str]) -> tuple[object, ...]:
+    return _primary_item_order(candidate.item, teams), candidate.order
+
+
+def _primary_item_order(item: LiveMarketImportItem, teams: list[str]) -> tuple[object, ...]:
+    if _is_draw_market(item):
+        return (1, item.title)
+    team = _team_from_win_title(item.title)
+    if team and teams:
+        if _same_team(team, teams[0]):
+            return (0, item.title)
+        if len(teams) > 1 and _same_team(team, teams[1]):
+            return (2, item.title)
+    if item.market_shape == "match_winner":
+        return (0, item.title)
+    return (3, item.title)
+
+
+def _assign_roles(items: list[LiveMarketImportItem], teams: list[str]) -> None:
+    for item in items:
+        if _is_draw_market(item):
+            item.import_role = "draw"
+            continue
+        team = _team_from_win_title(item.title)
+        if team and teams:
+            if _same_team(team, teams[0]):
+                item.import_role = "team_a_win"
+                continue
+            if len(teams) > 1 and _same_team(team, teams[1]):
+                item.import_role = "team_b_win"
+                continue
+        item.import_role = item.import_role or "primary"
+
+
+def _event_key(candidate: _ImportCandidate) -> str:
+    raw_slug = candidate.item.event_slug or candidate.item.market_slug
+    return _canonical_event_slug(raw_slug) or candidate.item.remote_id or candidate.item.title
+
+
+def _canonical_event_slug(value: str | None) -> str | None:
+    slug = _safe_text(value)
+    if slug is None:
+        return None
+    secondary_suffixes = (
+        "-more-markets",
+        "-exact-score",
+        "-halftime-result",
+        "-player-props",
+        "-total-corners",
+    )
+    for suffix in secondary_suffixes:
+        if slug.endswith(suffix):
+            return slug[: -len(suffix)]
+    return slug
+
+
+def _detect_candidate_teams(candidates: list[_ImportCandidate]) -> list[str]:
+    for candidate in candidates:
+        teams = _teams_from_draw_title(candidate.item.title)
+        if len(teams) == 2:
+            return teams
+    win_teams: list[str] = []
+    for candidate in candidates:
+        team = _team_from_win_title(candidate.item.title)
+        if team and not any(_same_team(team, existing) for existing in win_teams):
+            win_teams.append(team)
+        if len(win_teams) >= 2:
+            return win_teams[:2]
+    return win_teams
+
+
+def _is_primary_soccer_market(item: LiveMarketImportItem, teams: list[str]) -> bool:
+    if _is_draw_market(item):
+        return True
+    if item.market_shape != "match_winner":
+        return False
+    team = _team_from_win_title(item.title)
+    return bool(team and (not teams or any(_same_team(team, existing) for existing in teams)))
+
+
+def _is_allowed_soccer_draw(item: LiveMarketImportItem, allow_soccer_draws: bool) -> bool:
+    return bool(
+        allow_soccer_draws
+        and item.sport == "soccer"
+        and item.market_shape == "yes_no_generic"
+        and _is_draw_market(item)
+    )
+
+
+def _is_draw_market(item: LiveMarketImportItem) -> bool:
+    return bool(_teams_from_draw_title(item.title))
+
+
+def _import_role(title: str) -> str | None:
+    if _teams_from_draw_title(title):
+        return "draw"
+    if _team_from_win_title(title):
+        return "team_win"
+    return None
+
+
+def _team_from_win_title(title: str) -> str | None:
+    match = re.match(
+        r"^Will\s+(.+?)\s+win(?:\s+on\s+\d{4}-\d{2}-\d{2})?\?$",
+        title,
+        flags=re.IGNORECASE,
+    )
+    return match.group(1).strip() if match else None
+
+
+def _teams_from_draw_title(title: str) -> list[str]:
+    match = re.match(
+        r"^Will\s+(.+?)\s+vs\.?\s+(.+?)\s+end in a draw\?$",
+        title,
+        flags=re.IGNORECASE,
+    )
+    return [match.group(1).strip(), match.group(2).strip()] if match else []
+
+
+def _league_from_event_slug(event_slug: str) -> str | None:
+    prefix = event_slug.split("-", 1)[0].upper()
+    if not prefix or prefix == event_slug.upper():
+        return None
+    return prefix
+
+
+def _same_team(left: str, right: str) -> bool:
+    return _normalize_team(left) == _normalize_team(right)
+
+
+def _normalize_team(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+def _sum_decimal(values) -> Decimal | None:
+    total = ZERO
+    for value in values:
+        if value is not None:
+            total += value
+    return total if total > ZERO else None
+
+
+def _timestamp(value: datetime | None) -> float:
+    return value.timestamp() if value is not None else float("inf")
 
 
 def _record_detected(summary: LiveMarketImportSummary, item: LiveMarketImportItem) -> None:
@@ -293,6 +707,7 @@ def _build_import_item(
     current_time: datetime,
     min_close_time: datetime,
     window_end: datetime,
+    allow_soccer_draws: bool = False,
 ) -> LiveMarketImportItem:
     question = _safe_text(market_payload.question) or "Mercado sin pregunta"
     event_title = _safe_text(event_payload.title)
@@ -304,18 +719,25 @@ def _build_import_item(
         event_title=event_context,
         event_category=event_payload.category,
     )
+    remote_prices = _remote_prices(market_payload)
     item = LiveMarketImportItem(
         action="would_import",
         remote_id=_safe_text(market_payload.id),
         title=question,
+        event_title=event_title,
         sport=classification.sport,
         market_shape=classification.market_shape,
+        import_role=_import_role(question),
         close_time=close_time,
         condition_id=_safe_text(market_payload.condition_id),
         clob_token_ids=_clean_string_list(market_payload.clob_token_ids),
         market_slug=_safe_text(market_payload.slug),
         event_slug=_safe_text(event_payload.slug),
         polymarket_url=_polymarket_event_url(event_payload.slug),
+        yes_price=remote_prices[0] if len(remote_prices) >= 1 else None,
+        no_price=remote_prices[1] if len(remote_prices) >= 2 else None,
+        liquidity=market_payload.liquidity,
+        volume=market_payload.volume,
     )
 
     if _find_local_market(local_markets, market_payload) is not None:
@@ -339,7 +761,7 @@ def _build_import_item(
         include_futures=False,
         focus=DEFAULT_FOCUS,
     )
-    if unsupported_reason is not None:
+    if unsupported_reason is not None and not _is_allowed_soccer_draw(item, allow_soccer_draws):
         return _skip(item, unsupported_reason)
 
     missing_required = [
@@ -360,7 +782,7 @@ def _build_import_item(
     if not item.condition_id and not item.clob_token_ids:
         return _skip(item, "missing_public_identifiers")
 
-    if len(_remote_prices(market_payload)) < 2:
+    if len(remote_prices) < 2:
         item.warnings.append("remote_payload_missing_yes_no_prices")
     item.reasons.append("remote_market_missing_locally")
     item.reasons.append("safe_metadata_available")

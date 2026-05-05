@@ -28,8 +28,10 @@ def main() -> None:
                     sport=args.sport,
                     days=args.days,
                     limit=args.limit,
+                    pages=args.pages,
                     dry_run=dry_run,
                     max_import=args.max_import,
+                    max_events=args.max_events,
                     min_hours_to_close=args.min_hours_to_close,
                     source_tag_id=settings.polymarket_sports_tag_id,
                     include_skip_reasons=args.debug_skips,
@@ -83,9 +85,29 @@ def build_parser() -> argparse.ArgumentParser:
             "los mercados aplanados; usa --max-import para limitar escrituras."
         ),
     )
+    parser.add_argument(
+        "--pages",
+        "--max-pages",
+        type=int,
+        default=1,
+        help=(
+            "Cantidad maxima de paginas remotas /events a leer. Default 1 conserva "
+            "el comportamiento historico; usa 3-5 para dry-run de carteleras mas profundas."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true", help="Solo muestra import. Es el default.")
     parser.add_argument("--apply", action="store_true", help="Aplica import limitado.")
     parser.add_argument("--max-import", type=int, default=10, help="Maximo de mercados a importar.")
+    parser.add_argument(
+        "--max-events",
+        "--max-games",
+        type=int,
+        default=None,
+        help=(
+            "Maximo de eventos/partidos elegibles. Para soccer agrupa home/draw/away "
+            "antes de aplicar --max-import."
+        ),
+    )
     parser.add_argument(
         "--min-hours-to-close",
         type=float,
@@ -113,8 +135,10 @@ def _run(
     sport: str | None = None,
     days: int = 7,
     limit: int = 50,
+    pages: int = 1,
     dry_run: bool = True,
     max_import: int = 10,
+    max_events: int | None = None,
     min_hours_to_close: float = 6,
     source_tag_id: str | None = None,
     include_skip_reasons: bool = False,
@@ -126,8 +150,10 @@ def _run(
         sport=sport,
         days=days,
         limit=limit,
+        pages=pages,
         dry_run=dry_run,
         max_import=max_import,
+        max_events=max_events,
         min_hours_to_close=min_hours_to_close,
         source_tag_id=source_tag_id,
         include_skip_reasons=include_skip_reasons,
@@ -153,7 +179,8 @@ def _print_human(payload: dict[str, Any]) -> None:
     print(
         "requested_sport={requested_sport} normalized_sport={normalized_sport} "
         "requested_days={requested_days} requested_limit={requested_limit} "
-        "remote_page_limit={remote_page_limit}".format(**payload)
+        "requested_pages={requested_pages} remote_pages_fetched={remote_pages_fetched} "
+        "remote_page_limit={remote_page_limit} max_events={max_events}".format(**payload)
     )
     if payload.get("skip_reasons_count"):
         print("skip_reasons_count=" + json.dumps(payload["skip_reasons_count"], sort_keys=True))
@@ -164,6 +191,19 @@ def _print_human(payload: dict[str, Any]) -> None:
             "detected_market_types_count="
             + json.dumps(payload["detected_market_types_count"], sort_keys=True)
         )
+    if payload.get("event_groups"):
+        print("event_groups:")
+        for group in payload["event_groups"]:
+            teams = " vs ".join(group.get("teams") or []) or "teams_unknown"
+            print(
+                "  {slug} | {teams} | would_import={count} draw={draw} close={close}".format(
+                    slug=group.get("event_slug"),
+                    teams=teams,
+                    count=group.get("would_import_markets_count"),
+                    draw=group.get("has_draw_market"),
+                    close=group.get("close_time"),
+                )
+            )
     if not payload["items"]:
         print("No import candidates found.")
         return
