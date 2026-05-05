@@ -448,8 +448,9 @@ export default function SportDetailPage() {
       return;
     }
     setState((current) => ({ ...current, loading: true, error: null }));
+    const overviewPath = buildUpcomingPath(sportOption);
     try {
-      const overview = await fetchJson<MarketsOverviewResponse>(buildUpcomingPath(sportOption));
+      const overview = await fetchJson<MarketsOverviewResponse>(overviewPath);
       const items = (overview.items ?? []).map(mapOverviewItem).filter(Boolean) as UpcomingSportsMarket[];
       const qualityItems = items.map(buildQualityItem);
       setState({
@@ -469,7 +470,7 @@ export default function SportDetailPage() {
       setState((current) => ({
         ...current,
         loading: false,
-        error: friendlyApiError(error, `datos de ${sportOption.label}`),
+        error: `${friendlyApiError(error, `datos de ${sportOption.label}`)} Ruta consultada: ${overviewPath}`,
       }));
     }
   }, [sportIsEnabled, sportOption]);
@@ -481,6 +482,7 @@ export default function SportDetailPage() {
   const qualityByMarketId = useMemo(() => {
     return new Map(state.qualityItems.map((item) => [item.market_id, item]));
   }, [state.qualityItems]);
+  const overviewPath = buildUpcomingPath(sportOption);
 
   const handleSelectSport = (nextSport: string) => {
     if (nextSport === "all") {
@@ -597,7 +599,7 @@ export default function SportDetailPage() {
           {sportIsEnabled ? (
             <a
               className="text-link"
-              href={`${API_BASE_URL}${buildUpcomingPath(sportOption)}`}
+              href={`${API_BASE_URL}${overviewPath}`}
               rel="noreferrer"
               target="_blank"
             >
@@ -617,7 +619,7 @@ export default function SportDetailPage() {
           <LoadingState copy={`Cargando mercados de ${sportOption.label}...`} />
         ) : state.items.length === 0 ? (
           <EmptyState
-            copy="El backend respondió correctamente con total_count=0 para este deporte. Ejecuta el pipeline limitado cuando quieras poblarlo; no se muestran datos inventados."
+            copy={`La API respondió correctamente, pero no hay datos sincronizados para sport_type=${sportOption.apiValue ?? selectedSport}. total_count=0 en ${overviewPath}. Ejecuta el pipeline limitado cuando quieras poblarlo; no se muestran datos inventados.`}
             title={`Todavía no hay mercados cargados para ${sportOption.label}.`}
           />
         ) : (
