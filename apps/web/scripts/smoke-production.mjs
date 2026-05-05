@@ -93,16 +93,24 @@ function countMarketCards(dom) {
   return (dom.match(/<article\s+class="sports-market-card/g) || []).length;
 }
 
+function countMatchCards(dom) {
+  return (dom.match(/<article\s+class="soccer-match-card/g) || []).length;
+}
+
 function validateRenderedSoccerPage(dom, expectedTitles, label) {
   const cardCount = countMarketCards(dom);
+  const matchCardCount = countMatchCards(dom);
   const blockedTexts = RENDER_ERROR_TEXT.filter((text) => dom.includes(text));
   const titleFound = expectedTitles.some((title) => title && dom.includes(title));
 
-  assert(cardCount >= MIN_SOCCER_MARKETS, `${label} rendered ${cardCount} soccer cards`);
+  assert(
+    cardCount >= MIN_SOCCER_MARKETS || matchCardCount > 0,
+    `${label} rendered ${cardCount} market cards and ${matchCardCount} match cards`,
+  );
   assert(blockedTexts.length === 0, `${label} rendered error/empty text: ${blockedTexts.join(", ")}`);
   assert(titleFound, `${label} did not render any expected soccer market title`);
 
-  return { card_count: cardCount, title_found: titleFound };
+  return { market_card_count: cardCount, match_card_count: matchCardCount, title_found: titleFound };
 }
 
 async function main() {

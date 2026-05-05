@@ -36,8 +36,11 @@ type PolySignalScore = {
 
 type UpcomingSportsMarket = {
   market_id: number;
+  remote_id?: string | null;
   question: string;
   event_title?: string | null;
+  event_slug?: string | null;
+  market_slug?: string | null;
   sport: string;
   market_shape: string;
   close_time?: string | null;
@@ -97,6 +100,9 @@ type MarketOverviewItem = {
     market_type?: string | null;
     close_time?: string | null;
     end_date?: string | null;
+    event_slug?: string | null;
+    market_slug?: string | null;
+    remote_id?: string | null;
   } | null;
   latest_snapshot?: {
     yes_price?: string | number | null;
@@ -265,8 +271,11 @@ function mapOverviewItem(item: MarketOverviewItem): UpcomingSportsMarket | null 
   const edgeSigned = toNumber(prediction?.edge_signed);
   return {
     market_id: market.id,
+    remote_id: market.remote_id,
     question: market.question || "Mercado sin título",
     event_title: market.event_title,
+    event_slug: market.event_slug,
+    market_slug: market.market_slug,
     sport: market.sport_type || "unknown",
     market_shape: market.market_type || "match_winner",
     close_time: market.close_time ?? market.end_date ?? null,
@@ -416,6 +425,481 @@ function SportMarketCard({
   );
 }
 
+type SoccerTeamMeta = {
+  initials: string;
+  shortName: string;
+  tone: string;
+};
+
+type ParsedSoccerQuestion =
+  | { kind: "win"; team: string; date: string | null }
+  | { kind: "exact_score"; homeTeam: string; awayTeam: string; date: string | null }
+  | { kind: "exact_other"; date: string | null }
+  | { kind: "halftime"; team: string; date: string | null }
+  | { kind: "draw"; date: string | null }
+  | { kind: "unknown"; date: string | null };
+
+type SoccerMatch = {
+  key: string;
+  homeTeam: string;
+  awayTeam: string;
+  date: string | null;
+  dateSource: "market" | "question" | "none";
+  markets: UpcomingSportsMarket[];
+  homeWin?: UpcomingSportsMarket;
+  awayWin?: UpcomingSportsMarket;
+  draw?: UpcomingSportsMarket;
+  extras: UpcomingSportsMarket[];
+};
+
+type SoccerScheduleSection = {
+  key: string;
+  label: string;
+  matches: SoccerMatch[];
+};
+
+const SOCCER_TEAM_BADGES: Record<string, SoccerTeamMeta> = {
+  "bengaluru fc": { initials: "BFC", shortName: "Bengaluru", tone: "blue" },
+  "chelsea fc": { initials: "CHE", shortName: "Chelsea", tone: "blue" },
+  "nottingham forest fc": { initials: "NFO", shortName: "Nottingham", tone: "red" },
+  "odisha fc": { initials: "OFC", shortName: "Odisha", tone: "amber" },
+};
+
+function normalizeTeamName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function teamMeta(team: string): SoccerTeamMeta {
+  const known = SOCCER_TEAM_BADGES[normalizeTeamName(team)];
+  if (known) {
+    return known;
+  }
+  const words = team
+    .replace(/\b(fc|cf|sc|club)\b/gi, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  return {
+    initials: words
+      .slice(0, 3)
+      .map((word) => word[0]?.toUpperCase())
+      .join("") || "?",
+    shortName: team.replace(/\s+FC$/i, ""),
+    tone: "neutral",
+  };
+}
+
+function extractQuestionDate(question: string): string | null {
+  return question.match(/\bon\s+(\d{4}-\d{2}-\d{2})\??$/i)?.[1] ?? null;
+}
+
+function parseSoccerQuestion(question: string): ParsedSoccerQuestion {
+  const date = extractQuestionDate(question);
+  const exact = question.match(/^Exact Score:\s*(.+?)\s+\d+\s*-\s*\d+\s+(.+?)\?$/i);
+  if (exact) {
+    return {
+      kind: "exact_score",
+      homeTeam: exact[1].trim(),
+      awayTeam: exact[2].trim(),
+      date,
+    };
+  }
+  if (/^Exact Score:\s*Any Other Score\?/i.test(question)) {
+    return { kind: "exact_other", date };
+  }
+  const win = question.match(/^Will\s+(.+?)\s+win(?:\s+on\s+\d{4}-\d{2}-\d{2})?\?$/i);
+  if (win) {
+    return { kind: "win", team: win[1].trim(), date };
+  }
+  const halftime = question.match(/^(.+?)\s+leading at halftime\?$/i);
+  if (halftime) {
+    return { kind: "halftime", team: halftime[1].trim(), date };
+  }
+  if (/\bdraw\b|\bempate\b/i.test(question)) {
+    return { kind: "draw", date };
+  }
+  return { kind: "unknown", date };
+}
+
+function matchKey(homeTeam: string, awayTeam: string, date: string | null): string {
+  const pair = [normalizeTeamName(homeTeam), normalizeTeamName(awayTeam)].sort().join("__");
+  return `${date ?? "sin-fecha"}__${pair}`;
+}
+
+function marketDate(market: UpcomingSportsMarket): { date: string | null; source: SoccerMatch["dateSource"] } {
+  if (market.close_time) {
+    const date = new Date(market.close_time);
+    if (!Number.isNaN(date.getTime())) {
+      return { date: date.toISOString().slice(0, 10), source: "market" };
+    }
+  }
+  const questionDate = extractQuestionDate(market.question);
+  return questionDate ? { date: questionDate, source: "question" } : { date: null, source: "none" };
+}
+
+function mergeMatchDate(match: SoccerMatch, market: UpcomingSportsMarket) {
+  const next = marketDate(market);
+  if (match.dateSource === "market") {
+    return;
+  }
+  if (next.source === "market" || (match.dateSource === "none" && next.date)) {
+    match.date = next.date;
+    match.dateSource = next.source;
+    match.key = matchKey(match.homeTeam, match.awayTeam, match.date);
+  }
+}
+
+function pushUniqueMarket(match: SoccerMatch, market: UpcomingSportsMarket) {
+  if (!match.markets.some((item) => item.market_id === market.market_id)) {
+    match.markets.push(market);
+  }
+}
+
+function createSoccerMatch(
+  homeTeam: string,
+  awayTeam: string,
+  firstMarket: UpcomingSportsMarket,
+): SoccerMatch {
+  const date = marketDate(firstMarket);
+  return {
+    key: matchKey(homeTeam, awayTeam, date.date),
+    homeTeam,
+    awayTeam,
+    date: date.date,
+    dateSource: date.source,
+    markets: [firstMarket],
+    extras: [],
+  };
+}
+
+function findMatchForTeam(matches: SoccerMatch[], team: string): SoccerMatch | null {
+  const key = normalizeTeamName(team);
+  return (
+    matches.find(
+      (match) =>
+        normalizeTeamName(match.homeTeam) === key || normalizeTeamName(match.awayTeam) === key,
+    ) ?? null
+  );
+}
+
+function applyWinMarket(match: SoccerMatch, market: UpcomingSportsMarket, team: string) {
+  const key = normalizeTeamName(team);
+  if (normalizeTeamName(match.homeTeam) === key) {
+    match.homeWin = market;
+  } else if (normalizeTeamName(match.awayTeam) === key) {
+    match.awayWin = market;
+  } else {
+    match.extras.push(market);
+  }
+  pushUniqueMarket(match, market);
+  mergeMatchDate(match, market);
+}
+
+function buildSoccerMatches(markets: UpcomingSportsMarket[]): SoccerMatch[] {
+  const matches: SoccerMatch[] = [];
+  const unassignedWins: UpcomingSportsMarket[] = [];
+  const unassignedExtras: UpcomingSportsMarket[] = [];
+
+  markets.forEach((market) => {
+    const parsed = parseSoccerQuestion(market.question);
+    if (parsed.kind !== "exact_score") {
+      return;
+    }
+    let match = matches.find(
+      (candidate) =>
+        normalizeTeamName(candidate.homeTeam) === normalizeTeamName(parsed.homeTeam) &&
+        normalizeTeamName(candidate.awayTeam) === normalizeTeamName(parsed.awayTeam),
+    );
+    if (!match) {
+      match = createSoccerMatch(parsed.homeTeam, parsed.awayTeam, market);
+      matches.push(match);
+    }
+    match.extras.push(market);
+    pushUniqueMarket(match, market);
+  });
+
+  markets.forEach((market) => {
+    const parsed = parseSoccerQuestion(market.question);
+    if (parsed.kind === "exact_score") {
+      return;
+    }
+    if (parsed.kind === "win") {
+      const match = findMatchForTeam(matches, parsed.team);
+      if (match) {
+        applyWinMarket(match, market, parsed.team);
+      } else {
+        unassignedWins.push(market);
+      }
+      return;
+    }
+    if (parsed.kind === "halftime") {
+      const match = findMatchForTeam(matches, parsed.team);
+      if (match) {
+        match.extras.push(market);
+        pushUniqueMarket(match, market);
+        mergeMatchDate(match, market);
+      } else {
+        unassignedExtras.push(market);
+      }
+      return;
+    }
+    if (parsed.kind === "draw") {
+      const fallback = matches[0];
+      if (fallback) {
+        fallback.draw = market;
+        pushUniqueMarket(fallback, market);
+        mergeMatchDate(fallback, market);
+      } else {
+        unassignedExtras.push(market);
+      }
+      return;
+    }
+    if (parsed.kind === "exact_other") {
+      const fallback = matches[0];
+      if (fallback) {
+        fallback.extras.push(market);
+        pushUniqueMarket(fallback, market);
+      } else {
+        unassignedExtras.push(market);
+      }
+      return;
+    }
+    unassignedExtras.push(market);
+  });
+
+  const winsByDate = new Map<string, UpcomingSportsMarket[]>();
+  unassignedWins.forEach((market) => {
+    const date = marketDate(market).date ?? "sin-fecha";
+    winsByDate.set(date, [...(winsByDate.get(date) ?? []), market]);
+  });
+  winsByDate.forEach((wins) => {
+    for (let index = 0; index < wins.length; index += 2) {
+      const home = wins[index];
+      const away = wins[index + 1];
+      const parsedHome = parseSoccerQuestion(home.question);
+      const parsedAway = away ? parseSoccerQuestion(away.question) : null;
+      if (parsedHome.kind === "win" && parsedAway?.kind === "win") {
+        const match = createSoccerMatch(parsedHome.team, parsedAway.team, home);
+        applyWinMarket(match, home, parsedHome.team);
+        applyWinMarket(match, away, parsedAway.team);
+        matches.push(match);
+      } else {
+        unassignedExtras.push(home);
+      }
+    }
+  });
+
+  if (unassignedExtras.length > 0 && matches.length > 0) {
+    unassignedExtras.forEach((market) => {
+      matches[0].extras.push(market);
+      pushUniqueMarket(matches[0], market);
+    });
+  }
+
+  return matches.sort((left, right) => {
+    const leftDate = left.date ? new Date(`${left.date}T12:00:00`).getTime() : Number.MAX_SAFE_INTEGER;
+    const rightDate = right.date ? new Date(`${right.date}T12:00:00`).getTime() : Number.MAX_SAFE_INTEGER;
+    return leftDate - rightDate || left.homeTeam.localeCompare(right.homeTeam);
+  });
+}
+
+function matchIsInThreeDayWindow(match: SoccerMatch): boolean {
+  if (match.dateSource !== "market" || !match.date) {
+    return true;
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const limit = new Date(today);
+  limit.setDate(limit.getDate() + 3);
+  const matchDate = new Date(`${match.date}T12:00:00`);
+  return matchDate >= today && matchDate < limit;
+}
+
+function formatMatchDay(date: string | null): string {
+  if (!date) {
+    return "Sin fecha clara";
+  }
+  const value = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(value.getTime())) {
+    return "Sin fecha clara";
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const day = new Date(value);
+  day.setHours(0, 0, 0, 0);
+  if (day.getTime() === today.getTime()) {
+    return "Hoy";
+  }
+  if (day.getTime() === tomorrow.getTime()) {
+    return "Mañana";
+  }
+  return new Intl.DateTimeFormat("es", {
+    day: "numeric",
+    month: "long",
+    weekday: "short",
+  }).format(value);
+}
+
+function buildSoccerSchedule(markets: UpcomingSportsMarket[]): SoccerScheduleSection[] {
+  const sections = new Map<string, SoccerMatch[]>();
+  buildSoccerMatches(markets)
+    .filter(matchIsInThreeDayWindow)
+    .forEach((match) => {
+      const label = formatMatchDay(match.date);
+      sections.set(label, [...(sections.get(label) ?? []), match]);
+    });
+  return Array.from(sections.entries()).map(([label, matches]) => ({
+    key: label,
+    label,
+    matches,
+  }));
+}
+
+function formatSoccerPrice(value: unknown): string {
+  const probability = normalizeProbability(value);
+  if (probability === null) {
+    return "Sin dato";
+  }
+  return `${Math.round(probability * 100)}¢`;
+}
+
+function sumMarketMetric(markets: UpcomingSportsMarket[], field: "liquidity" | "volume"): number | null {
+  const total = markets.reduce((sum, market) => sum + (toNumber(market[field]) ?? 0), 0);
+  return total > 0 ? total : null;
+}
+
+function TeamBadge({ team }: { team: string }) {
+  const meta = teamMeta(team);
+  return (
+    <span className={`team-crest tone-${meta.tone}`} aria-hidden="true">
+      {meta.initials}
+    </span>
+  );
+}
+
+function SoccerOutcomePill({
+  label,
+  market,
+}: {
+  label: string;
+  market?: UpcomingSportsMarket;
+}) {
+  const content = (
+    <>
+      <span>{label}</span>
+      <strong>{market ? formatSoccerPrice(market.market_yes_price) : "Sin dato"}</strong>
+    </>
+  );
+  if (!market) {
+    return <div className="soccer-outcome-pill missing">{content}</div>;
+  }
+  return (
+    <Link className="soccer-outcome-pill" href={`/markets/${market.market_id}`}>
+      {content}
+    </Link>
+  );
+}
+
+function SoccerMatchCard({ match }: { match: SoccerMatch }) {
+  const home = teamMeta(match.homeTeam);
+  const away = teamMeta(match.awayTeam);
+  const analysisMarketId =
+    match.homeWin?.market_id ?? match.awayWin?.market_id ?? match.markets[0]?.market_id;
+  const liquidity = sumMarketMetric(match.markets, "liquidity");
+  const volume = sumMarketMetric(match.markets, "volume");
+  const hasIncompletePrices = !match.homeWin || !match.awayWin || !match.draw;
+
+  return (
+    <article className="soccer-match-card">
+      <div className="soccer-match-meta">
+        <span>Fútbol</span>
+        <span>{match.dateSource === "question" ? "Fecha inferida" : "Próximo partido"}</span>
+        <span>Vol. {formatMetric(volume)}</span>
+      </div>
+      <div className="soccer-match-main">
+        <div className="soccer-team-row">
+          <TeamBadge team={match.homeTeam} />
+          <strong>{home.shortName}</strong>
+        </div>
+        <span className="soccer-versus">vs</span>
+        <div className="soccer-team-row away">
+          <TeamBadge team={match.awayTeam} />
+          <strong>{away.shortName}</strong>
+        </div>
+      </div>
+      <div className="soccer-outcome-grid" aria-label="Precios principales">
+        <SoccerOutcomePill label={home.shortName} market={match.homeWin} />
+        <SoccerOutcomePill label="Empate" market={match.draw} />
+        <SoccerOutcomePill label={away.shortName} market={match.awayWin} />
+      </div>
+      <div className="soccer-match-footer">
+        <span>{match.markets.length} mercados incluidos</span>
+        <span>Liquidez {formatMetric(liquidity)}</span>
+        {hasIncompletePrices ? <span className="warning-chip">Mercado incompleto</span> : null}
+        {analysisMarketId ? (
+          <Link className="analysis-link" href={`/markets/${analysisMarketId}`}>
+            Ver análisis
+          </Link>
+        ) : null}
+      </div>
+      {match.extras.length > 0 ? (
+        <details className="soccer-match-details">
+          <summary>Mercados secundarios</summary>
+          <ul>
+            {match.extras.slice(0, 8).map((market) => (
+              <li key={market.market_id}>
+                <Link href={`/markets/${market.market_id}`}>{market.question}</Link>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </article>
+  );
+}
+
+function SoccerMatchSchedule({ markets }: { markets: UpcomingSportsMarket[] }) {
+  const schedule = buildSoccerSchedule(markets);
+  if (schedule.length === 0) {
+    return (
+      <div className="sports-market-grid">
+        {markets.map((market) => (
+          <SportMarketCard key={market.market_id} market={market} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="soccer-schedule">
+      <div className="soccer-schedule-note">
+        <strong>Próximos 3 días</strong>
+        <span>
+          Se usa `close_time` cuando existe. Los mercados actuales no traen hora
+          estructurada, así que la fecha se infiere del título y los precios se
+          muestran solo cuando existen.
+        </span>
+      </div>
+      {schedule.map((section) => (
+        <section className="soccer-day-section" key={section.key}>
+          <div className="soccer-day-heading">
+            <h3>{section.label}</h3>
+            <span>{section.matches.length} partidos</span>
+          </div>
+          <div className="soccer-match-list">
+            {section.matches.map((match) => (
+              <SoccerMatchCard key={match.key} match={match} />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export default function SportDetailPage() {
   const params = useParams<{ sport: string }>();
   const router = useRouter();
@@ -432,6 +916,7 @@ export default function SportDetailPage() {
     error: null,
     updatedAt: null,
   });
+  const [soccerViewMode, setSoccerViewMode] = useState<"matches" | "markets">("matches");
 
   const loadSport = useCallback(async () => {
     if (!sportIsEnabled) {
@@ -483,6 +968,12 @@ export default function SportDetailPage() {
     return new Map(state.qualityItems.map((item) => [item.market_id, item]));
   }, [state.qualityItems]);
   const overviewPath = buildUpcomingPath(sportOption);
+  const shouldShowSoccerSchedule =
+    selectedSport === "soccer" &&
+    sportIsEnabled &&
+    !state.loading &&
+    state.items.length > 0 &&
+    soccerViewMode === "matches";
 
   const handleSelectSport = (nextSport: string) => {
     if (nextSport === "all") {
@@ -590,7 +1081,7 @@ export default function SportDetailPage() {
       <section className="panel sports-market-section">
         <div className="panel-heading">
           <div>
-            <h2>Mercados próximos</h2>
+            <h2>{selectedSport === "soccer" ? "Próximos partidos" : "Mercados próximos"}</h2>
             <p>
               Filtro activo: {sportOption.label}. Esta vista no importa datos,
               discovery ni scoring; solo lee mercados disponibles.
@@ -610,6 +1101,25 @@ export default function SportDetailPage() {
           )}
         </div>
 
+        {selectedSport === "soccer" && sportIsEnabled && state.items.length > 0 ? (
+          <div className="view-toggle" aria-label="Cambiar vista de fútbol">
+            <button
+              className={soccerViewMode === "matches" ? "active" : ""}
+              onClick={() => setSoccerViewMode("matches")}
+              type="button"
+            >
+              Vista partidos
+            </button>
+            <button
+              className={soccerViewMode === "markets" ? "active" : ""}
+              onClick={() => setSoccerViewMode("markets")}
+              type="button"
+            >
+              Vista mercados
+            </button>
+          </div>
+        ) : null}
+
         {!sportIsEnabled ? (
           <ComingSoonModule
             copy="La categoría se muestra como roadmap, pero no carga mercados, discovery, scoring ni datos remotos todavía."
@@ -622,6 +1132,8 @@ export default function SportDetailPage() {
             copy={`La API respondió correctamente, pero no hay datos sincronizados para sport_type=${sportOption.apiValue ?? selectedSport}. total_count=0 en ${overviewPath}. Ejecuta el pipeline limitado cuando quieras poblarlo; no se muestran datos inventados.`}
             title={`Todavía no hay mercados cargados para ${sportOption.label}.`}
           />
+        ) : shouldShowSoccerSchedule ? (
+          <SoccerMatchSchedule markets={state.items} />
         ) : (
           <div className="sports-market-grid">
             {state.items.map((market) => (
