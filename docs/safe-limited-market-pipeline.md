@@ -57,6 +57,11 @@ value currently clamps the remote events page size, not the flattened market
 count; `total_remote_checked` can be higher because one event can contain many
 markets.
 
+For import dry-runs, treat `--limit` as a remote event/page guard and
+`--max-import` as the cap on markets that could be written if the command were
+changed to `--apply`. Do not interpret `--limit 100` as "review exactly 100
+remote markets"; one remote event can carry many markets.
+
 ## Snapshot Dry-Run
 
 Only for sports where import dry-run shows viable candidates:

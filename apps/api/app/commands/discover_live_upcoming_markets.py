@@ -74,7 +74,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--sport", type=str, default=None, help="Filtro opcional de deporte.")
     parser.add_argument("--days", type=int, default=7, help="Ventana de proximos dias.")
-    parser.add_argument("--limit", type=int, default=50, help="Cantidad maxima de items devueltos.")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=50,
+        help=(
+            "Cantidad maxima de items devueltos tras filtrar. La busqueda remota "
+            "puede pedir mas eventos para encontrar candidatos."
+        ),
+    )
     parser.add_argument(
         "--include-futures",
         action="store_true",

@@ -74,7 +74,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--sport", type=str, default=None, help="Filtro opcional de deporte.")
     parser.add_argument("--days", type=int, default=7, help="Ventana de proximos dias.")
-    parser.add_argument("--limit", type=int, default=50, help="Limite remoto revisado.")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=50,
+        help=(
+            "Limite base de eventos remotos solicitados. No limita directamente "
+            "los mercados aplanados; usa --max-import para limitar escrituras."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true", help="Solo muestra import. Es el default.")
     parser.add_argument("--apply", action="store_true", help="Aplica import limitado.")
     parser.add_argument("--max-import", type=int, default=10, help="Maximo de mercados a importar.")
