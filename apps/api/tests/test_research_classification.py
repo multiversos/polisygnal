@@ -170,6 +170,24 @@ from app.services.research.classification import (
             "sports_generic",
         ),
         (
+            "Exact Score: Chelsea FC 3 - 3 Nottingham Forest FC?",
+            "soccer",
+            "exact_score",
+            "sports_generic",
+        ),
+        (
+            "Will Chelsea FC be leading at halftime?",
+            "soccer",
+            "halftime_leader",
+            "sports_generic",
+        ),
+        (
+            "Chelsea FC leading at halftime?",
+            "soccer",
+            "halftime_leader",
+            "sports_generic",
+        ),
+        (
             "Boca Juniors vs River Plate",
             "soccer",
             "match_winner",
@@ -226,7 +244,13 @@ from app.services.research.classification import (
         (
             "NBA Playoffs: Suns vs. Thunder Total Games O/U 4.5",
             "basketball",
-            "team_prop",
+            "total_points",
+            "sports_generic",
+        ),
+        (
+            "Chiefs -3.5 spread vs Bills",
+            "nfl",
+            "spread",
             "sports_generic",
         ),
     ],

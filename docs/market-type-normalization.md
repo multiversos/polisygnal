@@ -8,6 +8,9 @@ This is a planning note only. It does not change production data.
 - Older code paths still mention `winner`, especially in legacy repository helpers.
 - Research and UI code often use the synonym `market_shape`.
 - Discovery currently focuses on `match_winner` unless explicitly widened.
+- New import classification now recognizes common non-primary sports markets
+  such as `exact_score`, `halftime_leader`, `total_points`, and `spread`.
+  Existing production rows are not reclassified by this plan.
 
 ## Canonical Values
 
@@ -17,6 +20,7 @@ Use these canonical `market_type` values for new data:
 - `exact_score`: market for exact final score.
 - `halftime_leader`: market for leader at halftime or interval.
 - `race_winner`: winner of a race, including horse racing.
+- `championship`: winner of a championship, title, cup, or league.
 - `total_points`: over/under total points, goals, games, or runs.
 - `spread`: handicap/spread market.
 

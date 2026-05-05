@@ -87,6 +87,7 @@ def list_upcoming_data_quality(
     sport: str | None = None,
     days: int = 7,
     limit: int = 50,
+    focus: str | None = DEFAULT_UPCOMING_FOCUS,
     now: datetime | None = None,
 ) -> UpcomingDataQualitySelection:
     current_time = _normalize_datetime(now or datetime.now(tz=UTC))
@@ -97,7 +98,7 @@ def list_upcoming_data_quality(
         limit=safe_limit,
         days=days,
         include_futures=False,
-        focus=DEFAULT_UPCOMING_FOCUS,
+        focus=focus,
         now=current_time,
     )
     market_ids = [item.market_id for item in selection.items]
@@ -146,7 +147,7 @@ def list_upcoming_data_quality(
             "days": selection.filters_applied.get("days"),
             "limit": safe_limit,
             "include_futures": False,
-            "focus": DEFAULT_UPCOMING_FOCUS,
+            "focus": selection.filters_applied.get("focus"),
             "window_start": selection.filters_applied.get("window_start"),
             "window_end": selection.filters_applied.get("window_end"),
         },

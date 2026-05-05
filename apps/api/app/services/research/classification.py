@@ -24,9 +24,13 @@ SUPPORTED_MARKET_SHAPES = {
     "match_winner",
     "championship",
     "futures",
+    "exact_score",
+    "halftime_leader",
     "player_prop",
     "team_prop",
     "race_winner",
+    "total_points",
+    "spread",
     "yes_no_generic",
     "other",
 }
@@ -288,12 +292,40 @@ PLAYER_PROP_HINTS = (
 )
 TEAM_PROP_HINTS = (
     "team total",
-    "total games",
-    "over under",
-    "o/u",
     "win total",
     "regular season wins",
     "score first",
+)
+EXACT_SCORE_HINTS = (
+    "exact score",
+    "correct score",
+    "final score",
+)
+HALFTIME_LEADER_HINTS = (
+    "leading at halftime",
+    "lead at halftime",
+    "halftime leader",
+    "halftime lead",
+    "at halftime",
+    "at half time",
+    "first half leader",
+    "leading at the half",
+)
+TOTAL_POINTS_HINTS = (
+    "total games",
+    "total points",
+    "total goals",
+    "total runs",
+    "total score",
+    "over under",
+    "o/u",
+)
+SPREAD_HINTS = (
+    "spread",
+    "handicap",
+    "set handicap",
+    "run line",
+    "puck line",
 )
 MATCH_WINNER_HINTS = (
     " beat ",
@@ -569,10 +601,19 @@ def normalize_market_shape(value: str | None) -> str:
         "match": "match_winner",
         "winner": "match_winner",
         "game_winner": "match_winner",
+        "match_result": "match_winner",
         "champion": "championship",
         "championship_winner": "championship",
         "future": "futures",
         "race": "race_winner",
+        "correct_score": "exact_score",
+        "final_score": "exact_score",
+        "halftime": "halftime_leader",
+        "first_half": "halftime_leader",
+        "over_under": "total_points",
+        "totals": "total_points",
+        "total": "total_points",
+        "handicap": "spread",
         "generic_yes_no": "yes_no_generic",
         "yes_no": "yes_no_generic",
     }
@@ -654,6 +695,18 @@ def _infer_market_shape_with_reason(
     normalized_text = f" {_normalize_text(text)} "
     if sport == "horse_racing" or _contains_any(normalized_text, RACE_WINNER_HINTS):
         return "race_winner", "market_shape=race_winner from horse racing/race hints"
+
+    if _contains_any(normalized_text, EXACT_SCORE_HINTS):
+        return "exact_score", "market_shape=exact_score from exact/correct score wording"
+
+    if _contains_any(normalized_text, HALFTIME_LEADER_HINTS):
+        return "halftime_leader", "market_shape=halftime_leader from halftime leader wording"
+
+    if _contains_any(normalized_text, SPREAD_HINTS):
+        return "spread", "market_shape=spread from spread/handicap wording"
+
+    if _contains_any(normalized_text, TOTAL_POINTS_HINTS):
+        return "total_points", "market_shape=total_points from total/over-under wording"
 
     if _looks_like_player_prop(normalized_text):
         return "player_prop", "market_shape=player_prop from player-stat prop hints"

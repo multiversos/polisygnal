@@ -57,7 +57,7 @@ def list_analysis_readiness(
         days=safe_days,
         limit=safe_limit,
         include_futures=False,
-        focus="match_winner",
+        focus="all",
         now=current_time,
     )
     quality_selection = list_upcoming_data_quality(
@@ -65,6 +65,7 @@ def list_analysis_readiness(
         sport=sport,
         days=safe_days,
         limit=safe_limit,
+        focus="all",
         now=current_time,
     )
     quality_by_market_id = {item.market_id: item for item in quality_selection.items}
@@ -127,7 +128,7 @@ def list_analysis_readiness(
             "days": safe_days,
             "limit": safe_limit,
             "include_futures": False,
-            "focus": "match_winner",
+            "focus": "all",
             "min_hours_to_close": min_hours_to_close,
             "window_start": upcoming_selection.filters_applied.get("window_start"),
             "window_end": upcoming_selection.filters_applied.get("window_end"),
@@ -169,6 +170,8 @@ def _build_item(upcoming_item, quality_item, *, source: str, now: datetime) -> A
     if has_clear_shape:
         reasons.append("match_winner")
     elif quality_item.market_shape == "match_winner" and not is_primary_match_winner:
+        reasons.append("non_primary_market")
+    elif quality_item.market_shape != "other":
         reasons.append("non_primary_market")
     else:
         reasons.append("market_shape_uncertain")
