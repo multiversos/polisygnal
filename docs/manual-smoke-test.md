@@ -39,10 +39,24 @@ Use these checks after a production deploy. Correct domains:
 ## Sports
 
 1. Open `https://polisygnal-web.vercel.app/sports/soccer`.
-2. Confirm soccer shows real markets.
+2. Confirm soccer shows 20 market cards.
 3. Open `https://polisygnal-web.vercel.app/sports/basketball`.
 4. Confirm basketball shows a clean empty state, not `Failed to fetch`.
 5. Confirm UFC, cricket, and NHL/Hockey remain disabled and do not navigate as active filters.
+6. Confirm `/sports/soccer` does not show `La API no respondió` or `Datos no disponibles`.
+
+## Cache Troubleshooting
+
+If a normal browser shows `Datos no disponibles` but backend/proxy checks pass:
+
+1. Open `https://polisygnal-web.vercel.app/sports/soccer` in an incognito window.
+2. Hard refresh the normal tab with `Ctrl+F5`.
+3. Open `https://polisygnal-web.vercel.app/api/build-info` and compare `commit`
+   with the latest Vercel production deployment.
+4. Open `https://polisygnal-web.vercel.app/api/backend/markets/overview?sport_type=soccer&limit=20`.
+5. Confirm the proxy returns `total_count=20` and 20 `items`.
+6. If the proxy works and incognito works, treat the issue as local browser cache
+   or an old tab rather than a backend outage.
 
 ## Market Detail
 
