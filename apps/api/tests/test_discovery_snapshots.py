@@ -210,6 +210,148 @@ def test_discovery_snapshot_skips_missing_binary_prices(db_session: Session) -> 
     assert summary.items[0].reason == "remote_payload_missing_binary_prices"
 
 
+def test_discovery_snapshot_allows_soccer_draw_market_dry_run(db_session: Session) -> None:
+    question = "Will Arsenal FC vs. Club Atletico de Madrid end in a draw?"
+    _create_local_market(
+        db_session,
+        remote_id="remote-soccer-draw",
+        slug="arsenal-atletico-draw",
+        question=question,
+        sport_type="soccer",
+        market_type="yes_no_generic",
+    )
+    before_snapshots = db_session.scalar(select(func.count()).select_from(MarketSnapshot))
+    client = FakeGammaClient(
+        [
+            _event_payload(
+                event_id="event-soccer-draw",
+                title="Arsenal FC vs Club Atletico de Madrid",
+                slug="arsenal-atletico",
+                markets=[
+                    _market_payload(
+                        market_id="remote-soccer-draw",
+                        question=question,
+                        slug="arsenal-atletico-draw",
+                        prices=["0.23", "0.77"],
+                    )
+                ],
+            )
+        ]
+    )
+
+    summary = create_snapshots_from_discovery_pricing(
+        db_session,
+        client=client,  # type: ignore[arg-type]
+        sport="soccer",
+        days=7,
+        limit=10,
+        dry_run=True,
+        max_snapshots=3,
+        now=NOW,
+    )
+
+    assert summary.would_create == 1
+    assert summary.snapshots_created == 0
+    assert summary.items[0].market_shape == "yes_no_generic"
+    assert summary.items[0].yes_price == Decimal("0.2300")
+    assert db_session.scalar(select(func.count()).select_from(MarketSnapshot)) == before_snapshots
+
+
+def test_discovery_snapshot_apply_creates_soccer_draw_snapshot(db_session: Session) -> None:
+    question = "Will FC Bayern Munchen vs. Paris Saint-Germain FC end in a draw?"
+    market = _create_local_market(
+        db_session,
+        remote_id="remote-soccer-draw-apply",
+        slug="bayern-psg-draw",
+        question=question,
+        sport_type="soccer",
+        market_type="yes_no_generic",
+    )
+    client = FakeGammaClient(
+        [
+            _event_payload(
+                event_id="event-soccer-draw-apply",
+                title="FC Bayern Munchen vs Paris Saint-Germain FC",
+                slug="bayern-psg",
+                markets=[
+                    _market_payload(
+                        market_id="remote-soccer-draw-apply",
+                        question=question,
+                        slug="bayern-psg-draw",
+                        prices=["0.24", "0.76"],
+                    )
+                ],
+            )
+        ]
+    )
+
+    summary = create_snapshots_from_discovery_pricing(
+        db_session,
+        client=client,  # type: ignore[arg-type]
+        sport="soccer",
+        days=7,
+        limit=10,
+        dry_run=False,
+        max_snapshots=3,
+        now=NOW,
+    )
+    snapshot = db_session.scalar(
+        select(MarketSnapshot).where(MarketSnapshot.market_id == market.id)
+    )
+
+    assert summary.snapshots_created == 1
+    assert snapshot is not None
+    assert snapshot.yes_price == Decimal("0.2400")
+    assert snapshot.no_price == Decimal("0.7600")
+
+
+def test_discovery_snapshot_keeps_soccer_player_prop_out_of_primary_snapshots(
+    db_session: Session,
+) -> None:
+    question = "Will Bukayo Saka score over 1.5 shots on target?"
+    _create_local_market(
+        db_session,
+        remote_id="remote-soccer-prop",
+        slug="bukayo-saka-shots",
+        question=question,
+        sport_type="soccer",
+        market_type="player_prop",
+    )
+    client = FakeGammaClient(
+        [
+            _event_payload(
+                event_id="event-soccer-prop",
+                title="Arsenal FC vs Club Atletico de Madrid player props",
+                slug="arsenal-atletico-player-props",
+                markets=[
+                    _market_payload(
+                        market_id="remote-soccer-prop",
+                        question=question,
+                        slug="bukayo-saka-shots",
+                        prices=["0.52", "0.48"],
+                    )
+                ],
+            )
+        ]
+    )
+
+    summary = create_snapshots_from_discovery_pricing(
+        db_session,
+        client=client,  # type: ignore[arg-type]
+        sport="soccer",
+        days=7,
+        limit=10,
+        dry_run=False,
+        max_snapshots=3,
+        now=NOW,
+    )
+
+    assert summary.local_candidates == 0
+    assert summary.snapshots_created == 0
+    assert summary.snapshots_skipped == 1
+    assert summary.items[0].reason == "not_match_winner_focus"
+
+
 def test_discovery_snapshot_ignores_remote_market_without_local_match(
     db_session: Session,
 ) -> None:
@@ -502,7 +644,15 @@ def _market_payload(
     }
 
 
-def _create_local_market(db_session: Session, *, remote_id: str, slug: str) -> Market:
+def _create_local_market(
+    db_session: Session,
+    *,
+    remote_id: str,
+    slug: str,
+    question: str = "Lakers vs Warriors",
+    sport_type: str = "nba",
+    market_type: str = "match_winner",
+) -> Market:
     event = Event(
         polymarket_event_id=f"snapshot-event-{remote_id}",
         title=f"Snapshot Event {remote_id}",
@@ -518,14 +668,14 @@ def _create_local_market(db_session: Session, *, remote_id: str, slug: str) -> M
     market = Market(
         polymarket_market_id=remote_id,
         event_id=event.id,
-        question="Lakers vs Warriors",
+        question=question,
         slug=slug,
         condition_id=f"0x{remote_id}",
         clob_token_ids=[f"{remote_id}-yes", f"{remote_id}-no"],
         yes_token_id=f"{remote_id}-yes",
         no_token_id=f"{remote_id}-no",
-        sport_type="nba",
-        market_type="match_winner",
+        sport_type=sport_type,
+        market_type=market_type,
         active=True,
         closed=False,
         end_date=NOW + timedelta(days=2),

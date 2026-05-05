@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+import re
 from typing import Any
 
 from sqlalchemy import func, or_, select
@@ -307,7 +308,7 @@ def _build_snapshot_item(
         include_futures=False,
         focus=DEFAULT_FOCUS,
     )
-    if unsupported_reason is not None:
+    if unsupported_reason is not None and not _is_allowed_soccer_draw_snapshot(item, question=question):
         return _skip(item, unsupported_reason)
     if latest_snapshot is not None and latest_snapshot.yes_price is not None and latest_snapshot.no_price is not None:
         return _skip(item, "already_has_local_prices")
@@ -464,9 +465,27 @@ def _skip(
 
 def _include_skipped_item(item: DiscoverySnapshotItem) -> bool:
     return item.reason in {
+        "not_match_winner_focus",
         "remote_payload_missing_binary_prices",
         "max_snapshots_reached",
     }
+
+
+def _is_allowed_soccer_draw_snapshot(item: DiscoverySnapshotItem, *, question: str) -> bool:
+    return bool(
+        item.sport == "soccer"
+        and item.market_shape == "yes_no_generic"
+        and _teams_from_draw_title(question)
+    )
+
+
+def _teams_from_draw_title(title: str) -> list[str]:
+    match = re.match(
+        r"^Will\s+(.+?)\s+vs\.?\s+(.+?)\s+end in a draw\?$",
+        title,
+        flags=re.IGNORECASE,
+    )
+    return [match.group(1).strip(), match.group(2).strip()] if match else []
 
 
 def _normalize_probability(value: Decimal | None) -> Decimal | None:
