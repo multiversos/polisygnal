@@ -37,8 +37,23 @@ function jsonResponse(payload: object, status: number): Response {
     status,
     headers: {
       "Cache-Control": "no-store",
+      "X-PolySignal-Proxy": "enabled",
     },
   });
+}
+
+function methodNotAllowed(): Response {
+  return Response.json(
+    { error: "method_not_allowed" },
+    {
+      status: 405,
+      headers: {
+        Allow: "GET",
+        "Cache-Control": "no-store",
+        "X-PolySignal-Proxy": "enabled",
+      },
+    },
+  );
 }
 
 function buildBackendPath(pathSegments: string[]): string | null {
@@ -91,6 +106,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
       headers: {
         "Cache-Control": "no-store",
         "Content-Type": upstream.headers.get("content-type") || "application/json",
+        "X-PolySignal-Proxy": "enabled",
       },
     });
   } catch (error) {
@@ -102,4 +118,20 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export function POST(): Response {
+  return methodNotAllowed();
+}
+
+export function PUT(): Response {
+  return methodNotAllowed();
+}
+
+export function PATCH(): Response {
+  return methodNotAllowed();
+}
+
+export function DELETE(): Response {
+  return methodNotAllowed();
 }
