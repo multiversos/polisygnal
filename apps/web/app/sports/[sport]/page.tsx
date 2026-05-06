@@ -24,6 +24,7 @@ import {
   fetchApiJson,
   friendlyApiError,
 } from "../../lib/api";
+import { deriveMarketLifecycle } from "../../lib/marketLifecycle";
 
 type PolySignalScore = {
   score_probability?: string | number | null;
@@ -43,6 +44,8 @@ type UpcomingSportsMarket = {
   market_slug?: string | null;
   sport: string;
   market_shape: string;
+  active?: boolean | null;
+  closed?: boolean | null;
   close_time?: string | null;
   event_time?: string | null;
   market_yes_price?: string | number | null;
@@ -52,6 +55,8 @@ type UpcomingSportsMarket = {
   urgency_score?: string | number | null;
   reasons?: string[];
   warnings?: string[];
+  has_snapshot?: boolean;
+  has_prediction?: boolean;
   polysignal_score?: PolySignalScore | null;
 };
 
@@ -103,6 +108,8 @@ type MarketOverviewItem = {
     event_slug?: string | null;
     market_slug?: string | null;
     remote_id?: string | null;
+    active?: boolean | null;
+    closed?: boolean | null;
   } | null;
   latest_snapshot?: {
     yes_price?: string | number | null;
@@ -278,6 +285,8 @@ function mapOverviewItem(item: MarketOverviewItem): UpcomingSportsMarket | null 
     market_slug: market.market_slug,
     sport: market.sport_type || "unknown",
     market_shape: market.market_type || "match_winner",
+    active: market.active,
+    closed: market.closed,
     close_time: market.close_time ?? market.end_date ?? null,
     event_time: market.close_time ?? market.end_date ?? null,
     market_yes_price: snapshot.yes_price,
@@ -286,6 +295,8 @@ function mapOverviewItem(item: MarketOverviewItem): UpcomingSportsMarket | null 
     volume: snapshot.volume,
     urgency_score: prediction?.action_score ?? item.priority_rank ?? null,
     warnings: item.priority_bucket ? [item.priority_bucket] : [],
+    has_snapshot: Boolean(item.latest_snapshot),
+    has_prediction: Boolean(item.latest_prediction),
     polysignal_score: prediction
       ? {
           score_probability: prediction.yes_probability,
@@ -300,16 +311,42 @@ function mapOverviewItem(item: MarketOverviewItem): UpcomingSportsMarket | null 
 }
 
 function buildQualityItem(market: UpcomingSportsMarket): UpcomingDataQualityItem {
+  const lifecycle = deriveSportsMarketLifecycle(market);
+  const warnings = new Set(market.warnings ?? []);
+  if (lifecycle.status === "missed_live_snapshot") {
+    warnings.add("Sin snapshot en vivo");
+  } else if (lifecycle.isExpired) {
+    warnings.add("Cerrado");
+  }
   return {
     market_id: market.market_id,
-    quality_label: market.polysignal_score ? "Completo" : "Parcial",
+    quality_label:
+      lifecycle.status === "missed_live_snapshot"
+        ? "Sin snapshot en vivo"
+        : market.polysignal_score
+          ? "Completo"
+          : "Parcial",
     has_snapshot: market.market_yes_price !== null && market.market_yes_price !== undefined,
     has_yes_price: market.market_yes_price !== null && market.market_yes_price !== undefined,
     has_no_price: market.market_no_price !== null && market.market_no_price !== undefined,
     has_polysignal_score: Boolean(market.polysignal_score),
     missing_fields: [],
-    warnings: market.warnings ?? [],
+    warnings: Array.from(warnings),
   };
+}
+
+function deriveSportsMarketLifecycle(market: UpcomingSportsMarket) {
+  return deriveMarketLifecycle({
+    active: market.active,
+    closed: market.closed,
+    close_time: market.close_time,
+    end_date: market.event_time,
+    question: market.question,
+    event_slug: market.event_slug,
+    market_slug: market.market_slug,
+    latest_snapshot: market.has_snapshot ? true : null,
+    latest_prediction: market.has_prediction ? true : null,
+  });
 }
 
 function PolySignalMiniScore({
@@ -381,13 +418,17 @@ function SportMarketCard({
   dataQuality?: UpcomingDataQualityItem;
   market: UpcomingSportsMarket;
 }) {
+  const lifecycle = deriveSportsMarketLifecycle(market);
   return (
-    <article className="sports-market-card">
+    <article className={`sports-market-card ${lifecycle.isExpired ? "is-expired" : ""}`}>
       <div className="sports-market-card-header">
         <div className="badge-row">
           <span className="candidate-id">#{market.market_id}</span>
           <span className="badge">{formatMarketShape(market.market_shape)}</span>
           <span className="badge muted">Cierra {formatDateTime(market.close_time)}</span>
+          {lifecycle.status !== "live" && lifecycle.status !== "unknown" ? (
+            <span className="warning-chip">{lifecycle.label}</span>
+          ) : null}
         </div>
         <span className="urgency-pill medium">{formatScore(market.urgency_score)}</span>
       </div>
@@ -436,7 +477,7 @@ type ParsedSoccerQuestion =
   | { kind: "exact_score"; homeTeam: string; awayTeam: string; date: string | null }
   | { kind: "exact_other"; date: string | null }
   | { kind: "halftime"; team: string; date: string | null }
-  | { kind: "draw"; date: string | null }
+  | { kind: "draw"; homeTeam: string | null; awayTeam: string | null; date: string | null }
   | { kind: "unknown"; date: string | null };
 
 type SoccerMatch = {
@@ -517,8 +558,17 @@ function parseSoccerQuestion(question: string): ParsedSoccerQuestion {
   if (halftime) {
     return { kind: "halftime", team: halftime[1].trim(), date };
   }
+  const drawMatchup = question.match(/^Will\s+(.+?)\s+vs\.?\s+(.+?)\s+end in a draw\?$/i);
+  if (drawMatchup) {
+    return {
+      kind: "draw",
+      homeTeam: drawMatchup[1].trim(),
+      awayTeam: drawMatchup[2].trim(),
+      date,
+    };
+  }
   if (/\bdraw\b|\bempate\b/i.test(question)) {
-    return { kind: "draw", date };
+    return { kind: "draw", homeTeam: null, awayTeam: null, date };
   }
   return { kind: "unknown", date };
 }
@@ -584,6 +634,25 @@ function findMatchForTeam(matches: SoccerMatch[], team: string): SoccerMatch | n
   );
 }
 
+function findMatchForTeams(
+  matches: SoccerMatch[],
+  homeTeam: string | null,
+  awayTeam: string | null,
+): SoccerMatch | null {
+  if (!homeTeam || !awayTeam) {
+    return null;
+  }
+  const left = normalizeTeamName(homeTeam);
+  const right = normalizeTeamName(awayTeam);
+  return (
+    matches.find((match) => {
+      const home = normalizeTeamName(match.homeTeam);
+      const away = normalizeTeamName(match.awayTeam);
+      return (home === left && away === right) || (home === right && away === left);
+    }) ?? null
+  );
+}
+
 function applyWinMarket(match: SoccerMatch, market: UpcomingSportsMarket, team: string) {
   const key = normalizeTeamName(team);
   if (normalizeTeamName(match.homeTeam) === key) {
@@ -646,7 +715,7 @@ function buildSoccerMatches(markets: UpcomingSportsMarket[]): SoccerMatch[] {
       return;
     }
     if (parsed.kind === "draw") {
-      const fallback = matches[0];
+      const fallback = findMatchForTeams(matches, parsed.homeTeam, parsed.awayTeam) ?? matches[0];
       if (fallback) {
         fallback.draw = market;
         pushUniqueMarket(fallback, market);
@@ -706,6 +775,10 @@ function buildSoccerMatches(markets: UpcomingSportsMarket[]): SoccerMatch[] {
 }
 
 function matchIsInThreeDayWindow(match: SoccerMatch): boolean {
+  const lifecycle = deriveSoccerMatchLifecycle(match);
+  if (!lifecycle.isReviewableLive) {
+    return false;
+  }
   if (match.dateSource !== "market" || !match.date) {
     return true;
   }
@@ -715,6 +788,26 @@ function matchIsInThreeDayWindow(match: SoccerMatch): boolean {
   limit.setDate(limit.getDate() + 3);
   const matchDate = new Date(`${match.date}T12:00:00`);
   return matchDate >= today && matchDate < limit;
+}
+
+function deriveSoccerMatchLifecycle(match: SoccerMatch) {
+  const lifecycles = match.markets.map(deriveSportsMarketLifecycle);
+  const reviewable = lifecycles.some((lifecycle) => lifecycle.isReviewableLive);
+  if (reviewable) {
+    return {
+      ...(lifecycles[0] ?? deriveMarketLifecycle({})),
+      status: "live" as const,
+      label: "Próximo partido",
+      detail: "Partido vivo o futuro.",
+      isExpired: false,
+      isReviewableLive: true,
+    };
+  }
+  const missed = lifecycles.find((lifecycle) => lifecycle.status === "missed_live_snapshot");
+  if (missed) {
+    return missed;
+  }
+  return lifecycles[0] ?? deriveMarketLifecycle({});
 }
 
 function formatMatchDay(date: string | null): string {
@@ -746,12 +839,22 @@ function formatMatchDay(date: string | null): string {
 
 function buildSoccerSchedule(markets: UpcomingSportsMarket[]): SoccerScheduleSection[] {
   const sections = new Map<string, SoccerMatch[]>();
-  buildSoccerMatches(markets)
-    .filter(matchIsInThreeDayWindow)
-    .forEach((match) => {
-      const label = formatMatchDay(match.date);
-      sections.set(label, [...(sections.get(label) ?? []), match]);
-    });
+  const closedMatches: SoccerMatch[] = [];
+  buildSoccerMatches(markets).forEach((match) => {
+    const lifecycle = deriveSoccerMatchLifecycle(match);
+    if (!lifecycle.isReviewableLive) {
+      closedMatches.push(match);
+      return;
+    }
+    if (!matchIsInThreeDayWindow(match)) {
+      return;
+    }
+    const label = formatMatchDay(match.date);
+    sections.set(label, [...(sections.get(label) ?? []), match]);
+  });
+  if (closedMatches.length > 0) {
+    sections.set("Cerrados", closedMatches);
+  }
   return Array.from(sections.entries()).map(([label, matches]) => ({
     key: label,
     label,
@@ -788,17 +891,28 @@ function SoccerOutcomePill({
   label: string;
   market?: UpcomingSportsMarket;
 }) {
+  const lifecycle = market ? deriveSportsMarketLifecycle(market) : null;
+  const priceLabel = market ? formatSoccerPrice(market.market_yes_price) : "Sin dato";
+  const displayPrice =
+    lifecycle?.status === "missed_live_snapshot" && priceLabel === "Sin dato"
+      ? "Sin snapshot"
+      : lifecycle?.isExpired && priceLabel === "Sin dato"
+        ? "Cerrado"
+        : priceLabel;
   const content = (
     <>
       <span>{label}</span>
-      <strong>{market ? formatSoccerPrice(market.market_yes_price) : "Sin dato"}</strong>
+      <strong>{displayPrice}</strong>
     </>
   );
   if (!market) {
     return <div className="soccer-outcome-pill missing">{content}</div>;
   }
   return (
-    <Link className="soccer-outcome-pill" href={`/markets/${market.market_id}`}>
+    <Link
+      className={`soccer-outcome-pill ${lifecycle?.isExpired ? "missing" : ""}`}
+      href={`/markets/${market.market_id}`}
+    >
       {content}
     </Link>
   );
@@ -812,10 +926,12 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
   const liquidity = sumMarketMetric(match.markets, "liquidity");
   const volume = sumMarketMetric(match.markets, "volume");
   const hasIncompletePrices = !match.homeWin || !match.awayWin || !match.draw;
+  const lifecycle = deriveSoccerMatchLifecycle(match);
 
   return (
-    <article className="soccer-match-card">
+    <article className={`soccer-match-card ${lifecycle.isExpired ? "is-expired" : ""}`}>
       <div className="soccer-match-meta">
+        <span>{lifecycle.label}</span>
         <span>Fútbol</span>
         <span>{match.dateSource === "question" ? "Fecha inferida" : "Próximo partido"}</span>
         <span>Vol. {formatMetric(volume)}</span>
@@ -839,6 +955,9 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
       <div className="soccer-match-footer">
         <span>{match.markets.length} mercados incluidos</span>
         <span>Liquidez {formatMetric(liquidity)}</span>
+        {lifecycle.status === "missed_live_snapshot" ? (
+          <span className="warning-chip">Sin snapshot en vivo</span>
+        ) : null}
         {hasIncompletePrices ? <span className="warning-chip">Mercado incompleto</span> : null}
         {analysisMarketId ? (
           <Link className="analysis-link" href={`/markets/${analysisMarketId}`}>

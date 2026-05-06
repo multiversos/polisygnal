@@ -33,14 +33,14 @@ def list_markets_for_overview(
     market_type: str | None,
     active: bool | None,
 ) -> list[Market]:
-    stmt = select(Market).order_by(Market.id.asc())
+    stmt = select(Market).options(joinedload(Market.event)).order_by(Market.id.asc())
     if sport_type is not None:
         stmt = stmt.where(func.lower(Market.sport_type).in_(_sport_filter_values(sport_type)))
     if market_type is not None:
         stmt = stmt.where(Market.market_type == market_type)
     if active is not None:
         stmt = stmt.where(Market.active.is_(active))
-    return list(db.scalars(stmt).all())
+    return list(db.scalars(stmt).unique().all())
 
 
 def _sport_filter_values(value: str) -> tuple[str, ...]:

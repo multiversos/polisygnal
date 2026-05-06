@@ -9,8 +9,15 @@ from pydantic import BaseModel, ConfigDict, Field
 class PredictionMarketSummary(BaseModel):
     id: int
     question: str
+    remote_id: str | None = None
+    event_id: int | None = None
+    event_title: str | None = None
+    event_slug: str | None = None
+    market_slug: str | None = None
     sport_type: str | None = None
     market_type: str | None = None
+    close_time: datetime | None = None
+    end_date: datetime | None = None
     evidence_eligible: bool
     evidence_shape: str
     evidence_skip_reason: str | None = None

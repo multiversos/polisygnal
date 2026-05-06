@@ -40,6 +40,7 @@ import type {
   MarketOverviewItem,
   MarketOverviewResponse,
 } from "./lib/marketOverview";
+import { deriveMarketLifecycle } from "./lib/marketLifecycle";
 
 type HealthResponse = {
   status?: string;
@@ -1286,11 +1287,30 @@ function compareOverviewItems(a: MarketOverviewItem, b: MarketOverviewItem): num
   );
 }
 
+function getOverviewLifecycle(item: MarketOverviewItem) {
+  const market = item.market ?? {};
+  return deriveMarketLifecycle({
+    active: market.active,
+    closed: market.closed,
+    close_time: market.close_time,
+    end_date: market.end_date,
+    question: market.question,
+    event_slug: market.event_slug,
+    market_slug: market.market_slug,
+    latest_snapshot: item.latest_snapshot,
+    latest_prediction: item.latest_prediction,
+  });
+}
+
 function getOverviewBucketKey(item: MarketOverviewItem): MarketOverviewBucketKey {
   const prediction = item.latest_prediction;
   const backendBucket = (item.priority_bucket ?? "").toLowerCase();
   const scoringMode = (item.scoring_mode ?? "").toLowerCase();
+  const lifecycle = getOverviewLifecycle(item);
 
+  if (!prediction && lifecycle.status === "missed_live_snapshot") {
+    return "data-only";
+  }
   if (!prediction || backendBucket === "no_prediction" || scoringMode === "no_prediction") {
     return "no-prediction";
   }
@@ -1370,6 +1390,21 @@ function getOverviewStatus(item: MarketOverviewItem): {
   tone: string;
   detail: string;
 } {
+  const lifecycle = getOverviewLifecycle(item);
+  if (lifecycle.status === "missed_live_snapshot") {
+    return {
+      label: "Sin snapshot en vivo",
+      tone: "neutral",
+      detail: "Mercado vencido; no se scorea retroactivamente",
+    };
+  }
+  if (lifecycle.status === "closed" || lifecycle.status === "expired") {
+    return {
+      label: "Cerrado",
+      tone: "neutral",
+      detail: "Dato historico, fuera de revision activa",
+    };
+  }
   const bucketKey = getOverviewBucketKey(item);
   const bucket = getOverviewBucketDefinition(bucketKey);
   if (bucketKey === "no-prediction") {

@@ -6,6 +6,7 @@ from typing import Literal
 
 from sqlalchemy.orm import Session
 
+from app.models.market import Market
 from app.repositories.evidence_items import MarketEvidenceSummary, summarize_evidence_for_markets
 from app.repositories.markets import list_markets_for_overview
 from app.repositories.market_snapshots import list_latest_market_snapshots_for_markets
@@ -83,7 +84,7 @@ def build_markets_overview(
             MarketOverviewItem(
                 priority_bucket=priority_bucket,
                 scoring_mode=scoring_mode,
-                market=PredictionMarketSummary.model_validate(market),
+                market=_build_market_summary(market),
                 latest_snapshot=(
                     OverviewSnapshotSummary.model_validate(latest_snapshots[market.id])
                     if market.id in latest_snapshots
@@ -215,6 +216,23 @@ def _resolve_scoring_mode(
 
 def _build_prediction_summary(prediction: object) -> OverviewPredictionSummary:
     return OverviewPredictionSummary.model_validate(prediction)
+
+
+def _build_market_summary(market: Market) -> PredictionMarketSummary:
+    event = market.event
+    end_date = _normalize_datetime(market.end_date)
+    event_end_at = _normalize_datetime(getattr(event, "end_at", None))
+    return PredictionMarketSummary.model_validate(market).model_copy(
+        update={
+            "remote_id": market.polymarket_market_id,
+            "event_id": market.event_id,
+            "event_title": getattr(event, "title", None),
+            "event_slug": getattr(event, "slug", None),
+            "market_slug": market.slug,
+            "close_time": end_date or event_end_at,
+            "end_date": end_date,
+        }
+    )
 
 
 def _normalize_datetime(value: object | None) -> datetime | None:

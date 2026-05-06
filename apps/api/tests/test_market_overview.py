@@ -435,6 +435,51 @@ def test_get_markets_overview_ignores_research_family_predictions(
     assert payload["items"][0]["latest_prediction"]["yes_probability"] == "0.5200"
 
 
+def test_get_markets_overview_exposes_market_event_timing_metadata(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    event_end_at = datetime(2026, 5, 6, 19, 0, tzinfo=UTC)
+    market_end_date = datetime(2026, 5, 6, 18, 30, tzinfo=UTC)
+    market = _create_market(
+        db_session,
+        suffix="overview-metadata",
+        question="Will Arsenal FC vs. Club Atletico de Madrid end in a draw?",
+        sport_type="soccer",
+        market_type="yes_no_generic",
+        event_end_at=event_end_at,
+        market_end_date=market_end_date,
+    )
+    event_only_market = _create_market(
+        db_session,
+        suffix="overview-event-time",
+        question="Will FC Bayern Munchen vs. Paris Saint-Germain FC end in a draw?",
+        sport_type="soccer",
+        market_type="yes_no_generic",
+        event_end_at=event_end_at + timedelta(hours=2),
+    )
+    db_session.commit()
+
+    response = client.get("/markets/overview", params={"sport_type": "soccer"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    by_market_id = {item["market"]["id"]: item["market"] for item in payload["items"]}
+
+    first = by_market_id[market.id]
+    assert first["remote_id"] == market.polymarket_market_id
+    assert first["event_id"] == market.event_id
+    assert first["event_title"] == market.event.title
+    assert first["event_slug"] == market.event.slug
+    assert first["market_slug"] == market.slug
+    assert first["end_date"].startswith("2026-05-06T18:30:00")
+    assert first["close_time"].startswith("2026-05-06T18:30:00")
+
+    second = by_market_id[event_only_market.id]
+    assert second["end_date"] is None
+    assert second["close_time"].startswith("2026-05-06T21:00:00")
+
+
 def _create_market(
     db_session: Session,
     *,
@@ -443,6 +488,8 @@ def _create_market(
     sport_type: str = "nba",
     market_type: str = "winner",
     active: bool = True,
+    event_end_at: datetime | None = None,
+    market_end_date: datetime | None = None,
 ) -> Market:
     event = Event(
         polymarket_event_id=f"event-{suffix}",
@@ -451,6 +498,7 @@ def _create_market(
         slug=f"event-{suffix}",
         active=True,
         closed=False,
+        end_at=event_end_at,
     )
     db_session.add(event)
     db_session.flush()
@@ -464,6 +512,7 @@ def _create_market(
         market_type=market_type,
         active=active,
         closed=False,
+        end_date=market_end_date,
     )
     db_session.add(market)
     db_session.flush()

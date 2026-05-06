@@ -43,7 +43,9 @@ Use these checks after a production deploy. Correct domains:
 3. Open `https://polisygnal-web.vercel.app/sports/basketball`.
 4. Confirm basketball shows a clean empty state, not `Failed to fetch`.
 5. Confirm UFC, cricket, and NHL/Hockey remain disabled and do not navigate as active filters.
-6. Confirm `/sports/soccer` does not show `La API no respondió` or `Datos no disponibles`.
+6. If a soccer market closed before a live snapshot was captured, confirm it is
+   labeled as `Sin snapshot en vivo` or `Cerrado`, not as an active opportunity.
+7. Confirm `/sports/soccer` does not show `La API no respondió` or `Datos no disponibles`.
 
 ## Critical Regression: Soccer Must Render Data
 
@@ -90,7 +92,11 @@ If a normal browser shows `Datos no disponibles` but backend/proxy checks pass:
 
 1. Open `https://polisygnal-web.vercel.app/data-health`.
 2. Confirm the market overview summary shows real counts from `/markets/overview`.
-3. Confirm it clearly states the view is read-only.
+3. Confirm live markets without prediction are separated from expired markets
+   without a live snapshot.
+4. Confirm expired markets without live snapshots are not treated as critical
+   scoring failures; they should not be scored retroactively.
+5. Confirm it clearly states the view is read-only.
 
 ## Modules In Preparation
 

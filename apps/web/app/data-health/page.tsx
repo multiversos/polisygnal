@@ -20,11 +20,19 @@ import {
   type RefreshRuns,
   type SnapshotGaps,
 } from "../lib/dataHealth";
+import { deriveMarketLifecycle } from "../lib/marketLifecycle";
 
 type MarketOverviewHealthItem = {
   scoring_mode?: string | null;
   market?: {
+    active?: boolean | null;
+    closed?: boolean | null;
+    question?: string | null;
     sport_type?: string | null;
+    close_time?: string | null;
+    end_date?: string | null;
+    event_slug?: string | null;
+    market_slug?: string | null;
   } | null;
   latest_snapshot?: {
     captured_at?: string | null;
@@ -165,6 +173,21 @@ function fetchMarketOverviewHealth(): Promise<MarketOverviewHealthResponse> {
   return fetchApiJson<MarketOverviewHealthResponse>("/markets/overview?limit=100");
 }
 
+function getHealthMarketLifecycle(item: MarketOverviewHealthItem) {
+  const market = item.market ?? {};
+  return deriveMarketLifecycle({
+    active: market.active,
+    closed: market.closed,
+    close_time: market.close_time,
+    end_date: market.end_date,
+    question: market.question,
+    event_slug: market.event_slug,
+    market_slug: market.market_slug,
+    latest_snapshot: item.latest_snapshot,
+    latest_prediction: item.latest_prediction,
+  });
+}
+
 function isClosingTooSoon(label?: string | null): boolean {
   return label === "Menos de 1h" || label === "1-6h";
 }
@@ -274,6 +297,14 @@ export default function DataHealthPage() {
   const overviewFallbackOnly = marketOverviewItems.filter(
     (item) => item.scoring_mode === "fallback_only",
   ).length;
+  const overviewLiveMissingPredictions = marketOverviewItems.filter((item) => {
+    const lifecycle = getHealthMarketLifecycle(item);
+    return lifecycle.isReviewableLive && !item.latest_prediction;
+  }).length;
+  const overviewExpiredWithoutSnapshots = marketOverviewItems.filter((item) => {
+    const lifecycle = getHealthMarketLifecycle(item);
+    return lifecycle.status === "missed_live_snapshot";
+  }).length;
   const sportsWithData = new Set(
     marketOverviewItems
       .map((item) => item.market?.sport_type)
@@ -371,6 +402,16 @@ export default function DataHealthPage() {
             <span>Fallback only</span>
             <strong>{loading ? "..." : overviewFallbackOnly}</strong>
             <p>Score informativo o datos parciales</p>
+          </article>
+          <article className="metric-card">
+            <span>Sin predicciÃ³n vivos</span>
+            <strong>{loading ? "..." : overviewLiveMissingPredictions}</strong>
+            <p>Pendientes reales para scoring futuro</p>
+          </article>
+          <article className="metric-card">
+            <span>Vencidos sin snapshot</span>
+            <strong>{loading ? "..." : overviewExpiredWithoutSnapshots}</strong>
+            <p>No se scorean retroactivamente</p>
           </article>
           <article className="metric-card">
             <span>Deportes con datos</span>

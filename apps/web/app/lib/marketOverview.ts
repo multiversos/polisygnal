@@ -1,6 +1,11 @@
 export type MarketOverviewMarket = {
   id?: number;
   question?: string | null;
+  remote_id?: string | null;
+  event_id?: number | null;
+  event_title?: string | null;
+  event_slug?: string | null;
+  market_slug?: string | null;
   sport_type?: string | null;
   market_type?: string | null;
   active?: boolean | null;

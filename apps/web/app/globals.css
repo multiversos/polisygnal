@@ -4270,6 +4270,12 @@ h2 {
   background: var(--surface);
 }
 
+.soccer-match-card.is-expired,
+.sports-market-card.is-expired {
+  border-color: var(--line);
+  background: var(--surface-muted);
+}
+
 .research-run-header {
   display: flex;
   flex-wrap: wrap;
