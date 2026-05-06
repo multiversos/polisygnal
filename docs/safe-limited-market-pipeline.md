@@ -87,6 +87,37 @@ draw availability, `primary_markets`, `secondary_markets_count`, and
 `would_import_markets_count`. Do not switch to `--apply` until the dry-run
 clearly matches the intended upcoming games.
 
+## Soccer Refresh Orchestrator
+
+Use the orchestrator when you want one safe summary instead of manually running
+import, snapshot, and scoring dry-runs one by one:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.refresh_soccer_markets --dry-run --days 7 --pages 5 --max-events 10 --max-import 30 --max-snapshots 30 --score-limit 30 --json --debug-skips
+```
+
+Default behavior is dry-run even if `--dry-run` is omitted. In dry-run, the
+command:
+
+- reads current local counts;
+- runs soccer import discovery in dry-run;
+- reports the backup/delete plan without deleting anything;
+- runs snapshot discovery in dry-run;
+- runs missing-market scoring in dry-run;
+- prints `next_command_to_apply` for a supervised follow-up.
+
+Review `candidate_events`, `candidate_markets`, `snapshot_would_create`, and
+`scoring_candidates` before any apply. The apply command is intentionally
+explicit:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.refresh_soccer_markets --apply --days 7 --pages 5 --max-events 10 --max-import 30 --max-snapshots 30 --score-limit 30 --json --debug-skips
+```
+
+`--delete-existing` is reserved for a future supervised refresh. It must not be
+used until there is a soccer-only backup, an explicit confirmation flow, and a
+tested transaction plan. The current orchestrator refuses to delete data.
+
 ## Snapshot Dry-Run
 
 Only for sports where import dry-run shows viable candidates:
