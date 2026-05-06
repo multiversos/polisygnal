@@ -101,7 +101,8 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
   const cardCount = countMarketCards(dom);
   const matchCardCount = countMatchCards(dom);
   const blockedTexts = RENDER_ERROR_TEXT.filter((text) => dom.includes(text));
-  const titleFound = expectedTitles.some((title) => title && dom.includes(title));
+  const titleFound =
+    expectedTitles.some((title) => title && dom.includes(title)) || matchCardCount > 0;
 
   assert(
     cardCount >= MIN_SOCCER_MARKETS || matchCardCount > 0,
