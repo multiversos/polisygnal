@@ -807,15 +807,15 @@ const warningLabels: Record<string, string> = {
   poor_metadata: "metadata incompleta",
   zero_volume: "volumen cero",
   zero_open_interest: "interés abierto cero",
-  missing_latest_snapshot: "sin snapshot reciente",
-  missing_snapshot: "sin snapshot",
+  missing_latest_snapshot: "sin precio reciente",
+  missing_snapshot: "sin precio reciente",
   missing_price: "faltan precios",
   missing_close_time: "sin fecha de cierre",
   missing_liquidity: "liquidez no disponible",
   missing_volume: "volumen no disponible",
   sport_uncertain: "deporte incierto",
   market_shape_uncertain: "tipo de mercado incierto",
-  polysignal_score_pending: "score pendiente",
+  polysignal_score_pending: "análisis pendiente",
   market_closed: "mercado cerrado",
   no_external_signal: "sin señal externa",
   future_or_championship_market: "mercado futuro/campeonato",
@@ -828,7 +828,7 @@ const warningLabels: Record<string, string> = {
   volume_unknown: "volumen desconocido",
   close_time_past: "cierre pasado",
   close_time_missing: "sin fecha de cierre",
-  snapshot_too_old: "snapshot viejo",
+  snapshot_too_old: "actualización antigua",
   missing_prices: "faltan precios",
   data_quality_insufficient: "calidad insuficiente",
 };
@@ -842,9 +842,9 @@ const freshnessStatusLabels: Record<string, string> = {
 
 const freshnessActionLabels: Record<string, string> = {
   ok: "OK",
-  needs_snapshot: "Necesita snapshot",
+  needs_snapshot: "Necesita actualización",
   review_market: "Revisar mercado",
-  exclude_from_scoring: "Excluir del score",
+  exclude_from_scoring: "Dejar en observación",
 };
 
 const marketTermTranslations: Record<string, string> = {
@@ -1094,7 +1094,7 @@ function formatReadinessStatus(value: string): string {
     return "Listo";
   }
   if (value === "needs_refresh") {
-    return "Necesita refresh";
+    return "Necesita actualización";
   }
   if (value === "blocked") {
     return "Bloqueado";
@@ -1104,10 +1104,10 @@ function formatReadinessStatus(value: string): string {
 
 function formatReadinessAction(value: string): string {
   if (value === "listo_para_research_packet") {
-    return "Listo para Research Packet";
+    return "Listo para revisar";
   }
   if (value === "ejecutar_refresh_snapshot_dry_run") {
-    return "Probar snapshot dry-run";
+    return "Actualizar precios";
   }
   if (value === "revisar_o_descartar_por_ahora") {
     return "Revisar o descartar por ahora";
@@ -1461,10 +1461,10 @@ function getOverviewItemsWithPrediction(items: MarketOverviewItem[]): number {
 
 function formatReadinessSource(value?: string | null): string {
   if (value === "snapshot_from_discovery") {
-    return "Snapshot reciente";
+    return "Precio reciente";
   }
   if (value === "imported_from_discovery") {
-    return "Discovery";
+    return "Mercado importado";
   }
   return "Local";
 }
@@ -1781,7 +1781,7 @@ function DataQualitySummaryPanel({
         <span>Sport=other</span>
         <strong>{getValue("sport_other_count")}</strong>
       </div>
-      <p>El score queda pendiente cuando faltan precios, snapshots o clasificaciÃ³n confiable.</p>
+      <p>La señal queda pendiente cuando faltan precios recientes o clasificación confiable.</p>
     </section>
   );
 }
