@@ -89,7 +89,38 @@ function formatDate(value?: string | null): string {
 }
 
 function formatAlertType(value: string): string {
-  return typeLabels[value] ?? value.replaceAll("_", " ");
+  return publicAlertText(typeLabels[value] ?? value.replaceAll("_", " "));
+}
+
+function publicAlertText(value?: string | null): string {
+  if (!value) {
+    return "";
+  }
+  return value
+    .replace(/\bsnapshots?\b/gi, "precios recientes")
+    .replace(/\bfallback\b/gi, "datos limitados")
+    .replace(/\bmarket[_ ]?overview\b/gi, "mercados visibles")
+    .replace(/\bapi\b/gi, "servicio")
+    .replace(/\bbackend\b/gi, "servicio")
+    .replace(/\bjson\b/gi, "datos")
+    .replace(/\bproxy\b/gi, "conexión")
+    .replace(/\be2e\b/gi, "prueba")
+    .replace(/\bdebug\b/gi, "revisión")
+    .replace(/\bpipeline\b/gi, "proceso")
+    .replace(/\bmarket_type\b/gi, "tipo de mercado");
+}
+
+function formatAlertSource(value?: string | null): string {
+  if (!value) {
+    return "mercados visibles";
+  }
+  if (value.includes("market_overview") || value.includes("overview")) {
+    return "mercados visibles";
+  }
+  if (value.includes("smart") || value.includes("alert")) {
+    return "alertas de PolySignal";
+  }
+  return "mercados visibles";
 }
 
 function buildActionHref(alert: SmartAlert): string | null {
@@ -438,10 +469,11 @@ export default function AlertsPage() {
                       <span className="badge">#{alert.market_id}</span>
                     ) : null}
                   </div>
-                  <h3>{alert.title}</h3>
-                  <p>{alert.description}</p>
+                  <h3>{publicAlertText(alert.title)}</h3>
+                  <p>{publicAlertText(alert.description)}</p>
                   <p className="section-note">
-                    Razón: {alert.reason} · Fuente: {alert.created_from}
+                    Razón: {publicAlertText(alert.reason)} · Fuente:{" "}
+                    {formatAlertSource(alert.created_from)}
                   </p>
                   {actionHref ? (
                     <a className="analysis-link" href={actionHref}>
