@@ -199,17 +199,17 @@ const freshnessStatusLabels: Record<string, string> = {
 
 const freshnessActionLabels: Record<string, string> = {
   ok: "OK",
-  needs_snapshot: "Necesita snapshot",
+  needs_snapshot: "Necesita actualización",
   review_market: "Revisar mercado",
-  exclude_from_scoring: "Excluir del score",
+  exclude_from_scoring: "Dejar en observación",
 };
 
 const freshnessReasonLabels: Record<string, string> = {
-  missing_snapshot: "Sin snapshot",
+  missing_snapshot: "Sin actualización reciente",
   missing_prices: "Faltan precios",
   close_time_past: "Cierre pasado",
   close_time_missing: "Sin fecha de cierre",
-  snapshot_too_old: "Snapshot viejo",
+  snapshot_too_old: "Actualización antigua",
   market_closed: "Mercado cerrado",
   data_quality_insufficient: "Calidad insuficiente",
 };
@@ -854,7 +854,7 @@ export default function DailyBriefingPage() {
                 ["SÍ inicial", formatPercent(mover.first_yes_price)],
                 ["SÍ actual", formatPercent(mover.latest_yes_price)],
                 ["Cambio", formatSignedPoints(mover.change_yes_abs)],
-                ["Snapshots", String(mover.snapshots_count)],
+                ["Actualizaciones", String(mover.snapshots_count)],
               ]}
               note={`${formatDateTime(mover.start_time)} → ${formatDateTime(mover.end_time)}`}
             />
@@ -865,8 +865,8 @@ export default function DailyBriefingPage() {
       <section className="safety-strip">
         <strong>No es recomendación de apuesta.</strong>
         <span>
-          El briefing solo reorganiza datos guardados para revisión manual. No ejecuta research,
-          trading, fetch remoto ni crea predicciones.
+          El resumen diario solo reorganiza mercados disponibles para revisión manual.
+          No ejecuta apuestas automáticas.
         </span>
       </section>
     </main>

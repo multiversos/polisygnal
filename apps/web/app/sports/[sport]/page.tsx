@@ -312,7 +312,7 @@ function buildQualityItem(market: UpcomingSportsMarket): UpcomingDataQualityItem
   const lifecycle = deriveSportsMarketLifecycle(market);
   const warnings = new Set(market.warnings ?? []);
   if (lifecycle.status === "missed_live_snapshot") {
-    warnings.add("Sin snapshot en vivo");
+    warnings.add("Información parcial");
   } else if (lifecycle.isExpired) {
     warnings.add("Cerrado");
   }
@@ -320,7 +320,7 @@ function buildQualityItem(market: UpcomingSportsMarket): UpcomingDataQualityItem
     market_id: market.market_id,
     quality_label:
       lifecycle.status === "missed_live_snapshot"
-        ? "Sin snapshot en vivo"
+        ? "Información parcial"
         : market.polysignal_score
           ? "Completo"
           : "Parcial",
@@ -361,7 +361,7 @@ function PolySignalMiniScore({
         <strong>pendiente</strong>
         <p>
           {dataQuality?.has_snapshot === false || dataQuality?.has_yes_price === false
-            ? "Faltan precios o snapshots para estimar."
+            ? "Faltan precios recientes para estimar."
             : "Faltan datos suficientes para estimar."}
         </p>
       </div>
@@ -387,13 +387,13 @@ function DataQualityMiniBadges({ item }: { item?: UpcomingDataQualityItem }) {
   }
   const badges: string[] = [];
   if (!item.has_snapshot) {
-    badges.push("Sin snapshot");
+    badges.push("Información parcial");
   }
   if (!item.has_yes_price || !item.has_no_price) {
     badges.push("Faltan precios");
   }
   if (!item.has_polysignal_score) {
-    badges.push("Score pendiente");
+    badges.push("Análisis pendiente");
   }
   if (badges.length === 0) {
     badges.push(item.quality_label);
@@ -910,7 +910,7 @@ function SoccerOutcomePill({
   const priceLabel = market ? formatSoccerPrice(market.market_yes_price) : "Sin dato";
   const displayPrice =
     lifecycle?.status === "missed_live_snapshot" && priceLabel === "Sin dato"
-      ? "Sin snapshot"
+      ? "Información parcial"
       : lifecycle?.isExpired && priceLabel === "Sin dato"
         ? "Cerrado"
         : priceLabel;
@@ -971,9 +971,9 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
         <span>{match.markets.length} mercados incluidos</span>
         <span>Liquidez {formatMetric(liquidity)}</span>
         {lifecycle.status === "missed_live_snapshot" ? (
-          <span className="warning-chip">Sin snapshot en vivo</span>
+          <span className="warning-chip">Información parcial</span>
         ) : null}
-        {hasIncompletePrices ? <span className="warning-chip">Mercado incompleto</span> : null}
+        {hasIncompletePrices ? <span className="warning-chip">Información parcial</span> : null}
         {analysisMarketId ? (
           <Link className="analysis-link" href={`/markets/${analysisMarketId}`}>
             Ver análisis
@@ -1089,7 +1089,7 @@ export default function SportDetailPage() {
       setState((current) => ({
         ...current,
         loading: false,
-        error: `${friendlyApiError(error, `datos de ${sportOption.label}`)} Ruta consultada: ${overviewPath}`,
+        error: `No pudimos actualizar ${sportOption.label}. Intenta de nuevo en unos segundos.`,
       }));
     }
   }, [sportIsEnabled, sportOption]);

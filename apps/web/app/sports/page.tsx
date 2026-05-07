@@ -15,9 +15,9 @@ const sportDescriptions: Record<string, string> = {
   tennis: "Cruces de tenis ATP/WTA y torneos principales.",
   baseball: "Béisbol y mercados de ganador de partido.",
   horse_racing: "Carreras de caballos y mercados de ganador de carrera.",
-  ufc: "UFC/MMA se activará cuando el pipeline tenga soporte operativo.",
-  cricket: "Críquet se mantiene visible como categoría futura.",
-  nhl: "Hockey/NHL queda pausado hasta activar datos dedicados.",
+  ufc: "UFC/MMA estará disponible más adelante.",
+  cricket: "Críquet estará disponible más adelante.",
+  nhl: "Hockey/NHL estará disponible más adelante.",
 };
 
 export default function SportsIndexPage() {
@@ -29,8 +29,8 @@ export default function SportsIndexPage() {
           <p className="eyebrow">Deportes</p>
           <h1>Deportes en PolySignal</h1>
           <p className="subtitle">
-            Vista por deporte de mercados próximos. En esta etapa priorizamos
-            partidos de los próximos 7 días y ganador/perdedor del partido.
+            Vista sencilla por deporte. Hoy priorizamos partidos cercanos y
+            mercados con precios activos.
           </p>
         </div>
       </header>

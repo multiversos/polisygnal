@@ -32,7 +32,6 @@ import {
 } from "./lib/smartAlerts";
 import {
   API_BASE_URL,
-  API_HOST_LABEL,
   buildBackendApiPath,
   DEFAULT_REQUEST_TIMEOUT_MS,
 } from "./lib/api";
@@ -1133,26 +1132,26 @@ function getMarketOverviewItems(overview: MarketOverviewResponse | null): Market
 
 function overviewBucketLabel(value?: string | null): string {
   if (!value) {
-    return "Sin bucket";
+    return "Sin clasificar";
   }
   const labels: Record<string, string> = {
     priority: "Oportunidad",
     watchlist: "Vigilancia",
     review_fallback: "Baja confianza",
-    fallback_only: "Solo datos",
-    no_prediction: "Sin predicción",
+    fallback_only: "Datos limitados",
+    no_prediction: "Sin análisis",
   };
   return labels[value] ?? humanizeToken(value);
 }
 
 function overviewScoringModeLabel(value?: string | null): string {
   if (!value) {
-    return "Sin modo";
+    return "Sin análisis";
   }
   const labels: Record<string, string> = {
-    evidence_backed: "Con evidencia",
-    fallback_only: "Solo snapshot",
-    no_prediction: "Sin predicción",
+    evidence_backed: "Análisis completo",
+    fallback_only: "Datos limitados",
+    no_prediction: "Sin análisis",
   };
   return labels[value] ?? humanizeToken(value);
 }
@@ -1163,31 +1162,31 @@ const marketOverviewBucketDefinitions: Array<
   {
     key: "opportunity",
     title: "Mejores oportunidades",
-    description: "Señales con mejor combinación de score, confianza y precio para revisar primero.",
+    description: "Mercados con mejor combinación de señal, confianza y precio para revisar primero.",
     tone: "opportunity",
   },
   {
     key: "watchlist",
-    title: "Watchlist",
-    description: "Mercados con score medio, edge interesante o movimiento que merece seguimiento.",
+    title: "Vigilancia",
+    description: "Mercados con lectura media o movimiento que merece seguimiento.",
     tone: "watchlist",
   },
   {
     key: "low-confidence",
     title: "Baja confianza",
-    description: "Hay predicción, pero los datos disponibles todavía no sostienen una lectura fuerte.",
+    description: "Hay análisis, pero los datos disponibles todavía no sostienen una lectura fuerte.",
     tone: "low-confidence",
   },
   {
     key: "data-only",
-    title: "Solo datos",
-    description: "Mercados con precios y snapshots útiles, sin una señal accionable por ahora.",
+    title: "En observación",
+    description: "Mercados con precios útiles, sin una señal fuerte por ahora.",
     tone: "data-only",
   },
   {
     key: "no-prediction",
-    title: "Sin predicción",
-    description: "Mercados pendientes de scoring; se muestran para contexto, no para priorizar.",
+    title: "Sin análisis",
+    description: "Mercados pendientes de análisis; se muestran como contexto.",
     tone: "neutral",
   },
 ];
@@ -1197,11 +1196,11 @@ const dashboardReviewFilters: Array<{
   label: string;
 }> = [
   { key: "all", label: "Todos" },
-  { key: "with-prediction", label: "Con predicción" },
+  { key: "with-prediction", label: "Analizados" },
   { key: "opportunity", label: "Solo oportunidades" },
   { key: "watchlist", label: "Solo vigilancia" },
   { key: "low-confidence", label: "Baja confianza" },
-  { key: "data-only", label: "Solo datos" },
+  { key: "data-only", label: "En observación" },
 ];
 
 function getOverviewScoreValue(item: MarketOverviewItem): number | null {
@@ -1371,9 +1370,9 @@ function getOverviewStatus(item: MarketOverviewItem): {
   const lifecycle = getOverviewLifecycle(item);
   if (lifecycle.status === "missed_live_snapshot") {
     return {
-      label: "Sin snapshot en vivo",
+      label: "Información parcial",
       tone: "neutral",
-      detail: "Mercado vencido; no se scorea retroactivamente",
+      detail: "Mercado vencido; se mantiene solo como referencia",
     };
   }
   if (lifecycle.status === "closed" || lifecycle.status === "expired") {
@@ -1387,9 +1386,9 @@ function getOverviewStatus(item: MarketOverviewItem): {
   const bucket = getOverviewBucketDefinition(bucketKey);
   if (bucketKey === "no-prediction") {
     return {
-      label: "Sin predicción",
+      label: "Sin análisis",
       tone: "neutral",
-      detail: "Pendiente de scoring",
+      detail: "Pendiente de análisis",
     };
   }
   if (bucketKey === "opportunity") {
@@ -1675,7 +1674,7 @@ function getScorePendingMessage(dataQuality?: UpcomingDataQualityItem | null): s
     missingFields.has("yes_price") ||
     missingFields.has("no_price")
   ) {
-    return "Faltan precios o snapshots para estimar.";
+    return "Faltan precios recientes para estimar.";
   }
   if (missingFields.has("sport") || missingFields.has("market_shape")) {
     return "Falta clasificaciÃ³n confiable para estimar.";
@@ -1697,13 +1696,13 @@ function DataQualityBadges({
     badges.push("Faltan precios");
   }
   if (!dataQuality.has_snapshot) {
-    badges.push("Sin snapshot");
+    badges.push("Información parcial");
   }
   if (dataQuality.sport === "other" || dataQuality.missing_fields.includes("sport")) {
     badges.push("Deporte incierto");
   }
   if (!dataQuality.has_polysignal_score) {
-    badges.push("Score pendiente");
+    badges.push("Análisis pendiente");
   }
 
   if (badges.length === 0) {
@@ -1775,7 +1774,7 @@ function DataQualitySummaryPanel({
         <strong>{getValue("missing_price_count")}</strong>
       </div>
       <div>
-        <span>Sin snapshots</span>
+        <span>Sin actualización</span>
         <strong>{getValue("missing_snapshot_count")}</strong>
       </div>
       <div>
@@ -1909,11 +1908,11 @@ function PolySignalScoreCard({
         <span>Diferencia: {formatPercentPoints(score.edge_percent_points)}</span>
         <span>Confianza: {score.confidence_label}</span>
       </div>
-      {!compact ? <p>{score.label}</p> : null}
+      {!compact ? <p>Lectura informativa</p> : null}
       {score.warnings?.length ? (
         <span className="polysignal-score-warning">
           {score.warnings.includes("low_confidence") || score.confidence_label === "Baja"
-            ? "Score preliminar"
+            ? "Lectura preliminar"
             : "Estimación informativa"}
         </span>
       ) : null}
@@ -2031,20 +2030,20 @@ function SmartAlertsPanel({
         <div>
           <h2>Alertas inteligentes</h2>
           <p>
-            Recordatorios operativos calculados desde datos existentes. No son
+            Recordatorios simples calculados desde mercados visibles. No son
             recomendaciones de apuesta.
           </p>
         </div>
       </div>
       <div className="smart-alert-counts">
         <span>Info {loading ? "..." : counts?.info ?? 0}</span>
-        <span>Warning {loading ? "..." : counts?.warning ?? 0}</span>
+        <span>Avisos {loading ? "..." : counts?.warning ?? 0}</span>
         <span>Críticas {loading ? "..." : counts?.critical ?? 0}</span>
       </div>
       {loading ? (
         <div className="empty-state compact">Cargando alertas...</div>
       ) : alerts.length === 0 ? (
-        <div className="empty-state compact">No hay alertas operativas con los filtros actuales.</div>
+        <div className="empty-state compact">No hay alertas importantes por ahora.</div>
       ) : (
         <div className="smart-alert-list">
           {alerts.slice(0, 6).map((alert) => (
@@ -2084,7 +2083,7 @@ function WatchlistPanel({
     <section className="panel watchlist-panel" id="mi-seguimiento" aria-label="Mi lista de seguimiento">
       <div className="panel-heading">
         <div>
-          <h2>Mi lista de seguimiento</h2>
+          <h2>Mi lista</h2>
           <p>
             Mercados guardados manualmente para revisar después. No es una
             recomendación de apuesta.
@@ -2094,15 +2093,21 @@ function WatchlistPanel({
 
       {error ? (
         <div className="alert-panel compact" role="status">
-          <strong>No se pudo actualizar seguimiento</strong>
+          <strong>No se pudo actualizar tu lista</strong>
           <span>{error}</span>
         </div>
       ) : null}
 
       {loading ? (
-        <div className="empty-state compact">Cargando lista de seguimiento...</div>
+        <div className="empty-state compact">Cargando tu lista...</div>
       ) : items.length === 0 ? (
-        <div className="empty-state compact">No tienes mercados en seguimiento todavía.</div>
+        <div className="empty-state compact">
+          <strong>Todavía no tienes mercados guardados.</strong>
+          <p>Cuando sigas un mercado, aparecerá aquí.</p>
+          <a className="analysis-link" href="/sports">
+            Explorar mercados deportivos
+          </a>
+        </div>
       ) : (
         <div className="watchlist-card-grid">
           {items.map((item) => {
@@ -2488,7 +2493,7 @@ function MarketOverviewPanel({
           <strong>{loading ? "..." : filteredItems.length}</strong>
         </div>
         <div>
-          <span>Con predicción</span>
+          <span>Analizados</span>
           <strong>{loading ? "..." : withPrediction}</strong>
         </div>
         <div>
@@ -2530,16 +2535,15 @@ function MarketOverviewPanel({
               : `Todavía no hay mercados cargados para ${sportLabel}.`}
           </strong>
           <p>
-            Ejecuta el pipeline limitado para poblar este deporte. La pantalla
-            queda en modo solo lectura y no dispara imports, discovery ni scoring.
+            Aún no hay mercados activos para este deporte. Cuando aparezcan
+            mercados disponibles, los verás aquí.
           </p>
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="empty-state">
           <strong>No hay mercados en el filtro {selectedFilterLabel}.</strong>
           <p>
-            Cambia el filtro de revisión para ver otros mercados cargados. Este
-            filtro es local y no dispara llamadas nuevas al backend.
+            Cambia el filtro de revisión para ver otros mercados cargados.
           </p>
         </div>
       ) : (
@@ -2620,7 +2624,7 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
       <div className="market-overview-card-readout">
         <strong>{status.detail}</strong>
         <span>
-          Cierre: {closeLabel} | Snapshot: {snapshotLabel}
+          Cierre: {closeLabel} | Última actualización: {snapshotLabel}
         </span>
       </div>
 
@@ -2648,7 +2652,7 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
           <strong>{modelProbability === "--" ? "No calculado" : modelProbability}</strong>
         </div>
         <div className="market-overview-metric primary">
-          <span>Score revisión</span>
+          <span>Señal</span>
           <strong>{actionScore === "--" ? "Pendiente" : actionScore}</strong>
         </div>
         <div className="market-overview-metric">
@@ -2656,18 +2660,18 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
           <strong>{confidence === "--" ? "Pendiente" : confidence}</strong>
         </div>
         <div className="market-overview-metric">
-          <span>Edge</span>
+          <span>Diferencia</span>
           <strong>{edge === "N/D" ? "Sin dato" : edge}</strong>
         </div>
       </div>
 
       <div className="market-overview-foot">
         <div>
-          <span>Bucket</span>
+          <span>Estado</span>
           <strong>{overviewBucketLabel(item.priority_bucket)}</strong>
         </div>
         <div>
-          <span>Modo</span>
+          <span>Lectura</span>
           <strong>{status.detail}</strong>
         </div>
         <div>
@@ -2675,14 +2679,14 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
           <strong>{formatDateTime(closeTime)}</strong>
         </div>
         <div>
-          <span>Snapshot</span>
+          <span>Actualización</span>
           <strong>{formatDateTime(snapshot.captured_at)}</strong>
         </div>
       </div>
 
       <div className="market-overview-actions">
         <span className="quiet-text">
-          Evidencia: {evidenceCount} | Liquidez {liquidityLabel === "--" ? "Sin dato" : liquidityLabel}
+          Contexto: {evidenceCount} | Liquidez {liquidityLabel === "--" ? "Sin dato" : liquidityLabel}
         </span>
         {marketId ? (
           <a className="analysis-link" href={`/markets/${marketId}`}>
@@ -2780,7 +2784,7 @@ export default function DashboardPage() {
 
     const errors: string[] = [];
     if (health.status === "rejected") {
-      errors.push("La API no respondió en /health");
+      errors.push("No se pudo confirmar el estado de conexión");
     }
     if (overview.status === "rejected") {
       errors.push("La vista principal no pudo leer overview de mercados");
@@ -2842,11 +2846,10 @@ export default function DashboardPage() {
       updatedAt: new Date(),
     });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Error desconocido";
       setState((current) => ({
         ...current,
         loading: false,
-        error: `La API no respondió desde ${API_HOST_LABEL}. ${message}`,
+        error: "No pudimos actualizar los mercados. Intenta de nuevo en unos segundos.",
         updatedAt: new Date(),
       }));
     }
@@ -2975,7 +2978,7 @@ export default function DashboardPage() {
         };
       });
     } catch {
-      setWatchlistError("No se pudo actualizar la lista. Revisa que la API esté en línea.");
+      setWatchlistError("No se pudo actualizar la lista. Intenta de nuevo en unos segundos.");
     } finally {
       setWatchlistActionMarketId(null);
     }
@@ -3028,6 +3031,21 @@ export default function DashboardPage() {
           de apuesta y no ejecuta apuestas automáticas.
         </span>
       </section>
+
+      <nav className="command-center-link-grid" aria-label="Acciones principales">
+        <a className="command-center-link-card" href="/sports">
+          <strong>Ver mercados deportivos</strong>
+          <span>Partidos y precios activos por deporte.</span>
+        </a>
+        <a className="command-center-link-card" href="/briefing">
+          <strong>Ver resumen diario</strong>
+          <span>Lo más importante para revisar hoy.</span>
+        </a>
+        <a className="command-center-link-card" href="/alerts">
+          <strong>Revisar alertas</strong>
+          <span>Cambios y recordatorios relevantes.</span>
+        </a>
+      </nav>
 
       <section className="command-center-shortcuts" aria-label="Accesos rápidos">
         <div className="panel-heading compact">

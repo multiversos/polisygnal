@@ -13,7 +13,11 @@ const MIN_SOCCER_MARKETS = Number(process.env.POLYSIGNAL_SMOKE_MIN_SOCCER_MARKET
 const EXPECTED_COMMIT = process.env.POLYSIGNAL_SMOKE_EXPECTED_COMMIT || "";
 const PROXY_PATH = "/api/backend/markets/overview?sport_type=soccer&limit=50";
 const BUILD_INFO_PATH = "/api/build-info";
+const HOME_PATH = "/";
+const SPORTS_PATH = "/sports";
 const SPORTS_SOCCER_PATH = "/sports/soccer";
+const BRIEFING_PATH = "/briefing";
+const ALERTS_PATH = "/alerts";
 const DATA_HEALTH_PATH = "/data-health";
 const WORKFLOW_PATH = "/workflow";
 const RENDER_ERROR_TEXT = [
@@ -41,6 +45,20 @@ const INTERNAL_NAV_TEXT = [
   "Salud de datos",
   "Trial E2E",
   "Backtesting",
+];
+const PUBLIC_TECHNICAL_TEXT = [
+  "API",
+  "backend",
+  "JSON",
+  "proxy",
+  "E2E",
+  "debug",
+  "pipeline",
+  "fallback",
+  "snapshot",
+  "Snapshot",
+  "market_type",
+  "Kalshi",
 ];
 
 function urlFor(path) {
@@ -167,6 +185,19 @@ function countMatchCards(dom) {
   return (dom.match(/<article\s+class="soccer-match-card/g) || []).length;
 }
 
+function validatePublicProductPage(dom, label, requiredText = []) {
+  const text = visibleText(dom);
+  for (const publicItem of PUBLIC_NAV_TEXT) {
+    assertTextIncludes(text, publicItem, `${label} public sidebar`);
+  }
+  for (const expected of requiredText) {
+    assertTextIncludes(text, expected, label);
+  }
+  assertTextExcludes(text, INTERNAL_NAV_TEXT, `${label} public sidebar`);
+  assertTextExcludes(text, PUBLIC_TECHNICAL_TEXT, `${label} public copy`);
+  return { public_sidebar_found: true, internal_sidebar_hidden: true, technical_copy_hidden: true };
+}
+
 function validateRenderedSoccerPage(dom, expectedTitles, label) {
   const cardCount = countMarketCards(dom);
   const matchCardCount = countMatchCards(dom);
@@ -186,10 +217,12 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
   assertTextIncludes(text, `Vista mercados (${MIN_SOCCER_MARKETS})`, label);
   assertTextIncludes(text, "Partidos detectados", label);
   assertTextIncludes(text, "Próximos partidos", label);
-  for (const publicItem of PUBLIC_NAV_TEXT) {
-    assertTextIncludes(text, publicItem, `${label} public sidebar`);
-  }
-  assertTextExcludes(text, INTERNAL_NAV_TEXT, `${label} public sidebar`);
+  const publicProduct = validatePublicProductPage(dom, label, [
+    `Mercados ${MIN_SOCCER_MARKETS}`,
+    `Vista mercados (${MIN_SOCCER_MARKETS})`,
+    "Partidos detectados",
+    "Próximos partidos",
+  ]);
 
   return {
     market_card_count: cardCount,
@@ -198,8 +231,7 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
     markets_summary_found: true,
     market_toggle_found: true,
     match_summary_found: true,
-    public_sidebar_found: true,
-    internal_sidebar_hidden: true,
+    ...publicProduct,
   };
 }
 
@@ -273,6 +305,22 @@ async function main() {
     expectedTitles,
     "sports/soccer cache buster",
   );
+  const homeDom = await dumpDom(urlFor(HOME_PATH));
+  const homeRender = validatePublicProductPage(homeDom, "home", [
+    "Inicio",
+    "Ver mercados deportivos",
+    "Ver resumen diario",
+    "Revisar alertas",
+  ]);
+  const sportsDom = await dumpDom(urlFor(SPORTS_PATH));
+  const sportsRender = validatePublicProductPage(sportsDom, "sports", [
+    "Mercados deportivos",
+    "Deportes principales",
+  ]);
+  const briefingDom = await dumpDom(urlFor(BRIEFING_PATH));
+  const briefingRender = validatePublicProductPage(briefingDom, "briefing", ["Resumen diario"]);
+  const alertsDom = await dumpDom(urlFor(ALERTS_PATH));
+  const alertsRender = validatePublicProductPage(alertsDom, "alerts", ["Alertas"]);
   const dataHealthDom = await dumpDom(urlFor(DATA_HEALTH_PATH));
   const dataHealthRender = validateDataHealthPage(dataHealthDom);
   const workflowDom = await dumpDom(urlFor(WORKFLOW_PATH));
@@ -298,6 +346,12 @@ async function main() {
         },
         render: baseRender,
         cache_buster_render: cacheBusterRender,
+        public_pages: {
+          home: homeRender,
+          sports: sportsRender,
+          briefing: briefingRender,
+          alerts: alertsRender,
+        },
         data_health: dataHealthRender,
         workflow: workflowRender,
       },

@@ -62,12 +62,13 @@ const sportOptions = [
 ];
 
 const typeLabels: Record<string, string> = {
+  missing_data: "Información pendiente",
+  no_prediction: "Sin análisis",
+  price_move: "Cambio importante",
+  upcoming_close_soon: "Revisar después",
   external_signal_unmatched: "Contexto pendiente",
-  low_data_quality: "Baja calidad de datos",
-  missing_data: "Datos faltantes",
+  low_data_quality: "Datos limitados",
   no_research: "Falta contexto",
-  price_move: "Movimiento de precio",
-  upcoming_close_soon: "Cierre próximo",
   watchlist_needs_review: "Mi lista requiere revisión",
 };
 
@@ -158,9 +159,9 @@ function deriveAlertsFromOverview(overview: MarketOverviewAlertsResponse): Smart
         id: `derived-no-prediction-${marketId}`,
         type: "missing_data",
         severity: "critical",
-        title: "Mercado sin predicción",
+        title: "Mercado sin análisis",
         description: question,
-        reason: "No hay latest_prediction disponible para este mercado.",
+        reason: "Todavía no hay análisis disponible para este mercado.",
         created_from: "market_overview",
       });
     }
@@ -170,9 +171,9 @@ function deriveAlertsFromOverview(overview: MarketOverviewAlertsResponse): Smart
         id: `derived-no-snapshot-${marketId}`,
         type: "missing_data",
         severity: "warning",
-        title: "Mercado sin snapshot",
+        title: "Mercado sin precio reciente",
         description: question,
-        reason: "No hay latest_snapshot disponible para revisar precios.",
+        reason: "Todavía falta un precio reciente para revisarlo con confianza.",
         created_from: "market_overview",
       });
     }
@@ -182,9 +183,9 @@ function deriveAlertsFromOverview(overview: MarketOverviewAlertsResponse): Smart
         id: `derived-fallback-${marketId}`,
         type: "low_data_quality",
         severity: "warning",
-        title: "Score solo informativo",
+        title: "Datos limitados",
         description: question,
-        reason: "El scoring_mode es fallback_only.",
+        reason: "La lectura disponible es limitada.",
         created_from: "market_overview",
       });
     }
