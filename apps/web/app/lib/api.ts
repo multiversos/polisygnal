@@ -119,10 +119,11 @@ export async function fetchApiJson<T>(
   try {
     const response = await fetch(requestUrl, {
       cache: "no-store",
+      next: { revalidate: 0 },
       ...init,
       signal: controller.signal,
       headers: buildRequestHeaders(init),
-    });
+    } as RequestInit & { next: { revalidate: number } });
 
     if (!response.ok) {
       throw new ApiRequestError(`${path} responded ${response.status}`, response.status, path);
@@ -151,10 +152,10 @@ export function friendlyApiError(error: unknown, moduleName: string): string {
   }
   if (error instanceof ApiRequestError) {
     const status = error.status ? ` (HTTP ${error.status})` : "";
-    return `La API no respondió correctamente desde ${API_HOST_LABEL}${status}. Reintentar.`;
+    return `No pudimos actualizar los datos ahora${status}. Reintentar.`;
   }
   if (error instanceof Error) {
-    return `La API no respondió desde ${API_HOST_LABEL}. Reintentar.`;
+    return "No pudimos actualizar los datos ahora. Reintentar.";
   }
   return `No hay datos cargados todavía para ${moduleName}.`;
 }

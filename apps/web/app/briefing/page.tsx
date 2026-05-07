@@ -12,6 +12,7 @@ import {
 import { fetchApiJson, friendlyApiError } from "../lib/api";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { fetchSmartAlerts, type SmartAlert } from "../lib/smartAlerts";
+import { formatLastUpdated, useAutoRefresh } from "../lib/useAutoRefresh";
 import { WATCHLIST_STATUS_LABELS, type WatchlistStatus } from "../lib/watchlist";
 
 type BriefingCounts = {
@@ -544,6 +545,7 @@ export default function DailyBriefingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sourceNote, setSourceNote] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [markdownCopyStatus, setMarkdownCopyStatus] = useState<MarkdownCopyStatus>("idle");
   const [markdownFallback, setMarkdownFallback] = useState<string | null>(null);
   const handleSelectSport = useCallback((nextSport: string) => {
@@ -575,8 +577,10 @@ export default function DailyBriefingPage() {
         );
       }
       setSmartAlerts(alertsResult.status === "fulfilled" ? alertsResult.value.alerts : []);
+      setUpdatedAt(new Date());
     } catch (error) {
       setError(friendlyApiError(error, "el briefing diario"));
+      setUpdatedAt((current) => current ?? new Date());
     } finally {
       setLoading(false);
     }
@@ -585,6 +589,7 @@ export default function DailyBriefingPage() {
   useEffect(() => {
     void loadBriefing();
   }, [loadBriefing]);
+  useAutoRefresh(loadBriefing);
 
   const summaryCards = useMemo(() => {
     const markets = briefing?.upcoming_markets ?? [];
@@ -656,6 +661,12 @@ export default function DailyBriefingPage() {
             ahora; no es recomendación de apuesta.
           </p>
         </div>
+        <div className="topbar-actions">
+          <span className="timestamp-pill">{formatLastUpdated(updatedAt)}</span>
+          <button className="text-link" disabled={loading} onClick={loadBriefing} type="button">
+            {loading ? "Actualizando" : "Actualizar"}
+          </button>
+        </div>
       </header>
 
       <SportsSelectorBar
@@ -676,9 +687,6 @@ export default function DailyBriefingPage() {
             ))}
           </select>
         </label>
-        <button className="refresh-button" disabled={loading} onClick={loadBriefing} type="button">
-          {loading ? "Actualizando..." : "Actualizar"}
-        </button>
         <button
           className="refresh-button briefing-copy-button"
           disabled={loading || markdownCopyStatus === "copying"}

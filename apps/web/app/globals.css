@@ -4003,6 +4003,57 @@ h2 {
   font-weight: 950;
 }
 
+.soccer-market-summary {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+}
+
+.soccer-market-summary-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.soccer-market-summary ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.soccer-market-summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.soccer-market-summary-row a {
+  color: var(--foreground);
+  font-weight: 850;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.soccer-market-summary-row strong {
+  color: var(--foreground);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
 .soccer-match-details {
   display: grid;
   gap: 8px;
@@ -4030,7 +4081,8 @@ h2 {
 
 @media (max-width: 720px) {
   .soccer-match-main,
-  .soccer-outcome-grid {
+  .soccer-outcome-grid,
+  .soccer-market-summary-row {
     grid-template-columns: 1fr;
   }
 

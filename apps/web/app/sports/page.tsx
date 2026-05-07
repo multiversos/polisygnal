@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
 import {
   primarySportOptions,
   secondarySportOptions,
 } from "../components/SportsSelectorBar";
+import { formatLastUpdated, useAutoRefresh } from "../lib/useAutoRefresh";
 
 const sportDescriptions: Record<string, string> = {
   basketball: "Partidos de baloncesto con la liga como metadata separada.",
@@ -21,6 +23,12 @@ const sportDescriptions: Record<string, string> = {
 };
 
 export default function SportsIndexPage() {
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(new Date());
+  const refreshSportsView = useCallback(() => {
+    setUpdatedAt(new Date());
+  }, []);
+  useAutoRefresh(refreshSportsView);
+
   return (
     <main className="dashboard-shell sports-page">
       <MainNavigation />
@@ -32,6 +40,12 @@ export default function SportsIndexPage() {
             Vista sencilla por deporte. Hoy priorizamos partidos cercanos y
             mercados con precios activos.
           </p>
+        </div>
+        <div className="topbar-actions">
+          <span className="timestamp-pill">{formatLastUpdated(updatedAt)}</span>
+          <button className="refresh-button" onClick={refreshSportsView} type="button">
+            Actualizar
+          </button>
         </div>
       </header>
 

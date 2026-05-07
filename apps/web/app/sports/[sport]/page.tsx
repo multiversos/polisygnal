@@ -24,6 +24,7 @@ import {
 } from "../../lib/api";
 import { deriveMarketLifecycle } from "../../lib/marketLifecycle";
 import { getPublicMarketStatus } from "../../lib/publicMarketStatus";
+import { formatLastUpdated, useAutoRefresh } from "../../lib/useAutoRefresh";
 
 type PolySignalScore = {
   score_probability?: string | number | null;
@@ -981,6 +982,36 @@ function SoccerOutcomePill({
   );
 }
 
+function orderedSoccerMatchMarkets(match: SoccerMatch): UpcomingSportsMarket[] {
+  const ordered = [
+    match.homeWin,
+    match.draw,
+    match.awayWin,
+    ...match.extras,
+    ...match.markets,
+  ].filter(Boolean) as UpcomingSportsMarket[];
+  const seen = new Set<number>();
+  return ordered.filter((market) => {
+    if (seen.has(market.market_id)) {
+      return false;
+    }
+    seen.add(market.market_id);
+    return true;
+  });
+}
+
+function SoccerMarketSummaryRow({ market }: { market: UpcomingSportsMarket }) {
+  const status = getSportsMarketPublicStatus(market);
+  const price = formatSoccerPrice(market.market_yes_price);
+  return (
+    <li className="soccer-market-summary-row">
+      <Link href={`/markets/${market.market_id}`}>{market.question}</Link>
+      <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+      <strong>{price === "Sin dato" ? "Sin precio" : price}</strong>
+    </li>
+  );
+}
+
 function SoccerMatchCard({ match }: { match: SoccerMatch }) {
   const home = teamMeta(match.homeTeam);
   const away = teamMeta(match.awayTeam);
@@ -998,6 +1029,9 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
     isPartial: hasIncompletePrices || lifecycle.status === "missed_live_snapshot",
     lifecycleStatus: lifecycle.status,
   });
+  const orderedMarkets = orderedSoccerMatchMarkets(match);
+  const previewMarkets = orderedMarkets.slice(0, 3);
+  const hiddenMarkets = orderedMarkets.slice(3);
 
   return (
     <article className={`soccer-match-card ${lifecycle.isExpired ? "is-expired" : ""}`}>
@@ -1023,6 +1057,27 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
         <SoccerOutcomePill label="Empate" market={match.draw} />
         <SoccerOutcomePill label={away.shortName} market={match.awayWin} />
       </div>
+      <div className="soccer-market-summary">
+        <div className="soccer-market-summary-heading">
+          <span>Mercados disponibles</span>
+          <strong>{orderedMarkets.length}</strong>
+        </div>
+        <ul>
+          {previewMarkets.map((market) => (
+            <SoccerMarketSummaryRow key={market.market_id} market={market} />
+          ))}
+        </ul>
+        {hiddenMarkets.length > 0 ? (
+          <details className="soccer-match-details">
+            <summary>Ver todos los mercados</summary>
+            <ul>
+              {hiddenMarkets.map((market) => (
+                <SoccerMarketSummaryRow key={market.market_id} market={market} />
+              ))}
+            </ul>
+          </details>
+        ) : null}
+      </div>
       <div className="soccer-match-footer">
         <span>{match.markets.length} mercados incluidos</span>
         <span>Liquidez {formatMetric(liquidity)}</span>
@@ -1036,18 +1091,6 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
           </Link>
         ) : null}
       </div>
-      {match.extras.length > 0 ? (
-        <details className="soccer-match-details">
-          <summary>Mercados secundarios</summary>
-          <ul>
-            {match.extras.slice(0, 8).map((market) => (
-              <li key={market.market_id}>
-                <Link href={`/markets/${market.market_id}`}>{market.question}</Link>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
     </article>
   );
 }
@@ -1106,6 +1149,10 @@ export default function SportDetailPage() {
     updatedAt: null,
   });
   const [soccerViewMode, setSoccerViewMode] = useState<"matches" | "markets">("matches");
+  const [soccerQuery, setSoccerQuery] = useState("");
+  const [soccerStatusFilter, setSoccerStatusFilter] = useState<
+    "active" | "all" | "analyzed" | "observing"
+  >("all");
 
   const loadSport = useCallback(async () => {
     if (!sportIsEnabled) {
@@ -1152,16 +1199,37 @@ export default function SportDetailPage() {
   useEffect(() => {
     void loadSport();
   }, [loadSport]);
+  useAutoRefresh(loadSport, { enabled: sportIsEnabled });
 
   const qualityByMarketId = useMemo(() => {
     return new Map(state.qualityItems.map((item) => [item.market_id, item]));
   }, [state.qualityItems]);
+  const visibleSoccerItems = useMemo(() => {
+    if (selectedSport !== "soccer") {
+      return state.items;
+    }
+    const query = soccerQuery.trim().toLowerCase();
+    return state.items.filter((market) => {
+      const status = getSportsMarketPublicStatus(market);
+      const matchesQuery =
+        query.length === 0 ||
+        market.question.toLowerCase().includes(query) ||
+        (market.event_title ?? "").toLowerCase().includes(query);
+      const matchesStatus =
+        soccerStatusFilter === "all" ||
+        (soccerStatusFilter === "analyzed" && status.label === "Analizado") ||
+        (soccerStatusFilter === "observing" && status.label === "En observación") ||
+        (soccerStatusFilter === "active" &&
+          (status.label === "Activo" || status.label === "Analizado"));
+      return matchesQuery && matchesStatus;
+    });
+  }, [selectedSport, soccerQuery, soccerStatusFilter, state.items]);
   const overviewPath = buildUpcomingPath(sportOption);
   const shouldShowSoccerSchedule =
     selectedSport === "soccer" &&
     sportIsEnabled &&
     !state.loading &&
-    state.items.length > 0 &&
+    visibleSoccerItems.length > 0 &&
     soccerViewMode === "matches";
   const soccerMatchStats = useMemo(() => {
     if (selectedSport !== "soccer" || state.items.length === 0) {
@@ -1191,6 +1259,7 @@ export default function SportDetailPage() {
           </p>
         </div>
         <div className="topbar-actions">
+          <span className="timestamp-pill">{formatLastUpdated(state.updatedAt)}</span>
           <button
             className="refresh-button"
             disabled={state.loading || !sportIsEnabled}
@@ -1244,6 +1313,12 @@ export default function SportDetailPage() {
           onRetry={() => void loadSport()}
           title="No se pudo cargar este deporte"
         />
+      ) : null}
+      {state.error && state.items.length > 0 ? (
+        <section className="safety-strip" role="status">
+          <strong>Mostrando última información disponible.</strong>
+          <span>No pudimos actualizar ahora; volveremos a intentar automáticamente.</span>
+        </section>
       ) : null}
 
       <section className="data-quality-summary" aria-label="Calidad de datos">
@@ -1302,6 +1377,37 @@ export default function SportDetailPage() {
         </section>
       ) : null}
 
+      {selectedSport === "soccer" && sportIsEnabled && state.items.length > 0 ? (
+        <section className="filter-panel soccer-market-filter-panel" aria-label="Filtros de fútbol">
+          <label className="filter-group">
+            Buscar equipo o mercado
+            <input
+              onChange={(event) => setSoccerQuery(event.target.value)}
+              placeholder="Ej. Arsenal, empate, Chelsea"
+              type="search"
+              value={soccerQuery}
+            />
+          </label>
+          <label className="filter-group">
+            Estado
+            <select
+              onChange={(event) =>
+                setSoccerStatusFilter(event.target.value as typeof soccerStatusFilter)
+              }
+              value={soccerStatusFilter}
+            >
+              <option value="all">Todos</option>
+              <option value="analyzed">Analizados</option>
+              <option value="observing">En observación</option>
+              <option value="active">Activos</option>
+            </select>
+          </label>
+          <span className="badge muted">
+            Mostrando {visibleSoccerItems.length} de {state.items.length}
+          </span>
+        </section>
+      ) : null}
+
       <section className="panel sports-market-section">
         <div className="panel-heading">
           <div>
@@ -1349,11 +1455,16 @@ export default function SportDetailPage() {
             copy="La conexión funciona, pero todavía no hay mercados cargados para este deporte. Cuando haya datos disponibles aparecerán aquí."
             title={`Todavía no hay mercados cargados para ${sportOption.label}.`}
           />
+        ) : visibleSoccerItems.length === 0 ? (
+          <EmptyState
+            copy="Prueba con otra búsqueda o cambia el filtro de estado."
+            title="No hay mercados que coincidan con estos filtros."
+          />
         ) : shouldShowSoccerSchedule ? (
-          <SoccerMatchSchedule markets={state.items} />
+          <SoccerMatchSchedule markets={visibleSoccerItems} />
         ) : (
           <div className="sports-market-grid">
-            {state.items.map((market) => (
+            {visibleSoccerItems.map((market) => (
               <SportMarketCard
                 dataQuality={qualityByMarketId.get(market.market_id)}
                 key={market.market_id}

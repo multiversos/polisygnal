@@ -41,6 +41,7 @@ import type {
 } from "./lib/marketOverview";
 import { deriveMarketLifecycle } from "./lib/marketLifecycle";
 import { getPublicMarketStatus } from "./lib/publicMarketStatus";
+import { formatLastUpdated, useAutoRefresh } from "./lib/useAutoRefresh";
 
 type HealthResponse = {
   status?: string;
@@ -3020,6 +3021,7 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [loadDashboard]);
+  useAutoRefresh(loadDashboard);
 
   const apiOnline = state.health?.status === "ok";
   const marketCount = useMemo(() => {
@@ -3170,6 +3172,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="topbar-actions">
+          <span className="timestamp-pill">{formatLastUpdated(state.updatedAt)}</span>
           <button
             className="text-link"
             disabled={state.loading}
@@ -3242,6 +3245,12 @@ export default function DashboardPage() {
           >
             {state.loading ? "Cargando" : "Reintentar"}
           </button>
+        </section>
+      ) : null}
+      {state.error && state.overview ? (
+        <section className="safety-strip" role="status">
+          <strong>Mostrando última información disponible.</strong>
+          <span>No pudimos actualizar ahora; volveremos a intentar automáticamente.</span>
         </section>
       ) : null}
 

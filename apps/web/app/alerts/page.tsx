@@ -9,6 +9,7 @@ import {
   type SmartAlert,
   type SmartAlertSeverity,
 } from "../lib/smartAlerts";
+import { formatLastUpdated, useAutoRefresh } from "../lib/useAutoRefresh";
 
 type MarketOverviewAlertItem = {
   priority_bucket?: string | null;
@@ -277,6 +278,7 @@ export default function AlertsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sourceNote, setSourceNote] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   const loadAlerts = useCallback(async () => {
     setLoading(true);
@@ -292,6 +294,7 @@ export default function AlertsPage() {
         setAlerts(response.alerts);
         setCounts(response.counts);
         setGeneratedAt(response.generated_at);
+        setUpdatedAt(new Date());
       } else {
         const overview = await fetchMarketOverviewAlerts(sport);
         const derivedAlerts = deriveAlertsFromOverview(overview).filter((alert) =>
@@ -300,6 +303,7 @@ export default function AlertsPage() {
         setAlerts(derivedAlerts);
         setCounts(buildDerivedAlertCounts(derivedAlerts));
         setGeneratedAt(new Date().toISOString());
+        setUpdatedAt(new Date());
         setSourceNote("Alertas generadas con los mercados visibles disponibles.");
       }
     } catch {
@@ -311,11 +315,13 @@ export default function AlertsPage() {
         setAlerts(derivedAlerts);
         setCounts(buildDerivedAlertCounts(derivedAlerts));
         setGeneratedAt(new Date().toISOString());
+        setUpdatedAt(new Date());
         setSourceNote(
           "Alertas generadas con los mercados visibles disponibles.",
         );
       } catch {
-        setError("No se pudieron cargar alertas ni derivarlas desde market overview.");
+        setError("No pudimos actualizar las alertas ahora. Mostramos lo último disponible.");
+        setUpdatedAt((current) => current ?? new Date());
       }
     } finally {
       setLoading(false);
@@ -325,6 +331,7 @@ export default function AlertsPage() {
   useEffect(() => {
     void loadAlerts();
   }, [loadAlerts]);
+  useAutoRefresh(loadAlerts);
 
   const alertTypes = useMemo(() => {
     return Array.from(new Set(alerts.map((alert) => alert.type))).sort();
@@ -350,8 +357,9 @@ export default function AlertsPage() {
           </p>
         </div>
         <div className="topbar-actions">
+          <span className="timestamp-pill">{formatLastUpdated(updatedAt)}</span>
           <button className="theme-toggle" onClick={() => void loadAlerts()} type="button">
-            Actualizar
+            {loading ? "Actualizando" : "Actualizar"}
           </button>
         </div>
       </header>
@@ -452,11 +460,15 @@ export default function AlertsPage() {
 
         {loading ? (
           <div className="empty-state">Cargando alertas...</div>
-        ) : visibleAlerts.length === 0 ? (
-          <div className="empty-state">
-            No hay alertas con los filtros actuales.
-          </div>
-        ) : (
+      ) : visibleAlerts.length === 0 ? (
+        <div className="empty-state">
+            <strong>No hay alertas importantes por ahora.</strong>
+            <p>Mientras tanto puedes revisar los mercados deportivos disponibles.</p>
+            <a className="analysis-link" href="/sports">
+              Explorar mercados deportivos
+            </a>
+        </div>
+      ) : (
           <div className="alerts-list">
             {visibleAlerts.map((alert) => {
               const actionHref = buildActionHref(alert);

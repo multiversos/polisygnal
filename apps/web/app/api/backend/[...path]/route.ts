@@ -27,6 +27,7 @@ type RouteContext = {
 };
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function backendBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_BACKEND_BASE_URL).replace(/\/$/, "");
@@ -93,13 +94,14 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
   try {
     const upstream = await fetch(targetUrl, {
       cache: "no-store",
+      next: { revalidate: 0 },
       headers: {
         Accept: "application/json",
         "User-Agent": "PolySignal Web API proxy",
       },
       method: "GET",
       signal: controller.signal,
-    });
+    } as RequestInit & { next: { revalidate: number } });
     const body = await upstream.text();
     return new Response(body, {
       status: upstream.status,

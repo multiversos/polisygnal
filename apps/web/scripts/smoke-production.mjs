@@ -60,6 +60,13 @@ const PUBLIC_TECHNICAL_TEXT = [
   "market_type",
   "Kalshi",
 ];
+const UPDATE_TEXT = ["Última actualización", "Ãšltima actualizaciÃ³n"];
+const SOCCER_MARKET_LIST_TEXT = [
+  "Mercados disponibles",
+  "Ver todos los mercados",
+  "Precio SÍ",
+  "Precio SÃ",
+];
 
 function urlFor(path) {
   return `${FRONTEND_BASE_URL}${path}`;
@@ -221,6 +228,9 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
   assertTextIncludes(text, `Mercados ${MIN_SOCCER_MARKETS}`, label);
   assertTextIncludes(text, `Vista mercados (${MIN_SOCCER_MARKETS})`, label);
   assertTextIncludes(text, "Partidos detectados", label);
+  assertTextIncludes(text, "Actualizar", label);
+  assertTextIncludesOneOf(text, UPDATE_TEXT, `${label} update timestamp`);
+  assertTextIncludesOneOf(text, SOCCER_MARKET_LIST_TEXT, `${label} visible market list`);
   assertTextIncludes(text, "Próximos partidos", label);
   assertTextIncludesOneOf(
     text,
@@ -324,6 +334,9 @@ async function main() {
     "Revisar alertas",
   ]);
   const homeText = visibleText(homeDom);
+  assertTextIncludes(homeText, "Mercados destacados", "home live content");
+  assertTextIncludes(homeText, "Actualizar", "home update button");
+  assertTextIncludesOneOf(homeText, UPDATE_TEXT, "home update timestamp");
   assertTextIncludesOneOf(
     homeText,
     [
@@ -339,14 +352,23 @@ async function main() {
     "Mercados deportivos",
     "Deportes principales",
   ]);
+  const sportsText = visibleText(sportsDom);
+  assertTextIncludes(sportsText, "Actualizar", "sports update button");
+  assertTextIncludesOneOf(sportsText, UPDATE_TEXT, "sports update timestamp");
   const briefingDom = await dumpDom(urlFor(BRIEFING_PATH));
   const briefingRender = validatePublicProductPage(briefingDom, "briefing", [
     "Resumen diario",
     "Resumen rápido",
     "Para revisar hoy",
   ]);
+  const briefingText = visibleText(briefingDom);
+  assertTextIncludes(briefingText, "Actualizar", "briefing update button");
+  assertTextIncludesOneOf(briefingText, UPDATE_TEXT, "briefing update timestamp");
   const alertsDom = await dumpDom(urlFor(ALERTS_PATH));
   const alertsRender = validatePublicProductPage(alertsDom, "alerts", ["Alertas"]);
+  const alertsText = visibleText(alertsDom);
+  assertTextIncludes(alertsText, "Actualizar", "alerts update button");
+  assertTextIncludesOneOf(alertsText, UPDATE_TEXT, "alerts update timestamp");
   const dataHealthDom = await dumpDom(urlFor(DATA_HEALTH_PATH));
   const dataHealthRender = validateDataHealthPage(dataHealthDom);
   const workflowDom = await dumpDom(urlFor(WORKFLOW_PATH));

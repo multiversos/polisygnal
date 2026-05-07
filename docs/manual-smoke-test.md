@@ -6,18 +6,13 @@ Use these checks after a production deploy. Correct domains:
 - Backend: https://polisygnal.onrender.com
 - Do not use `polisignal` or `polysignal`.
 
-## Backend
+## Backend And Proxy
 
-1. Open `https://polisygnal.onrender.com/health`.
-2. Confirm JSON shows `status: ok`.
-3. Open `https://polisygnal.onrender.com/markets/overview?limit=20`.
-4. Confirm `total_count` is greater than `0` and `items` is not empty.
-
-## Proxy
-
-1. Open `https://polisygnal-web.vercel.app/api/backend/markets/overview?sport_type=soccer&limit=20`.
-2. Confirm it returns the same shape as backend `/markets/overview`.
-3. Confirm no browser CORS error is needed for visible pages.
+1. Open `https://polisygnal.onrender.com/health` and confirm `status: ok`.
+2. Open `https://polisygnal.onrender.com/markets/overview?sport_type=soccer&limit=50`.
+3. Confirm `total_count` is at least `50` and `items` is not empty.
+4. Open `https://polisygnal-web.vercel.app/api/backend/markets/overview?sport_type=soccer&limit=50`.
+5. Confirm the proxy returns the same overview shape and does not expose CORS issues.
 
 ## Build Diagnostics
 
@@ -26,28 +21,52 @@ Use these checks after a production deploy. Correct domains:
    `api_host: polisygnal.onrender.com`.
 3. If the page looks stale, compare `commit` with the latest Vercel production
    deployment, then hard refresh with `Ctrl+F5` or open an incognito window.
-4. Re-check the proxy endpoint above before treating the UI as disconnected.
 
-## Dashboard
+## Public Navigation
 
 1. Open `https://polisygnal-web.vercel.app/`.
-2. Confirm KPIs show real market counts.
-3. Confirm `Mercados destacados` shows cards.
-4. Confirm buckets and review filters work without a full page reload.
-5. Confirm the safety copy says the app is read-only and not automatic trading.
+2. Confirm the sidebar only shows:
+   - Inicio
+   - Mercados deportivos
+   - Resumen diario
+   - Mi lista
+   - Alertas
+   - Modo oscuro
+3. Confirm the sidebar does not show internal sections such as Investigación,
+   Evidencia, Workflow, Salud de datos, Trial E2E, or Backtesting.
+
+## Public Home
+
+1. Confirm Inicio shows `Qué revisar ahora`, `Mercados destacados`, and
+   `Próximos partidos`.
+2. Confirm it shows `Última actualización` and an `Actualizar` button.
+3. Confirm CTAs link to Mercados deportivos, Resumen diario, and Alertas.
+4. Confirm no visible copy mentions API, backend, JSON, proxy, snapshot,
+   fallback, debug, pipeline, or market_type.
 
 ## Sports
 
-1. Open `https://polisygnal-web.vercel.app/sports/soccer`.
-2. Confirm soccer shows 20 market cards.
-3. Open `https://polisygnal-web.vercel.app/sports/basketball`.
-4. Confirm basketball shows a clean empty state, not `Failed to fetch`.
-5. Confirm UFC, cricket, and NHL/Hockey remain disabled and do not navigate as active filters.
-6. If a soccer market closed before a live snapshot was captured, confirm it is
-   labeled as `Sin snapshot en vivo` or `Cerrado`, not as an active opportunity.
-7. Confirm `/sports/soccer` does not show `La API no respondió` or `Datos no disponibles`.
+1. Open `https://polisygnal-web.vercel.app/sports`.
+2. Confirm it shows Mercados deportivos clearly and does not present empty
+   sports as errors.
+3. Confirm it shows `Última actualización` and an `Actualizar` button.
+4. Confirm UFC, cricket, and NHL/Hockey remain disabled and do not load data.
 
-## Critical Regression: Soccer Must Render Data
+## Soccer Critical Regression
+
+1. Open `https://polisygnal-web.vercel.app/sports/soccer`.
+2. Confirm it shows `Mercados 50`.
+3. Confirm it shows `Vista mercados (50)`.
+4. Confirm it shows `Partidos detectados` and `Próximos partidos`.
+5. Confirm at least one match card renders.
+6. Confirm match cards show markets inside the card, including prices when
+   available and `Ver todos los mercados` when there are more items.
+7. Confirm search/filter controls work without a full page reload.
+8. Confirm the page shows `Última actualización` and an `Actualizar` button.
+9. Confirm closed or expired markets appear as Cerrado or Información parcial,
+   not as active opportunities.
+10. Confirm it does not show `Datos no disponibles`, `La API no respondió`, or
+    `Todavía no hay mercados`.
 
 Run the automated production smoke test from the repo root:
 
@@ -55,51 +74,46 @@ Run the automated production smoke test from the repo root:
 npm.cmd --workspace apps/web run smoke:production
 ```
 
-The test must confirm:
-
-1. `/api/build-info` returns the current production build metadata.
-2. `/api/backend/markets/overview?sport_type=soccer&limit=20` returns
-   `total_count=20` and 20 `items`.
-3. `/sports/soccer` renders at least 20 market cards in headless Chrome.
-4. `/sports/soccer?debug_ts=<timestamp>` also renders market cards.
-5. The rendered page does not contain `Datos no disponibles`,
-   `La API no respondió`, or `Todavía no hay mercados`.
-
 If this test fails, stop feature work and treat it as a production regression.
 
-## Cache Troubleshooting
+## Resumen Diario
 
-If a normal browser shows `Datos no disponibles` but backend/proxy checks pass:
+1. Open `https://polisygnal-web.vercel.app/briefing`.
+2. Confirm it shows `Resumen rápido`, `Para revisar hoy`, and current market
+   guidance.
+3. Confirm it shows `Última actualización` and an `Actualizar` button.
+4. Confirm empty states guide the user back to soccer or sports markets.
 
-1. Open `https://polisygnal-web.vercel.app/sports/soccer` in an incognito window.
-2. Hard refresh the normal tab with `Ctrl+F5`.
-3. Open `https://polisygnal-web.vercel.app/api/build-info` and compare `commit`
-   with the latest Vercel production deployment.
-4. Open `https://polisygnal-web.vercel.app/api/backend/markets/overview?sport_type=soccer&limit=20`.
-5. Confirm the proxy returns `total_count=20` and 20 `items`.
-6. If the proxy works and incognito works, treat the issue as local browser cache
-   or an old tab rather than a backend outage.
-7. Re-run `npm.cmd --workspace apps/web run smoke:production` to compare the
-   user browser with a clean headless render.
+## Mi Lista
+
+1. Open the public Mi lista route from the sidebar.
+2. If no items are saved, confirm it says the list is empty in friendly copy.
+3. Confirm it offers a CTA to explore sports markets or soccer.
+4. Confirm it does not pretend persistent saving is complete if it is not.
+
+## Alertas
+
+1. Open `https://polisygnal-web.vercel.app/alerts`.
+2. Confirm it shows Alertas in simple language.
+3. Confirm it shows `Última actualización` and an `Actualizar` button.
+4. If there are no important alerts, confirm it says so clearly and offers a
+   CTA to Mercados deportivos.
 
 ## Market Detail
 
-1. From the dashboard, open `Ver analisis` on a market.
-2. Confirm the page shows quick read, technical data, prices, score, confidence, evidence fallback, history fallback, and links back to dashboard/sport.
-3. Confirm missing evidence or history appears as a planned empty state, not a broken API message.
+1. Open a market from `/sports/soccer`.
+2. Confirm the detail page focuses on title, status, price, analysis, history,
+   and list follow-up.
+3. Confirm it links back to Inicio, Mercados deportivos, and the sport page.
+4. Confirm it does not show public links to JSON, API docs, raw IDs, or command
+   snippets.
 
-## Data Health
+## Cache Troubleshooting
 
-1. Open `https://polisygnal-web.vercel.app/data-health`.
-2. Confirm the market overview summary shows real counts from `/markets/overview`.
-3. Confirm live markets without prediction are separated from expired markets
-   without a live snapshot.
-4. Confirm expired markets without live snapshots are not treated as critical
-   scoring failures; they should not be scored retroactively.
-5. Confirm it clearly states the view is read-only.
+If a normal browser shows old data but backend/proxy checks pass:
 
-## Modules In Preparation
-
-1. Open `/research`, `/evidence`, `/sources`, `/external-signals/matches`, and `/backtesting`.
-2. Confirm each page says the module is in preparation when data is not present.
-3. Confirm none of those pages suggests the global API is broken unless the backend is actually unavailable.
+1. Open `/sports/soccer` in an incognito window.
+2. Hard refresh the normal tab with `Ctrl+F5`.
+3. Open `/api/build-info` and compare `commit` with Vercel Production.
+4. Open `/api/backend/markets/overview?sport_type=soccer&limit=50`.
+5. Re-run `npm.cmd --workspace apps/web run smoke:production`.

@@ -1563,7 +1563,7 @@ function PriceHistoryChart({ points }: { points: PriceHistoryPoint[] }) {
     return (
       <div className="price-history-chart single">
         <div className="price-history-single-card">
-          <span>Solo hay un snapshot disponible</span>
+          <span>Solo hay una actualización disponible</span>
           <strong>{formatProbability(onlyPoint.yes)}</strong>
           <small>{formatDateTime(onlyPoint.captured_at)}</small>
         </div>
@@ -1674,7 +1674,7 @@ function PricePanel({ snapshot }: { snapshot?: AnalysisSnapshot | null }) {
           <h2>Precio del mercado</h2>
         </div>
         <span className="timestamp-pill">
-          Snapshot {formatDateTime(snapshot?.captured_at)}
+          Última actualización {formatDateTime(snapshot?.captured_at)}
         </span>
       </div>
       <div className="market-price-panel analysis-price-panel">
@@ -1809,7 +1809,7 @@ function scorePendingMessage(dataQuality?: MarketDataQuality | null): string {
     missingFields.has("yes_price") ||
     missingFields.has("no_price")
   ) {
-    return "Faltan precios o snapshots para estimar.";
+    return "Faltan precios recientes para estimar.";
   }
   if (missingFields.has("sport") || missingFields.has("market_shape")) {
     return "Falta clasificaciÃ³n confiable para estimar.";
@@ -1862,7 +1862,7 @@ function DataQualityPanel({
       <div className="analysis-stat-grid">
         <div><span>Precio SÃ</span><strong>{formatQualityBoolean(dataQuality.has_yes_price)}</strong></div>
         <div><span>Precio NO</span><strong>{formatQualityBoolean(dataQuality.has_no_price)}</strong></div>
-        <div><span>Snapshot</span><strong>{formatQualityBoolean(dataQuality.has_snapshot)}</strong></div>
+        <div><span>Actualización</span><strong>{formatQualityBoolean(dataQuality.has_snapshot)}</strong></div>
         <div><span>SeÃ±al externa</span><strong>{formatQualityBoolean(dataQuality.has_external_signal)}</strong></div>
         <div><span>PredicciÃ³n guardada</span><strong>{formatQualityBoolean(dataQuality.has_prediction)}</strong></div>
         <div><span>Research disponible</span><strong>{formatQualityBoolean(dataQuality.has_research)}</strong></div>
@@ -1901,7 +1901,7 @@ function FreshnessPanel({ freshness }: { freshness?: MarketFreshness | null }) {
           <span className="section-kicker">Frescura interna</span>
           <h2>Frescura de datos</h2>
           <p className="section-note">
-            PolySignal no estima probabilidades cuando faltan precios o snapshots confiables.
+            PolySignal no estima probabilidades cuando faltan precios recientes confiables.
           </p>
         </div>
         <span className={`data-quality-label ${isFresh ? "completo" : "parcial"}`}>
@@ -1911,9 +1911,9 @@ function FreshnessPanel({ freshness }: { freshness?: MarketFreshness | null }) {
 
       <div className="analysis-stat-grid">
         <div><span>Acción sugerida</span><strong>{formatFreshnessAction(freshness.recommended_action)}</strong></div>
-        <div><span>Último snapshot</span><strong>{formatDateTime(freshness.latest_snapshot_at)}</strong></div>
+        <div><span>Última actualización</span><strong>{formatDateTime(freshness.latest_snapshot_at)}</strong></div>
         <div><span>Cierre</span><strong>{formatDateTime(freshness.close_time)}</strong></div>
-        <div><span>Edad snapshot</span><strong>{freshness.age_hours ?? "N/D"} h</strong></div>
+        <div><span>Antigüedad</span><strong>{freshness.age_hours ?? "N/D"} h</strong></div>
       </div>
 
       {reasons.length > 0 ? (
@@ -1956,7 +1956,7 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
           <h2>Qué revisar primero</h2>
           <p className="section-note">
             Estas viendo un mercado de {sportLabel} tipo {marketTypeLabel}. PolySignal
-            compara precio, snapshot y predicción guardada para ayudar a revisar el
+            compara precio y análisis guardado para ayudar a revisar el
             mercado con criterio humano.
           </p>
         </div>
@@ -1973,9 +1973,9 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
       </div>
 
       <div className="analysis-stat-grid">
-        <div><span>Precio YES</span><strong>{formatProbability(snapshot?.yes_price)}</strong></div>
+        <div><span>Precio SÍ</span><strong>{formatProbability(snapshot?.yes_price)}</strong></div>
         <div><span>Precio NO</span><strong>{formatProbability(snapshot?.no_price)}</strong></div>
-        <div><span>Modelo YES</span><strong>{formatProbability(yesModelProbability)}</strong></div>
+        <div><span>Análisis SÍ</span><strong>{formatProbability(yesModelProbability)}</strong></div>
         <div><span>Score</span><strong>{score?.score_percent !== undefined && score?.score_percent !== null ? `${score.score_percent}%` : formatProbability(score?.score_probability)}</strong></div>
         <div><span>Confianza</span><strong>{formatProbability(confidenceValue)}</strong></div>
         <div><span>Edge</span><strong>{formatSignedProbabilityPoints(edgeValue)}</strong></div>
@@ -2397,10 +2397,10 @@ function PriceHistoryPanel({
           <span className="section-kicker">Polymarket</span>
           <h2>Historial del precio</h2>
           <p className="section-note">
-            Evolución del precio SÍ según snapshots guardados por PolySignal.
+            Evolución del precio SÍ según las actualizaciones guardadas por PolySignal.
           </p>
         </div>
-        <span className="timestamp-pill">{history.count} snapshots</span>
+        <span className="timestamp-pill">{history.count} actualizaciones</span>
       </div>
       <div className="price-history-summary">
         <div className="analysis-stat-grid">
@@ -4298,21 +4298,15 @@ export default function MarketAnalysisPage() {
       <MainNavigation />
       <header className="analysis-topbar">
         <Link className="text-link" href="/">
-          Volver al dashboard
+          Volver a Inicio
         </Link>
         <div className="topbar-actions">
           <Link className="text-link" href="/sports">
-            Volver a Deportes
+            Volver a mercados deportivos
           </Link>
           <Link className="text-link" href={sportDetailHref}>
             Ver deporte
           </Link>
-          <a className="text-link" href={analysisJsonUrl} target="_blank" rel="noreferrer">
-            Ver JSON del análisis
-          </a>
-          <a className="text-link" href={`${API_BASE_URL}/docs`} target="_blank" rel="noreferrer">
-            API docs
-          </a>
         </div>
       </header>
 
@@ -4325,8 +4319,8 @@ export default function MarketAnalysisPage() {
         </section>
       ) : state.error ? (
         <section className="alert-panel" role="status">
-          <strong>API sin respuesta</strong>
-          <span>{state.error} Host API usado: {API_BASE_URL}.</span>
+          <strong>No pudimos cargar este mercado</strong>
+          <span>{state.error}</span>
         </section>
       ) : analysis ? (
         <>
@@ -4378,7 +4372,7 @@ export default function MarketAnalysisPage() {
           <section className="safety-strip">
             <strong>Solo lectura:</strong>
             <span>
-              Esta página no ejecuta research, no consulta Kalshi en vivo, no crea predicciones y no ejecuta apuestas automáticas.
+              Esta página organiza información para revisión manual y no ejecuta apuestas automáticas.
             </span>
           </section>
 
@@ -4405,7 +4399,6 @@ export default function MarketAnalysisPage() {
           <div className="analysis-layout">
             <div className="analysis-main">
               <QuickReadPanel analysis={analysis} />
-              <MarketTechnicalDataPanel analysis={analysis} />
               <PricePanel snapshot={analysis.latest_snapshot} />
               <PolySignalScorePanel score={analysis.polysignal_score} />
               <DataQualityPanel
@@ -4413,40 +4406,8 @@ export default function MarketAnalysisPage() {
                 score={analysis.polysignal_score}
               />
               <FreshnessPanel freshness={analysis.freshness ?? analysis.data_quality?.freshness} />
-              <MarketLinksPanel links={analysis.links} />
-              <WalletIntelligencePanel
-                error={state.walletIntelligenceError}
-                intelligence={state.walletIntelligence}
-              />
               <MarketTimelinePanel state={timelineState} />
               <PriceHistoryPanel history={state.priceHistory} error={state.priceHistoryError} />
-              <CandidateContextPanel context={analysis.candidate_context} />
-              <ExternalSignalsPanel signals={analysis.external_signals} snapshot={analysis.latest_snapshot} />
-              <EvidencePanel analysis={analysis} />
-              <ManualEvidencePanel
-                onClaimChange={(claim) =>
-                  setManualEvidenceState((current) => ({ ...current, claimDraft: claim }))
-                }
-                onNotesChange={(notes) =>
-                  setManualEvidenceState((current) => ({ ...current, notesDraft: notes }))
-                }
-                onSave={saveManualEvidence}
-                onSourceNameChange={(sourceName) =>
-                  setManualEvidenceState((current) => ({ ...current, sourceNameDraft: sourceName }))
-                }
-                onSourceUrlChange={(sourceUrl) =>
-                  setManualEvidenceState((current) => ({ ...current, sourceUrlDraft: sourceUrl }))
-                }
-                onStanceChange={(stance) =>
-                  setManualEvidenceState((current) => ({ ...current, stanceDraft: stance }))
-                }
-                onTitleChange={(title) =>
-                  setManualEvidenceState((current) => ({ ...current, titleDraft: title }))
-                }
-                state={manualEvidenceState}
-              />
-              <PredictionPanel analysis={analysis} />
-              <ResearchRunsPanel runs={analysis.research_runs} />
             </div>
 
             <aside className="analysis-side">
@@ -4463,74 +4424,8 @@ export default function MarketAnalysisPage() {
                 state={watchlistState}
               />
 
-              <InvestigationStatusDetailPanel
-                onDelete={deleteInvestigationStatus}
-                onNoteChange={(note) =>
-                  setInvestigationState((current) => ({ ...current, noteDraft: note }))
-                }
-                onPriorityChange={(priority) =>
-                  setInvestigationState((current) => ({ ...current, priorityDraft: priority }))
-                }
-                onSave={saveInvestigationStatus}
-                onStatusChange={(status) =>
-                  setInvestigationState((current) => ({ ...current, statusDraft: status }))
-                }
-                state={investigationState}
-              />
-
-              <MarketTagsDetailPanel
-                onAdd={addTagToMarket}
-                onDraftChange={(draft) =>
-                  setMarketTagsState((current) => ({ ...current, draft }))
-                }
-                onRemove={removeTagFromMarket}
-                state={marketTagsState}
-              />
-
-              <MarketOutcomeDetailPanel
-                onDelete={removeMarketOutcome}
-                onNotesChange={(notes) =>
-                  setMarketOutcomeState((current) => ({ ...current, notesDraft: notes }))
-                }
-                onOutcomeChange={(outcome) =>
-                  setMarketOutcomeState((current) => ({ ...current, outcomeDraft: outcome }))
-                }
-                onResolvedAtChange={(resolvedAt) =>
-                  setMarketOutcomeState((current) => ({
-                    ...current,
-                    resolvedAtDraft: resolvedAt,
-                  }))
-                }
-                onSave={saveMarketOutcome}
-                onSourceChange={(source) =>
-                  setMarketOutcomeState((current) => ({ ...current, sourceDraft: source }))
-                }
-                state={marketOutcomeState}
-              />
-
-              <MarketDecisionLogPanel
-                onConfidenceChange={(confidence) =>
-                  setMarketDecisionState((current) => ({
-                    ...current,
-                    confidenceDraft: confidence,
-                  }))
-                }
-                onDecisionChange={(decision) =>
-                  setMarketDecisionState((current) => ({
-                    ...current,
-                    decisionDraft: decision,
-                  }))
-                }
-                onDelete={removeMarketDecision}
-                onNoteChange={(note) =>
-                  setMarketDecisionState((current) => ({ ...current, noteDraft: note }))
-                }
-                onSave={saveMarketDecision}
-                state={marketDecisionState}
-              />
-
               <section className="analysis-section">
-                <h2>Qué falta por investigar</h2>
+                <h2>Qué revisar después</h2>
                 <div className="candidate-chip-list">
                   {analysis.warnings.length > 0 ? (
                     analysis.warnings.map((warning) => (
@@ -4539,182 +4434,6 @@ export default function MarketAnalysisPage() {
                   ) : (
                     <span className="reason-chip">Sin faltantes críticos</span>
                   )}
-                </div>
-              </section>
-
-              <section className="analysis-section">
-                <h2>Investigar este mercado</h2>
-                <p className="section-note">
-                  Este mercado todavía puede investigarse con Codex Agent. PolySignal
-                  generará un request JSON y un packet Markdown para que un agente
-                  externo analice fuentes y devuelva evidencia estructurada.
-                </p>
-                {analysis.research_runs.length > 0 ? (
-                  <span className="reason-chip">
-                    Ya existen investigaciones previas para este mercado.
-                  </span>
-                ) : null}
-                <div className="research-packet-ui">
-                  <label className="watchlist-field">
-                    Notas opcionales para el packet
-                    <textarea
-                      disabled={researchPacketState.loading}
-                      maxLength={4000}
-                      onChange={(event) =>
-                        setResearchPacketState((current) => ({
-                          ...current,
-                          notesDraft: event.target.value,
-                        }))
-                      }
-                      placeholder="Ej. revisar lesionados, calendario reciente o movimiento de precio."
-                      rows={3}
-                      value={researchPacketState.notesDraft}
-                    />
-                  </label>
-                  <button
-                    className="watchlist-button"
-                    disabled={researchPacketState.loading}
-                    onClick={() => void generatePacketFromUi()}
-                    type="button"
-                  >
-                    {researchPacketState.loading ? "Generando..." : "Generar Research Packet"}
-                  </button>
-                  <p className="section-note">
-                    Esto no ejecuta investigación automática. Solo prepara
-                    archivos para revisar con Codex/ChatGPT.
-                  </p>
-                </div>
-                {researchPacketState.error ? (
-                  <div className="alert-panel compact" role="status">
-                    <strong>Research Packet</strong>
-                    <span>{researchPacketState.error}</span>
-                  </div>
-                ) : null}
-                {researchPacketState.result ? (
-                  <div className="research-packet-result">
-                    <div>
-                      <span>research_run_id</span>
-                      <strong>{researchPacketState.result.research_run_id}</strong>
-                    </div>
-                    <div>
-                      <span>request</span>
-                      <code>{researchPacketState.result.request_path}</code>
-                    </div>
-                    <div>
-                      <span>packet</span>
-                      <code>{researchPacketState.result.packet_path}</code>
-                    </div>
-                    <div>
-                      <span>response esperada</span>
-                      <code>{researchPacketState.result.expected_response_path}</code>
-                    </div>
-                    <div className="command-card">
-                      <div>
-                        <span>Ingesta dry-run</span>
-                        <code>{researchPacketState.result.ingest_dry_run_command}</code>
-                      </div>
-                      <button
-                        onClick={() =>
-                          void copyResearchPacketCommand(
-                            researchPacketState.result?.ingest_dry_run_command ?? "",
-                            "dry-run",
-                          )
-                        }
-                        type="button"
-                      >
-                        {researchPacketState.copied === "dry-run" ? "Copiado" : "Copiar comando"}
-                      </button>
-                    </div>
-                    <div className="command-card">
-                      <div>
-                        <span>Ingesta final manual</span>
-                        <code>{researchPacketState.result.ingest_command}</code>
-                      </div>
-                      <button
-                        onClick={() =>
-                          void copyResearchPacketCommand(
-                            researchPacketState.result?.ingest_command ?? "",
-                            "ingest",
-                          )
-                        }
-                        type="button"
-                      >
-                        {researchPacketState.copied === "ingest" ? "Copiado" : "Copiar comando"}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-                <div className="command-card">
-                  <div>
-                    <span>Exportar análisis</span>
-                    <code>GET /markets/{marketId}/analysis/markdown</code>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void copyMarkdownAnalysis()}
-                    disabled={markdownExportState.loading}
-                  >
-                    {markdownExportState.loading
-                      ? "Generando..."
-                      : markdownExportState.copied
-                        ? "Copiado"
-                        : "Copiar análisis Markdown"}
-                  </button>
-                </div>
-                {markdownExportState.error ? (
-                  <div className="alert-panel compact" role="status">
-                    <strong>Export Markdown</strong>
-                    <span>{markdownExportState.error}</span>
-                  </div>
-                ) : null}
-                {markdownExportState.fallback ? (
-                  <div className="markdown-export-fallback">
-                    <label>
-                      Copia manual
-                      <textarea readOnly value={markdownExportState.fallback} />
-                    </label>
-                  </div>
-                ) : null}
-                <div className="command-card">
-                  <div>
-                    <span>Generar Research Packet</span>
-                    <code>{researchPacketCommand}</code>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void copyCommand(researchPacketCommand, "prepare")}
-                  >
-                    {copiedCommand === "prepare" ? "Copiado" : "Copiar comando"}
-                  </button>
-                </div>
-                <div className="command-card">
-                  <div>
-                    <span>Ingesta segura con Quality Gate</span>
-                    <code>{ingestDryRunCommand}</code>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void copyCommand(ingestDryRunCommand, "ingest")}
-                  >
-                    {copiedCommand === "ingest" ? "Copiado" : "Copiar comando"}
-                  </button>
-                </div>
-                <p className="section-note">
-                  Primero usa <strong>--dry-run</strong> para pasar por Quality Gate
-                  antes de crear predicción.
-                </p>
-                <p className="warning-text">
-                  No ejecutes apuestas automáticas. El packet es para investigación,
-                  no para trading.
-                </p>
-              </section>
-
-              <section className="analysis-section">
-                <h2>Links técnicos</h2>
-                <div className="quick-links">
-                  <a href={analysisJsonUrl} target="_blank" rel="noreferrer">Endpoint de análisis</a>
-                  <a href={`${API_BASE_URL}/markets/${marketId}/external-signals`} target="_blank" rel="noreferrer">Señales externas del mercado</a>
-                  <a href={`${API_BASE_URL}/docs`} target="_blank" rel="noreferrer">Documentación API</a>
                 </div>
               </section>
             </aside>
