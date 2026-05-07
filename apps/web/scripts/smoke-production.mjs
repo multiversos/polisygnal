@@ -88,6 +88,11 @@ function assertTextIncludes(text, expected, label) {
   assert(text.includes(expected), `${label} did not render expected text: ${expected}`);
 }
 
+function assertTextIncludesOneOf(text, expectedValues, label) {
+  const found = expectedValues.find((value) => text.includes(value));
+  assert(Boolean(found), `${label} did not render any expected text: ${expectedValues.join(" | ")}`);
+}
+
 function assertTextExcludes(text, blocked, label) {
   const found = blocked.filter((value) => text.includes(value));
   assert(found.length === 0, `${label} rendered blocked text: ${found.join(", ")}`);
@@ -217,6 +222,11 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
   assertTextIncludes(text, `Vista mercados (${MIN_SOCCER_MARKETS})`, label);
   assertTextIncludes(text, "Partidos detectados", label);
   assertTextIncludes(text, "Próximos partidos", label);
+  assertTextIncludesOneOf(
+    text,
+    ["Hoy", "Mañana", "Esta semana", "Próximamente", "Sin fecha confirmada"],
+    `${label} schedule grouping`,
+  );
   const publicProduct = validatePublicProductPage(dom, label, [
     `Mercados ${MIN_SOCCER_MARKETS}`,
     `Vista mercados (${MIN_SOCCER_MARKETS})`,
@@ -308,17 +318,33 @@ async function main() {
   const homeDom = await dumpDom(urlFor(HOME_PATH));
   const homeRender = validatePublicProductPage(homeDom, "home", [
     "Inicio",
+    "Qué revisar ahora",
     "Ver mercados deportivos",
     "Ver resumen diario",
     "Revisar alertas",
   ]);
+  const homeText = visibleText(homeDom);
+  assertTextIncludesOneOf(
+    homeText,
+    [
+      "Todavía no tienes mercados guardados",
+      "Cuando sigas un mercado",
+      "Explorar mercados deportivos",
+      "Ver análisis",
+    ],
+    "home watchlist",
+  );
   const sportsDom = await dumpDom(urlFor(SPORTS_PATH));
   const sportsRender = validatePublicProductPage(sportsDom, "sports", [
     "Mercados deportivos",
     "Deportes principales",
   ]);
   const briefingDom = await dumpDom(urlFor(BRIEFING_PATH));
-  const briefingRender = validatePublicProductPage(briefingDom, "briefing", ["Resumen diario"]);
+  const briefingRender = validatePublicProductPage(briefingDom, "briefing", [
+    "Resumen diario",
+    "Resumen rápido",
+    "Para revisar hoy",
+  ]);
   const alertsDom = await dumpDom(urlFor(ALERTS_PATH));
   const alertsRender = validatePublicProductPage(alertsDom, "alerts", ["Alertas"]);
   const dataHealthDom = await dumpDom(urlFor(DATA_HEALTH_PATH));

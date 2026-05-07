@@ -10,6 +10,7 @@ import {
   isSportBackendEnabled,
 } from "../components/SportsSelectorBar";
 import { fetchApiJson, friendlyApiError } from "../lib/api";
+import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { fetchSmartAlerts, type SmartAlert } from "../lib/smartAlerts";
 import { WATCHLIST_STATUS_LABELS, type WatchlistStatus } from "../lib/watchlist";
 
@@ -289,9 +290,44 @@ function formatSmartAlertSeverity(value: string): string {
     return "Crítica";
   }
   if (value === "warning") {
-    return "Warning";
+    return "Atención";
   }
   return "Info";
+}
+
+function publicBriefingText(value?: string | null): string {
+  if (!value) {
+    return "";
+  }
+  return value
+    .replace(/\bmissing[_ ]latest[_ ]snapshots?\b/gi, "sin precio reciente")
+    .replace(/\bmissing[_ ]snapshots?\b/gi, "sin precio reciente")
+    .replace(/\blatest[_ ]snapshots?\b/gi, "precio reciente")
+    .replace(/\bsnapshots?\b/gi, "precios recientes")
+    .replace(/\bfallback[_ ]only\b/gi, "datos limitados")
+    .replace(/\bfallback\b/gi, "datos limitados")
+    .replace(/\bmarket[_ ]overview\b/gi, "mercados visibles")
+    .replace(/\bno[_ ]prediction\b/gi, "sin análisis")
+    .replace(/\bsin[_ ]prediccion\b/gi, "sin análisis")
+    .replace(/\bpriority\b/gi, "oportunidad")
+    .replace(/\bwatchlist\b/gi, "seguimiento")
+    .replace(/\breview[_ ]fallback\b/gi, "baja confianza")
+    .replace(/\blow[_ ]confidence\b/gi, "baja confianza");
+}
+
+function formatBriefingChip(value: string): string {
+  const labels: Record<string, string> = {
+    baja_confianza: "Baja confianza",
+    data_only: "En observación",
+    fallback_only: "Datos limitados",
+    no_prediction: "Sin análisis",
+    opportunity: "Oportunidad",
+    priority: "Oportunidad",
+    review_fallback: "Baja confianza",
+    sin_prediccion: "Sin análisis",
+    watchlist: "Seguimiento",
+  };
+  return labels[value] ?? publicBriefingText(value.replace(/_/g, " "));
 }
 
 function formatWarningList(value: BriefingExternalSignal["warnings"]): string[] {
@@ -325,6 +361,19 @@ function formatFreshnessReason(value: string): string {
 function needsFreshnessReview(item: BriefingUpcomingMarket): boolean {
   const freshness = item.freshness;
   return Boolean(freshness && freshness.freshness_status !== "fresh");
+}
+
+function getBriefingMarketStatus(item: BriefingUpcomingMarket) {
+  return getPublicMarketStatus({
+    hasAnalysis: !item.warnings.includes("sin_prediccion"),
+    hasPrice:
+      item.market_yes_price !== null &&
+      item.market_yes_price !== undefined,
+    isPartial:
+      item.warnings.includes("sin_prediccion") ||
+      item.warnings.includes("fallback_only") ||
+      item.freshness?.freshness_status === "incomplete",
+  });
 }
 
 function translateMarketTitleToSpanish(title: string): string {
@@ -538,13 +587,36 @@ export default function DailyBriefingPage() {
   }, [loadBriefing]);
 
   const summaryCards = useMemo(() => {
+    const markets = briefing?.upcoming_markets ?? [];
     const counts = briefing?.summary.counts;
+    const analyzed = markets.filter(
+      (market) => !market.warnings.includes("sin_prediccion"),
+    ).length;
     return [
-      ["Próximos partidos", counts?.upcoming_count ?? 0],
-      ["En seguimiento", counts?.watchlist_count ?? 0],
-      ["Señales pendientes", counts?.unmatched_external_signals_count ?? 0],
-      ["Faltan evidencias", counts?.research_gaps_count ?? 0],
+      ["Mercados visibles", counts?.candidates_count ?? markets.length],
+      ["Mercados analizados", analyzed],
+      ["Para revisar", counts?.upcoming_count ?? markets.length],
+      ["En mi lista", counts?.watchlist_count ?? 0],
     ] as const;
+  }, [briefing]);
+  const topReviewMarkets = useMemo(
+    () => (briefing?.upcoming_markets ?? []).slice(0, 4),
+    [briefing],
+  );
+  const nextMatches = useMemo(
+    () =>
+      (briefing?.upcoming_markets ?? [])
+        .filter((market) => Boolean(market.close_time ?? market.event_time))
+        .slice(0, 4),
+    [briefing],
+  );
+  const activeSports = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const market of briefing?.upcoming_markets ?? []) {
+      const sportLabel = formatSport(market.sport);
+      counts.set(sportLabel, (counts.get(sportLabel) ?? 0) + 1);
+    }
+    return Array.from(counts.entries()).slice(0, 4);
   }, [briefing]);
   const staleUpcomingMarkets = useMemo(
     () => (briefing?.upcoming_markets ?? []).filter(needsFreshnessReview).slice(0, 5),
@@ -664,6 +736,97 @@ export default function DailyBriefingPage() {
         Generado: {briefing ? formatDateTime(briefing.summary.generated_at) : "cargando"}
       </p>
 
+      <section className="panel briefing-guide-panel" aria-label="Resumen rápido">
+        <div className="panel-heading compact">
+          <div>
+            <p className="eyebrow">Resumen rápido</p>
+            <h2>Para revisar hoy</h2>
+            <p>
+              Una guía corta con los mercados visibles, próximos partidos y
+              deportes con actividad.
+            </p>
+          </div>
+          <div className="panel-action-links">
+            <Link className="analysis-link" href="/sports">
+              Ver mercados deportivos
+            </Link>
+            <Link className="analysis-link secondary" href="/sports/soccer">
+              Revisar fútbol
+            </Link>
+          </div>
+        </div>
+
+        {loading ? (
+          <EmptyState copy="Preparando resumen..." />
+        ) : !topReviewMarkets.length ? (
+          <div className="empty-state compact">
+            <strong>Todavía no hay suficiente actividad para generar un resumen completo.</strong>
+            <p>Puedes revisar los mercados deportivos disponibles mientras tanto.</p>
+          </div>
+        ) : (
+          <div className="briefing-guide-grid">
+            <section>
+              <h3>Mercados con más atención</h3>
+              <div className="briefing-list compact-list">
+                {topReviewMarkets.slice(0, 3).map((item) => (
+                  <BriefingMarketCard
+                    key={`review-${item.market_id}`}
+                    marketId={item.market_id}
+                    question={item.question}
+                    sport={item.sport}
+                    marketShape={item.market_shape}
+                    closeTime={item.close_time ?? item.event_time}
+                    metrics={[
+                      ["Estado", getBriefingMarketStatus(item).label],
+                      ["SÍ", formatPercent(item.market_yes_price)],
+                      ["Liquidez", formatCompact(item.liquidity)],
+                    ]}
+                    warnings={item.warnings}
+                  />
+                ))}
+              </div>
+            </section>
+            <section>
+              <h3>Partidos próximos</h3>
+              <div className="briefing-list compact-list">
+                {nextMatches.length ? (
+                  nextMatches.slice(0, 3).map((item) => (
+                    <BriefingMarketCard
+                      key={`next-${item.market_id}`}
+                      marketId={item.market_id}
+                      question={item.question}
+                      sport={item.sport}
+                      marketShape={item.market_shape}
+                      closeTime={item.close_time ?? item.event_time}
+                      metrics={[
+                        ["Estado", getBriefingMarketStatus(item).label],
+                        ["Volumen", formatCompact(item.volume)],
+                      ]}
+                    />
+                  ))
+                ) : (
+                  <EmptyState copy="No hay partidos con fecha clara en este filtro." />
+                )}
+              </div>
+            </section>
+            <section>
+              <h3>Deportes con actividad</h3>
+              <div className="briefing-sport-stack">
+                {activeSports.length ? (
+                  activeSports.map(([label, count]) => (
+                    <span key={label}>
+                      {label} <strong>{count}</strong>
+                    </span>
+                  ))
+                ) : (
+                  <span>Sin actividad suficiente por ahora.</span>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+      </section>
+
       <section className="panel briefing-section">
         <div className="panel-heading compact">
           <div>
@@ -680,10 +843,10 @@ export default function DailyBriefingPage() {
             <article className={`briefing-card briefing-alert-card ${alert.severity}`} key={alert.id}>
               <div className="badge-row">
                 <span className="badge muted">{formatSmartAlertSeverity(alert.severity)}</span>
-                <span className="badge">{alert.type.replace(/_/g, " ")}</span>
+                <span className="badge">{formatBriefingChip(alert.type)}</span>
               </div>
-              <h3>{alert.title}</h3>
-              <p className="briefing-note">{alert.description}</p>
+              <h3>{publicBriefingText(alert.title)}</h3>
+              <p className="briefing-note">{publicBriefingText(alert.description)}</p>
               {alert.action_url ? (
                 <div className="briefing-card-actions">
                   <Link className="analysis-link" href={alert.action_url}>
@@ -841,7 +1004,7 @@ export default function DailyBriefingPage() {
           emptyCopy="No hay movimientos relevantes de precio en los mercados destacados."
           items={briefing?.price_movers ?? []}
           loading={loading}
-          title="Movimiento de precio"
+          title="Mercados con más movimiento"
         >
           {(mover) => (
             <BriefingMarketCard
@@ -925,7 +1088,6 @@ function BriefingMarketCard({
   return (
     <article className="briefing-card">
       <div className="badge-row">
-        <span className="badge">#{marketId}</span>
         <span className="badge">{formatSport(sport)}</span>
         <span className="badge muted">{formatMarketShape(marketShape)}</span>
         {closeTime ? <span className="badge muted">{formatDateTime(closeTime)}</span> : null}
@@ -956,7 +1118,7 @@ function ChipList({ items }: { items: string[] }) {
   return (
     <div className="reason-list compact">
       {items.slice(0, 4).map((item) => (
-        <span key={item}>{item}</span>
+        <span key={item}>{formatBriefingChip(item)}</span>
       ))}
     </div>
   );

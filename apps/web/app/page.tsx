@@ -40,6 +40,7 @@ import type {
   MarketOverviewResponse,
 } from "./lib/marketOverview";
 import { deriveMarketLifecycle } from "./lib/marketLifecycle";
+import { getPublicMarketStatus } from "./lib/publicMarketStatus";
 
 type HealthResponse = {
   status?: string;
@@ -2103,10 +2104,18 @@ function WatchlistPanel({
       ) : items.length === 0 ? (
         <div className="empty-state compact">
           <strong>Todavía no tienes mercados guardados.</strong>
-          <p>Cuando sigas un mercado, aparecerá aquí.</p>
-          <a className="analysis-link" href="/sports">
-            Explorar mercados deportivos
-          </a>
+          <p>
+            Cuando sigas un mercado, aparecerá aquí para revisarlo más rápido.
+            Pronto podrás guardar tus mercados favoritos desde cualquier detalle.
+          </p>
+          <div className="empty-state-actions">
+            <a className="analysis-link" href="/sports">
+              Explorar mercados deportivos
+            </a>
+            <a className="analysis-link secondary" href="/sports/soccer">
+              Ver fútbol
+            </a>
+          </div>
         </div>
       ) : (
         <div className="watchlist-card-grid">
@@ -2698,6 +2707,146 @@ function MarketOverviewCard({ item }: { item: MarketOverviewItem }) {
   );
 }
 
+function getOverviewPublicStatus(item: MarketOverviewItem) {
+  const market = item.market ?? {};
+  const lifecycle = getOverviewLifecycle(item);
+  return getPublicMarketStatus({
+    active: market.active,
+    closed: market.closed,
+    hasAnalysis: Boolean(item.latest_prediction),
+    hasPrice:
+      item.latest_snapshot?.yes_price !== null &&
+      item.latest_snapshot?.yes_price !== undefined,
+    isPartial: lifecycle.status === "missed_live_snapshot",
+    lifecycleStatus: lifecycle.status,
+  });
+}
+
+function HomeHighlightCard({ item }: { item: MarketOverviewItem }) {
+  const market = item.market ?? {};
+  const status = getOverviewPublicStatus(item);
+  const title = market.question ? humanizeMarketTitle(market.question) : "Mercado sin título";
+  const price = formatMarketPercent(item.latest_snapshot?.yes_price);
+  const confidence = formatMarketPercent(item.latest_prediction?.confidence_score);
+
+  return (
+    <article className={`guidance-card ${status.tone}`}>
+      <div className="badge-row">
+        <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+        <span className="badge muted">{formatSportLabel(market.sport_type)}</span>
+      </div>
+      <h3>{title}</h3>
+      <p>{status.detail}</p>
+      <div className="guidance-card-metrics">
+        <span>SÍ {price === "--" ? "Sin dato" : price}</span>
+        <span>Confianza {confidence === "--" ? "Pendiente" : confidence}</span>
+      </div>
+      {market.id ? (
+        <a className="analysis-link" href={`/markets/${market.id}`}>
+          Ver análisis
+        </a>
+      ) : null}
+    </article>
+  );
+}
+
+function UpcomingPreviewCard({ market }: { market: UpcomingSportsMarket }) {
+  const lifecycle = deriveMarketLifecycle({
+    close_time: market.close_time,
+    end_date: market.event_time,
+    question: market.question,
+    latest_snapshot:
+      market.market_yes_price !== null && market.market_yes_price !== undefined ? true : null,
+    latest_prediction: market.polysignal_score ? true : null,
+  });
+  const status = getPublicMarketStatus({
+    hasAnalysis: Boolean(market.polysignal_score),
+    hasPrice:
+      market.market_yes_price !== null &&
+      market.market_yes_price !== undefined,
+    lifecycleStatus: lifecycle.status,
+  });
+
+  return (
+    <article className={`guidance-card ${status.tone}`}>
+      <div className="badge-row">
+        <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+        <span className="badge muted">{formatDateTime(market.close_time ?? market.event_time)}</span>
+      </div>
+      <h3>{humanizeMarketTitle(market.question)}</h3>
+      <p>{market.event_title ? translateMarketSubtitleToSpanish(market.event_title) : status.detail}</p>
+      <a className="analysis-link" href={`/markets/${market.market_id}`}>
+        Ver detalles
+      </a>
+    </article>
+  );
+}
+
+function HomeGuidancePanel({
+  highlights,
+  loading,
+  upcoming,
+}: {
+  highlights: MarketOverviewItem[];
+  loading: boolean;
+  upcoming: UpcomingSportsMarket[];
+}) {
+  return (
+    <section className="panel public-guidance-panel" aria-label="Qué revisar ahora">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Guía rápida</p>
+          <h2>Qué revisar ahora</h2>
+          <p>
+            Una selección corta de mercados y partidos para empezar sin recorrer
+            toda la lista.
+          </p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="empty-state compact">Preparando guía de revisión...</div>
+      ) : highlights.length === 0 && upcoming.length === 0 ? (
+        <div className="empty-state compact">
+          <strong>Todavía no hay suficiente actividad para destacar mercados.</strong>
+          <p>Mientras tanto puedes revisar los mercados deportivos disponibles.</p>
+          <a className="analysis-link" href="/sports">
+            Explorar mercados deportivos
+          </a>
+        </div>
+      ) : (
+        <div className="guidance-grid">
+          <section>
+            <h3>Mercados destacados</h3>
+            <div className="guidance-card-list">
+              {highlights.slice(0, 3).map((item, index) => (
+                <HomeHighlightCard
+                  item={item}
+                  key={item.market?.id ?? `${item.market?.question ?? "highlight"}-${index}`}
+                />
+              ))}
+            </div>
+          </section>
+          <section>
+            <h3>Próximos partidos</h3>
+            <div className="guidance-card-list">
+              {upcoming.slice(0, 3).map((market) => (
+                <UpcomingPreviewCard key={market.market_id} market={market} />
+              ))}
+              {upcoming.length === 0 ? (
+                <div className="empty-state compact">
+                  <strong>No hay partidos próximos en la selección actual.</strong>
+                  <p>Revisa fútbol para ver la cartelera disponible.</p>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function DashboardPage() {
   const [filters, setFilters] = useState<DashboardFilters>({
     sport: "all",
@@ -2906,6 +3055,14 @@ export default function DashboardPage() {
     matchesSelectedSport(market.sport, upcomingFilters.sport),
   );
   const topUpcomingMarkets = filteredUpcomingMarkets.slice(0, 8);
+  const homeHighlights = useMemo(
+    () => [...overviewItems].sort(compareOverviewItems).slice(0, 5),
+    [overviewItems],
+  );
+  const homeUpcomingPreview = useMemo(
+    () => topUpcomingMarkets.filter((market) => market.sport === "soccer").slice(0, 5),
+    [topUpcomingMarkets],
+  );
   const dataQualityByMarketId = useMemo(() => {
     const entries = state.upcomingDataQualityItems.map((item) => [item.market_id, item] as const);
     return new Map(entries);
@@ -3047,11 +3204,17 @@ export default function DashboardPage() {
         </a>
       </nav>
 
+      <HomeGuidancePanel
+        highlights={homeHighlights}
+        loading={state.loading}
+        upcoming={homeUpcomingPreview}
+      />
+
       <section className="command-center-shortcuts" aria-label="Accesos rápidos">
         <div className="panel-heading compact">
           <div>
             <h2>Accesos rápidos</h2>
-            <p>Las vistas principales para revisar mercados sin ruido técnico.</p>
+            <p>Las vistas principales para revisar mercados sin complicaciones.</p>
           </div>
         </div>
         <nav className="command-center-link-grid" aria-label="Vistas principales">

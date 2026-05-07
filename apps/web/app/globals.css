@@ -586,6 +586,84 @@ h2 {
   line-height: 1.35;
 }
 
+.public-guidance-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.guidance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.guidance-grid h3 {
+  margin: 0 0 10px;
+  color: var(--foreground);
+  font-size: 0.98rem;
+}
+
+.guidance-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.guidance-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.guidance-card.opportunity {
+  border-left-color: var(--success);
+}
+
+.guidance-card.watchlist {
+  border-left-color: var(--accent);
+}
+
+.guidance-card.data-only,
+.guidance-card.neutral {
+  border-left-color: var(--muted);
+}
+
+.guidance-card h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.98rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.guidance-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.guidance-card-metrics,
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.guidance-card-metrics span {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
 .metric-card,
 .panel {
   border: 1px solid var(--line);
@@ -5641,6 +5719,49 @@ h2 {
   font-size: 0.9rem;
 }
 
+.briefing-guide-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.briefing-guide-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.8fr;
+  gap: 16px;
+}
+
+.briefing-guide-grid h3 {
+  margin: 0 0 10px;
+  color: var(--foreground);
+  font-size: 0.98rem;
+}
+
+.briefing-page .briefing-list.compact-list {
+  gap: 10px;
+}
+
+.briefing-sport-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.briefing-sport-stack span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--muted-strong);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.briefing-sport-stack strong {
+  color: var(--foreground);
+}
+
 .briefing-page .briefing-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5784,6 +5905,8 @@ h2 {
   .metric-grid,
   .market-overview-kpis,
   .dashboard-grid,
+  .guidance-grid,
+  .briefing-guide-grid,
   .analysis-layout,
   .match-review-layout,
   .workflow-board,
@@ -5871,6 +5994,8 @@ h2 {
   .market-overview-metrics,
   .market-overview-foot,
   .market-overview-price-block,
+  .guidance-grid,
+  .briefing-guide-grid,
   .dashboard-grid,
   .filter-panel,
   .outcome-management-form,

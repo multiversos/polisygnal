@@ -23,6 +23,7 @@ import {
   friendlyApiError,
 } from "../../lib/api";
 import { deriveMarketLifecycle } from "../../lib/marketLifecycle";
+import { getPublicMarketStatus } from "../../lib/publicMarketStatus";
 
 type PolySignalScore = {
   score_probability?: string | number | null;
@@ -347,6 +348,23 @@ function deriveSportsMarketLifecycle(market: UpcomingSportsMarket) {
   });
 }
 
+function getSportsMarketPublicStatus(market: UpcomingSportsMarket) {
+  const lifecycle = deriveSportsMarketLifecycle(market);
+  return getPublicMarketStatus({
+    active: market.active,
+    closed: market.closed,
+    hasAnalysis: Boolean(market.has_prediction || market.polysignal_score),
+    hasPrice:
+      market.market_yes_price !== null &&
+      market.market_yes_price !== undefined,
+    isPartial:
+      lifecycle.status === "missed_live_snapshot" ||
+      !market.has_snapshot ||
+      !market.has_prediction,
+    lifecycleStatus: lifecycle.status,
+  });
+}
+
 function PolySignalMiniScore({
   dataQuality,
   score,
@@ -417,16 +435,16 @@ function SportMarketCard({
   market: UpcomingSportsMarket;
 }) {
   const lifecycle = deriveSportsMarketLifecycle(market);
+  const publicStatus = getSportsMarketPublicStatus(market);
   return (
     <article className={`sports-market-card ${lifecycle.isExpired ? "is-expired" : ""}`}>
       <div className="sports-market-card-header">
         <div className="badge-row">
-          <span className="candidate-id">#{market.market_id}</span>
           <span className="badge">{formatMarketShape(market.market_shape)}</span>
           <span className="badge muted">Cierra {formatDateTime(market.close_time)}</span>
-          {lifecycle.status !== "live" && lifecycle.status !== "unknown" ? (
-            <span className="warning-chip">{lifecycle.label}</span>
-          ) : null}
+          <span className={`market-status-badge ${publicStatus.tone}`}>
+            {publicStatus.label}
+          </span>
         </div>
         <span className="urgency-pill medium">{formatScore(market.urgency_score)}</span>
       </div>
@@ -810,11 +828,11 @@ function deriveSoccerMatchLifecycle(match: SoccerMatch) {
 
 function formatMatchDay(date: string | null): string {
   if (!date) {
-    return "Sin fecha clara";
+    return "Sin fecha confirmada";
   }
   const value = new Date(`${date}T12:00:00`);
   if (Number.isNaN(value.getTime())) {
-    return "Sin fecha clara";
+    return "Sin fecha confirmada";
   }
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -828,11 +846,39 @@ function formatMatchDay(date: string | null): string {
   if (day.getTime() === tomorrow.getTime()) {
     return "Mañana";
   }
+  const weekLimit = new Date(today);
+  weekLimit.setDate(weekLimit.getDate() + 7);
+  if (day > tomorrow && day <= weekLimit) {
+    return "Esta semana";
+  }
+  return "Próximamente";
+}
+
+function formatMatchDateDetail(date: string | null): string {
+  if (!date) {
+    return "Sin fecha confirmada";
+  }
+  const value = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(value.getTime())) {
+    return "Sin fecha confirmada";
+  }
   return new Intl.DateTimeFormat("es", {
     day: "numeric",
     month: "long",
     weekday: "short",
   }).format(value);
+}
+
+function soccerSectionRank(label: string): number {
+  const order: Record<string, number> = {
+    Hoy: 0,
+    "Mañana": 1,
+    "Esta semana": 2,
+    "Próximamente": 3,
+    "Sin fecha confirmada": 4,
+    Cerrados: 5,
+  };
+  return order[label] ?? 6;
 }
 
 function buildSoccerSchedule(markets: UpcomingSportsMarket[]): SoccerScheduleSection[] {
@@ -853,11 +899,13 @@ function buildSoccerSchedule(markets: UpcomingSportsMarket[]): SoccerScheduleSec
   if (closedMatches.length > 0) {
     sections.set("Cerrados", closedMatches);
   }
-  return Array.from(sections.entries()).map(([label, matches]) => ({
-    key: label,
-    label,
-    matches,
-  }));
+  return Array.from(sections.entries())
+    .map(([label, matches]) => ({
+      key: label,
+      label,
+      matches,
+    }))
+    .sort((left, right) => soccerSectionRank(left.label) - soccerSectionRank(right.label));
 }
 
 function buildSoccerMatchStats(markets: UpcomingSportsMarket[]) {
@@ -942,13 +990,21 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
   const volume = sumMarketMetric(match.markets, "volume");
   const hasIncompletePrices = !match.homeWin || !match.awayWin || !match.draw;
   const lifecycle = deriveSoccerMatchLifecycle(match);
+  const status = getPublicMarketStatus({
+    hasAnalysis: match.markets.some((market) => market.has_prediction),
+    hasPrice: match.markets.some(
+      (market) => market.market_yes_price !== null && market.market_yes_price !== undefined,
+    ),
+    isPartial: hasIncompletePrices || lifecycle.status === "missed_live_snapshot",
+    lifecycleStatus: lifecycle.status,
+  });
 
   return (
     <article className={`soccer-match-card ${lifecycle.isExpired ? "is-expired" : ""}`}>
       <div className="soccer-match-meta">
-        <span>{lifecycle.label}</span>
+        <span>{status.label}</span>
         <span>Fútbol</span>
-        <span>{match.dateSource === "question" ? "Fecha inferida" : "Próximo partido"}</span>
+        <span>{formatMatchDateDetail(match.date)}</span>
         <span>Vol. {formatMetric(volume)}</span>
       </div>
       <div className="soccer-match-main">
@@ -976,7 +1032,7 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
         {hasIncompletePrices ? <span className="warning-chip">Información parcial</span> : null}
         {analysisMarketId ? (
           <Link className="analysis-link" href={`/markets/${analysisMarketId}`}>
-            Ver análisis
+            Ver mercados
           </Link>
         ) : null}
       </div>
@@ -1010,11 +1066,10 @@ function SoccerMatchSchedule({ markets }: { markets: UpcomingSportsMarket[] }) {
   return (
     <div className="soccer-schedule">
       <div className="soccer-schedule-note">
-        <strong>Próximos 3 días</strong>
+        <strong>Próximos partidos</strong>
         <span>
-          Se usa `close_time` cuando existe. Los mercados actuales no traen hora
-          estructurada, así que la fecha se infiere del título y los precios se
-          muestran solo cuando existen.
+          La cartelera se agrupa por día cuando hay fecha disponible. Si falta
+          algún precio, el partido se marca como información parcial.
         </span>
       </div>
       {schedule.map((section) => (
