@@ -97,7 +97,12 @@ function publicAlertText(value?: string | null): string {
     return "";
   }
   return value
+    .replace(/\bmissing[_ ]latest[_ ]snapshots?\b/gi, "sin precio reciente")
+    .replace(/\bmissing[_ ]snapshots?\b/gi, "sin precio reciente")
+    .replace(/\blatest[_ ]snapshots?\b/gi, "precio reciente")
     .replace(/\bsnapshots?\b/gi, "precios recientes")
+    .replace(/\bscoring[_ ]mode\b/gi, "lectura")
+    .replace(/\bscore\b/gi, "señal")
     .replace(/\bfallback\b/gi, "datos limitados")
     .replace(/\bmarket[_ ]?overview\b/gi, "mercados visibles")
     .replace(/\bapi\b/gi, "servicio")
