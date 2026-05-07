@@ -92,6 +92,11 @@ def build_parser() -> argparse.ArgumentParser:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="Modo solo lectura. Es el default.")
     mode.add_argument("--apply", action="store_true", help="Ejecuta import, snapshots y scoring.")
+    parser.add_argument(
+        "--yes-i-understand-this-writes-data",
+        action="store_true",
+        help="Confirmacion adicional obligatoria para usar --apply.",
+    )
     parser.add_argument("--days", type=int, default=7, help="Ventana de proximos dias.")
     parser.add_argument(
         "--pages",
@@ -144,6 +149,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def validate_args(args: argparse.Namespace) -> None:
+    if args.apply and not args.yes_i_understand_this_writes_data:
+        raise ValueError(
+            "--apply requiere --yes-i-understand-this-writes-data para confirmar escrituras."
+        )
     if args.delete_existing and not args.apply:
         raise ValueError("--delete-existing requiere --apply y backup verificado.")
     if args.delete_existing:
@@ -395,6 +404,7 @@ def _build_next_apply_command(
     parts = [
         "python -m app.commands.refresh_soccer_markets",
         "--apply",
+        "--yes-i-understand-this-writes-data",
         f"--days {days}",
         f"--pages {pages}",
         f"--limit {limit}",

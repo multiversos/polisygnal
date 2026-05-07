@@ -50,6 +50,7 @@ def test_refresh_soccer_markets_parser_defaults_to_dry_run() -> None:
 
     assert args.apply is False
     assert args.dry_run is False
+    assert args.yes_i_understand_this_writes_data is False
     assert args.days == 7
     assert args.pages == 5
     assert args.max_events == 10
@@ -104,6 +105,7 @@ def test_refresh_soccer_markets_dry_run_does_not_write_and_propagates_flags(
     ]
     assert "dry_run_default_no_writes" in payload["warnings"]
     assert "--apply" in payload["next_command_to_apply"]
+    assert "--yes-i-understand-this-writes-data" in payload["next_command_to_apply"]
 
     assert calls["import"]["dry_run"] is True
     assert calls["import"]["sport"] == "soccer"
@@ -143,6 +145,13 @@ def test_refresh_soccer_markets_apply_is_required_for_writes_and_propagates_appl
     assert calls["scoring"]["apply"] is True
 
 
+def test_refresh_soccer_markets_apply_requires_explicit_write_confirmation() -> None:
+    args = command.build_parser().parse_args(["--apply"])
+
+    with pytest.raises(ValueError, match="--yes-i-understand-this-writes-data"):
+        command.validate_args(args)
+
+
 def test_refresh_soccer_markets_delete_existing_is_blocked_without_apply() -> None:
     args = command.build_parser().parse_args(["--delete-existing"])
 
@@ -151,7 +160,9 @@ def test_refresh_soccer_markets_delete_existing_is_blocked_without_apply() -> No
 
 
 def test_refresh_soccer_markets_delete_existing_is_not_implemented_even_with_apply() -> None:
-    args = command.build_parser().parse_args(["--apply", "--delete-existing"])
+    args = command.build_parser().parse_args(
+        ["--apply", "--yes-i-understand-this-writes-data", "--delete-existing"]
+    )
 
     with pytest.raises(ValueError, match="todavia no esta implementado"):
         command.validate_args(args)

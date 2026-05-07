@@ -108,10 +108,10 @@ command:
 
 Review `candidate_events`, `candidate_markets`, `snapshot_would_create`, and
 `scoring_candidates` before any apply. The apply command is intentionally
-explicit:
+explicit and requires a second write-confirmation flag:
 
 ```powershell
-.\.venv\Scripts\python.exe -m app.commands.refresh_soccer_markets --apply --days 7 --pages 5 --max-events 10 --max-import 30 --max-snapshots 30 --score-limit 30 --json --debug-skips
+.\.venv\Scripts\python.exe -m app.commands.refresh_soccer_markets --apply --yes-i-understand-this-writes-data --days 7 --pages 5 --max-events 10 --max-import 30 --max-snapshots 30 --score-limit 30 --json --debug-skips
 ```
 
 `--delete-existing` is reserved for a future supervised refresh. It must not be
