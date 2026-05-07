@@ -185,9 +185,9 @@ const marketShapeLabels: Record<string, string> = {
 };
 
 const gapLabels: Record<string, string> = {
-  sin_research_runs: "Sin research runs",
-  sin_evidencia_guardada: "Sin evidencia guardada",
-  sin_reporte_de_prediccion: "Sin reporte de predicción",
+  sin_research_runs: "Falta contexto",
+  sin_evidencia_guardada: "Falta contexto",
+  sin_reporte_de_prediccion: "Sin lectura PolySignal",
 };
 
 const freshnessStatusLabels: Record<string, string> = {
@@ -522,7 +522,7 @@ export default function DailyBriefingPage() {
         const derivedBriefing = await fetchDerivedBriefing(days, sport);
         setBriefing(derivedBriefing);
         setSourceNote(
-          "Briefing derivado desde /markets/overview porque el módulo de briefing dedicado aún no está listo.",
+          "Resumen generado con los mercados visibles disponibles.",
         );
       }
       setSmartAlerts(alertsResult.status === "fulfilled" ? alertsResult.value.alerts : []);
@@ -567,7 +567,7 @@ export default function DailyBriefingPage() {
       }
     } catch {
       setMarkdownCopyStatus("error");
-      setError("No se pudo generar el Markdown. Revisa que la API este en linea.");
+      setError("No se pudo preparar el resumen. Intenta actualizar de nuevo.");
     }
   }, [days, sport]);
 
@@ -577,9 +577,9 @@ export default function DailyBriefingPage() {
       <header className="topbar briefing-header">
         <div>
           <p className="eyebrow">PolySignal</p>
-          <h1>Briefing diario</h1>
+          <h1>Resumen diario</h1>
           <p className="subtitle">
-            Resumen operativo centrado en partidos deportivos de los próximos 7
+            Resumen simple centrado en partidos deportivos de los próximos 7
             días. Los campeonatos y futuros quedan fuera del flujo principal por
             ahora; no es recomendación de apuesta.
           </p>
@@ -588,12 +588,12 @@ export default function DailyBriefingPage() {
 
       <SportsSelectorBar
         activeLabel="Activo"
-        description="Selecciona un deporte para filtrar el briefing diario."
+        description="Selecciona un deporte para filtrar el resumen diario."
         onSelect={handleSelectSport}
         selectedSport={sport}
       />
 
-      <section className="filter-panel briefing-filter-panel" aria-label="Filtros del briefing">
+      <section className="filter-panel briefing-filter-panel" aria-label="Filtros del resumen diario">
         <label>
           Ventana
           <select value={days} onChange={(event) => setDays(Number(event.target.value))}>
@@ -617,7 +617,7 @@ export default function DailyBriefingPage() {
             ? "Copiando..."
             : markdownCopyStatus === "copied"
               ? "Copiado"
-              : "Copiar Markdown"}
+              : "Copiar resumen"}
         </button>
       </section>
 
@@ -633,16 +633,16 @@ export default function DailyBriefingPage() {
 
       {sourceNote ? (
         <section className="safety-strip briefing-focus-note">
-          <strong>Datos existentes:</strong>
-          <span>{sourceNote} No ejecuta research automático ni crea predicciones.</span>
+          <strong>Mercados visibles:</strong>
+          <span>{sourceNote}</span>
         </section>
       ) : null}
 
       {markdownFallback ? (
-        <section className="panel briefing-markdown-fallback" aria-label="Markdown del briefing">
+        <section className="panel briefing-markdown-fallback" aria-label="Texto del resumen diario">
           <div className="panel-heading compact">
             <div>
-              <h2>Copia manual del Markdown</h2>
+              <h2>Copia manual del resumen</h2>
               <p>El portapapeles no estuvo disponible. Puedes seleccionar el texto.</p>
             </div>
           </div>
@@ -696,7 +696,7 @@ export default function DailyBriefingPage() {
         </div>
       </section>
 
-      {staleUpcomingMarkets.length > 0 ? (
+      {false ? (
         <section className="panel briefing-section">
           <div className="panel-heading compact">
             <div>
@@ -779,6 +779,7 @@ export default function DailyBriefingPage() {
           )}
         </BriefingSection>
 
+        {false ? (
         <section className="panel briefing-section">
           <div className="panel-heading compact">
             <div>
@@ -811,7 +812,9 @@ export default function DailyBriefingPage() {
             ))}
           </div>
         </section>
+        ) : null}
 
+        {false ? (
         <BriefingSection
           emptyCopy="No hay gaps detectados en los mercados destacados."
           items={briefing?.research_gaps ?? []}
@@ -832,6 +835,7 @@ export default function DailyBriefingPage() {
             />
           )}
         </BriefingSection>
+        ) : null}
 
         <BriefingSection
           emptyCopy="No hay movimientos relevantes de precio en los mercados destacados."

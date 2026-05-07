@@ -23,6 +23,25 @@ const RENDER_ERROR_TEXT = [
   "Todavia no hay mercados",
   "Todavía no hay mercados",
 ];
+const PUBLIC_NAV_TEXT = [
+  "Inicio",
+  "Mercados deportivos",
+  "Resumen diario",
+  "Mi lista",
+  "Alertas",
+];
+const INTERNAL_NAV_TEXT = [
+  "Investigación",
+  "InvestigaciÃ³n",
+  "Evidencia",
+  "Decisiones",
+  "Workflow",
+  "Coincidencias Kalshi",
+  "Calidad de fuentes",
+  "Salud de datos",
+  "Trial E2E",
+  "Backtesting",
+];
 
 function urlFor(path) {
   return `${FRONTEND_BASE_URL}${path}`;
@@ -167,6 +186,10 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
   assertTextIncludes(text, `Vista mercados (${MIN_SOCCER_MARKETS})`, label);
   assertTextIncludes(text, "Partidos detectados", label);
   assertTextIncludes(text, "Próximos partidos", label);
+  for (const publicItem of PUBLIC_NAV_TEXT) {
+    assertTextIncludes(text, publicItem, `${label} public sidebar`);
+  }
+  assertTextExcludes(text, INTERNAL_NAV_TEXT, `${label} public sidebar`);
 
   return {
     market_card_count: cardCount,
@@ -175,6 +198,8 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
     markets_summary_found: true,
     market_toggle_found: true,
     match_summary_found: true,
+    public_sidebar_found: true,
+    internal_sidebar_hidden: true,
   };
 }
 

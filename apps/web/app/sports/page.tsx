@@ -38,8 +38,8 @@ export default function SportsIndexPage() {
       <section className="safety-strip">
         <strong>Solo lectura:</strong>
         <span>
-          Estas páginas organizan mercados ya sincronizados. No crean datos,
-          research, predicciones, órdenes ni apuestas.
+          Estas páginas organizan mercados disponibles para revisión manual. No
+          crean apuestas ni ejecutan operaciones automáticas.
         </span>
       </section>
 
@@ -47,7 +47,7 @@ export default function SportsIndexPage() {
         <div className="panel-heading">
           <div>
             <h2>Deportes principales</h2>
-            <p>Activos para navegación, filtros y llamadas controladas al backend.</p>
+            <p>Disponibles para revisar mercados deportivos.</p>
           </div>
         </div>
         <div className="sports-index-grid">
@@ -72,7 +72,7 @@ export default function SportsIndexPage() {
         <div className="panel-heading">
           <div>
             <h2>Otros</h2>
-          <p>Visibles como roadmap, sin carga de datos ni llamadas al backend.</p>
+          <p>Visibles como próximos deportes, todavía sin mercados.</p>
           </div>
         </div>
         <div className="sports-index-grid secondary">

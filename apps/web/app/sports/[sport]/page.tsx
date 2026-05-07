@@ -19,8 +19,6 @@ import {
   type SportSelectorOption,
 } from "../../components/SportsSelectorBar";
 import {
-  API_BASE_URL,
-  API_HOST_LABEL,
   fetchApiJson,
   friendlyApiError,
 } from "../../lib/api";
@@ -1133,9 +1131,8 @@ export default function SportDetailPage() {
           <p className="eyebrow">Deportes</p>
           <h1>Mercados de {sportOption.label}</h1>
           <p className="subtitle">
-            Mercados reales filtrados desde /markets/overview mediante el proxy
-            same-origin. Si un deporte principal aún no tiene datos, verás un
-            estado vacío limpio.
+            Mercados reales para revisar por deporte. Si un deporte principal
+            aún no tiene datos, verás un estado vacío limpio.
           </p>
         </div>
         <div className="topbar-actions">
@@ -1154,7 +1151,7 @@ export default function SportDetailPage() {
         <strong>No es recomendación de apuesta:</strong>
         <span>
           Esta vista organiza mercados deportivos para revisión manual. No
-          ejecuta research, predicciones, órdenes ni trading.
+          ejecuta apuestas automáticas ni operaciones por ti.
         </span>
       </section>
 
@@ -1214,9 +1211,8 @@ export default function SportDetailPage() {
           <strong>{state.loading ? "..." : state.qualitySummary?.missing_price_count ?? 0}</strong>
         </div>
         <p>
-          Fuente: {API_HOST_LABEL} vía /api/backend/markets/overview. Actualizado{" "}
-          {state.updatedAt ? formatDateTime(state.updatedAt.toISOString()) : "al cargar"}.
-          La calidad de datos explica por qué un score puede quedar pendiente.
+          Actualizado {state.updatedAt ? formatDateTime(state.updatedAt.toISOString()) : "al cargar"}.
+          Si un mercado aparece parcial, todavía no tiene todos los precios necesarios.
         </p>
       </section>
 
@@ -1246,7 +1242,7 @@ export default function SportDetailPage() {
             La vista de partidos agrupa mercados por equipo vs equipo. Si un
             partido aparece incompleto, cambia a Vista mercados para revisar los
             {` ${state.items.length} `}mercados individuales cargados desde el
-            backend.
+            listado disponible.
           </p>
         </section>
       ) : null}
@@ -1256,21 +1252,14 @@ export default function SportDetailPage() {
           <div>
             <h2>{selectedSport === "soccer" ? "Próximos partidos" : "Mercados próximos"}</h2>
             <p>
-              Filtro activo: {sportOption.label}. Esta vista no importa datos,
-              discovery ni scoring; solo lee mercados disponibles.
+              Filtro activo: {sportOption.label}. Esta vista solo muestra mercados
+              disponibles para revisión manual.
             </p>
           </div>
           {sportIsEnabled ? (
-            <a
-              className="text-link"
-              href={`${API_BASE_URL}${overviewPath}`}
-              rel="noreferrer"
-              target="_blank"
-            >
-            Ver JSON
-            </a>
+            <span className="badge muted">Solo lectura</span>
           ) : (
-            <span className="badge muted">Sin consulta al backend</span>
+            <span className="badge muted">Próximamente</span>
           )}
         </div>
 
@@ -1295,14 +1284,14 @@ export default function SportDetailPage() {
 
         {!sportIsEnabled ? (
           <ComingSoonModule
-            copy="La categoría se muestra como roadmap, pero no carga mercados, discovery, scoring ni datos remotos todavía."
+            copy="Este deporte se muestra como próximo lanzamiento y todavía no carga mercados."
             title={`${sportOption.label} está en preparación.`}
           />
         ) : state.loading ? (
           <LoadingState copy={`Cargando mercados de ${sportOption.label}...`} />
         ) : state.items.length === 0 ? (
           <EmptyState
-            copy={`La API respondió correctamente, pero no hay datos sincronizados para sport_type=${sportOption.apiValue ?? selectedSport}. total_count=0 en ${overviewPath}. Ejecuta el pipeline limitado cuando quieras poblarlo; no se muestran datos inventados.`}
+            copy="La conexión funciona, pero todavía no hay mercados cargados para este deporte. Cuando haya datos disponibles aparecerán aquí."
             title={`Todavía no hay mercados cargados para ${sportOption.label}.`}
           />
         ) : shouldShowSoccerSchedule ? (

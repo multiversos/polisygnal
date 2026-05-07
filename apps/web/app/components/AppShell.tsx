@@ -23,25 +23,16 @@ type NavIconName =
 
 const THEME_STORAGE_KEY = "polysignal-theme";
 
-const navigationItems: Array<{
+const publicNavigationItems: Array<{
   label: string;
   href: string;
   icon: NavIconName;
 }> = [
-  { label: "Dashboard", href: "/", icon: "dashboard" },
-  { label: "Deportes", href: "/sports", icon: "sports" },
-  { label: "Briefing diario", href: "/briefing", icon: "briefing" },
-  { label: "Investigación", href: "/research", icon: "research" },
-  { label: "Evidencia", href: "/evidence", icon: "evidence" },
-  { label: "Mi seguimiento", href: "/#mi-seguimiento", icon: "watchlist" },
-  { label: "Decisiones", href: "/decisions", icon: "decisions" },
-  { label: "Workflow", href: "/workflow", icon: "workflow" },
+  { label: "Inicio", href: "/", icon: "dashboard" },
+  { label: "Mercados deportivos", href: "/sports", icon: "sports" },
+  { label: "Resumen diario", href: "/briefing", icon: "briefing" },
+  { label: "Mi lista", href: "/#mi-seguimiento", icon: "watchlist" },
   { label: "Alertas", href: "/alerts", icon: "alerts" },
-  { label: "Coincidencias Kalshi", href: "/external-signals/matches", icon: "matches" },
-  { label: "Calidad de fuentes", href: "/sources", icon: "sources" },
-  { label: "Salud de datos", href: "/data-health", icon: "data" },
-  { label: "Trial E2E", href: "/trials/e2e", icon: "trial" },
-  { label: "Backtesting", href: "/backtesting", icon: "backtesting" },
 ];
 
 function applyThemePreference(theme: ThemePreference) {
@@ -101,11 +92,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <aside className="app-sidebar" aria-label="Navegación principal">
-        <Link className="app-logo" href="/" aria-label="Ir al dashboard de PolySignal">
+        <Link className="app-logo" href="/" aria-label="Ir al inicio de PolySignal">
           <img src="/brand/polysignal-logo-option5.svg" alt="PolySignal" />
         </Link>
         <nav className="app-nav">
-          {navigationItems.map((item) => (
+          {publicNavigationItems.map((item) => (
             <Link
               aria-current={isActivePath(pathname, item.href) ? "page" : undefined}
               className={`app-nav-item ${isActivePath(pathname, item.href) ? "active" : ""}`}
@@ -134,7 +125,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <img src="/brand/polysignal-icon-option5.svg" alt="" aria-hidden="true" />
             <div>
               <span>PolySignal</span>
-              <strong>Mercados próximos y datos operativos</strong>
+              <strong>Mercados y alertas deportivas</strong>
             </div>
           </div>
         </header>

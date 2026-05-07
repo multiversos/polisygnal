@@ -349,60 +349,38 @@ const marketShapeOptions = [
 const limitOptions = [5, 10, 20];
 
 const quickLinks = [
-  { label: "Briefing diario", href: "/briefing" },
-  { label: "Calidad de fuentes", href: "/sources" },
-  { label: "Backtesting", href: "/backtesting" },
-  { label: "Documentación API", href: `${API_BASE_URL}/docs` },
-  { label: "Panel backend", href: `${API_BASE_URL}/` },
-  { label: "Estado API", href: `${API_BASE_URL}/health` },
-  { label: "Resumen de mercados", href: `${API_BASE_URL}/markets/overview` },
-  {
-    label: "Candidatos de investigación",
-    href: `${API_BASE_URL}/research/candidates?limit=10&vertical=sports`,
-  },
-  {
-    label: "Próximos partidos",
-    href: `${API_BASE_URL}/research/upcoming-sports?limit=10&days=7&focus=match_winner`,
-  },
-  { label: "Señales externas", href: `${API_BASE_URL}/external-signals/kalshi?limit=10` },
-  { label: "Revisar coincidencias Kalshi", href: "/external-signals/matches" },
+  { label: "Inicio", href: "/" },
+  { label: "Mercados deportivos", href: "/sports" },
+  { label: "Resumen diario", href: "/briefing" },
+  { label: "Mi lista", href: "/#mi-seguimiento" },
+  { label: "Alertas", href: "/alerts" },
 ];
 
 const commandCenterLinks = [
   {
-    label: "Briefing",
-    description: "Resumen operativo diario",
-    href: "/briefing",
+    label: "Inicio",
+    description: "Vista general de mercados y señales",
+    href: "/",
   },
   {
-    label: "Deportes",
-    description: "Mercados próximos por deporte",
+    label: "Mercados deportivos",
+    description: "Partidos y precios por deporte",
     href: "/sports",
   },
   {
-    label: "Investigación",
-    description: "Runs y packets generados",
-    href: "/research",
+    label: "Resumen diario",
+    description: "Lo más importante para revisar hoy",
+    href: "/briefing",
+  },
+  {
+    label: "Mi lista",
+    description: "Mercados guardados para revisar después",
+    href: "/#mi-seguimiento",
   },
   {
     label: "Alertas",
-    description: "Recordatorios operativos",
+    description: "Recordatorios para revisar primero",
     href: "/alerts",
-  },
-  {
-    label: "Workflow",
-    description: "Kanban de investigación",
-    href: "/workflow",
-  },
-  {
-    label: "Backtesting",
-    description: "Resultados manuales y métricas",
-    href: "/backtesting",
-  },
-  {
-    label: "Salud de datos",
-    description: "Cobertura, precios y snapshots",
-    href: "/data-health",
   },
 ];
 
@@ -2498,18 +2476,10 @@ function MarketOverviewPanel({
         <div>
           <h2>Mercados destacados</h2>
           <p>
-            Lectura directa de /markets/overview: precios, score, confianza y
-            estado operativo para decidir que revisar primero.
+            Precios, lectura PolySignal y nivel de confianza para decidir qué
+            revisar primero.
           </p>
         </div>
-        <a
-          className="text-link"
-          href={`${API_BASE_URL}${overviewPath}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Ver JSON
-        </a>
       </div>
 
       <div className="market-overview-kpis" aria-label="Resumen de mercados destacados">
@@ -3033,29 +3003,20 @@ export default function DashboardPage() {
       <header className="topbar">
         <div>
           <p className="eyebrow">PolySignal</p>
-          <h1>Centro de comando PolySignal</h1>
+          <h1>Inicio</h1>
           <p className="subtitle">
-            Vista operativa de solo lectura para revisar partidos próximos,
-            seguimiento, alertas, workflow y calidad de datos sin ejecutar
-            research automático, predicciones ni trading.
+            Revisa mercados deportivos, tu lista y alertas en un solo lugar.
+            PolySignal es una herramienta de lectura y revisión manual.
           </p>
         </div>
         <div className="topbar-actions">
-          <div
-            className={`status-pill ${apiOnline ? "status-online" : "status-offline"}`}
-            aria-live="polite"
-          >
-            <span className="status-dot" />
-            {state.loading ? "Cargando API" : apiOnline ? "API en línea" : "API sin respuesta"}
-          </div>
-          <span className="badge muted">API: {API_HOST_LABEL}</span>
           <button
             className="text-link"
             disabled={state.loading}
             onClick={() => void loadDashboard()}
             type="button"
           >
-            {state.loading ? "Cargando" : "Reintentar"}
+            {state.loading ? "Actualizando" : "Actualizar"}
           </button>
         </div>
       </header>
@@ -3063,17 +3024,16 @@ export default function DashboardPage() {
       <section className="safety-strip">
         <strong>Solo lectura:</strong>
         <span>
-          PolySignal prioriza partidos cercanos para revisión manual; no es una
-          recomendación de apuesta. No ejecuta apuestas automáticas, research ni
-          predicciones desde esta UI.
+          PolySignal organiza mercados para revisión manual. No es una recomendación
+          de apuesta y no ejecuta apuestas automáticas.
         </span>
       </section>
 
-      <section className="command-center-shortcuts" aria-label="Accesos rápidos del centro de comando">
+      <section className="command-center-shortcuts" aria-label="Accesos rápidos">
         <div className="panel-heading compact">
           <div>
             <h2>Accesos rápidos</h2>
-            <p>Las vistas principales del flujo operativo diario en un solo lugar.</p>
+            <p>Las vistas principales para revisar mercados sin ruido técnico.</p>
           </div>
         </div>
         <nav className="command-center-link-grid" aria-label="Vistas principales">
@@ -3086,12 +3046,12 @@ export default function DashboardPage() {
         </nav>
       </section>
 
-      {state.error ? (
+      {state.error && !state.overview ? (
         <section className="alert-panel" role="status">
-          <strong>Datos parciales</strong>
+          <strong>No pudimos actualizar los mercados</strong>
           <span>
-            {state.error}. Host API usado: {API_HOST_LABEL}. Los datos principales
-            siguen visibles cuando estan disponibles.
+            Intenta actualizar de nuevo. Si ya tenías datos en pantalla, se
+            conservarán mientras vuelve la conexión.
           </span>
           <button
             className="refresh-button"
@@ -3106,19 +3066,19 @@ export default function DashboardPage() {
 
       <section className="metric-grid" aria-label="Estado del sistema">
         <article className="metric-card">
-          <span>Estado backend</span>
-          <strong>{state.loading ? "Cargando" : apiOnline ? "en línea" : "desconectado"}</strong>
-          <p>{state.health?.environment ?? "Entorno local pendiente"}</p>
+          <span>Estado de datos</span>
+          <strong>{state.loading ? "Cargando" : apiOnline ? "Listos" : "Pendientes"}</strong>
+          <p>{state.overview ? "Mercados disponibles para revisar" : "Actualización pendiente"}</p>
         </article>
         <article className="metric-card">
-          <span>Resumen de mercados</span>
+          <span>Mercados visibles</span>
           <strong>{marketCount === null ? "N/D" : marketCount}</strong>
-          <p>{state.overview ? "Endpoint disponible" : "Sin respuesta del endpoint"}</p>
+          <p>{state.overview ? "Cargados en esta vista" : "Sin datos cargados"}</p>
         </article>
         <article className="metric-card">
-          <span>Con predicción</span>
+          <span>Con señal</span>
           <strong>{state.loading ? "..." : overviewItemsWithPrediction}</strong>
-          <p>Mercados con score visible en overview</p>
+          <p>Mercados con lectura disponible</p>
         </article>
         <article className="metric-card">
           <span>Deportes disponibles</span>
@@ -3128,15 +3088,15 @@ export default function DashboardPage() {
         <article className="metric-card">
           <span>Modo actual</span>
           <strong>solo lectura</strong>
-          <p>No trading automático ni scoring desde la UI</p>
+          <p>No ejecuta apuestas automáticas</p>
         </article>
         <article className="metric-card">
-          <span>Actualizacion local</span>
+          <span>Actualización</span>
           <strong>{formatDateTime(state.updatedAt)}</strong>
           <p>
             {state.dashboardMeta?.generated_at
-              ? `Reporte backend: ${formatDateTime(state.dashboardMeta.generated_at)}`
-              : "Dashboard en vivo"}
+              ? formatDateTime(state.dashboardMeta.generated_at)
+              : "Vista actualizada"}
           </p>
         </article>
       </section>
@@ -3159,12 +3119,6 @@ export default function DashboardPage() {
         selectedSport={upcomingFilters.sport}
         totalCount={marketCount}
         updatedAt={state.updatedAt}
-      />
-
-      <FirstAnalysisReadinessPanel
-        items={state.analysisReadinessItems}
-        loading={state.loading}
-        summary={state.analysisReadinessSummary}
       />
 
       <section className="filter-panel dashboard-filter-panel" aria-label="Filtros de candidatos">
@@ -3226,14 +3180,6 @@ export default function DashboardPage() {
               pausados por ahora.
             </p>
           </div>
-          <a
-            className="text-link"
-            href={`${API_BASE_URL}${upcomingPath}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Ver JSON
-          </a>
         </div>
 
         <div className="upcoming-filter-row" aria-label="Filtros de próximos mercados">
@@ -3279,11 +3225,6 @@ export default function DashboardPage() {
           <span>Ganador de partido: {state.loading ? "..." : state.upcomingCounts?.match_winner ?? 0}</span>
           <span>Futuros/campeonatos: {state.loading ? "..." : state.upcomingCounts?.championship_futures ?? 0}</span>
         </div>
-        <DataQualitySummaryPanel
-          loading={state.loading}
-          summary={state.upcomingDataQualitySummary}
-        />
-
         {state.loading ? (
           <div className="empty-state">Cargando próximos mercados...</div>
         ) : topUpcomingMarkets.length === 0 ? (
@@ -3315,11 +3256,6 @@ export default function DashboardPage() {
         )}
       </section>
 
-      <InvestigationStatusSummary
-        items={state.investigationStatuses}
-        loading={state.loading}
-      />
-
       <WatchlistPanel
         busyItemId={watchlistActionItemId}
         error={watchlistError}
@@ -3328,6 +3264,7 @@ export default function DashboardPage() {
         onRemove={handleRemoveWatchlistItem}
       />
 
+      {false ? (
       <section className="dashboard-grid">
         <article className="panel panel-wide">
           <div className="panel-heading">
@@ -3575,6 +3512,7 @@ export default function DashboardPage() {
           </nav>
         </aside>
       </section>
+      ) : null}
     </main>
   );
 }

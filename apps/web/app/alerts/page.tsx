@@ -62,13 +62,13 @@ const sportOptions = [
 ];
 
 const typeLabels: Record<string, string> = {
-  external_signal_unmatched: "Señal externa sin vincular",
+  external_signal_unmatched: "Contexto pendiente",
   low_data_quality: "Baja calidad de datos",
   missing_data: "Datos faltantes",
-  no_research: "Sin research",
+  no_research: "Falta contexto",
   price_move: "Movimiento de precio",
   upcoming_close_soon: "Cierre próximo",
-  watchlist_needs_review: "Watchlist requiere revisión",
+  watchlist_needs_review: "Mi lista requiere revisión",
 };
 
 function formatDate(value?: string | null): string {
@@ -208,7 +208,7 @@ function deriveAlertsFromOverview(overview: MarketOverviewAlertsResponse): Smart
         id: `derived-close-${marketId}`,
         type: "upcoming_close_soon",
         severity: "info",
-        title: "Cierre proximo",
+        title: "Cierre próximo",
         description: question,
         reason: `Cierra en ${closeHours.toFixed(1)} horas.`,
         created_from: "market_overview",
@@ -220,9 +220,9 @@ function deriveAlertsFromOverview(overview: MarketOverviewAlertsResponse): Smart
         id: `derived-no-evidence-${marketId}`,
         type: "no_research",
         severity: "info",
-        title: "Sin evidencia externa guardada",
+        title: "Falta contexto",
         description: question,
-        reason: "La evidencia externa se agregara en un sprint posterior.",
+        reason: "Todavía falta contexto adicional para revisar este mercado.",
         created_from: "market_overview",
       });
     }
@@ -263,7 +263,7 @@ export default function AlertsPage() {
         setAlerts(derivedAlerts);
         setCounts(buildDerivedAlertCounts(derivedAlerts));
         setGeneratedAt(new Date().toISOString());
-        setSourceNote("Alertas derivadas desde /markets/overview porque no hay alertas inteligentes guardadas.");
+        setSourceNote("Alertas generadas con los mercados visibles disponibles.");
       }
     } catch {
       try {
@@ -275,7 +275,7 @@ export default function AlertsPage() {
         setCounts(buildDerivedAlertCounts(derivedAlerts));
         setGeneratedAt(new Date().toISOString());
         setSourceNote(
-          "Alertas derivadas desde /markets/overview porque el módulo de alertas dedicado aún no está listo.",
+          "Alertas generadas con los mercados visibles disponibles.",
         );
       } catch {
         setError("No se pudieron cargar alertas ni derivarlas desde market overview.");
@@ -308,8 +308,8 @@ export default function AlertsPage() {
           <p className="eyebrow">PolySignal</p>
           <h1>Alertas inteligentes</h1>
           <p className="subtitle">
-            Recordatorios operativos para revisar mercados, datos y señales. No son
-            recomendaciones de apuesta.
+            Recordatorios simples para revisar mercados. No son recomendaciones de
+            apuesta.
           </p>
         </div>
         <div className="topbar-actions">
@@ -322,7 +322,7 @@ export default function AlertsPage() {
       <section className="safety-strip">
         <strong>Solo revisión:</strong>
         <span>
-          Las alertas no ejecutan research, no crean predicciones y no hacen trading.
+          Las alertas son recordatorios de revisión. No ejecutan apuestas automáticas.
         </span>
       </section>
 
@@ -376,7 +376,7 @@ export default function AlertsPage() {
         <article className="metric-card">
           <span>Atención</span>
           <strong>{loading ? "..." : counts.warning ?? 0}</strong>
-          <p>Seguimiento operativo</p>
+          <p>Revisar durante el día</p>
         </article>
         <article className="metric-card">
           <span>Info</span>
@@ -399,8 +399,8 @@ export default function AlertsPage() {
 
       {sourceNote ? (
         <section className="safety-strip">
-          <strong>Datos existentes:</strong>
-          <span>{sourceNote} No ejecuta research, discovery, scoring ni trading.</span>
+          <strong>Mercados visibles:</strong>
+          <span>{sourceNote}</span>
         </section>
       ) : null}
 
