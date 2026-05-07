@@ -125,8 +125,11 @@ async function fetchMarketOverviewWorkflow(): Promise<MarketOverviewWorkflowResp
 }
 
 function deriveWorkflowStatus(item: MarketOverviewWorkflowItem): InvestigationStatus {
-  if (!item.latest_prediction || item.scoring_mode === "fallback_only") {
+  if (!item.latest_prediction) {
     return "paused";
+  }
+  if (item.scoring_mode === "fallback_only") {
+    return "investigating";
   }
   const confidence = toNumber(item.latest_prediction.confidence_score);
   if (confidence !== null && confidence < 0.35) {

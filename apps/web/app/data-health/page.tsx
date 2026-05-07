@@ -45,6 +45,9 @@ type MarketOverviewHealthResponse = {
   items?: MarketOverviewHealthItem[];
 };
 
+const ENABLE_ADVANCED_DATA_HEALTH =
+  process.env.NEXT_PUBLIC_ENABLE_ADVANCED_DATA_HEALTH === "true";
+
 const sportLabels: Record<string, string> = {
   nba: "Baloncesto",
   basketball: "Baloncesto",
@@ -208,6 +211,21 @@ export default function DataHealthPage() {
     setLoading(true);
     setError(null);
     try {
+      if (!ENABLE_ADVANCED_DATA_HEALTH) {
+        const overviewResult = await withTimeout(
+          fetchMarketOverviewHealth(),
+          10000,
+          "market-overview",
+        );
+        setMarketOverview(overviewResult);
+        setOverview(null);
+        setAnalysisReadiness(null);
+        setSnapshotGaps(null);
+        setRefreshPriorities(null);
+        setRefreshRuns(null);
+        setLiveDiscovery(null);
+        return;
+      }
       const results = await Promise.allSettled([
         withTimeout(fetchMarketOverviewHealth(), 10000, "market-overview"),
         withTimeout(fetchDataHealthOverview(), 10000, "overview"),
@@ -320,6 +338,14 @@ export default function DataHealthPage() {
     .map((item) => item.latest_snapshot?.captured_at)
     .filter((value): value is string => Boolean(value))
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+  const shouldShowAdvancedDiagnostics = Boolean(
+    ENABLE_ADVANCED_DATA_HEALTH &&
+      overview &&
+      ((overview.total_markets ?? 0) > 0 ||
+        (overview.active_markets ?? 0) > 0 ||
+        (overview.markets_with_snapshots ?? 0) > 0 ||
+        (overview.coverage_by_sport?.length ?? 0) > 0),
+  );
   const hasAnyDataHealthPanel =
     Boolean(marketOverview) ||
     Boolean(overview) ||
@@ -434,6 +460,8 @@ export default function DataHealthPage() {
         </div>
       </section>
 
+      {shouldShowAdvancedDiagnostics ? (
+        <>
       <section className="metric-grid" aria-label="Resumen de salud de datos">
         <article className="metric-card">
           <span>Mercados totales</span>
@@ -1137,7 +1165,6 @@ export default function DataHealthPage() {
           )}
         </div>
       </section>
-
       <section className="dashboard-panel">
         <div className="panel-heading">
           <div>
@@ -1180,6 +1207,32 @@ export default function DataHealthPage() {
           </div>
         )}
       </section>
+        </>
+      ) : (
+        <section className="dashboard-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Diagnósticos avanzados</p>
+              <h2>Chequeos operativos en preparación</h2>
+              <p className="section-note">
+                El resumen principal ya está conectado a /markets/overview. Los
+                bloques antiguos de discovery, readiness y cobertura detallada se
+                ocultan cuando todavía no devuelven datos reales para evitar KPIs
+                engañosos en cero.
+              </p>
+            </div>
+            <span className="badge muted">Sin alerta crítica</span>
+          </div>
+          <div className="data-health-notes">
+            <span className="reason-chip">Markets visibles: {overviewTotalMarkets}</span>
+            <span className="reason-chip">Con snapshot: {overviewWithSnapshots}</span>
+            <span className="reason-chip">Con predicción: {overviewWithPredictions}</span>
+            <span className="reason-chip">
+              Vivos sin predicción: {overviewLiveMissingPredictions}
+            </span>
+          </div>
+        </section>
+      )}
 
       <section className="dashboard-panel">
         <div className="panel-heading">

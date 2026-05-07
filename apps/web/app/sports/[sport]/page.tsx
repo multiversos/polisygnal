@@ -245,7 +245,7 @@ function formatMarketShape(value: string): string {
 
 function buildUpcomingPath(option: SportSelectorOption): string {
   const params = new URLSearchParams({
-    limit: "20",
+    limit: "50",
   });
   if (option.apiValue) {
     params.set("sport_type", option.apiValue);
@@ -862,6 +862,23 @@ function buildSoccerSchedule(markets: UpcomingSportsMarket[]): SoccerScheduleSec
   }));
 }
 
+function buildSoccerMatchStats(markets: UpcomingSportsMarket[]) {
+  const matches = buildSoccerMatches(markets);
+  const liveMatches = matches.filter((match) => deriveSoccerMatchLifecycle(match).isReviewableLive);
+  const closedMatches = matches.filter(
+    (match) => !deriveSoccerMatchLifecycle(match).isReviewableLive,
+  );
+  const incompleteMatches = matches.filter((match) => !match.homeWin || !match.awayWin || !match.draw);
+  return {
+    totalMatches: matches.length,
+    liveMatches: liveMatches.length,
+    closedMatches: closedMatches.length,
+    incompleteMatches: incompleteMatches.length,
+    completeMarkets: markets.filter((market) => market.has_snapshot && market.has_prediction).length,
+    pendingMarkets: markets.filter((market) => !market.has_snapshot || !market.has_prediction).length,
+  };
+}
+
 function formatSoccerPrice(value: unknown): string {
   const probability = normalizeProbability(value);
   if (probability === null) {
@@ -1093,6 +1110,12 @@ export default function SportDetailPage() {
     !state.loading &&
     state.items.length > 0 &&
     soccerViewMode === "matches";
+  const soccerMatchStats = useMemo(() => {
+    if (selectedSport !== "soccer" || state.items.length === 0) {
+      return null;
+    }
+    return buildSoccerMatchStats(state.items);
+  }, [selectedSport, state.items]);
 
   const handleSelectSport = (nextSport: string) => {
     if (nextSport === "all") {
@@ -1197,6 +1220,37 @@ export default function SportDetailPage() {
         </p>
       </section>
 
+      {selectedSport === "soccer" && sportIsEnabled && soccerMatchStats ? (
+        <section className="data-quality-summary" aria-label="Resumen de fútbol">
+          <div>
+            <span>Partidos detectados</span>
+            <strong>{soccerMatchStats.totalMatches}</strong>
+          </div>
+          <div>
+            <span>Partidos activos</span>
+            <strong>{soccerMatchStats.liveMatches}</strong>
+          </div>
+          <div>
+            <span>Cerrados</span>
+            <strong>{soccerMatchStats.closedMatches}</strong>
+          </div>
+          <div>
+            <span>Mercados completos</span>
+            <strong>{soccerMatchStats.completeMarkets}</strong>
+          </div>
+          <div>
+            <span>Pendientes</span>
+            <strong>{soccerMatchStats.pendingMarkets}</strong>
+          </div>
+          <p>
+            La vista de partidos agrupa mercados por equipo vs equipo. Si un
+            partido aparece incompleto, cambia a Vista mercados para revisar los
+            {` ${state.items.length} `}mercados individuales cargados desde el
+            backend.
+          </p>
+        </section>
+      ) : null}
+
       <section className="panel sports-market-section">
         <div className="panel-heading">
           <div>
@@ -1234,7 +1288,7 @@ export default function SportDetailPage() {
               onClick={() => setSoccerViewMode("markets")}
               type="button"
             >
-              Vista mercados
+              Vista mercados ({state.items.length})
             </button>
           </div>
         ) : null}
