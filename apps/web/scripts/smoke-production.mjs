@@ -229,6 +229,11 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
   assertTextIncludes(text, `Vista mercados (${MIN_SOCCER_MARKETS})`, label);
   assertTextIncludes(text, "Partidos detectados", label);
   assertTextIncludes(text, "Actualizar", label);
+  assertTextIncludes(text, "Buscar equipo o mercado", label);
+  assertTextIncludes(text, "Estado", label);
+  assertTextIncludes(text, "Orden", label);
+  assertTextIncludes(text, "Mostrando", label);
+  assertTextIncludesOneOf(text, ["Seguir", "Siguiendo"], `${label} watchlist button`);
   assertTextIncludesOneOf(text, UPDATE_TEXT, `${label} update timestamp`);
   assertTextIncludesOneOf(text, SOCCER_MARKET_LIST_TEXT, `${label} visible market list`);
   assertTextIncludes(text, "Próximos partidos", label);
@@ -253,6 +258,20 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
     match_summary_found: true,
     ...publicProduct,
   };
+}
+
+function validateMarketDetailPage(dom, label) {
+  const text = visibleText(dom);
+  assertTextIncludesOneOf(text, ["Seguir mercado", "Siguiendo"], `${label} watchlist action`);
+  assertTextIncludes(text, "Volver a mercados deportivos", label);
+  assertTextIncludesOneOf(text, ["Volver a fÃºtbol", "Volver a fútbol"], `${label} sport return`);
+  assertTextIncludesOneOf(text, ["QuÃ© significa esto", "Qué significa esto"], label);
+  assertTextExcludes(
+    text,
+    ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
+    label,
+  );
+  return { watchlist_action_found: true, public_detail_copy_found: true };
 }
 
 function validateBuildInfo(buildInfo) {
@@ -347,6 +366,11 @@ async function main() {
     ],
     "home watchlist",
   );
+  assertTextIncludesOneOf(
+    homeText,
+    ["Esta lista se guarda en este navegador", "Siguiendo", "Seguir"],
+    "home local watchlist copy",
+  );
   const sportsDom = await dumpDom(urlFor(SPORTS_PATH));
   const sportsRender = validatePublicProductPage(sportsDom, "sports", [
     "Mercados deportivos",
@@ -369,6 +393,15 @@ async function main() {
   const alertsText = visibleText(alertsDom);
   assertTextIncludes(alertsText, "Actualizar", "alerts update button");
   assertTextIncludesOneOf(alertsText, UPDATE_TEXT, "alerts update timestamp");
+  assertTextIncludes(alertsText, "Mercados que sigues", "alerts local watchlist");
+  assertTextIncludesOneOf(
+    alertsText,
+    ["No tienes mercados en seguimiento", "Mercado en seguimiento"],
+    "alerts watchlist state",
+  );
+  const detailMarketId = items[0]?.market?.id || items[0]?.market_id || 1;
+  const marketDetailDom = await dumpDom(urlFor(`/markets/${detailMarketId}`));
+  const marketDetailRender = validateMarketDetailPage(marketDetailDom, "market detail");
   const dataHealthDom = await dumpDom(urlFor(DATA_HEALTH_PATH));
   const dataHealthRender = validateDataHealthPage(dataHealthDom);
   const workflowDom = await dumpDom(urlFor(WORKFLOW_PATH));
@@ -399,6 +432,7 @@ async function main() {
           sports: sportsRender,
           briefing: briefingRender,
           alerts: alertsRender,
+          market_detail: marketDetailRender,
         },
         data_health: dataHealthRender,
         workflow: workflowRender,
