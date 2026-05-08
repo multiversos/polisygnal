@@ -6,6 +6,10 @@ import {
 
 type NumericValue = number | string | null | undefined;
 
+// Real fields currently available in market overview/detail:
+// updatedAt (prediction run or price capture), closeTime, active/closed,
+// hasAnalysis, hasPrice, volume, liquidity, and partial-data flags.
+// Public labels below must stay descriptive and must not imply advice.
 export type PublicMarketInsightInput = PublicMarketStatusInput & {
   closeTime?: string | null;
   liquidity?: NumericValue;
@@ -21,12 +25,29 @@ export type PublicMarketInsight = {
   tone: "data-only" | "low-confidence" | "neutral" | "opportunity" | "watchlist";
 };
 
+export type PublicMarketActivity = {
+  detail: string;
+  label:
+    | "Actividad baja"
+    | "Actualizado recientemente"
+    | "Con actividad"
+    | "Datos limitados"
+    | "Mercado cerrado"
+    | "Próximo partido"
+    | "Sin cambios recientes";
+  tone: "data-only" | "low-confidence" | "neutral" | "opportunity" | "watchlist";
+};
+
 function toNumber(value: NumericValue): number | null {
   if (value === null || value === undefined || value === "") {
     return null;
   }
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hasActivity(input: PublicMarketInsightInput): boolean {
+  return (toNumber(input.volume) ?? 0) > 0 || (toNumber(input.liquidity) ?? 0) > 0;
 }
 
 function isRecent(value?: string | null, nowMs = Date.now()): boolean {
@@ -52,12 +73,110 @@ function isSoon(value?: string | null, nowMs = Date.now()): boolean {
   return parsed >= nowMs && parsed <= nowMs + 7 * 24 * 60 * 60 * 1000;
 }
 
+export function getMarketActivityLabel(
+  input: PublicMarketInsightInput,
+  nowMs = Date.now(),
+): PublicMarketActivity | null {
+  const status = getPublicMarketStatus(input);
+  const activeEnough = hasActivity(input);
+  const recent = isRecent(input.updatedAt, nowMs);
+  const soon = isSoon(input.closeTime, nowMs);
+
+  if (status.label === "Cerrado") {
+    return {
+      detail: "Este mercado queda como referencia.",
+      label: "Mercado cerrado",
+      tone: "neutral",
+    };
+  }
+
+  if (status.label === "Información parcial") {
+    return {
+      detail: "Hay algunos datos, pero todavía falta información para destacarlo.",
+      label: "Datos limitados",
+      tone: "neutral",
+    };
+  }
+
+  if (recent) {
+    return {
+      detail: "Recibió información nueva recientemente.",
+      label: "Actualizado recientemente",
+      tone: "opportunity",
+    };
+  }
+
+  if (soon) {
+    return {
+      detail: "El partido o mercado está cerca en el calendario visible.",
+      label: "Próximo partido",
+      tone: "watchlist",
+    };
+  }
+
+  if (activeEnough) {
+    return {
+      detail: "Tiene volumen o liquidez visible para revisión.",
+      label: "Con actividad",
+      tone: "watchlist",
+    };
+  }
+
+  if (input.updatedAt) {
+    return {
+      detail: "No vemos información reciente suficiente para destacarlo.",
+      label: "Sin cambios recientes",
+      tone: "neutral",
+    };
+  }
+
+  if (input.hasPrice) {
+    return {
+      detail: "Tiene precio visible, pero poca actividad adicional.",
+      label: "Actividad baja",
+      tone: "data-only",
+    };
+  }
+
+  return null;
+}
+
+export function getMarketReviewPriority(input: PublicMarketInsightInput, nowMs = Date.now()): number {
+  const status = getPublicMarketStatus(input);
+  const activity = getMarketActivityLabel(input, nowMs);
+  let priority = 0;
+
+  if (status.label !== "Cerrado") {
+    priority += 100;
+  }
+  if (status.label === "Analizado") {
+    priority += 50;
+  }
+  if (activity?.label === "Actualizado recientemente") {
+    priority += 35;
+  }
+  if (activity?.label === "Próximo partido") {
+    priority += 25;
+  }
+  if (hasActivity(input)) {
+    priority += 15;
+  }
+  if (status.label === "Información parcial") {
+    priority -= 25;
+  }
+  if (status.label === "Cerrado") {
+    priority -= 100;
+  }
+
+  return priority;
+}
+
 export function getMarketReviewReason(
   input: PublicMarketInsightInput,
   nowMs = Date.now(),
 ): PublicMarketInsight {
   const status = getPublicMarketStatus(input);
-  const hasActivity = (toNumber(input.volume) ?? 0) > 0 || (toNumber(input.liquidity) ?? 0) > 0;
+  const activeEnough = hasActivity(input);
   const recent = isRecent(input.updatedAt, nowMs);
   const soon = isSoon(input.closeTime, nowMs);
 
@@ -101,7 +220,7 @@ export function getMarketReviewReason(
     };
   }
 
-  if (soon && hasActivity) {
+  if (soon && activeEnough) {
     return {
       action: "Puede valer la pena seguirlo de cerca.",
       label: "Seguir de cerca",

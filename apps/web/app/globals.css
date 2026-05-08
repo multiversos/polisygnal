@@ -989,6 +989,44 @@ h2 {
   background: var(--surface-muted);
 }
 
+.market-activity-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 26px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted-strong);
+  background: var(--surface);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.market-activity-badge.opportunity {
+  border-color: rgba(15, 118, 110, 0.28);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.market-activity-badge.watchlist {
+  border-color: rgba(37, 99, 235, 0.28);
+  color: var(--blue);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.market-activity-badge.low-confidence {
+  border-color: rgba(217, 119, 6, 0.28);
+  color: var(--amber);
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.market-activity-badge.data-only,
+.market-activity-badge.neutral {
+  color: var(--muted-strong);
+  background: var(--surface-muted);
+}
+
 .market-insight-note {
   display: flex;
   align-items: flex-start;
@@ -4144,7 +4182,7 @@ h2 {
 
 .soccer-market-summary-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto auto;
   gap: 8px;
   align-items: center;
   min-width: 0;

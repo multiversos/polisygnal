@@ -42,7 +42,11 @@ import type {
   MarketOverviewResponse,
 } from "./lib/marketOverview";
 import { deriveMarketLifecycle } from "./lib/marketLifecycle";
-import { getMarketReviewReason } from "./lib/publicMarketInsights";
+import {
+  getMarketActivityLabel,
+  getMarketReviewPriority,
+  getMarketReviewReason,
+} from "./lib/publicMarketInsights";
 import { getPublicMarketStatus } from "./lib/publicMarketStatus";
 import { formatLastUpdated, useAutoRefresh } from "./lib/useAutoRefresh";
 
@@ -2775,16 +2779,30 @@ function HomeHighlightCard({ item }: { item: MarketOverviewItem }) {
     updatedAt: item.latest_prediction?.run_at ?? item.latest_snapshot?.captured_at ?? null,
     volume: item.latest_snapshot?.volume,
   });
+  const activity = getMarketActivityLabel({
+    active: market.active,
+    closed: market.closed,
+    closeTime: market.close_time ?? market.end_date ?? null,
+    hasAnalysis: Boolean(item.latest_prediction),
+    hasPrice:
+      item.latest_snapshot?.yes_price !== null &&
+      item.latest_snapshot?.yes_price !== undefined,
+    isPartial: !item.latest_snapshot || !item.latest_prediction,
+    liquidity: item.latest_snapshot?.liquidity,
+    updatedAt: item.latest_prediction?.run_at ?? item.latest_snapshot?.captured_at ?? null,
+    volume: item.latest_snapshot?.volume,
+  });
 
   return (
     <article className={`guidance-card ${status.tone}`}>
       <div className="badge-row">
         <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
         <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
+        {activity ? <span className={`market-activity-badge ${activity.tone}`}>{activity.label}</span> : null}
         <span className="badge muted">{formatSportLabel(market.sport_type)}</span>
       </div>
       <h3>{title}</h3>
-      <p>{reviewReason.reason}</p>
+      <p>{activity ? `${reviewReason.reason} ${activity.detail}` : reviewReason.reason}</p>
       <div className="guidance-card-metrics">
         <span>SÍ {price === "--" ? "Sin dato" : price}</span>
         <span>Confianza {confidence === "--" ? "Pendiente" : confidence}</span>
@@ -2824,16 +2842,27 @@ function UpcomingPreviewCard({ market }: { market: UpcomingSportsMarket }) {
     liquidity: market.liquidity,
     volume: market.volume,
   });
+  const activity = getMarketActivityLabel({
+    closeTime: market.close_time ?? market.event_time ?? null,
+    hasAnalysis: Boolean(market.polysignal_score),
+    hasPrice:
+      market.market_yes_price !== null &&
+      market.market_yes_price !== undefined,
+    lifecycleStatus: lifecycle.status,
+    liquidity: market.liquidity,
+    volume: market.volume,
+  });
 
   return (
     <article className={`guidance-card ${status.tone}`}>
       <div className="badge-row">
         <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
         <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
+        {activity ? <span className={`market-activity-badge ${activity.tone}`}>{activity.label}</span> : null}
         <span className="badge muted">{formatDateTime(market.close_time ?? market.event_time)}</span>
       </div>
       <h3>{humanizeMarketTitle(market.question)}</h3>
-      <p>{reviewReason.reason}</p>
+      <p>{activity ? `${reviewReason.reason} ${activity.detail}` : reviewReason.reason}</p>
       <a className="analysis-link" href={`/markets/${market.market_id}`}>
         Ver detalles
       </a>
@@ -2844,10 +2873,12 @@ function UpcomingPreviewCard({ market }: { market: UpcomingSportsMarket }) {
 function HomeGuidancePanel({
   highlights,
   loading,
+  recent,
   upcoming,
 }: {
   highlights: MarketOverviewItem[];
   loading: boolean;
+  recent: MarketOverviewItem[];
   upcoming: UpcomingSportsMarket[];
 }) {
   return (
@@ -2884,6 +2915,23 @@ function HomeGuidancePanel({
                   key={item.market?.id ?? `${item.market?.question ?? "highlight"}-${index}`}
                 />
               ))}
+            </div>
+          </section>
+          <section>
+            <h3>Movimientos recientes</h3>
+            <div className="guidance-card-list">
+              {recent.slice(0, 3).map((item, index) => (
+                <HomeHighlightCard
+                  item={item}
+                  key={item.market?.id ?? `${item.market?.question ?? "recent"}-${index}`}
+                />
+              ))}
+              {recent.length === 0 ? (
+                <div className="empty-state compact">
+                  <strong>Aún no hay cambios recientes suficientes para destacar.</strong>
+                  <p>Cuando haya actualizaciones claras aparecerán aquí.</p>
+                </div>
+              ) : null}
             </div>
           </section>
           <section>
@@ -3119,6 +3167,43 @@ export default function DashboardPage() {
     () => [...overviewItems].sort(compareOverviewItems).slice(0, 5),
     [overviewItems],
   );
+  const homeRecentMarkets = useMemo(
+    () =>
+      [...overviewItems]
+        .sort((left, right) => {
+          const leftMarket = left.market ?? {};
+          const rightMarket = right.market ?? {};
+          const leftPriority = getMarketReviewPriority({
+            active: leftMarket.active,
+            closed: leftMarket.closed,
+            closeTime: leftMarket.close_time ?? leftMarket.end_date ?? null,
+            hasAnalysis: Boolean(left.latest_prediction),
+            hasPrice:
+              left.latest_snapshot?.yes_price !== null &&
+              left.latest_snapshot?.yes_price !== undefined,
+            isPartial: !left.latest_snapshot || !left.latest_prediction,
+            liquidity: left.latest_snapshot?.liquidity,
+            updatedAt: left.latest_prediction?.run_at ?? left.latest_snapshot?.captured_at ?? null,
+            volume: left.latest_snapshot?.volume,
+          });
+          const rightPriority = getMarketReviewPriority({
+            active: rightMarket.active,
+            closed: rightMarket.closed,
+            closeTime: rightMarket.close_time ?? rightMarket.end_date ?? null,
+            hasAnalysis: Boolean(right.latest_prediction),
+            hasPrice:
+              right.latest_snapshot?.yes_price !== null &&
+              right.latest_snapshot?.yes_price !== undefined,
+            isPartial: !right.latest_snapshot || !right.latest_prediction,
+            liquidity: right.latest_snapshot?.liquidity,
+            updatedAt: right.latest_prediction?.run_at ?? right.latest_snapshot?.captured_at ?? null,
+            volume: right.latest_snapshot?.volume,
+          });
+          return rightPriority - leftPriority;
+        })
+        .slice(0, 4),
+    [overviewItems],
+  );
   const homeUpcomingPreview = useMemo(
     () => topUpcomingMarkets.filter((market) => market.sport === "soccer").slice(0, 5),
     [topUpcomingMarkets],
@@ -3285,6 +3370,7 @@ export default function DashboardPage() {
       <HomeGuidancePanel
         highlights={homeHighlights}
         loading={state.loading}
+        recent={homeRecentMarkets}
         upcoming={homeUpcomingPreview}
       />
 

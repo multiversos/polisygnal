@@ -59,6 +59,8 @@ const PUBLIC_TECHNICAL_TEXT = [
   "snapshot",
   "Snapshot",
   "market_type",
+  "model_version",
+  "raw",
   "Kalshi",
 ];
 const UPDATE_TEXT = [
@@ -109,6 +111,16 @@ const WHY_VISIBLE_TEXT = [
   "Por quÃ© aparecen aquÃ­",
   "Por qué aparece este mercado",
   "Por quÃ© aparece este mercado",
+];
+const ACTIVITY_TEXT = [
+  "Actualizado recientemente",
+  "Con actividad",
+  "Actividad baja",
+  "Datos limitados",
+  "Sin cambios recientes",
+  "Próximo partido",
+  "PrÃ³ximo partido",
+  "Mercado cerrado",
 ];
 
 function urlFor(path) {
@@ -281,6 +293,7 @@ function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTo
   assertTextIncludes(text, "Orden", label);
   assertTextIncludesOneOf(text, ["Seguir", "Siguiendo"], `${label} watchlist button`);
   assertTextIncludesOneOf(text, REVIEW_REASON_TEXT, `${label} review reason`);
+  assertTextIncludesOneOf(text, ACTIVITY_TEXT, `${label} activity label`);
   assertTextIncludesOneOf(text, UPDATE_TEXT, `${label} update timestamp`);
   assertTextIncludesOneOf(text, SOCCER_MARKET_LIST_TEXT, `${label} visible market list`);
   assertTextIncludesOneOf(text, UPCOMING_MATCHES_TEXT, label);
@@ -314,6 +327,7 @@ function validateMarketDetailPage(dom, label) {
   assertTextIncludesOneOf(text, WHAT_THIS_MEANS_TEXT, label);
   assertTextIncludesOneOf(text, WHY_VISIBLE_TEXT, `${label} visible reason`);
   assertTextIncludesOneOf(text, REVIEW_REASON_TEXT, `${label} public state`);
+  assertTextIncludesOneOf(text, ACTIVITY_TEXT, `${label} activity context`);
   assertTextExcludes(
     text,
     ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
@@ -409,6 +423,8 @@ async function main() {
   const homeText = visibleText(homeDom);
   assertTextIncludesOneOf(homeText, REVIEW_NOW_TEXT, "home review block");
   assertTextIncludes(homeText, "Mercados destacados", "home live content");
+  assertTextIncludes(homeText, "Movimientos recientes", "home recent activity");
+  assertTextIncludesOneOf(homeText, ACTIVITY_TEXT, "home activity label");
   assertTextIncludes(homeText, "Actualizar", "home update button");
   assertTextIncludesOneOf(homeText, UPDATE_TEXT, "home update timestamp");
   assertTextIncludesOneOf(
@@ -444,6 +460,7 @@ async function main() {
   assertTextIncludesOneOf(briefingText, QUICK_SUMMARY_TEXT, "briefing quick summary");
   assertTextIncludesOneOf(briefingText, WHY_VISIBLE_TEXT, "briefing priority explanation");
   assertTextIncludesOneOf(briefingText, REVIEW_REASON_TEXT, "briefing review reason");
+  assertTextIncludesOneOf(briefingText, ACTIVITY_TEXT, "briefing activity label");
   assertTextIncludes(briefingText, "Actualizar", "briefing update button");
   assertTextIncludesOneOf(briefingText, UPDATE_TEXT, "briefing update timestamp");
   const alertsDom = await dumpDom(urlFor(ALERTS_PATH));
@@ -453,6 +470,7 @@ async function main() {
   assertTextIncludesOneOf(alertsText, UPDATE_TEXT, "alerts update timestamp");
   assertTextIncludes(alertsText, "Mercados que sigues", "alerts local watchlist");
   assertTextIncludes(alertsText, "Cómo leer estas alertas", "alerts meaning copy");
+  assertTextIncludesOneOf(alertsText, ["Mercado actualizado", "Listo para revisar", "No tienes mercados en seguimiento"], "alerts real context");
   assertTextIncludesOneOf(
     alertsText,
     ["No tienes mercados en seguimiento", "Mercado en seguimiento"],

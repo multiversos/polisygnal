@@ -23,7 +23,11 @@ import {
   friendlyApiError,
 } from "../../lib/api";
 import { deriveMarketLifecycle } from "../../lib/marketLifecycle";
-import { getMarketReviewReason } from "../../lib/publicMarketInsights";
+import {
+  getMarketActivityLabel,
+  getMarketReviewPriority,
+  getMarketReviewReason,
+} from "../../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../../lib/publicMarketStatus";
 import { formatLastUpdated, useAutoRefresh } from "../../lib/useAutoRefresh";
 import {
@@ -462,9 +466,9 @@ function getSportsMarketPublicStatus(market: UpcomingSportsMarket) {
   });
 }
 
-function getSportsMarketReviewReason(market: UpcomingSportsMarket) {
+function buildSportsMarketInsightInput(market: UpcomingSportsMarket) {
   const lifecycle = deriveSportsMarketLifecycle(market);
-  return getMarketReviewReason({
+  return {
     active: market.active,
     closed: market.closed,
     closeTime: market.close_time ?? market.event_time ?? null,
@@ -480,7 +484,19 @@ function getSportsMarketReviewReason(market: UpcomingSportsMarket) {
     liquidity: market.liquidity,
     updatedAt: market.latest_update,
     volume: market.volume,
-  });
+  };
+}
+
+function getSportsMarketActivity(market: UpcomingSportsMarket) {
+  return getMarketActivityLabel(buildSportsMarketInsightInput(market));
+}
+
+function getSportsMarketReviewReason(market: UpcomingSportsMarket) {
+  return getMarketReviewReason(buildSportsMarketInsightInput(market));
+}
+
+function getSportsMarketReviewPriority(market: UpcomingSportsMarket) {
+  return getMarketReviewPriority(buildSportsMarketInsightInput(market));
 }
 
 function PolySignalMiniScore({
@@ -561,6 +577,7 @@ function SportMarketCard({
   const lifecycle = deriveSportsMarketLifecycle(market);
   const publicStatus = getSportsMarketPublicStatus(market);
   const reviewReason = getSportsMarketReviewReason(market);
+  const activity = getSportsMarketActivity(market);
   return (
     <article className={`sports-market-card ${lifecycle.isExpired ? "is-expired" : ""}`}>
       <div className="sports-market-card-header">
@@ -570,6 +587,7 @@ function SportMarketCard({
           <span className={`market-status-badge ${publicStatus.tone}`}>
             {publicStatus.label}
           </span>
+          {activity ? <span className={`market-activity-badge ${activity.tone}`}>{activity.label}</span> : null}
         </div>
         <span className="urgency-pill medium">{formatScore(market.urgency_score)}</span>
       </div>
@@ -577,7 +595,7 @@ function SportMarketCard({
       {market.event_title ? <p>{market.event_title}</p> : null}
       <div className="market-insight-note">
         <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
-        <p>{reviewReason.reason}</p>
+        <p>{activity ? `${reviewReason.reason} ${activity.detail}` : reviewReason.reason}</p>
       </div>
       <DataQualityMiniBadges item={dataQuality} />
 
@@ -1244,12 +1262,14 @@ function SoccerMarketSummaryRow({
   const price = formatSoccerPrice(market.market_yes_price);
   const label = formatSoccerMarketLabel(market);
   const reviewReason = getSportsMarketReviewReason(market);
+  const activity = getSportsMarketActivity(market);
   return (
     <li className="soccer-market-summary-row">
       <Link href={`/markets/${market.market_id}`} title={market.question}>
         {label}
       </Link>
       <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
+      {activity ? <span className={`market-activity-badge ${activity.tone}`}>{activity.label}</span> : null}
       <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
       <strong>{price === "Sin dato" ? "Sin precio" : price}</strong>
       <button
@@ -1297,6 +1317,7 @@ function SoccerMatchCard({
   const updatedAt = latestMatchUpdate(match);
   const leadMarket = match.homeWin ?? match.awayWin ?? match.draw ?? match.markets[0];
   const reviewReason = leadMarket ? getSportsMarketReviewReason(leadMarket) : null;
+  const activity = leadMarket ? getSportsMarketActivity(leadMarket) : null;
 
   return (
     <article className={`soccer-match-card ${lifecycle.isExpired ? "is-expired" : ""}`}>
@@ -1319,11 +1340,18 @@ function SoccerMatchCard({
         {volume ? <span>Vol. {formatMetric(volume)}</span> : null}
         {liquidity ? <span>Liquidez {formatMetric(liquidity)}</span> : null}
         {updatedAt ? <span>Actualizado {formatDateTime(updatedAt)}</span> : null}
+        {activity ? <span className={`market-activity-badge ${activity.tone}`}>{activity.label}</span> : null}
       </div>
       {reviewReason ? (
         <div className="market-insight-note compact">
           <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
-          <p>{hasIncompletePrices ? "Tiene mercados principales incompletos; conviene revisarlo más tarde." : reviewReason.reason}</p>
+          <p>
+            {hasIncompletePrices
+              ? "Tiene mercados principales incompletos; conviene revisarlo más tarde."
+              : activity
+                ? `${reviewReason.reason} ${activity.detail}`
+                : reviewReason.reason}
+          </p>
         </div>
       ) : null}
       <div className="soccer-outcome-grid" aria-label="Precios principales">
@@ -1452,10 +1480,17 @@ function marketTimeValue(market: UpcomingSportsMarket): number {
 function compareSoccerMarkets(
   left: UpcomingSportsMarket,
   right: UpcomingSportsMarket,
-  sort: "markets" | "recent" | "upcoming",
+  sort: "markets" | "recent" | "review" | "upcoming",
 ): number {
   if (sort === "recent") {
     return marketTimeValue(right) - marketTimeValue(left) || right.market_id - left.market_id;
+  }
+  if (sort === "review") {
+    return (
+      getSportsMarketReviewPriority(right) - getSportsMarketReviewPriority(left) ||
+      marketTimeValue(left) - marketTimeValue(right) ||
+      right.market_id - left.market_id
+    );
   }
   if (sort === "markets") {
     return (toNumber(right.volume) ?? 0) - (toNumber(left.volume) ?? 0) || left.market_id - right.market_id;
@@ -1484,7 +1519,7 @@ export default function SportDetailPage() {
   const [soccerStatusFilter, setSoccerStatusFilter] = useState<
     "active" | "all" | "analyzed" | "closed" | "observing" | "partial" | "review"
   >("all");
-  const [soccerSort, setSoccerSort] = useState<"markets" | "recent" | "upcoming">("upcoming");
+  const [soccerSort, setSoccerSort] = useState<"markets" | "recent" | "review" | "upcoming">("review");
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
   const [watchlistActionMarketId, setWatchlistActionMarketId] = useState<number | null>(null);
 
@@ -1795,9 +1830,10 @@ export default function SportDetailPage() {
               onChange={(event) => setSoccerSort(event.target.value as typeof soccerSort)}
               value={soccerSort}
             >
+              <option value="review">Qué revisar primero</option>
               <option value="upcoming">Próximos primero</option>
-              <option value="markets">Más actividad</option>
               <option value="recent">Actualizados recientemente</option>
+              <option value="markets">Más actividad</option>
             </select>
           </label>
           <span className="badge muted">
@@ -1810,7 +1846,7 @@ export default function SportDetailPage() {
               onClick={() => {
                 setSoccerQuery("");
                 setSoccerStatusFilter("all");
-                setSoccerSort("upcoming");
+                setSoccerSort("review");
               }}
               type="button"
             >
@@ -1832,10 +1868,14 @@ export default function SportDetailPage() {
             {recentlyUpdatedSoccerItems.map((market) => {
               const status = getSportsMarketPublicStatus(market);
               const reviewReason = getSportsMarketReviewReason(market);
+              const activity = getSportsMarketActivity(market);
               return (
                 <article className="smart-alert-card info" key={market.market_id}>
                   <div>
-                    <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+                    <div className="badge-row">
+                      <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+                      {activity ? <span className={`market-activity-badge ${activity.tone}`}>{activity.label}</span> : null}
+                    </div>
                     <h3>{formatSoccerMarketLabel(market)}</h3>
                     <p>{formatDateTime(market.event_time ?? market.close_time)}</p>
                     <p className="section-note">{reviewReason.reason}</p>

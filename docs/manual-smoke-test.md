@@ -74,13 +74,16 @@ Use these checks after a production deploy. Correct domains:
    not as active opportunities.
 13. Confirm cards show a simple reason such as `Para revisar`,
     `En observación`, `Información parcial`, or `Seguir de cerca`.
-14. Confirm status labels explain themselves in plain language and do not
+14. Confirm activity labels such as `Actualizado recientemente`,
+    `Con actividad`, `Datos limitados`, or `Próximo partido` come from visible
+    market data.
+15. Confirm status labels explain themselves in plain language and do not
     promise profit or certainty.
-15. Confirm the mobile view has no horizontal overflow and buttons are not cut
+16. Confirm the mobile view has no horizontal overflow and buttons are not cut
     off.
-16. Click `Actualizar` and confirm the existing match list stays visible while
+17. Click `Actualizar` and confirm the existing match list stays visible while
     the page refreshes.
-17. Confirm it does not show `Datos no disponibles`, `La API no respondió`, or
+18. Confirm it does not show `Datos no disponibles`, `La API no respondió`, or
     `Todavía no hay mercados`.
 
 Run the automated production smoke test from the repo root:
@@ -98,7 +101,9 @@ If this test fails, stop feature work and treat it as a production regression.
    guidance.
 3. Confirm it shows `Última actualización` and an `Actualizar` button.
 4. Confirm it explains `Por qué aparecen aquí` before listing markets.
-5. Confirm empty states guide the user back to soccer or sports markets.
+5. Confirm it includes `Qué hacer ahora` and separates markets to review from
+   markets in observation.
+6. Confirm empty states guide the user back to soccer or sports markets.
 
 ## Mi Lista
 
@@ -136,7 +141,10 @@ Use these quick checks when reviewing public pages:
 2. `En observación` means the market is being followed but is not highlighted yet.
 3. `Información parcial` means some information is available but the market is not complete.
 4. `Para revisar` means the market is worth a manual look, not a guaranteed outcome.
-5. Confirm public copy says this is not financial advice, does not promise
+5. `Actualizado recientemente` means a recent visible update exists.
+6. `Con actividad` means volume or liquidity is visible.
+7. `Datos limitados` means the app has incomplete data and should not overstate the market.
+8. Confirm public copy says this is not financial advice, does not promise
    results, and does not tell the user to buy or bet.
 
 ## Cache Troubleshooting

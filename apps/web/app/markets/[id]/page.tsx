@@ -64,7 +64,10 @@ import {
   fetchMarketTimeline,
   type MarketTimelineItem,
 } from "../../lib/marketTimeline";
-import { getMarketReviewReason } from "../../lib/publicMarketInsights";
+import {
+  getMarketActivityLabel,
+  getMarketReviewReason,
+} from "../../lib/publicMarketInsights";
 import {
   MANUAL_EVIDENCE_REVIEW_STATUS_LABELS,
   MANUAL_EVIDENCE_STANCE_LABELS,
@@ -665,37 +668,37 @@ const sportLabels: Record<string, string> = {
 };
 
 const warningLabels: Record<string, string> = {
-  missing_latest_snapshot: "sin snapshot reciente",
+  missing_latest_snapshot: "sin precio reciente",
   no_evidence_found: "sin evidencia guardada",
   no_external_signals: "sin señales externas",
-  no_prediction_found: "sin predicción investigada",
+  no_prediction_found: "sin análisis disponible",
   missing_yes_price: "falta precio SÍ",
   missing_price_data: "faltan datos de precio",
-  missing_snapshot: "sin snapshot",
+  missing_snapshot: "sin precio reciente",
   missing_price: "faltan precios",
   missing_close_time: "sin fecha de cierre",
   missing_liquidity: "liquidez no disponible",
   missing_volume: "volumen no disponible",
   sport_uncertain: "deporte incierto",
   market_shape_uncertain: "tipo de mercado incierto",
-  polysignal_score_pending: "score pendiente",
-  preliminary_score: "score preliminar",
+  polysignal_score_pending: "lectura pendiente",
+  preliminary_score: "lectura inicial",
   missing_market_yes_price: "falta precio SÍ",
   external_signal_low_match_confidence: "señal externa con baja coincidencia",
   external_signal_missing_probability: "señal externa sin probabilidad",
-  few_price_history_points: "pocos snapshots",
+  few_price_history_points: "pocos cambios registrados",
   low_confidence: "confianza baja",
   insufficient_data: "datos insuficientes",
   low_liquidity: "baja liquidez",
   low_volume: "bajo volumen",
   market_inactive_or_closed: "mercado inactivo o cerrado",
-  generic_research_template: "template genérico",
+  generic_research_template: "contexto general",
   close_time_past: "cierre pasado",
   close_time_missing: "sin fecha de cierre",
-  snapshot_too_old: "snapshot viejo",
+  snapshot_too_old: "precio antiguo",
   missing_prices: "faltan precios",
   data_quality_insufficient: "calidad insuficiente",
-  condition_id_unavailable: "falta condition_id",
+  condition_id_unavailable: "dato externo no disponible",
   wallet_data_unavailable: "datos de billeteras no disponibles",
   wallet_trades_unavailable: "trades de billeteras no disponibles",
   wallet_positions_unavailable: "posiciones de billeteras no disponibles",
@@ -712,25 +715,25 @@ const freshnessStatusLabels: Record<string, string> = {
 
 const freshnessActionLabels: Record<string, string> = {
   ok: "OK",
-  needs_snapshot: "Necesita snapshot",
+  needs_snapshot: "Necesita precio reciente",
   review_market: "Revisar mercado",
-  exclude_from_scoring: "Excluir del score",
+  exclude_from_scoring: "Dejar fuera de revisión",
 };
 
 const reasonLabels: Record<string, string> = {
   market_active_open: "mercado activo",
   valid_latest_snapshot: "precio válido",
   yes_price_in_research_band: "precio SÍ investigable",
-  sports_metadata_present: "metadata deportiva",
+  sports_metadata_present: "contexto deportivo",
   supported_sport: "deporte soportado",
   supported_market_shape: "tipo de mercado claro",
-  specific_research_template: "template específico",
+  specific_research_template: "contexto específico",
   high_liquidity: "alta liquidez",
   high_volume: "alto volumen",
   medium_liquidity: "liquidez media",
   medium_volume: "volumen medio",
   future_close_time: "cierre futuro",
-  market_type_present: "tipo de mercado disponible",
+  market_type_present: "forma del mercado disponible",
 };
 
 const marketTermTranslations: Record<string, string> = {
@@ -1038,6 +1041,22 @@ function getAnalysisStatus(analysis: MarketAnalysis): {
 
 function getAnalysisReviewReason(analysis: MarketAnalysis) {
   return getMarketReviewReason({
+    active: analysis.market.active,
+    closed: analysis.market.closed,
+    closeTime: analysis.market.end_date ?? null,
+    hasAnalysis: Boolean(analysis.latest_prediction || analysis.polysignal_score),
+    hasPrice:
+      analysis.latest_snapshot?.yes_price !== null &&
+      analysis.latest_snapshot?.yes_price !== undefined,
+    isPartial: !analysis.latest_snapshot || !analysis.latest_prediction,
+    liquidity: analysis.latest_snapshot?.liquidity,
+    updatedAt: getLatestAnalysisUpdate(analysis),
+    volume: analysis.latest_snapshot?.volume,
+  });
+}
+
+function getAnalysisActivity(analysis: MarketAnalysis) {
+  return getMarketActivityLabel({
     active: analysis.market.active,
     closed: analysis.market.closed,
     closeTime: analysis.market.end_date ?? null,
@@ -1881,10 +1900,10 @@ function DataQualityPanel({
     <section className="analysis-section data-quality-detail-section">
       <div className="analysis-section-heading">
         <div>
-          <span className="section-kicker">DiagnÃ³stico read-only</span>
-          <h2>Calidad de datos</h2>
+          <span className="section-kicker">Revisión de información</span>
+          <h2>Datos disponibles</h2>
           <p className="section-note">
-            El score queda pendiente cuando faltan datos mÃ­nimos. PolySignal no inventa probabilidades.
+            La lectura queda pendiente cuando faltan datos mínimos. PolySignal no inventa probabilidades.
           </p>
         </div>
         <span className={`data-quality-label ${dataQuality.quality_label.toLowerCase()}`}>
@@ -1894,7 +1913,7 @@ function DataQualityPanel({
 
       {!hasScore ? (
         <div className="empty-state compact">
-          <strong>PolySignal SÃ pendiente</strong>
+          <strong>Lectura SÍ pendiente</strong>
           <p>{scorePendingMessage(dataQuality)}</p>
         </div>
       ) : null}
@@ -1904,9 +1923,9 @@ function DataQualityPanel({
         <div><span>Precio NO</span><strong>{formatQualityBoolean(dataQuality.has_no_price)}</strong></div>
         <div><span>Actualización</span><strong>{formatQualityBoolean(dataQuality.has_snapshot)}</strong></div>
         <div><span>SeÃ±al externa</span><strong>{formatQualityBoolean(dataQuality.has_external_signal)}</strong></div>
-        <div><span>PredicciÃ³n guardada</span><strong>{formatQualityBoolean(dataQuality.has_prediction)}</strong></div>
-        <div><span>Research disponible</span><strong>{formatQualityBoolean(dataQuality.has_research)}</strong></div>
-        <div><span>PolySignal Score</span><strong>{formatQualityBoolean(dataQuality.has_polysignal_score)}</strong></div>
+        <div><span>Lectura guardada</span><strong>{formatQualityBoolean(dataQuality.has_prediction)}</strong></div>
+        <div><span>Contexto disponible</span><strong>{formatQualityBoolean(dataQuality.has_research)}</strong></div>
+        <div><span>Lectura disponible</span><strong>{formatQualityBoolean(dataQuality.has_polysignal_score)}</strong></div>
         <div><span>Calidad</span><strong>{dataQuality.quality_score}/100</strong></div>
       </div>
 
@@ -1938,8 +1957,8 @@ function FreshnessPanel({ freshness }: { freshness?: MarketFreshness | null }) {
     <section className={`analysis-section freshness-detail-section ${freshness.freshness_status}`}>
       <div className="analysis-section-heading">
         <div>
-          <span className="section-kicker">Frescura interna</span>
-          <h2>Frescura de datos</h2>
+          <span className="section-kicker">Actualización</span>
+          <h2>Vigencia de la información</h2>
           <p className="section-note">
             PolySignal no estima probabilidades cuando faltan precios recientes confiables.
           </p>
@@ -1966,7 +1985,7 @@ function FreshnessPanel({ freshness }: { freshness?: MarketFreshness | null }) {
           </div>
         </div>
       ) : (
-        <p className="quiet-text">No hay señales internas de obsolescencia para este mercado.</p>
+        <p className="quiet-text">No hay señales de información vencida para este mercado.</p>
       )}
     </section>
   );
@@ -1978,6 +1997,7 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
   const score = analysis.polysignal_score;
   const status = getAnalysisStatus(analysis);
   const reviewReason = getAnalysisReviewReason(analysis);
+  const activity = getAnalysisActivity(analysis);
   const confidenceValue = prediction?.confidence_score ?? score?.confidence ?? null;
   const confidenceBand = getConfidenceBand(confidenceValue);
   const yesModelProbability = prediction?.yes_probability ?? score?.score_probability ?? null;
@@ -1999,7 +2019,8 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
 
       <div className="market-insight-note">
         <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
-        <p>{reviewReason.reason}</p>
+        {activity ? <span className={`market-activity-badge ${activity.tone}`}>{activity.label}</span> : null}
+        <p>{activity ? `${reviewReason.reason} ${activity.detail}` : reviewReason.reason}</p>
       </div>
 
       <div className="empty-state compact">
@@ -4435,6 +4456,15 @@ export default function MarketAnalysisPage() {
               {getAnalysisReviewReason(analysis).reason} {getAnalysisReviewReason(analysis).action}
             </span>
           </section>
+
+          {getAnalysisActivity(analysis) ? (
+            <section className="focus-notice active">
+              <strong>Estado y actividad</strong>
+              <span>
+                {getAnalysisActivity(analysis)?.label}: {getAnalysisActivity(analysis)?.detail}
+              </span>
+            </section>
+          ) : null}
 
           {pausedFutureMarket ? (
             <section className="focus-notice paused">

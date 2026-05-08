@@ -10,7 +10,10 @@ import {
   isSportBackendEnabled,
 } from "../components/SportsSelectorBar";
 import { fetchApiJson, friendlyApiError } from "../lib/api";
-import { getMarketReviewReason } from "../lib/publicMarketInsights";
+import {
+  getMarketActivityLabel,
+  getMarketReviewReason,
+} from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { fetchSmartAlerts, type SmartAlert } from "../lib/smartAlerts";
 import { formatLastUpdated, useAutoRefresh } from "../lib/useAutoRefresh";
@@ -805,6 +808,14 @@ export default function DailyBriefingPage() {
               </div>
             </section>
             <section>
+              <h3>Qué hacer ahora</h3>
+              <div className="briefing-sport-stack">
+                <span>Revisa primero los mercados marcados como <strong>Para revisar</strong>.</span>
+                <span>Guarda en Mi lista los mercados que quieras seguir de cerca.</span>
+                <span>Deja para después los mercados con datos limitados.</span>
+              </div>
+            </section>
+            <section>
               <h3>Partidos próximos</h3>
               <div className="briefing-list compact-list">
                 {nextMatches.length ? (
@@ -1111,16 +1122,23 @@ function BriefingMarketCard({
     hasPrice: yesMetric !== "" && yesMetric !== "--" && !yesMetric.toLowerCase().includes("sin dato"),
     isPartial: Boolean(warnings?.length) || statusMetric === "Información parcial",
   });
+  const activity = getMarketActivityLabel({
+    closeTime,
+    hasAnalysis: statusMetric === "Analizado",
+    hasPrice: yesMetric !== "" && yesMetric !== "--" && !yesMetric.toLowerCase().includes("sin dato"),
+    isPartial: Boolean(warnings?.length) || statusMetric === "Información parcial",
+  });
   return (
     <article className="briefing-card">
       <div className="badge-row">
         <span className="badge">{formatSport(sport)}</span>
         <span className="badge muted">{formatMarketShape(marketShape)}</span>
         <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
+        {activity ? <span className={`market-activity-badge ${activity.tone}`}>{activity.label}</span> : null}
         {closeTime ? <span className="badge muted">{formatDateTime(closeTime)}</span> : null}
       </div>
       <h3>{translateMarketTitleToSpanish(question)}</h3>
-      <p className="briefing-note">{reviewReason.reason}</p>
+      <p className="briefing-note">{activity ? `${reviewReason.reason} ${activity.detail}` : reviewReason.reason}</p>
       <div className="briefing-mini-metrics">
         {metrics.map(([label, value]) => (
           <span key={`${label}-${value}`}>

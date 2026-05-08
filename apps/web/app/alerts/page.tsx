@@ -166,6 +166,18 @@ function hoursUntil(value?: string | null): number | null {
   return (date.getTime() - Date.now()) / 36e5;
 }
 
+function updatedRecently(value?: string | null): boolean {
+  if (!value) {
+    return false;
+  }
+  const parsed = new Date(value).getTime();
+  if (!Number.isFinite(parsed)) {
+    return false;
+  }
+  const ageMs = Date.now() - parsed;
+  return ageMs >= 0 && ageMs <= 48 * 60 * 60 * 1000;
+}
+
 async function fetchMarketOverviewAlerts(sport: string): Promise<MarketOverviewAlertsResponse> {
   const params = new URLSearchParams({ limit: "50" });
   if (sport) {
@@ -195,6 +207,30 @@ function deriveAlertsFromOverview(overview: MarketOverviewAlertsResponse): Smart
       action_url: `/markets/${marketId}`,
       data: {},
     };
+    if (updatedRecently(item.latest_snapshot?.captured_at)) {
+      alerts.push({
+        ...base,
+        id: `derived-updated-${marketId}`,
+        type: "price_move",
+        severity: "info",
+        title: "Mercado actualizado",
+        description: question,
+        reason: "Recibió información nueva recientemente.",
+        created_from: "market_overview",
+      });
+    }
+    if (item.latest_prediction) {
+      alerts.push({
+        ...base,
+        id: `derived-ready-${marketId}`,
+        type: "watchlist_needs_review",
+        severity: "info",
+        title: "Listo para revisar",
+        description: question,
+        reason: "Tiene análisis disponible para una lectura inicial.",
+        created_from: "market_overview",
+      });
+    }
     if (!item.latest_prediction) {
       alerts.push({
         ...base,
@@ -512,6 +548,9 @@ export default function AlertsPage() {
                 <p>
                   Revisar este mercado. Última actividad local{" "}
                   {formatDate(item.updated_at)}.
+                </p>
+                <p className="section-note">
+                  Si vemos una actualización confiable, aparecerá como Mercado actualizado.
                 </p>
                 <a className="analysis-link" href={`/markets/${item.market_id}`}>
                   Ver mercado
