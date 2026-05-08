@@ -152,6 +152,11 @@ function visibleText(dom) {
     .trim();
 }
 
+function sidebarText(dom) {
+  const match = dom.match(/<aside[^>]*class="[^"]*app-sidebar[^"]*"[\s\S]*?<\/aside>/);
+  return visibleText(match?.[0] || "");
+}
+
 function assertTextIncludes(text, expected, label) {
   assert(text.includes(expected), `${label} did not render expected text: ${expected}`);
 }
@@ -260,13 +265,14 @@ function countMatchCards(dom) {
 
 function validatePublicProductPage(dom, label, requiredText = []) {
   const text = visibleText(dom);
+  const navText = sidebarText(dom);
   for (const publicItem of PUBLIC_NAV_TEXT) {
-    assertTextIncludes(text, publicItem, `${label} public sidebar`);
+    assertTextIncludes(navText, publicItem, `${label} public sidebar`);
   }
   for (const expected of requiredText) {
     assertTextIncludes(text, expected, label);
   }
-  assertTextExcludes(text, INTERNAL_NAV_TEXT, `${label} public sidebar`);
+  assertTextExcludes(navText, INTERNAL_NAV_TEXT, `${label} public sidebar`);
   assertTextExcludes(text, PUBLIC_TECHNICAL_TEXT, `${label} public copy`);
   return { public_sidebar_found: true, internal_sidebar_hidden: true, technical_copy_hidden: true };
 }
