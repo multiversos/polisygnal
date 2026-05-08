@@ -57,6 +57,7 @@ def test_refresh_soccer_markets_parser_defaults_to_dry_run() -> None:
     assert args.max_import == 30
     assert args.max_snapshots == 30
     assert args.score_limit == 30
+    assert args.report_json is None
     command.validate_args(args)
 
 
@@ -92,6 +93,9 @@ def test_refresh_soccer_markets_dry_run_does_not_write_and_propagates_flags(
     assert payload["import_would_import"] == 3
     assert payload["snapshot_would_create"] == 2
     assert payload["scoring_candidates"] == 4
+    assert payload["dry_run_report"]["candidate_events_count"] == 1
+    assert payload["dry_run_report"]["candidate_markets"] == 3
+    assert payload["dry_run_report"]["snapshot_would_create"] == 2
     assert payload["candidate_events"] == [
         {
             "event_slug": "ucl-ars-atm1-2026-05-05",
@@ -150,6 +154,33 @@ def test_refresh_soccer_markets_apply_requires_explicit_write_confirmation() -> 
 
     with pytest.raises(ValueError, match="--yes-i-understand-this-writes-data"):
         command.validate_args(args)
+
+
+def test_refresh_soccer_markets_report_json_is_dry_run_only() -> None:
+    args = command.build_parser().parse_args(
+        ["--apply", "--yes-i-understand-this-writes-data", "--report-json", "report.json"]
+    )
+
+    with pytest.raises(ValueError, match="--report-json"):
+        command.validate_args(args)
+
+
+def test_refresh_soccer_markets_report_json_redacts_secretish_values(tmp_path) -> None:
+    report_path = tmp_path / "refresh-report.json"
+
+    command.write_report_json(
+        {
+            "status": "ok",
+            "database_url": "postgresql://user:password@example/db",
+            "nested": {"token": "abc123", "safe": "visible"},
+        },
+        str(report_path),
+    )
+
+    report = report_path.read_text(encoding="utf-8")
+    assert "postgresql://user" not in report
+    assert "abc123" not in report
+    assert "visible" in report
 
 
 def test_refresh_soccer_markets_delete_existing_is_blocked_without_apply() -> None:

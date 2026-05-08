@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import func, select
@@ -79,6 +80,8 @@ def main() -> None:
         print(json.dumps(payload, indent=2, ensure_ascii=True, default=str))
     else:
         print_human(payload)
+    if args.report_json:
+        write_report_json(payload, args.report_json)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -133,6 +136,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--json", action="store_true", help="Imprime salida JSON.")
     parser.add_argument(
+        "--report-json",
+        help="Guarda un reporte local JSON seguro del dry-run. No funciona con --apply.",
+    )
+    parser.add_argument(
         "--debug-skips",
         action="store_true",
         help="Incluye razones de descarte del import dry-run.",
@@ -153,6 +160,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError(
             "--apply requiere --yes-i-understand-this-writes-data para confirmar escrituras."
         )
+    if args.apply and args.report_json:
+        raise ValueError("--report-json solo esta permitido en dry-run.")
     if args.delete_existing and not args.apply:
         raise ValueError("--delete-existing requiere --apply y backup verificado.")
     if args.delete_existing:
@@ -286,6 +295,11 @@ def run_refresh_soccer_markets(
         "candidate_markets": _candidate_market_count(import_payload),
         "snapshot_would_create": snapshot_payload.get("would_create", 0),
         "scoring_candidates": scoring_payload.get("candidates_without_prediction", 0),
+        "dry_run_report": _build_dry_run_report(
+            import_payload=import_payload,
+            snapshot_payload=snapshot_payload,
+            scoring_payload=scoring_payload,
+        ),
         "warnings": warnings,
         "next_command_to_apply": _build_next_apply_command(
             days=days,
@@ -355,6 +369,35 @@ def print_human(payload: dict[str, Any]) -> None:
     print(payload["next_command_to_apply"])
 
 
+def write_report_json(payload: dict[str, Any], path: str) -> Path:
+    report_path = Path(path)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(_redact_report_payload(payload), indent=2, ensure_ascii=True, default=str),
+        encoding="utf-8",
+    )
+    return report_path
+
+
+def _redact_report_payload(value: Any) -> Any:
+    if isinstance(value, dict):
+        redacted: dict[str, Any] = {}
+        for key, item in value.items():
+            normalized_key = str(key).lower()
+            if any(token in normalized_key for token in ("database_url", "password", "secret", "token")):
+                redacted[key] = "<redacted>"
+            else:
+                redacted[key] = _redact_report_payload(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_report_payload(item) for item in value]
+    if isinstance(value, str) and (
+        value.startswith("postgres://") or value.startswith("postgresql://")
+    ):
+        return "<redacted-url>"
+    return value
+
+
 def _count(db: Session, model: type[object]) -> int:
     return db.scalar(select(func.count()).select_from(model)) or 0
 
@@ -379,6 +422,27 @@ def _candidate_market_count(import_payload: dict[str, Any]) -> int:
     if "would_import" in import_payload:
         return int(import_payload["would_import"] or 0)
     return sum(1 for item in import_payload.get("items", []) if item.get("action") == "would_import")
+
+
+def _build_dry_run_report(
+    *,
+    import_payload: dict[str, Any],
+    snapshot_payload: dict[str, Any],
+    scoring_payload: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "candidate_events_count": len(import_payload.get("event_groups") or []),
+        "candidate_markets": _candidate_market_count(import_payload),
+        "would_import": import_payload.get("would_import", 0),
+        "imported": import_payload.get("imported", 0),
+        "skipped": import_payload.get("skipped", 0),
+        "skip_reasons_count": import_payload.get("skip_reasons_count", {}),
+        "skip_reason_examples": import_payload.get("skip_reason_examples", {}),
+        "snapshot_would_create": snapshot_payload.get("would_create", 0),
+        "snapshot_skipped": snapshot_payload.get("skipped", 0),
+        "scoring_candidates": scoring_payload.get("candidates_without_prediction", 0),
+        "scoring_candidates_with_snapshot": scoring_payload.get("candidates_with_snapshot", 0),
+    }
 
 
 def _combine_status(*payloads: dict[str, Any]) -> str:

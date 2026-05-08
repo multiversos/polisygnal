@@ -15,6 +15,14 @@ cd N:\projects\polimarket\apps\api
 Dry-run is the default. It reads candidates, snapshots, and scoring gaps, then
 reports what would happen without writing data.
 
+For a reviewable local report, add:
+
+```powershell
+--report-json N:\projects\_polysignal_backups\refresh-soccer-dry-run.json
+```
+
+`--report-json` is intentionally rejected with `--apply`.
+
 ## Supervised Apply
 
 Only run apply from a supervised PowerShell session after reviewing dry-run

@@ -96,6 +96,15 @@ import, snapshot, and scoring dry-runs one by one:
 .\.venv\Scripts\python.exe -m app.commands.refresh_soccer_markets --dry-run --days 7 --pages 5 --max-events 10 --max-import 30 --max-snapshots 30 --score-limit 30 --json --debug-skips
 ```
 
+To save a local dry-run report for review, add `--report-json`:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.refresh_soccer_markets --dry-run --days 7 --pages 5 --max-events 10 --max-import 30 --max-snapshots 30 --score-limit 30 --json --debug-skips --report-json N:\projects\_polysignal_backups\refresh-soccer-dry-run.json
+```
+
+The report is dry-run only and redacts secret-like fields defensively. Do not
+commit local reports.
+
 Default behavior is dry-run even if `--dry-run` is omitted. In dry-run, the
 command:
 
