@@ -10,9 +10,11 @@ Use these checks after a production deploy. Correct domains:
 
 1. Open `https://polisygnal.onrender.com/health` and confirm `status: ok`.
 2. Open `https://polisygnal.onrender.com/markets/overview?sport_type=soccer&limit=50`.
-3. Confirm `total_count` is at least `50` and `items` is not empty.
+3. Confirm `total_count` is at least `75` and `items` is not empty.
 4. Open `https://polisygnal-web.vercel.app/api/backend/markets/overview?sport_type=soccer&limit=50`.
 5. Confirm the proxy returns the same overview shape and does not expose CORS issues.
+6. Open `https://polisygnal-web.vercel.app/api/backend/markets/overview?sport_type=soccer&limit=50&offset=50`.
+7. Confirm pagination returns the remaining soccer markets instead of timing out.
 
 ## Build Diagnostics
 
@@ -55,17 +57,19 @@ Use these checks after a production deploy. Correct domains:
 ## Soccer Critical Regression
 
 1. Open `https://polisygnal-web.vercel.app/sports/soccer`.
-2. Confirm it shows `Mercados 50`.
-3. Confirm it shows `Vista mercados (50)`.
+2. Confirm it shows `Mercados 75` or a higher real total.
+3. Confirm it shows `Vista mercados (75)` or the same current total.
 4. Confirm it shows `Partidos detectados` and `Próximos partidos`.
 5. Confirm at least one match card renders.
 6. Confirm match cards show markets inside the card, including prices when
    available and `Ver todos los mercados` when there are more items.
-7. Confirm search/filter controls work without a full page reload.
-8. Confirm the page shows `Última actualización` and an `Actualizar` button.
-9. Confirm closed or expired markets appear as Cerrado or Información parcial,
+7. Confirm the filter bar says `Mostrando 75 de 75 mercados` or reflects the
+   current total from the proxy.
+8. Confirm search/filter controls work without a full page reload.
+9. Confirm the page shows `Última actualización` and an `Actualizar` button.
+10. Confirm closed or expired markets appear as Cerrado or Información parcial,
    not as active opportunities.
-10. Confirm it does not show `Datos no disponibles`, `La API no respondió`, or
+11. Confirm it does not show `Datos no disponibles`, `La API no respondió`, or
     `Todavía no hay mercados`.
 
 Run the automated production smoke test from the repo root:
@@ -116,4 +120,6 @@ If a normal browser shows old data but backend/proxy checks pass:
 2. Hard refresh the normal tab with `Ctrl+F5`.
 3. Open `/api/build-info` and compare `commit` with Vercel Production.
 4. Open `/api/backend/markets/overview?sport_type=soccer&limit=50`.
-5. Re-run `npm.cmd --workspace apps/web run smoke:production`.
+5. If `total_count` is greater than 50, also open
+   `/api/backend/markets/overview?sport_type=soccer&limit=50&offset=50`.
+6. Re-run `npm.cmd --workspace apps/web run smoke:production`.

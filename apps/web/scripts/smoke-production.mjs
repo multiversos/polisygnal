@@ -9,7 +9,7 @@ const execFileAsync = promisify(execFile);
 const FRONTEND_BASE_URL = (
   process.env.POLYSIGNAL_SMOKE_FRONTEND_URL || "https://polisygnal-web.vercel.app"
 ).replace(/\/$/, "");
-const MIN_SOCCER_MARKETS = Number(process.env.POLYSIGNAL_SMOKE_MIN_SOCCER_MARKETS || 50);
+const MIN_SOCCER_MARKETS = Number(process.env.POLYSIGNAL_SMOKE_MIN_SOCCER_MARKETS || 75);
 const EXPECTED_COMMIT = process.env.POLYSIGNAL_SMOKE_EXPECTED_COMMIT || "";
 const PROXY_PATH = "/api/backend/markets/overview?sport_type=soccer&limit=50";
 const BUILD_INFO_PATH = "/api/build-info";
@@ -348,7 +348,7 @@ async function main() {
     .filter(Boolean)
     .slice(0, 20);
   const totalOrItems = Math.max(Number(overview.body.total_count ?? 0), items.length);
-  const visibleMarketCount = items.length;
+  const visibleMarketCount = totalOrItems;
 
   assert(
     totalOrItems >= MIN_SOCCER_MARKETS,

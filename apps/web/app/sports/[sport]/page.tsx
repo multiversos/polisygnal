@@ -142,8 +142,13 @@ type MarketOverviewItem = {
 
 type MarketsOverviewResponse = {
   total_count?: number;
+  limit?: number;
+  offset?: number;
   items?: MarketOverviewItem[];
 };
+
+const MARKET_OVERVIEW_PAGE_SIZE = 50;
+const MAX_MARKET_OVERVIEW_ITEMS = 200;
 
 const supportedSportIds = new Set<string>(
   sportsSelectorOptions
@@ -255,10 +260,16 @@ function formatMarketShape(value: string): string {
   return labels[value] ?? value.replaceAll("_", " ");
 }
 
-function buildUpcomingPath(option: SportSelectorOption): string {
+function buildUpcomingPath(
+  option: SportSelectorOption,
+  pagination: { limit?: number; offset?: number } = {},
+): string {
   const params = new URLSearchParams({
-    limit: "50",
+    limit: String(pagination.limit ?? MARKET_OVERVIEW_PAGE_SIZE),
   });
+  if (pagination.offset && pagination.offset > 0) {
+    params.set("offset", String(pagination.offset));
+  }
   if (option.apiValue) {
     params.set("sport_type", option.apiValue);
   }
@@ -278,6 +289,59 @@ function buildDataQualityPath(option: SportSelectorOption): string {
 
 async function fetchJson<T>(path: string): Promise<T> {
   return fetchApiJson<T>(path);
+}
+
+async function fetchMarketsOverview(option: SportSelectorOption): Promise<MarketsOverviewResponse> {
+  const firstPage = await fetchJson<MarketsOverviewResponse>(
+    buildUpcomingPath(option, { limit: MARKET_OVERVIEW_PAGE_SIZE }),
+  );
+  const totalCount = firstPage.total_count ?? firstPage.items?.length ?? 0;
+  const items = [...(firstPage.items ?? [])];
+  const seenMarketIds = new Set(
+    items
+      .map((item) => item.market?.id)
+      .filter((marketId): marketId is number => typeof marketId === "number"),
+  );
+  let nextOffset = MARKET_OVERVIEW_PAGE_SIZE;
+
+  while (
+    totalCount > items.length &&
+    nextOffset < totalCount &&
+    items.length < MAX_MARKET_OVERVIEW_ITEMS
+  ) {
+    const page = await fetchJson<MarketsOverviewResponse>(
+      buildUpcomingPath(option, {
+        limit: MARKET_OVERVIEW_PAGE_SIZE,
+        offset: nextOffset,
+      }),
+    );
+    const pageItems = page.items ?? [];
+    if (pageItems.length === 0) {
+      break;
+    }
+    for (const item of pageItems) {
+      const marketId = item.market?.id;
+      if (typeof marketId === "number" && seenMarketIds.has(marketId)) {
+        continue;
+      }
+      if (typeof marketId === "number") {
+        seenMarketIds.add(marketId);
+      }
+      items.push(item);
+      if (items.length >= MAX_MARKET_OVERVIEW_ITEMS) {
+        break;
+      }
+    }
+    nextOffset += MARKET_OVERVIEW_PAGE_SIZE;
+  }
+
+  return {
+    ...firstPage,
+    items,
+    limit: items.length,
+    offset: 0,
+    total_count: totalCount,
+  };
 }
 
 function mapOverviewItem(item: MarketOverviewItem): UpcomingSportsMarket | null {
@@ -1302,9 +1366,8 @@ export default function SportDetailPage() {
       return;
     }
     setState((current) => ({ ...current, loading: true, error: null }));
-    const overviewPath = buildUpcomingPath(sportOption);
     try {
-      const overview = await fetchJson<MarketsOverviewResponse>(overviewPath);
+      const overview = await fetchMarketsOverview(sportOption);
       const items = (overview.items ?? []).map(mapOverviewItem).filter(Boolean) as UpcomingSportsMarket[];
       const qualityItems = items.map(buildQualityItem);
       setState({
@@ -1374,7 +1437,6 @@ export default function SportDetailPage() {
       return matchesQuery && matchesStatus;
     }).sort((left, right) => compareSoccerMarkets(left, right, soccerSort));
   }, [selectedSport, soccerQuery, soccerSort, soccerStatusFilter, state.items]);
-  const overviewPath = buildUpcomingPath(sportOption);
   const shouldShowSoccerSchedule =
     selectedSport === "soccer" &&
     sportIsEnabled &&
@@ -1590,7 +1652,8 @@ export default function SportDetailPage() {
             </select>
           </label>
           <span className="badge muted">
-            Mostrando {visibleSoccerItems.length} de {state.items.length}
+            Mostrando {visibleSoccerItems.length} de{" "}
+            {state.counts?.total_count ?? state.items.length} mercados
           </span>
           {visibleSoccerItems.length === 0 ? (
             <button
