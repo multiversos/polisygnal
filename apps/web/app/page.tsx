@@ -15,9 +15,11 @@ import {
 } from "./components/SportsSelectorBar";
 import {
   WATCHLIST_STATUS_LABELS,
+  WATCHLIST_STORAGE_EVENT,
   fetchWatchlistItems,
   removeWatchlistItem,
   toggleWatchlistMarket,
+  type WatchlistMarketDraft,
   type WatchlistItem,
 } from "./lib/watchlist";
 import {
@@ -1977,10 +1979,40 @@ function WatchlistToggleButton({
       {busy
         ? "Actualizando..."
         : isWatchlisted
-          ? "En seguimiento"
-          : "Agregar a seguimiento"}
+          ? "Siguiendo"
+          : "Seguir"}
     </button>
   );
+}
+
+function watchlistDraftFromCandidate(candidate: ResearchCandidate): WatchlistMarketDraft {
+  return {
+    active: true,
+    close_time: candidate.close_time ?? null,
+    latest_no_price: candidate.market_no_price ?? null,
+    latest_yes_price: candidate.market_yes_price ?? null,
+    liquidity: candidate.liquidity ?? null,
+    market_shape: candidate.market_shape,
+    question: candidate.question,
+    sport: candidate.sport,
+    title: humanizeMarketTitle(candidate.question),
+    volume: candidate.volume ?? null,
+  };
+}
+
+function watchlistDraftFromUpcoming(market: UpcomingSportsMarket): WatchlistMarketDraft {
+  return {
+    active: true,
+    close_time: market.close_time ?? market.event_time ?? null,
+    latest_no_price: market.market_no_price ?? null,
+    latest_yes_price: market.market_yes_price ?? null,
+    liquidity: market.liquidity ?? null,
+    market_shape: market.market_shape,
+    question: market.question,
+    sport: market.sport,
+    title: humanizeMarketTitle(market.question),
+    volume: market.volume ?? null,
+  };
 }
 
 function InvestigationStatusSummary({
@@ -2107,7 +2139,7 @@ function WatchlistPanel({
           <strong>Todavía no tienes mercados guardados.</strong>
           <p>
             Cuando sigas un mercado, aparecerá aquí para revisarlo más rápido.
-            Pronto podrás guardar tus mercados favoritos desde cualquier detalle.
+            Esta lista se guarda en este navegador.
           </p>
           <div className="empty-state-actions">
             <a className="analysis-link" href="/sports">
@@ -2174,7 +2206,7 @@ function CandidateCard({
   candidate: ResearchCandidate;
   hasExternalSignal: boolean;
   isWatchlisted: boolean;
-  onToggleWatchlist: (marketId: number) => void;
+  onToggleWatchlist: (marketId: number, market: WatchlistMarketDraft) => void;
   watchlistBusy: boolean;
 }) {
   const question = candidate.question || "Mercado sin título";
@@ -2224,7 +2256,7 @@ function CandidateCard({
         <WatchlistToggleButton
           busy={watchlistBusy}
           isWatchlisted={isWatchlisted}
-          onClick={() => onToggleWatchlist(candidate.market_id)}
+          onClick={() => onToggleWatchlist(candidate.market_id, watchlistDraftFromCandidate(candidate))}
         />
         <a className="analysis-link" href={`/markets/${candidate.market_id}`}>
           Ver análisis
@@ -2255,7 +2287,7 @@ function UpcomingMarketCard({
   dataQuality?: UpcomingDataQualityItem | null;
   isWatchlisted: boolean;
   market: UpcomingSportsMarket;
-  onToggleWatchlist: (marketId: number) => void;
+  onToggleWatchlist: (marketId: number, market: WatchlistMarketDraft) => void;
   watchlistBusy: boolean;
 }) {
   const question = market.question || "Mercado sin título";
@@ -2337,7 +2369,7 @@ function UpcomingMarketCard({
           <WatchlistToggleButton
             busy={watchlistBusy}
             isWatchlisted={isWatchlisted}
-            onClick={() => onToggleWatchlist(market.market_id)}
+            onClick={() => onToggleWatchlist(market.market_id, watchlistDraftFromUpcoming(market))}
           />
           <a className="analysis-link" href={`/markets/${market.market_id}`}>
             Ver análisis
@@ -3122,11 +3154,28 @@ export default function DashboardPage() {
     return () => window.removeEventListener("polysignal:sport-select", handleShellSportSelect);
   }, [handleSelectSport]);
 
-  const handleToggleWatchlist = useCallback(async (marketId: number) => {
+  useEffect(() => {
+    const syncLocalWatchlist = () => {
+      void fetchWatchlistItems().then((items) => {
+        setState((current) => ({ ...current, watchlistItems: items }));
+      });
+    };
+    window.addEventListener(WATCHLIST_STORAGE_EVENT, syncLocalWatchlist);
+    window.addEventListener("storage", syncLocalWatchlist);
+    return () => {
+      window.removeEventListener(WATCHLIST_STORAGE_EVENT, syncLocalWatchlist);
+      window.removeEventListener("storage", syncLocalWatchlist);
+    };
+  }, []);
+
+  const handleToggleWatchlist = useCallback(async (
+    marketId: number,
+    market: WatchlistMarketDraft,
+  ) => {
     setWatchlistActionMarketId(marketId);
     setWatchlistError(null);
     try {
-      const item = await toggleWatchlistMarket(marketId);
+      const item = await toggleWatchlistMarket(marketId, { market });
       setState((current) => {
         const withoutMarket = current.watchlistItems.filter(
           (watchlistItem) => watchlistItem.market_id !== marketId,

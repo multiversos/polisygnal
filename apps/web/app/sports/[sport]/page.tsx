@@ -25,6 +25,13 @@ import {
 import { deriveMarketLifecycle } from "../../lib/marketLifecycle";
 import { getPublicMarketStatus } from "../../lib/publicMarketStatus";
 import { formatLastUpdated, useAutoRefresh } from "../../lib/useAutoRefresh";
+import {
+  WATCHLIST_STORAGE_EVENT,
+  fetchWatchlistItems,
+  toggleWatchlistMarket,
+  type WatchlistItem,
+  type WatchlistMarketDraft,
+} from "../../lib/watchlist";
 
 type PolySignalScore = {
   score_probability?: string | number | null;
@@ -92,6 +99,11 @@ type PageState = {
   error: string | null;
   updatedAt: Date | null;
 };
+
+type WatchlistToggleHandler = (
+  marketId: number,
+  market: WatchlistMarketDraft,
+) => void;
 
 type MarketOverviewItem = {
   priority_rank?: number | null;
@@ -335,6 +347,23 @@ function buildQualityItem(market: UpcomingSportsMarket): UpcomingDataQualityItem
   };
 }
 
+function watchlistDraftFromSportsMarket(market: UpcomingSportsMarket): WatchlistMarketDraft {
+  return {
+    active: market.active ?? true,
+    close_time: market.close_time ?? market.event_time ?? null,
+    closed: market.closed ?? false,
+    latest_no_price: market.market_no_price ?? null,
+    latest_yes_price: market.market_yes_price ?? null,
+    liquidity: market.liquidity ?? null,
+    market_shape: market.market_shape,
+    market_slug: market.market_slug ?? null,
+    question: market.question,
+    sport: market.sport,
+    title: market.question,
+    volume: market.volume ?? null,
+  };
+}
+
 function deriveSportsMarketLifecycle(market: UpcomingSportsMarket) {
   return deriveMarketLifecycle({
     active: market.active,
@@ -430,10 +459,16 @@ function DataQualityMiniBadges({ item }: { item?: UpcomingDataQualityItem }) {
 
 function SportMarketCard({
   dataQuality,
+  isWatchlisted = false,
   market,
+  onToggleWatchlist,
+  watchlistBusy = false,
 }: {
   dataQuality?: UpcomingDataQualityItem;
+  isWatchlisted?: boolean;
   market: UpcomingSportsMarket;
+  onToggleWatchlist?: WatchlistToggleHandler;
+  watchlistBusy?: boolean;
 }) {
   const lifecycle = deriveSportsMarketLifecycle(market);
   const publicStatus = getSportsMarketPublicStatus(market);
@@ -475,6 +510,16 @@ function SportMarketCard({
       <PolySignalMiniScore dataQuality={dataQuality} score={market.polysignal_score} />
 
       <div className="sports-market-actions">
+        {onToggleWatchlist ? (
+          <button
+            className={`watchlist-button ${isWatchlisted ? "active" : ""}`}
+            disabled={watchlistBusy}
+            onClick={() => onToggleWatchlist(market.market_id, watchlistDraftFromSportsMarket(market))}
+            type="button"
+          >
+            {watchlistBusy ? "Actualizando..." : isWatchlisted ? "Siguiendo" : "Seguir"}
+          </button>
+        ) : null}
         <Link className="analysis-link" href={`/markets/${market.market_id}`}>
           Ver análisis
         </Link>
@@ -1000,7 +1045,17 @@ function orderedSoccerMatchMarkets(match: SoccerMatch): UpcomingSportsMarket[] {
   });
 }
 
-function SoccerMarketSummaryRow({ market }: { market: UpcomingSportsMarket }) {
+function SoccerMarketSummaryRow({
+  isWatchlisted,
+  market,
+  onToggleWatchlist,
+  watchlistBusy,
+}: {
+  isWatchlisted: boolean;
+  market: UpcomingSportsMarket;
+  onToggleWatchlist: WatchlistToggleHandler;
+  watchlistBusy: boolean;
+}) {
   const status = getSportsMarketPublicStatus(market);
   const price = formatSoccerPrice(market.market_yes_price);
   return (
@@ -1008,11 +1063,29 @@ function SoccerMarketSummaryRow({ market }: { market: UpcomingSportsMarket }) {
       <Link href={`/markets/${market.market_id}`}>{market.question}</Link>
       <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
       <strong>{price === "Sin dato" ? "Sin precio" : price}</strong>
+      <button
+        className={`watchlist-button compact ${isWatchlisted ? "active" : ""}`}
+        disabled={watchlistBusy}
+        onClick={() => onToggleWatchlist(market.market_id, watchlistDraftFromSportsMarket(market))}
+        type="button"
+      >
+        {watchlistBusy ? "..." : isWatchlisted ? "Siguiendo" : "Seguir"}
+      </button>
     </li>
   );
 }
 
-function SoccerMatchCard({ match }: { match: SoccerMatch }) {
+function SoccerMatchCard({
+  match,
+  onToggleWatchlist,
+  watchlistActionMarketId,
+  watchlistByMarketId,
+}: {
+  match: SoccerMatch;
+  onToggleWatchlist: WatchlistToggleHandler;
+  watchlistActionMarketId: number | null;
+  watchlistByMarketId: Map<number, WatchlistItem>;
+}) {
   const home = teamMeta(match.homeTeam);
   const away = teamMeta(match.awayTeam);
   const analysisMarketId =
@@ -1064,7 +1137,13 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
         </div>
         <ul>
           {previewMarkets.map((market) => (
-            <SoccerMarketSummaryRow key={market.market_id} market={market} />
+            <SoccerMarketSummaryRow
+              isWatchlisted={watchlistByMarketId.has(market.market_id)}
+              key={market.market_id}
+              market={market}
+              onToggleWatchlist={onToggleWatchlist}
+              watchlistBusy={watchlistActionMarketId === market.market_id}
+            />
           ))}
         </ul>
         {hiddenMarkets.length > 0 ? (
@@ -1072,7 +1151,13 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
             <summary>Ver todos los mercados</summary>
             <ul>
               {hiddenMarkets.map((market) => (
-                <SoccerMarketSummaryRow key={market.market_id} market={market} />
+                <SoccerMarketSummaryRow
+                  isWatchlisted={watchlistByMarketId.has(market.market_id)}
+                  key={market.market_id}
+                  market={market}
+                  onToggleWatchlist={onToggleWatchlist}
+                  watchlistBusy={watchlistActionMarketId === market.market_id}
+                />
               ))}
             </ul>
           </details>
@@ -1095,13 +1180,29 @@ function SoccerMatchCard({ match }: { match: SoccerMatch }) {
   );
 }
 
-function SoccerMatchSchedule({ markets }: { markets: UpcomingSportsMarket[] }) {
+function SoccerMatchSchedule({
+  markets,
+  onToggleWatchlist,
+  watchlistActionMarketId,
+  watchlistByMarketId,
+}: {
+  markets: UpcomingSportsMarket[];
+  onToggleWatchlist: WatchlistToggleHandler;
+  watchlistActionMarketId: number | null;
+  watchlistByMarketId: Map<number, WatchlistItem>;
+}) {
   const schedule = buildSoccerSchedule(markets);
   if (schedule.length === 0) {
     return (
       <div className="sports-market-grid">
         {markets.map((market) => (
-          <SportMarketCard key={market.market_id} market={market} />
+          <SportMarketCard
+            isWatchlisted={watchlistByMarketId.has(market.market_id)}
+            key={market.market_id}
+            market={market}
+            onToggleWatchlist={onToggleWatchlist}
+            watchlistBusy={watchlistActionMarketId === market.market_id}
+          />
         ))}
       </div>
     );
@@ -1123,13 +1224,42 @@ function SoccerMatchSchedule({ markets }: { markets: UpcomingSportsMarket[] }) {
           </div>
           <div className="soccer-match-list">
             {section.matches.map((match) => (
-              <SoccerMatchCard key={match.key} match={match} />
+              <SoccerMatchCard
+                key={match.key}
+                match={match}
+                onToggleWatchlist={onToggleWatchlist}
+                watchlistActionMarketId={watchlistActionMarketId}
+                watchlistByMarketId={watchlistByMarketId}
+              />
             ))}
           </div>
         </section>
       ))}
     </div>
   );
+}
+
+function marketTimeValue(market: UpcomingSportsMarket): number {
+  const raw = market.event_time ?? market.close_time;
+  if (!raw) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const parsed = new Date(raw).getTime();
+  return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
+}
+
+function compareSoccerMarkets(
+  left: UpcomingSportsMarket,
+  right: UpcomingSportsMarket,
+  sort: "markets" | "recent" | "upcoming",
+): number {
+  if (sort === "recent") {
+    return marketTimeValue(right) - marketTimeValue(left) || right.market_id - left.market_id;
+  }
+  if (sort === "markets") {
+    return (toNumber(right.volume) ?? 0) - (toNumber(left.volume) ?? 0) || left.market_id - right.market_id;
+  }
+  return marketTimeValue(left) - marketTimeValue(right) || left.market_id - right.market_id;
 }
 
 export default function SportDetailPage() {
@@ -1151,8 +1281,11 @@ export default function SportDetailPage() {
   const [soccerViewMode, setSoccerViewMode] = useState<"matches" | "markets">("matches");
   const [soccerQuery, setSoccerQuery] = useState("");
   const [soccerStatusFilter, setSoccerStatusFilter] = useState<
-    "active" | "all" | "analyzed" | "observing"
+    "active" | "all" | "analyzed" | "closed" | "observing"
   >("all");
+  const [soccerSort, setSoccerSort] = useState<"markets" | "recent" | "upcoming">("upcoming");
+  const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
+  const [watchlistActionMarketId, setWatchlistActionMarketId] = useState<number | null>(null);
 
   const loadSport = useCallback(async () => {
     if (!sportIsEnabled) {
@@ -1201,9 +1334,25 @@ export default function SportDetailPage() {
   }, [loadSport]);
   useAutoRefresh(loadSport, { enabled: sportIsEnabled });
 
+  useEffect(() => {
+    const syncWatchlist = () => {
+      void fetchWatchlistItems().then(setWatchlistItems);
+    };
+    syncWatchlist();
+    window.addEventListener(WATCHLIST_STORAGE_EVENT, syncWatchlist);
+    window.addEventListener("storage", syncWatchlist);
+    return () => {
+      window.removeEventListener(WATCHLIST_STORAGE_EVENT, syncWatchlist);
+      window.removeEventListener("storage", syncWatchlist);
+    };
+  }, []);
+
   const qualityByMarketId = useMemo(() => {
     return new Map(state.qualityItems.map((item) => [item.market_id, item]));
   }, [state.qualityItems]);
+  const watchlistByMarketId = useMemo(() => {
+    return new Map(watchlistItems.map((item) => [item.market_id, item] as const));
+  }, [watchlistItems]);
   const visibleSoccerItems = useMemo(() => {
     if (selectedSport !== "soccer") {
       return state.items;
@@ -1219,11 +1368,12 @@ export default function SportDetailPage() {
         soccerStatusFilter === "all" ||
         (soccerStatusFilter === "analyzed" && status.label === "Analizado") ||
         (soccerStatusFilter === "observing" && status.label === "En observación") ||
+        (soccerStatusFilter === "closed" && status.label === "Cerrado") ||
         (soccerStatusFilter === "active" &&
           (status.label === "Activo" || status.label === "Analizado"));
       return matchesQuery && matchesStatus;
-    });
-  }, [selectedSport, soccerQuery, soccerStatusFilter, state.items]);
+    }).sort((left, right) => compareSoccerMarkets(left, right, soccerSort));
+  }, [selectedSport, soccerQuery, soccerSort, soccerStatusFilter, state.items]);
   const overviewPath = buildUpcomingPath(sportOption);
   const shouldShowSoccerSchedule =
     selectedSport === "soccer" &&
@@ -1237,6 +1387,15 @@ export default function SportDetailPage() {
     }
     return buildSoccerMatchStats(state.items);
   }, [selectedSport, state.items]);
+  const recentlyUpdatedSoccerItems = useMemo(() => {
+    if (selectedSport !== "soccer") {
+      return [];
+    }
+    return state.items
+      .filter((market) => market.close_time || market.event_time)
+      .sort((left, right) => compareSoccerMarkets(left, right, "recent"))
+      .slice(0, 4);
+  }, [selectedSport, state.items]);
 
   const handleSelectSport = (nextSport: string) => {
     if (nextSport === "all") {
@@ -1245,6 +1404,22 @@ export default function SportDetailPage() {
     }
     router.push(`/sports/${nextSport}`);
   };
+
+  const handleToggleWatchlist = useCallback(async (
+    marketId: number,
+    market: WatchlistMarketDraft,
+  ) => {
+    setWatchlistActionMarketId(marketId);
+    try {
+      const item = await toggleWatchlistMarket(marketId, { market });
+      setWatchlistItems((current) => {
+        const withoutMarket = current.filter((watchlistItem) => watchlistItem.market_id !== marketId);
+        return item ? [item, ...withoutMarket] : withoutMarket;
+      });
+    } finally {
+      setWatchlistActionMarketId(null);
+    }
+  }, []);
 
   return (
     <main className="dashboard-shell sports-page">
@@ -1400,11 +1575,64 @@ export default function SportDetailPage() {
               <option value="analyzed">Analizados</option>
               <option value="observing">En observación</option>
               <option value="active">Activos</option>
+              <option value="closed">Cerrados</option>
+            </select>
+          </label>
+          <label className="filter-group">
+            Orden
+            <select
+              onChange={(event) => setSoccerSort(event.target.value as typeof soccerSort)}
+              value={soccerSort}
+            >
+              <option value="upcoming">Próximos primero</option>
+              <option value="markets">Más actividad</option>
+              <option value="recent">Actualizados recientemente</option>
             </select>
           </label>
           <span className="badge muted">
             Mostrando {visibleSoccerItems.length} de {state.items.length}
           </span>
+          {visibleSoccerItems.length === 0 ? (
+            <button
+              className="text-link"
+              onClick={() => {
+                setSoccerQuery("");
+                setSoccerStatusFilter("all");
+                setSoccerSort("upcoming");
+              }}
+              type="button"
+            >
+              Limpiar filtros
+            </button>
+          ) : null}
+        </section>
+      ) : null}
+
+      {selectedSport === "soccer" && recentlyUpdatedSoccerItems.length > 0 ? (
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Actualizados recientemente</h2>
+              <p>Mercados con actividad reciente o fecha cercana para revisar primero.</p>
+            </div>
+          </div>
+          <div className="smart-alert-list">
+            {recentlyUpdatedSoccerItems.map((market) => {
+              const status = getSportsMarketPublicStatus(market);
+              return (
+                <article className="smart-alert-card info" key={market.market_id}>
+                  <div>
+                    <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+                    <h3>{market.question}</h3>
+                    <p>{formatDateTime(market.event_time ?? market.close_time)}</p>
+                  </div>
+                  <Link className="analysis-link" href={`/markets/${market.market_id}`}>
+                    Ver mercado
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
         </section>
       ) : null}
 
@@ -1457,18 +1685,26 @@ export default function SportDetailPage() {
           />
         ) : visibleSoccerItems.length === 0 ? (
           <EmptyState
-            copy="Prueba con otra búsqueda o cambia el filtro de estado."
-            title="No hay mercados que coincidan con estos filtros."
+            copy="Prueba con otra búsqueda, cambia el estado o limpia los filtros."
+            title="No encontramos mercados con esa búsqueda."
           />
         ) : shouldShowSoccerSchedule ? (
-          <SoccerMatchSchedule markets={visibleSoccerItems} />
+          <SoccerMatchSchedule
+            markets={visibleSoccerItems}
+            onToggleWatchlist={handleToggleWatchlist}
+            watchlistActionMarketId={watchlistActionMarketId}
+            watchlistByMarketId={watchlistByMarketId}
+          />
         ) : (
           <div className="sports-market-grid">
             {visibleSoccerItems.map((market) => (
               <SportMarketCard
                 dataQuality={qualityByMarketId.get(market.market_id)}
+                isWatchlisted={watchlistByMarketId.has(market.market_id)}
                 key={market.market_id}
                 market={market}
+                onToggleWatchlist={handleToggleWatchlist}
+                watchlistBusy={watchlistActionMarketId === market.market_id}
               />
             ))}
           </div>

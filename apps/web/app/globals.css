@@ -4033,7 +4033,7 @@ h2 {
 
 .soccer-market-summary-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -4052,6 +4052,12 @@ h2 {
   color: var(--foreground);
   font-size: 0.9rem;
   white-space: nowrap;
+}
+
+.watchlist-button.compact {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 0.76rem;
 }
 
 .soccer-match-details {

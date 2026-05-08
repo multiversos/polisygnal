@@ -10,6 +10,11 @@ import {
   type SmartAlertSeverity,
 } from "../lib/smartAlerts";
 import { formatLastUpdated, useAutoRefresh } from "../lib/useAutoRefresh";
+import {
+  WATCHLIST_STORAGE_EVENT,
+  fetchWatchlistItems,
+  type WatchlistItem,
+} from "../lib/watchlist";
 
 type MarketOverviewAlertItem = {
   priority_bucket?: string | null;
@@ -279,12 +284,15 @@ export default function AlertsPage() {
   const [error, setError] = useState<string | null>(null);
   const [sourceNote, setSourceNote] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
 
   const loadAlerts = useCallback(async () => {
     setLoading(true);
     setError(null);
     setSourceNote(null);
     try {
+      const localWatchlist = await fetchWatchlistItems();
+      setWatchlistItems(localWatchlist);
       const response = await fetchSmartAlerts({
         limit: 50,
         severity: severity || null,
@@ -308,6 +316,8 @@ export default function AlertsPage() {
       }
     } catch {
       try {
+        const localWatchlist = await fetchWatchlistItems();
+        setWatchlistItems(localWatchlist);
         const overview = await fetchMarketOverviewAlerts(sport);
         const derivedAlerts = deriveAlertsFromOverview(overview).filter((alert) =>
           severity ? alert.severity === severity : true,
@@ -332,6 +342,18 @@ export default function AlertsPage() {
     void loadAlerts();
   }, [loadAlerts]);
   useAutoRefresh(loadAlerts);
+
+  useEffect(() => {
+    const syncWatchlist = () => {
+      void fetchWatchlistItems().then(setWatchlistItems);
+    };
+    window.addEventListener(WATCHLIST_STORAGE_EVENT, syncWatchlist);
+    window.addEventListener("storage", syncWatchlist);
+    return () => {
+      window.removeEventListener(WATCHLIST_STORAGE_EVENT, syncWatchlist);
+      window.removeEventListener("storage", syncWatchlist);
+    };
+  }, []);
 
   const alertTypes = useMemo(() => {
     return Array.from(new Set(alerts.map((alert) => alert.type))).sort();
@@ -448,6 +470,48 @@ export default function AlertsPage() {
           <span>{sourceNote}</span>
         </section>
       ) : null}
+
+      <section className="dashboard-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Mi lista</p>
+            <h2>Mercados que sigues</h2>
+            <p>
+              Aquí aparecerán avisos importantes de los mercados que guardes en
+              este navegador.
+            </p>
+          </div>
+          <span className="badge muted">{watchlistItems.length} guardados</span>
+        </div>
+        {watchlistItems.length === 0 ? (
+          <div className="empty-state compact">
+            <strong>No tienes mercados en seguimiento todavía.</strong>
+            <p>Guarda un mercado para revisarlo más rápido desde Alertas.</p>
+            <a className="analysis-link" href="/sports/soccer">
+              Ver fútbol
+            </a>
+          </div>
+        ) : (
+          <div className="alerts-list">
+            {watchlistItems.slice(0, 6).map((item) => (
+              <article className="alert-review-card severity-info" key={item.id}>
+                <div className="alert-review-header">
+                  <span className="badge severity-badge info">Mercado en seguimiento</span>
+                  <span className="badge muted">{item.sport ?? "Deporte"}</span>
+                </div>
+                <h3>{item.market_question}</h3>
+                <p>
+                  Revisar este mercado. Última actividad local{" "}
+                  {formatDate(item.updated_at)}.
+                </p>
+                <a className="analysis-link" href={`/markets/${item.market_id}`}>
+                  Ver mercado
+                </a>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="dashboard-panel">
         <div className="panel-heading">

@@ -18,6 +18,7 @@ import {
   removeWatchlistItem,
   updateWatchlistItem,
   type WatchlistItem,
+  type WatchlistMarketDraft,
   type WatchlistStatus,
 } from "../../lib/watchlist";
 import { MainNavigation } from "../../components/MainNavigation";
@@ -1041,6 +1042,28 @@ function getLatestAnalysisUpdate(analysis: MarketAnalysis): string | null {
     analysis.market.updated_at ||
     null
   );
+}
+
+function watchlistDraftFromAnalysis(analysis: MarketAnalysis): WatchlistMarketDraft {
+  return {
+    active: analysis.market.active,
+    close_time: analysis.market.end_date ?? null,
+    closed: analysis.market.closed,
+    latest_no_price: analysis.latest_snapshot?.no_price ?? null,
+    latest_yes_price: analysis.latest_snapshot?.yes_price ?? null,
+    liquidity: analysis.latest_snapshot?.liquidity ?? null,
+    market_shape:
+      analysis.candidate_context?.market_shape ||
+      analysis.market.evidence_shape ||
+      analysis.market.market_type ||
+      null,
+    market_slug: analysis.market.slug,
+    question: analysis.market.question,
+    sport: analysis.candidate_context?.sport || analysis.market.sport_type || null,
+    title: translateMarketTitleToSpanish(analysis.market.question),
+    updated_at: getLatestAnalysisUpdate(analysis),
+    volume: analysis.latest_snapshot?.volume ?? null,
+  };
 }
 
 function getScoringModeLabel(analysis: MarketAnalysis): string {
@@ -2755,13 +2778,13 @@ function WatchlistDetailPanel({
       <div className="analysis-section-heading">
         <div>
           <span className="section-kicker">Organización</span>
-          <h2>Lista de seguimiento</h2>
+          <h2>Mi lista</h2>
         </div>
-        {state.item ? <span className="badge external-hint">En seguimiento</span> : null}
+        {state.item ? <span className="badge external-hint">Siguiendo</span> : null}
       </div>
       <p className="section-note">
-        La lista de seguimiento es solo para organizar análisis. No representa
-        una recomendación de apuesta.
+        Esta lista se guarda en este navegador para que puedas volver al mercado
+        con menos pasos. No representa una recomendación de apuesta.
       </p>
 
       {state.loading ? <div className="empty-state compact">Cargando seguimiento...</div> : null}
@@ -2783,8 +2806,8 @@ function WatchlistDetailPanel({
             {state.saving
               ? "Guardando..."
               : state.item
-                ? "En seguimiento"
-                : "Agregar a seguimiento"}
+                ? "Siguiendo"
+                : "Seguir mercado"}
           </button>
 
           {state.item ? (
@@ -2828,13 +2851,13 @@ function WatchlistDetailPanel({
                   onClick={onRemove}
                   type="button"
                 >
-                  Quitar de seguimiento
+                  Quitar de Mi lista
                 </button>
               </div>
             </div>
           ) : (
             <span className="quiet-text">
-              Agrega este mercado para verlo luego en el dashboard.
+              Sigue este mercado para verlo luego en Mi lista.
             </span>
           )}
         </>
@@ -3863,6 +3886,7 @@ export default function MarketAnalysisPage() {
       const item = await createWatchlistItem(marketId, {
         status: "watching",
         note: watchlistState.noteDraft || null,
+        market: state.analysis ? watchlistDraftFromAnalysis(state.analysis) : undefined,
       });
       setWatchlistState((current) => ({
         ...current,
@@ -3879,7 +3903,7 @@ export default function MarketAnalysisPage() {
         error: "No se pudo agregar este mercado a seguimiento.",
       }));
     }
-  }, [marketId, watchlistState.noteDraft]);
+  }, [marketId, state.analysis, watchlistState.noteDraft]);
 
   const saveWatchlistItem = useCallback(async () => {
     setWatchlistState((current) => ({ ...current, saving: true, error: null }));
@@ -3892,6 +3916,7 @@ export default function MarketAnalysisPage() {
         : await createWatchlistItem(marketId, {
             status: watchlistState.statusDraft,
             note: watchlistState.noteDraft || null,
+            market: state.analysis ? watchlistDraftFromAnalysis(state.analysis) : undefined,
           });
       setWatchlistState((current) => ({
         ...current,
@@ -3908,7 +3933,7 @@ export default function MarketAnalysisPage() {
         error: "No se pudo guardar la nota o el estado.",
       }));
     }
-  }, [marketId, watchlistState.item, watchlistState.noteDraft, watchlistState.statusDraft]);
+  }, [marketId, state.analysis, watchlistState.item, watchlistState.noteDraft, watchlistState.statusDraft]);
 
   const removeFromWatchlist = useCallback(async () => {
     if (!watchlistState.item) {
@@ -4275,6 +4300,10 @@ export default function MarketAnalysisPage() {
   const sportDetailHref = analysis?.market.sport_type
     ? `/sports/${analysis.market.sport_type}`
     : "/sports";
+  const sportReturnLabel =
+    analysis?.market.sport_type === "soccer"
+      ? "Volver a fútbol"
+      : `Volver a ${formatSportLabel(analysis?.market.sport_type) || "deporte"}`;
 
   const marketBadges = useMemo(() => {
     if (!analysis) {
@@ -4305,7 +4334,7 @@ export default function MarketAnalysisPage() {
             Volver a mercados deportivos
           </Link>
           <Link className="text-link" href={sportDetailHref}>
-            Ver deporte
+            {sportReturnLabel}
           </Link>
         </div>
       </header>
@@ -4373,6 +4402,15 @@ export default function MarketAnalysisPage() {
             <strong>Solo lectura:</strong>
             <span>
               Esta página organiza información para revisión manual y no ejecuta apuestas automáticas.
+            </span>
+          </section>
+
+          <section className="focus-notice active">
+            <strong>Qué significa esto</strong>
+            <span>
+              Este mercado está siendo monitoreado con la información disponible.
+              Si lo sigues, aparecerá en Mi lista; cuando haya cambios importantes,
+              los podrás revisar desde Alertas.
             </span>
           </section>
 
