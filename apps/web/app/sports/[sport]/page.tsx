@@ -55,6 +55,7 @@ type UpcomingSportsMarket = {
   closed?: boolean | null;
   close_time?: string | null;
   event_time?: string | null;
+  latest_update?: string | null;
   market_yes_price?: string | number | null;
   market_no_price?: string | number | null;
   liquidity?: string | number | null;
@@ -365,6 +366,7 @@ function mapOverviewItem(item: MarketOverviewItem): UpcomingSportsMarket | null 
     closed: market.closed,
     close_time: market.close_time ?? market.end_date ?? null,
     event_time: market.close_time ?? market.end_date ?? null,
+    latest_update: snapshot.captured_at ?? null,
     market_yes_price: snapshot.yes_price,
     market_no_price: snapshot.no_price,
     liquidity: snapshot.liquidity,
@@ -631,12 +633,65 @@ const SOCCER_TEAM_BADGES: Record<string, SoccerTeamMeta> = {
   "nottingham forest fc": { initials: "NFO", shortName: "Nottingham", tone: "red" },
   "odisha fc": { initials: "OFC", shortName: "Odisha", tone: "amber" },
 };
+const TEAM_NAME_STOP_WORDS = new Set([
+  "afc",
+  "bv",
+  "calcio",
+  "cf",
+  "club",
+  "fc",
+  "rcd",
+  "sc",
+  "ss",
+  "us",
+  "vfl",
+]);
+const TEAM_AVATAR_TONES = ["blue", "red", "amber", "neutral"] as const;
 
 function normalizeTeamName(value: string): string {
   return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function cleanTeamWords(team: string): string[] {
+  return team
+    .replace(/\b09\b/g, "")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter(Boolean)
+    .filter((word) => !TEAM_NAME_STOP_WORDS.has(normalizeTeamName(word)));
+}
+
+function formatTeamName(team: string): string {
+  const known = SOCCER_TEAM_BADGES[normalizeTeamName(team)];
+  if (known) {
+    return known.shortName;
+  }
+  const cleaned = cleanTeamWords(team);
+  return (cleaned.length > 0 ? cleaned.join(" ") : team)
+    .replace(/\s+de\s+Barcelona$/i, "")
+    .trim();
+}
+
+function getTeamInitials(team: string): string {
+  const words = cleanTeamWords(team);
+  const source = words.length > 0 ? words : team.split(/\s+/).filter(Boolean);
+  return (
+    source
+      .slice(0, 3)
+      .map((word) => word[0]?.toUpperCase())
+      .join("") || "?"
+  );
+}
+
+function teamTone(team: string): string {
+  const normalized = normalizeTeamName(team);
+  const hash = Array.from(normalized).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return TEAM_AVATAR_TONES[hash % TEAM_AVATAR_TONES.length];
 }
 
 function teamMeta(team: string): SoccerTeamMeta {
@@ -644,17 +699,10 @@ function teamMeta(team: string): SoccerTeamMeta {
   if (known) {
     return known;
   }
-  const words = team
-    .replace(/\b(fc|cf|sc|club)\b/gi, "")
-    .split(/\s+/)
-    .filter(Boolean);
   return {
-    initials: words
-      .slice(0, 3)
-      .map((word) => word[0]?.toUpperCase())
-      .join("") || "?",
-    shortName: team.replace(/\s+FC$/i, ""),
-    tone: "neutral",
+    initials: getTeamInitials(team),
+    shortName: formatTeamName(team),
+    tone: teamTone(team),
   };
 }
 
@@ -1043,6 +1091,51 @@ function formatSoccerPrice(value: unknown): string {
   return `${Math.round(probability * 100)}¢`;
 }
 
+function formatSoccerMarketLabel(market: UpcomingSportsMarket): string {
+  const question = market.question.trim();
+  const parsed = parseSoccerQuestion(question);
+
+  if (parsed.kind === "draw") {
+    return "Empate";
+  }
+
+  if (parsed.kind === "win") {
+    return `${formatTeamName(parsed.team)} gana`;
+  }
+
+  if (parsed.kind === "exact_score") {
+    return `Marcador exacto: ${formatTeamName(parsed.homeTeam)} vs ${formatTeamName(parsed.awayTeam)}`;
+  }
+
+  if (parsed.kind === "halftime") {
+    return `${formatTeamName(parsed.team)} lidera al descanso`;
+  }
+
+  if (parsed.kind === "exact_other") {
+    return "Otro marcador";
+  }
+
+  return question
+    .replace(/^Will\s+/i, "")
+    .replace(/\?$/u, "")
+    .replace(/\s+on\s+\d{4}-\d{2}-\d{2}$/iu, "")
+    .trim();
+}
+
+function latestMatchUpdate(match: SoccerMatch): string | null {
+  const timestamps = match.markets
+    .map((market) => market.latest_update)
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+
+  if (timestamps.length === 0) {
+    return null;
+  }
+
+  return new Date(Math.max(...timestamps)).toISOString();
+}
+
 function sumMarketMetric(markets: UpcomingSportsMarket[], field: "liquidity" | "volume"): number | null {
   const total = markets.reduce((sum, market) => sum + (toNumber(market[field]) ?? 0), 0);
   return total > 0 ? total : null;
@@ -1051,7 +1144,7 @@ function sumMarketMetric(markets: UpcomingSportsMarket[], field: "liquidity" | "
 function TeamBadge({ team }: { team: string }) {
   const meta = teamMeta(team);
   return (
-    <span className={`team-crest tone-${meta.tone}`} aria-hidden="true">
+    <span className={`team-crest tone-${meta.tone}`} aria-label={meta.shortName} title={team}>
       {meta.initials}
     </span>
   );
@@ -1122,9 +1215,12 @@ function SoccerMarketSummaryRow({
 }) {
   const status = getSportsMarketPublicStatus(market);
   const price = formatSoccerPrice(market.market_yes_price);
+  const label = formatSoccerMarketLabel(market);
   return (
     <li className="soccer-market-summary-row">
-      <Link href={`/markets/${market.market_id}`}>{market.question}</Link>
+      <Link href={`/markets/${market.market_id}`} title={market.question}>
+        {label}
+      </Link>
       <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
       <strong>{price === "Sin dato" ? "Sin precio" : price}</strong>
       <button
@@ -1169,25 +1265,29 @@ function SoccerMatchCard({
   const orderedMarkets = orderedSoccerMatchMarkets(match);
   const previewMarkets = orderedMarkets.slice(0, 3);
   const hiddenMarkets = orderedMarkets.slice(3);
+  const updatedAt = latestMatchUpdate(match);
 
   return (
     <article className={`soccer-match-card ${lifecycle.isExpired ? "is-expired" : ""}`}>
-      <div className="soccer-match-meta">
-        <span>{status.label}</span>
-        <span>Fútbol</span>
-        <span>{formatMatchDateDetail(match.date)}</span>
-        <span>Vol. {formatMetric(volume)}</span>
+      <div className="soccer-match-header">
+        <div className="soccer-match-title-row">
+          <div className="team-crest-stack" aria-hidden="true">
+            <TeamBadge team={match.homeTeam} />
+            <TeamBadge team={match.awayTeam} />
+          </div>
+          <div className="soccer-match-title-copy">
+            <span className="soccer-match-kicker">{formatMatchDateDetail(match.date)}</span>
+            <h3>{home.shortName} vs {away.shortName}</h3>
+          </div>
+        </div>
+        <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
       </div>
-      <div className="soccer-match-main">
-        <div className="soccer-team-row">
-          <TeamBadge team={match.homeTeam} />
-          <strong>{home.shortName}</strong>
-        </div>
-        <span className="soccer-versus">vs</span>
-        <div className="soccer-team-row away">
-          <TeamBadge team={match.awayTeam} />
-          <strong>{away.shortName}</strong>
-        </div>
+      <div className="soccer-match-meta">
+        <span>Fútbol</span>
+        <span>{orderedMarkets.length} mercados</span>
+        {volume ? <span>Vol. {formatMetric(volume)}</span> : null}
+        {liquidity ? <span>Liquidez {formatMetric(liquidity)}</span> : null}
+        {updatedAt ? <span>Actualizado {formatDateTime(updatedAt)}</span> : null}
       </div>
       <div className="soccer-outcome-grid" aria-label="Precios principales">
         <SoccerOutcomePill label={home.shortName} market={match.homeWin} />
@@ -1440,7 +1540,6 @@ export default function SportDetailPage() {
   const shouldShowSoccerSchedule =
     selectedSport === "soccer" &&
     sportIsEnabled &&
-    !state.loading &&
     visibleSoccerItems.length > 0 &&
     soccerViewMode === "matches";
   const soccerMatchStats = useMemo(() => {
@@ -1555,6 +1654,13 @@ export default function SportDetailPage() {
         <section className="safety-strip" role="status">
           <strong>Mostrando última información disponible.</strong>
           <span>No pudimos actualizar ahora; volveremos a intentar automáticamente.</span>
+        </section>
+      ) : null}
+
+      {state.loading && state.items.length > 0 ? (
+        <section className="safety-strip" role="status">
+          <strong>Actualizando datos...</strong>
+          <span>La lista se mantiene visible mientras llega la información más reciente.</span>
         </section>
       ) : null}
 
@@ -1739,7 +1845,7 @@ export default function SportDetailPage() {
             copy="Este deporte se muestra como próximo lanzamiento y todavía no carga mercados."
             title={`${sportOption.label} está en preparación.`}
           />
-        ) : state.loading ? (
+        ) : state.loading && state.items.length === 0 ? (
           <LoadingState copy={`Cargando mercados de ${sportOption.label}...`} />
         ) : state.items.length === 0 ? (
           <EmptyState

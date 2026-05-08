@@ -63,13 +63,20 @@ Use these checks after a production deploy. Correct domains:
 5. Confirm at least one match card renders.
 6. Confirm match cards show markets inside the card, including prices when
    available and `Ver todos los mercados` when there are more items.
-7. Confirm the filter bar says `Mostrando 75 de 75 mercados` or reflects the
+7. Confirm match cards show clear `Equipo A vs Equipo B` titles and circular
+   team initials when no real crest is available.
+8. Confirm section headings group matches by day and show a match count.
+9. Confirm the filter bar says `Mostrando 75 de 75 mercados` or reflects the
    current total from the proxy.
-8. Confirm search/filter controls work without a full page reload.
-9. Confirm the page shows `Última actualización` and an `Actualizar` button.
-10. Confirm closed or expired markets appear as Cerrado or Información parcial,
+10. Confirm search/filter controls work without a full page reload.
+11. Confirm the page shows `Última actualización` and an `Actualizar` button.
+12. Confirm closed or expired markets appear as Cerrado or Información parcial,
    not as active opportunities.
-11. Confirm it does not show `Datos no disponibles`, `La API no respondió`, or
+13. Confirm the mobile view has no horizontal overflow and buttons are not cut
+    off.
+14. Click `Actualizar` and confirm the existing match list stays visible while
+    the page refreshes.
+15. Confirm it does not show `Datos no disponibles`, `La API no respondió`, or
     `Todavía no hay mercados`.
 
 Run the automated production smoke test from the repo root:

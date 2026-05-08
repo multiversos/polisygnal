@@ -10,6 +10,7 @@ const FRONTEND_BASE_URL = (
   process.env.POLYSIGNAL_SMOKE_FRONTEND_URL || "https://polisygnal-web.vercel.app"
 ).replace(/\/$/, "");
 const MIN_SOCCER_MARKETS = Number(process.env.POLYSIGNAL_SMOKE_MIN_SOCCER_MARKETS || 75);
+const MIN_SOCCER_MATCH_CARDS = Number(process.env.POLYSIGNAL_SMOKE_MIN_SOCCER_MATCH_CARDS || 20);
 const EXPECTED_COMMIT = process.env.POLYSIGNAL_SMOKE_EXPECTED_COMMIT || "";
 const PROXY_PATH = "/api/backend/markets/overview?sport_type=soccer&limit=50";
 const BUILD_INFO_PATH = "/api/build-info";
@@ -250,25 +251,31 @@ function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTo
     cardCount >= MIN_SOCCER_MARKETS || matchCardCount > 0,
     `${label} rendered ${cardCount} market cards and ${matchCardCount} match cards`,
   );
-  assert(matchCardCount >= 1, `${label} rendered ${matchCardCount} soccer match cards`);
+  assert(
+    matchCardCount >= MIN_SOCCER_MATCH_CARDS,
+    `${label} rendered ${matchCardCount} soccer match cards; expected at least ${MIN_SOCCER_MATCH_CARDS}`,
+  );
   assert(blockedTexts.length === 0, `${label} rendered error/empty text: ${blockedTexts.join(", ")}`);
   assert(titleFound, `${label} did not render any expected soccer market title`);
   assertTextIncludes(text, `Mercados ${expectedMarketTotal}`, label);
   assertTextIncludes(text, `Vista mercados (${visibleMarketCount})`, label);
+  assertTextIncludes(text, `Mostrando ${visibleMarketCount} de ${expectedMarketTotal} mercados`, label);
   assertTextIncludes(text, "Partidos detectados", label);
   assertTextIncludes(text, "Actualizar", label);
   assertTextIncludes(text, "Buscar equipo o mercado", label);
   assertTextIncludes(text, "Estado", label);
   assertTextIncludes(text, "Orden", label);
-  assertTextIncludes(text, "Mostrando", label);
   assertTextIncludesOneOf(text, ["Seguir", "Siguiendo"], `${label} watchlist button`);
   assertTextIncludesOneOf(text, UPDATE_TEXT, `${label} update timestamp`);
   assertTextIncludesOneOf(text, SOCCER_MARKET_LIST_TEXT, `${label} visible market list`);
   assertTextIncludesOneOf(text, UPCOMING_MATCHES_TEXT, label);
   assertTextIncludesOneOf(text, SCHEDULE_GROUP_TEXT, `${label} schedule grouping`);
+  assert(dom.includes("team-crest"), `${label} did not render team initials`);
+  assert(dom.includes("team-crest-stack"), `${label} did not render paired team avatars`);
   const publicProduct = validatePublicProductPage(dom, label, [
     `Mercados ${expectedMarketTotal}`,
     `Vista mercados (${visibleMarketCount})`,
+    `Mostrando ${visibleMarketCount} de ${expectedMarketTotal} mercados`,
     "Partidos detectados",
   ]);
 
@@ -279,6 +286,7 @@ function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTo
     markets_summary_found: true,
     market_toggle_found: true,
     match_summary_found: true,
+    team_avatars_found: true,
     ...publicProduct,
   };
 }
