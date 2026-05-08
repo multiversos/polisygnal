@@ -60,7 +60,8 @@ const PUBLIC_TECHNICAL_TEXT = [
   "Snapshot",
   "market_type",
   "model_version",
-  "raw",
+  "raw data",
+  "raw_data",
   "Kalshi",
 ];
 const UPDATE_TEXT = [
