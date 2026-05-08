@@ -111,6 +111,66 @@ tables. Identify newly created soccer events and markets from the apply output,
 then remove only those records and their dependent snapshots/predictions in a
 reviewed transaction.
 
+## Supervised Soccer Apply Record
+
+Run completed: 2026-05-08 01:39:42 UTC to 2026-05-08 01:40:08 UTC.
+
+Command executed once:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.refresh_soccer_markets --days 7 --limit 50 --apply --yes-i-understand-this-writes-data --json
+```
+
+Safety confirmations:
+
+- Add-only soccer refresh.
+- `--delete-existing` was not used.
+- No deletes, truncates, migrations, scheduler changes, or trading commands.
+- Limits were not expanded from the approved command.
+- Apply was executed once.
+
+Result:
+
+- Events created: 9.
+- Markets created/imported: 25.
+- Snapshots created: 25.
+- Predictions created: 15.
+- Scoring candidates skipped: 15 because they still lacked snapshots.
+- Snapshot skips: 21, mainly existing/unchanged local candidates.
+
+Counts before:
+
+- Events total: 18.
+- Markets total: 50.
+- Snapshots total: 35.
+- Predictions total: 35.
+- Soccer events: 18.
+- Soccer markets: 50.
+- Soccer snapshots: 35.
+- Soccer predictions: 35.
+
+Counts after:
+
+- Events total: 27.
+- Markets total: 75.
+- Snapshots total: 60.
+- Predictions total: 50.
+- Soccer events: 27.
+- Soccer markets: 75.
+- Soccer snapshots: 60.
+- Soccer predictions: 50.
+
+Post-apply public verification:
+
+- Backend/proxy soccer overview with `limit=50`: `total_count=75`, `items_length=50`.
+- `/sports/soccer` returned HTTP 200.
+- Production smoke passed with `match_card_count=16`.
+
+Follow-up recommendation: keep the next refresh add-only and supervised until
+the remaining snapshot gaps are understood. If the UI should display more than
+50 visible markets at once, change the frontend limit and smoke expectations in
+a separate product sprint.
+
 ## Scheduler Options
 
 - Render Cron Job: best once the apply command is trusted and guarded by
