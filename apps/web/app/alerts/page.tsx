@@ -393,6 +393,15 @@ export default function AlertsPage() {
         </span>
       </section>
 
+      <section className="safety-strip">
+        <strong>Cómo leer estas alertas:</strong>
+        <span>
+          Por ahora mostramos avisos básicos según los mercados que sigues y la
+          actividad disponible. Si no sigues mercados, la bandeja puede estar
+          tranquila.
+        </span>
+      </section>
+
       <section className="filter-panel alerts-filter-panel" aria-label="Filtros de alertas">
         <label className="filter-group">
           Severidad
@@ -546,9 +555,6 @@ export default function AlertsPage() {
                       {severityLabels[alert.severity]}
                     </span>
                     <span className="badge muted">{formatAlertType(alert.type)}</span>
-                    {alert.market_id ? (
-                      <span className="badge">#{alert.market_id}</span>
-                    ) : null}
                   </div>
                   <h3>{publicAlertText(alert.title)}</h3>
                   <p>{publicAlertText(alert.description)}</p>

@@ -72,11 +72,15 @@ Use these checks after a production deploy. Correct domains:
 11. Confirm the page shows `Última actualización` and an `Actualizar` button.
 12. Confirm closed or expired markets appear as Cerrado or Información parcial,
    not as active opportunities.
-13. Confirm the mobile view has no horizontal overflow and buttons are not cut
+13. Confirm cards show a simple reason such as `Para revisar`,
+    `En observación`, `Información parcial`, or `Seguir de cerca`.
+14. Confirm status labels explain themselves in plain language and do not
+    promise profit or certainty.
+15. Confirm the mobile view has no horizontal overflow and buttons are not cut
     off.
-14. Click `Actualizar` and confirm the existing match list stays visible while
+16. Click `Actualizar` and confirm the existing match list stays visible while
     the page refreshes.
-15. Confirm it does not show `Datos no disponibles`, `La API no respondió`, or
+17. Confirm it does not show `Datos no disponibles`, `La API no respondió`, or
     `Todavía no hay mercados`.
 
 Run the automated production smoke test from the repo root:
@@ -93,7 +97,8 @@ If this test fails, stop feature work and treat it as a production regression.
 2. Confirm it shows `Resumen rápido`, `Para revisar hoy`, and current market
    guidance.
 3. Confirm it shows `Última actualización` and an `Actualizar` button.
-4. Confirm empty states guide the user back to soccer or sports markets.
+4. Confirm it explains `Por qué aparecen aquí` before listing markets.
+5. Confirm empty states guide the user back to soccer or sports markets.
 
 ## Mi Lista
 
@@ -107,7 +112,9 @@ If this test fails, stop feature work and treat it as a production regression.
 1. Open `https://polisygnal-web.vercel.app/alerts`.
 2. Confirm it shows Alertas in simple language.
 3. Confirm it shows `Última actualización` and an `Actualizar` button.
-4. If there are no important alerts, confirm it says so clearly and offers a
+4. Confirm it explains that alerts are basic reminders connected to markets
+   the user follows.
+5. If there are no important alerts, confirm it says so clearly and offers a
    CTA to Mercados deportivos.
 
 ## Market Detail
@@ -115,9 +122,22 @@ If this test fails, stop feature work and treat it as a production regression.
 1. Open a market from `/sports/soccer`.
 2. Confirm the detail page focuses on title, status, price, analysis, history,
    and list follow-up.
-3. Confirm it links back to Inicio, Mercados deportivos, and the sport page.
-4. Confirm it does not show public links to JSON, API docs, raw IDs, or command
+3. Confirm it includes `Por qué aparece este mercado`, `Qué revisar`, or
+   `Qué significa esto` in plain language.
+4. Confirm it links back to Inicio, Mercados deportivos, and the sport page.
+5. Confirm it does not show public links to JSON, API docs, raw IDs, or command
    snippets.
+
+## Public Insight Language
+
+Use these quick checks when reviewing public pages:
+
+1. `Analizado` means there is enough information for an initial reading.
+2. `En observación` means the market is being followed but is not highlighted yet.
+3. `Información parcial` means some information is available but the market is not complete.
+4. `Para revisar` means the market is worth a manual look, not a guaranteed outcome.
+5. Confirm public copy says this is not financial advice, does not promise
+   results, and does not tell the user to buy or bet.
 
 ## Cache Troubleshooting
 

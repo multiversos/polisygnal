@@ -64,6 +64,7 @@ import {
   fetchMarketTimeline,
   type MarketTimelineItem,
 } from "../../lib/marketTimeline";
+import { getMarketReviewReason } from "../../lib/publicMarketInsights";
 import {
   MANUAL_EVIDENCE_REVIEW_STATUS_LABELS,
   MANUAL_EVIDENCE_STANCE_LABELS,
@@ -1002,37 +1003,53 @@ function getAnalysisStatus(analysis: MarketAnalysis): {
 
   if (!prediction && !score) {
     return {
-      label: "Sin predicción",
+      label: "En observación",
       tone: "neutral",
-      detail: "El mercado todavía no tiene una predicción guardada.",
+      detail: "Aún falta información para destacarlo.",
     };
   }
   if (prediction?.opportunity) {
     return {
-      label: "Oportunidad",
+      label: "Analizado",
       tone: "opportunity",
-      detail: "Hay una señal marcada como oportunidad para revisión manual.",
+      detail: "Tiene información suficiente para una lectura inicial.",
     };
   }
   if (edgeMagnitude !== null && edgeMagnitude >= 0.05) {
     return {
-      label: "Vigilancia",
+      label: "Analizado",
       tone: "watchlist",
-      detail: "La diferencia contra el precio de mercado merece seguimiento.",
+      detail: "El movimiento frente al precio visible merece seguimiento.",
     };
   }
   if (confidence !== null && confidence < 0.3) {
     return {
-      label: "Baja confianza",
+      label: "En observación",
       tone: "low-confidence",
-      detail: "Hay predicción, pero la confianza aún es limitada.",
+      detail: "Hay lectura inicial, pero todavía falta más información.",
     };
   }
   return {
-    label: "Solo datos",
+    label: "Analizado",
     tone: "data-only",
-    detail: "El mercado tiene datos útiles, sin una señal fuerte por ahora.",
+    detail: "El mercado tiene datos útiles para revisión manual.",
   };
+}
+
+function getAnalysisReviewReason(analysis: MarketAnalysis) {
+  return getMarketReviewReason({
+    active: analysis.market.active,
+    closed: analysis.market.closed,
+    closeTime: analysis.market.end_date ?? null,
+    hasAnalysis: Boolean(analysis.latest_prediction || analysis.polysignal_score),
+    hasPrice:
+      analysis.latest_snapshot?.yes_price !== null &&
+      analysis.latest_snapshot?.yes_price !== undefined,
+    isPartial: !analysis.latest_snapshot || !analysis.latest_prediction,
+    liquidity: analysis.latest_snapshot?.liquidity,
+    updatedAt: getLatestAnalysisUpdate(analysis),
+    volume: analysis.latest_snapshot?.volume,
+  });
 }
 
 function getLatestAnalysisUpdate(analysis: MarketAnalysis): string | null {
@@ -1745,26 +1762,26 @@ function PolySignalScorePanel({ score }: { score?: PolySignalScore | null }) {
       <div className="analysis-section-heading">
         <div>
           <span className="section-kicker">Estimación informativa</span>
-          <h2>Puntaje PolySignal</h2>
+          <h2>Lectura PolySignal</h2>
           <p className="section-note">
-            PolySignal Score es una estimación informativa basada en señales disponibles. No es recomendación de apuesta.
+            Esta lectura organiza la información disponible para revisión manual. No es recomendación de apuesta.
           </p>
         </div>
         <span className="timestamp-pill">
-          {score?.source === "latest_prediction" ? "Predicción guardada" : "Score preliminar"}
+          {score?.source === "latest_prediction" ? "Lectura guardada" : "Lectura inicial"}
         </span>
       </div>
 
       {!score || !hasScore ? (
         <div className="empty-state">
-          <strong>PolySignal SÍ: pendiente</strong>
+          <strong>Lectura SÍ: pendiente</strong>
           <p>Faltan datos suficientes para estimar.</p>
         </div>
       ) : (
         <div className="polysignal-detail-grid">
           <div className={`polysignal-score-card hero ${score.color_hint || "neutral"}`}>
             <div className="polysignal-score-heading">
-              <span>PolySignal SÍ</span>
+              <span>Lectura SÍ</span>
               <strong>{formatProbability(score.score_probability)}</strong>
             </div>
             <p>{score.label}</p>
@@ -1774,11 +1791,11 @@ function PolySignalScorePanel({ score }: { score?: PolySignalScore | null }) {
             <div><span>Mercado SÍ</span><strong>{formatProbability(score.market_yes_price)}</strong></div>
             <div><span>Diferencia</span><strong>{formatPercentPoints(score.edge_percent_points)}</strong></div>
             <div><span>Confianza</span><strong>{score.confidence_label}</strong></div>
-            <div><span>Fuente</span><strong>{humanizeToken(score.source)}</strong></div>
+            <div><span>Estado</span><strong>{score.source === "latest_prediction" ? "Lectura guardada" : "Lectura inicial"}</strong></div>
           </div>
 
           <div className="polysignal-components">
-            <h3>Componentes usados</h3>
+            <h3>Factores considerados</h3>
             {score.components.length > 0 ? (
               score.components.map((component) => (
                 <article className="polysignal-component" key={`${component.name}-${component.note}`}>
@@ -1960,12 +1977,7 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
   const snapshot = analysis.latest_snapshot;
   const score = analysis.polysignal_score;
   const status = getAnalysisStatus(analysis);
-  const sportLabel = formatSportLabel(analysis.candidate_context?.sport || analysis.market.sport_type);
-  const marketTypeLabel = formatMarketShapeLabel(
-    analysis.candidate_context?.market_shape ||
-      analysis.market.evidence_shape ||
-      analysis.market.market_type,
-  );
+  const reviewReason = getAnalysisReviewReason(analysis);
   const confidenceValue = prediction?.confidence_score ?? score?.confidence ?? null;
   const confidenceBand = getConfidenceBand(confidenceValue);
   const yesModelProbability = prediction?.yes_probability ?? score?.score_probability ?? null;
@@ -1978,31 +1990,34 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
           <span className="section-kicker">Lectura rápida</span>
           <h2>Qué revisar primero</h2>
           <p className="section-note">
-            Estas viendo un mercado de {sportLabel} tipo {marketTypeLabel}. PolySignal
-            compara precio y análisis guardado para ayudar a revisar el
-            mercado con criterio humano.
+            PolySignal compara la información disponible para ayudarte a decidir
+            si quieres seguir este mercado de cerca.
           </p>
         </div>
         <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+      </div>
+
+      <div className="market-insight-note">
+        <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
+        <p>{reviewReason.reason}</p>
       </div>
 
       <div className="empty-state compact">
         <strong>{status.detail}</strong>
         <p>
           {prediction
-            ? `La confianza del modelo es ${confidenceBand}. El score combina probabilidad estimada, edge y confianza para priorizar revisión manual; no es una recomendación de apuesta ni ejecuta trading automático.`
-            : "Todavía no hay predicción suficiente para este mercado. Esto no es una recomendación de apuesta ni ejecuta trading automático."}
+            ? `La confianza de la lectura es ${confidenceBand}. PolySignal organiza precio, actividad y confianza para priorizar revisión manual; no es una recomendación de apuesta.`
+            : "Todavía no hay información suficiente para destacar este mercado. Esto no es una recomendación de apuesta."}
         </p>
       </div>
 
       <div className="analysis-stat-grid">
         <div><span>Precio SÍ</span><strong>{formatProbability(snapshot?.yes_price)}</strong></div>
         <div><span>Precio NO</span><strong>{formatProbability(snapshot?.no_price)}</strong></div>
-        <div><span>Análisis SÍ</span><strong>{formatProbability(yesModelProbability)}</strong></div>
-        <div><span>Score</span><strong>{score?.score_percent !== undefined && score?.score_percent !== null ? `${score.score_percent}%` : formatProbability(score?.score_probability)}</strong></div>
+        <div><span>Lectura SÍ</span><strong>{formatProbability(yesModelProbability)}</strong></div>
+        <div><span>Prioridad</span><strong>{score?.score_percent !== undefined && score?.score_percent !== null ? `${score.score_percent}%` : formatProbability(score?.score_probability)}</strong></div>
         <div><span>Confianza</span><strong>{formatProbability(confidenceValue)}</strong></div>
-        <div><span>Edge</span><strong>{formatSignedProbabilityPoints(edgeValue)}</strong></div>
-        <div><span>Modo</span><strong>{getScoringModeLabel(analysis)}</strong></div>
+        <div><span>Diferencia visible</span><strong>{formatSignedProbabilityPoints(edgeValue)}</strong></div>
         <div><span>Última actualización</span><strong>{formatDateTime(getLatestAnalysisUpdate(analysis))}</strong></div>
       </div>
     </section>
@@ -4411,6 +4426,13 @@ export default function MarketAnalysisPage() {
               Este mercado está siendo monitoreado con la información disponible.
               Si lo sigues, aparecerá en Mi lista; cuando haya cambios importantes,
               los podrás revisar desde Alertas.
+            </span>
+          </section>
+
+          <section className="focus-notice active">
+            <strong>Por qué aparece este mercado</strong>
+            <span>
+              {getAnalysisReviewReason(analysis).reason} {getAnalysisReviewReason(analysis).action}
             </span>
           </section>
 

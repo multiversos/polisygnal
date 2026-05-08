@@ -96,6 +96,20 @@ const WHAT_THIS_MEANS_TEXT = [
   "QuÃ© significa esto",
   "QuÃƒÂ© significa esto",
 ];
+const REVIEW_REASON_TEXT = [
+  "Para revisar",
+  "En observación",
+  "En observaciÃ³n",
+  "Información parcial",
+  "InformaciÃ³n parcial",
+  "Seguir de cerca",
+];
+const WHY_VISIBLE_TEXT = [
+  "Por qué aparecen aquí",
+  "Por quÃ© aparecen aquÃ­",
+  "Por qué aparece este mercado",
+  "Por quÃ© aparece este mercado",
+];
 
 function urlFor(path) {
   return `${FRONTEND_BASE_URL}${path}`;
@@ -266,6 +280,7 @@ function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTo
   assertTextIncludes(text, "Estado", label);
   assertTextIncludes(text, "Orden", label);
   assertTextIncludesOneOf(text, ["Seguir", "Siguiendo"], `${label} watchlist button`);
+  assertTextIncludesOneOf(text, REVIEW_REASON_TEXT, `${label} review reason`);
   assertTextIncludesOneOf(text, UPDATE_TEXT, `${label} update timestamp`);
   assertTextIncludesOneOf(text, SOCCER_MARKET_LIST_TEXT, `${label} visible market list`);
   assertTextIncludesOneOf(text, UPCOMING_MATCHES_TEXT, label);
@@ -297,6 +312,8 @@ function validateMarketDetailPage(dom, label) {
   assertTextIncludes(text, "Volver a mercados deportivos", label);
   assertTextIncludesOneOf(text, SOCCER_RETURN_TEXT, `${label} sport return`);
   assertTextIncludesOneOf(text, WHAT_THIS_MEANS_TEXT, label);
+  assertTextIncludesOneOf(text, WHY_VISIBLE_TEXT, `${label} visible reason`);
+  assertTextIncludesOneOf(text, REVIEW_REASON_TEXT, `${label} public state`);
   assertTextExcludes(
     text,
     ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
@@ -425,6 +442,8 @@ async function main() {
   ]);
   const briefingText = visibleText(briefingDom);
   assertTextIncludesOneOf(briefingText, QUICK_SUMMARY_TEXT, "briefing quick summary");
+  assertTextIncludesOneOf(briefingText, WHY_VISIBLE_TEXT, "briefing priority explanation");
+  assertTextIncludesOneOf(briefingText, REVIEW_REASON_TEXT, "briefing review reason");
   assertTextIncludes(briefingText, "Actualizar", "briefing update button");
   assertTextIncludesOneOf(briefingText, UPDATE_TEXT, "briefing update timestamp");
   const alertsDom = await dumpDom(urlFor(ALERTS_PATH));
@@ -433,6 +452,7 @@ async function main() {
   assertTextIncludes(alertsText, "Actualizar", "alerts update button");
   assertTextIncludesOneOf(alertsText, UPDATE_TEXT, "alerts update timestamp");
   assertTextIncludes(alertsText, "Mercados que sigues", "alerts local watchlist");
+  assertTextIncludes(alertsText, "Cómo leer estas alertas", "alerts meaning copy");
   assertTextIncludesOneOf(
     alertsText,
     ["No tienes mercados en seguimiento", "Mercado en seguimiento"],

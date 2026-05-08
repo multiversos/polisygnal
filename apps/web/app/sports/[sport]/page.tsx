@@ -23,6 +23,7 @@ import {
   friendlyApiError,
 } from "../../lib/api";
 import { deriveMarketLifecycle } from "../../lib/marketLifecycle";
+import { getMarketReviewReason } from "../../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../../lib/publicMarketStatus";
 import { formatLastUpdated, useAutoRefresh } from "../../lib/useAutoRefresh";
 import {
@@ -461,6 +462,27 @@ function getSportsMarketPublicStatus(market: UpcomingSportsMarket) {
   });
 }
 
+function getSportsMarketReviewReason(market: UpcomingSportsMarket) {
+  const lifecycle = deriveSportsMarketLifecycle(market);
+  return getMarketReviewReason({
+    active: market.active,
+    closed: market.closed,
+    closeTime: market.close_time ?? market.event_time ?? null,
+    hasAnalysis: Boolean(market.has_prediction || market.polysignal_score),
+    hasPrice:
+      market.market_yes_price !== null &&
+      market.market_yes_price !== undefined,
+    isPartial:
+      lifecycle.status === "missed_live_snapshot" ||
+      !market.has_snapshot ||
+      !market.has_prediction,
+    lifecycleStatus: lifecycle.status,
+    liquidity: market.liquidity,
+    updatedAt: market.latest_update,
+    volume: market.volume,
+  });
+}
+
 function PolySignalMiniScore({
   dataQuality,
   score,
@@ -538,6 +560,7 @@ function SportMarketCard({
 }) {
   const lifecycle = deriveSportsMarketLifecycle(market);
   const publicStatus = getSportsMarketPublicStatus(market);
+  const reviewReason = getSportsMarketReviewReason(market);
   return (
     <article className={`sports-market-card ${lifecycle.isExpired ? "is-expired" : ""}`}>
       <div className="sports-market-card-header">
@@ -552,6 +575,10 @@ function SportMarketCard({
       </div>
       <h2>{market.question || "Mercado sin título"}</h2>
       {market.event_title ? <p>{market.event_title}</p> : null}
+      <div className="market-insight-note">
+        <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
+        <p>{reviewReason.reason}</p>
+      </div>
       <DataQualityMiniBadges item={dataQuality} />
 
       <div className="sports-market-metrics">
@@ -1216,11 +1243,13 @@ function SoccerMarketSummaryRow({
   const status = getSportsMarketPublicStatus(market);
   const price = formatSoccerPrice(market.market_yes_price);
   const label = formatSoccerMarketLabel(market);
+  const reviewReason = getSportsMarketReviewReason(market);
   return (
     <li className="soccer-market-summary-row">
       <Link href={`/markets/${market.market_id}`} title={market.question}>
         {label}
       </Link>
+      <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
       <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
       <strong>{price === "Sin dato" ? "Sin precio" : price}</strong>
       <button
@@ -1266,6 +1295,8 @@ function SoccerMatchCard({
   const previewMarkets = orderedMarkets.slice(0, 3);
   const hiddenMarkets = orderedMarkets.slice(3);
   const updatedAt = latestMatchUpdate(match);
+  const leadMarket = match.homeWin ?? match.awayWin ?? match.draw ?? match.markets[0];
+  const reviewReason = leadMarket ? getSportsMarketReviewReason(leadMarket) : null;
 
   return (
     <article className={`soccer-match-card ${lifecycle.isExpired ? "is-expired" : ""}`}>
@@ -1289,6 +1320,12 @@ function SoccerMatchCard({
         {liquidity ? <span>Liquidez {formatMetric(liquidity)}</span> : null}
         {updatedAt ? <span>Actualizado {formatDateTime(updatedAt)}</span> : null}
       </div>
+      {reviewReason ? (
+        <div className="market-insight-note compact">
+          <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
+          <p>{hasIncompletePrices ? "Tiene mercados principales incompletos; conviene revisarlo más tarde." : reviewReason.reason}</p>
+        </div>
+      ) : null}
       <div className="soccer-outcome-grid" aria-label="Precios principales">
         <SoccerOutcomePill label={home.shortName} market={match.homeWin} />
         <SoccerOutcomePill label="Empate" market={match.draw} />
@@ -1445,7 +1482,7 @@ export default function SportDetailPage() {
   const [soccerViewMode, setSoccerViewMode] = useState<"matches" | "markets">("matches");
   const [soccerQuery, setSoccerQuery] = useState("");
   const [soccerStatusFilter, setSoccerStatusFilter] = useState<
-    "active" | "all" | "analyzed" | "closed" | "observing"
+    "active" | "all" | "analyzed" | "closed" | "observing" | "partial" | "review"
   >("all");
   const [soccerSort, setSoccerSort] = useState<"markets" | "recent" | "upcoming">("upcoming");
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
@@ -1523,14 +1560,18 @@ export default function SportDetailPage() {
     const query = soccerQuery.trim().toLowerCase();
     return state.items.filter((market) => {
       const status = getSportsMarketPublicStatus(market);
+      const reviewReason = getSportsMarketReviewReason(market);
       const matchesQuery =
         query.length === 0 ||
         market.question.toLowerCase().includes(query) ||
         (market.event_title ?? "").toLowerCase().includes(query);
       const matchesStatus =
         soccerStatusFilter === "all" ||
+        (soccerStatusFilter === "review" && reviewReason.label === "Para revisar") ||
         (soccerStatusFilter === "analyzed" && status.label === "Analizado") ||
-        (soccerStatusFilter === "observing" && status.label === "En observación") ||
+        (soccerStatusFilter === "observing" &&
+          (status.label === "En observación" || reviewReason.label === "Seguir de cerca")) ||
+        (soccerStatusFilter === "partial" && status.label === "Información parcial") ||
         (soccerStatusFilter === "closed" && status.label === "Cerrado") ||
         (soccerStatusFilter === "active" &&
           (status.label === "Activo" || status.label === "Analizado"));
@@ -1740,8 +1781,10 @@ export default function SportDetailPage() {
               value={soccerStatusFilter}
             >
               <option value="all">Todos</option>
+              <option value="review">Para revisar</option>
               <option value="analyzed">Analizados</option>
               <option value="observing">En observación</option>
+              <option value="partial">Información parcial</option>
               <option value="active">Activos</option>
               <option value="closed">Cerrados</option>
             </select>
@@ -1788,12 +1831,14 @@ export default function SportDetailPage() {
           <div className="smart-alert-list">
             {recentlyUpdatedSoccerItems.map((market) => {
               const status = getSportsMarketPublicStatus(market);
+              const reviewReason = getSportsMarketReviewReason(market);
               return (
                 <article className="smart-alert-card info" key={market.market_id}>
                   <div>
                     <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
-                    <h3>{market.question}</h3>
+                    <h3>{formatSoccerMarketLabel(market)}</h3>
                     <p>{formatDateTime(market.event_time ?? market.close_time)}</p>
+                    <p className="section-note">{reviewReason.reason}</p>
                   </div>
                   <Link className="analysis-link" href={`/markets/${market.market_id}`}>
                     Ver mercado

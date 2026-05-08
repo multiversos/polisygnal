@@ -10,6 +10,7 @@ import {
   isSportBackendEnabled,
 } from "../components/SportsSelectorBar";
 import { fetchApiJson, friendlyApiError } from "../lib/api";
+import { getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { fetchSmartAlerts, type SmartAlert } from "../lib/smartAlerts";
 import { formatLastUpdated, useAutoRefresh } from "../lib/useAutoRefresh";
@@ -718,6 +719,15 @@ export default function DailyBriefingPage() {
         </section>
       ) : null}
 
+      <section className="safety-strip briefing-focus-note">
+        <strong>Por qué aparecen aquí:</strong>
+        <span>
+          Priorizamos mercados con información reciente, actividad visible o
+          partidos cercanos. Los mercados en observación todavía necesitan más
+          información antes de destacarse.
+        </span>
+      </section>
+
       {markdownFallback ? (
         <section className="panel briefing-markdown-fallback" aria-label="Texto del resumen diario">
           <div className="panel-heading compact">
@@ -1093,14 +1103,24 @@ function BriefingMarketCard({
   sport?: string | null;
   warnings?: string[];
 }) {
+  const statusMetric = metrics.find(([label]) => label === "Estado")?.[1] ?? "";
+  const yesMetric = metrics.find(([label]) => label === "SÍ" || label === "SÍ actual")?.[1] ?? "";
+  const reviewReason = getMarketReviewReason({
+    closeTime,
+    hasAnalysis: statusMetric === "Analizado",
+    hasPrice: yesMetric !== "" && yesMetric !== "--" && !yesMetric.toLowerCase().includes("sin dato"),
+    isPartial: Boolean(warnings?.length) || statusMetric === "Información parcial",
+  });
   return (
     <article className="briefing-card">
       <div className="badge-row">
         <span className="badge">{formatSport(sport)}</span>
         <span className="badge muted">{formatMarketShape(marketShape)}</span>
+        <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
         {closeTime ? <span className="badge muted">{formatDateTime(closeTime)}</span> : null}
       </div>
       <h3>{translateMarketTitleToSpanish(question)}</h3>
+      <p className="briefing-note">{reviewReason.reason}</p>
       <div className="briefing-mini-metrics">
         {metrics.map(([label, value]) => (
           <span key={`${label}-${value}`}>

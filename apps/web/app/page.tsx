@@ -42,6 +42,7 @@ import type {
   MarketOverviewResponse,
 } from "./lib/marketOverview";
 import { deriveMarketLifecycle } from "./lib/marketLifecycle";
+import { getMarketReviewReason } from "./lib/publicMarketInsights";
 import { getPublicMarketStatus } from "./lib/publicMarketStatus";
 import { formatLastUpdated, useAutoRefresh } from "./lib/useAutoRefresh";
 
@@ -2761,15 +2762,29 @@ function HomeHighlightCard({ item }: { item: MarketOverviewItem }) {
   const title = market.question ? humanizeMarketTitle(market.question) : "Mercado sin título";
   const price = formatMarketPercent(item.latest_snapshot?.yes_price);
   const confidence = formatMarketPercent(item.latest_prediction?.confidence_score);
+  const reviewReason = getMarketReviewReason({
+    active: market.active,
+    closed: market.closed,
+    closeTime: market.close_time ?? market.end_date ?? null,
+    hasAnalysis: Boolean(item.latest_prediction),
+    hasPrice:
+      item.latest_snapshot?.yes_price !== null &&
+      item.latest_snapshot?.yes_price !== undefined,
+    isPartial: !item.latest_snapshot || !item.latest_prediction,
+    liquidity: item.latest_snapshot?.liquidity,
+    updatedAt: item.latest_prediction?.run_at ?? item.latest_snapshot?.captured_at ?? null,
+    volume: item.latest_snapshot?.volume,
+  });
 
   return (
     <article className={`guidance-card ${status.tone}`}>
       <div className="badge-row">
         <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+        <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
         <span className="badge muted">{formatSportLabel(market.sport_type)}</span>
       </div>
       <h3>{title}</h3>
-      <p>{status.detail}</p>
+      <p>{reviewReason.reason}</p>
       <div className="guidance-card-metrics">
         <span>SÍ {price === "--" ? "Sin dato" : price}</span>
         <span>Confianza {confidence === "--" ? "Pendiente" : confidence}</span>
@@ -2799,15 +2814,26 @@ function UpcomingPreviewCard({ market }: { market: UpcomingSportsMarket }) {
       market.market_yes_price !== undefined,
     lifecycleStatus: lifecycle.status,
   });
+  const reviewReason = getMarketReviewReason({
+    closeTime: market.close_time ?? market.event_time ?? null,
+    hasAnalysis: Boolean(market.polysignal_score),
+    hasPrice:
+      market.market_yes_price !== null &&
+      market.market_yes_price !== undefined,
+    lifecycleStatus: lifecycle.status,
+    liquidity: market.liquidity,
+    volume: market.volume,
+  });
 
   return (
     <article className={`guidance-card ${status.tone}`}>
       <div className="badge-row">
         <span className={`market-status-badge ${status.tone}`}>{status.label}</span>
+        <span className={`market-intent-badge ${reviewReason.tone}`}>{reviewReason.label}</span>
         <span className="badge muted">{formatDateTime(market.close_time ?? market.event_time)}</span>
       </div>
       <h3>{humanizeMarketTitle(market.question)}</h3>
-      <p>{market.event_title ? translateMarketSubtitleToSpanish(market.event_title) : status.detail}</p>
+      <p>{reviewReason.reason}</p>
       <a className="analysis-link" href={`/markets/${market.market_id}`}>
         Ver detalles
       </a>
