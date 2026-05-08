@@ -300,6 +300,19 @@ def run_refresh_soccer_markets(
             snapshot_payload=snapshot_payload,
             scoring_payload=scoring_payload,
         ),
+        "apply_readiness": _build_apply_readiness(
+            import_payload=import_payload,
+            snapshot_payload=snapshot_payload,
+            scoring_payload=scoring_payload,
+            days=days,
+            pages=pages,
+            limit=limit,
+            max_events=max_events,
+            max_import=max_import,
+            max_snapshots=max_snapshots,
+            score_limit=score_limit,
+            debug_skips=debug_skips,
+        ),
         "warnings": warnings,
         "next_command_to_apply": _build_next_apply_command(
             days=days,
@@ -442,6 +455,149 @@ def _build_dry_run_report(
         "snapshot_skipped": snapshot_payload.get("skipped", 0),
         "scoring_candidates": scoring_payload.get("candidates_without_prediction", 0),
         "scoring_candidates_with_snapshot": scoring_payload.get("candidates_with_snapshot", 0),
+    }
+
+
+def _top_counts(counts: dict[str, Any], *, limit: int = 8) -> list[dict[str, Any]]:
+    normalized: list[tuple[str, int]] = []
+    for reason, count in counts.items():
+        try:
+            normalized.append((str(reason), int(count)))
+        except (TypeError, ValueError):
+            continue
+    normalized.sort(key=lambda item: (-item[1], item[0]))
+    return [{"reason": reason, "count": count} for reason, count in normalized[:limit]]
+
+
+def _build_next_dry_run_command(
+    *,
+    days: int,
+    pages: int,
+    limit: int,
+    max_events: int,
+    max_import: int,
+    max_snapshots: int,
+    score_limit: int,
+    debug_skips: bool,
+) -> str:
+    parts = [
+        "python -m app.commands.refresh_soccer_markets",
+        f"--days {days}",
+        f"--pages {pages}",
+        f"--limit {limit}",
+        f"--max-events {max_events}",
+        f"--max-import {max_import}",
+        f"--max-snapshots {max_snapshots}",
+        f"--score-limit {score_limit}",
+        "--json",
+    ]
+    if debug_skips:
+        parts.append("--debug-skips")
+    return " ".join(parts)
+
+
+def _build_apply_readiness(
+    *,
+    import_payload: dict[str, Any],
+    snapshot_payload: dict[str, Any],
+    scoring_payload: dict[str, Any],
+    days: int,
+    pages: int,
+    limit: int,
+    max_events: int,
+    max_import: int,
+    max_snapshots: int,
+    score_limit: int,
+    debug_skips: bool,
+) -> dict[str, Any]:
+    skip_reasons = import_payload.get("skip_reasons_count") or {}
+    if not isinstance(skip_reasons, dict):
+        skip_reasons = {}
+
+    duplicate_count = int(skip_reasons.get("already_exists_locally") or 0)
+    risky_reason_fragments = (
+        "closed",
+        "esport",
+        "missing_price",
+        "missing_prices",
+        "outside_window",
+        "sport_mismatch",
+        "too_close",
+        "unsupported",
+    )
+    risky_candidate_count = 0
+    top_risks: list[dict[str, Any]] = []
+    for reason, count in skip_reasons.items():
+        reason_text = str(reason)
+        try:
+            reason_count = int(count)
+        except (TypeError, ValueError):
+            continue
+        if any(fragment in reason_text for fragment in risky_reason_fragments):
+            risky_candidate_count += reason_count
+            top_risks.append({"reason": reason_text, "count": reason_count})
+    top_risks.sort(key=lambda item: (-int(item["count"]), str(item["reason"])))
+
+    safe_candidate_count = int(import_payload.get("would_import") or 0)
+    candidate_events_count = len(import_payload.get("event_groups") or [])
+    status_ok = str(import_payload.get("status", "ok")) == "ok"
+    ready = status_ok and safe_candidate_count > 0 and candidate_events_count > 0
+    recommended = ready and safe_candidate_count <= max_import
+
+    if not status_ok:
+        reason = "El dry-run de import no terminó correctamente."
+    elif safe_candidate_count <= 0:
+        reason = "No hay mercados nuevos claros para aplicar."
+    elif candidate_events_count <= 0:
+        reason = "Hay candidatos, pero no quedaron agrupados en eventos revisables."
+    elif safe_candidate_count > max_import:
+        reason = "Hay más candidatos que el límite de importación; revisa y ajusta límites."
+    else:
+        reason = "Hay candidatos soccer agrupados y el límite actual evita un import masivo."
+
+    return {
+        "ready": ready,
+        "recommended": recommended,
+        "reason": reason,
+        "safe_candidate_count": safe_candidate_count,
+        "duplicate_count": duplicate_count,
+        "risky_candidate_count": risky_candidate_count,
+        "top_risks": top_risks[:8],
+        "top_skip_reasons": _top_counts(skip_reasons),
+        "snapshot_would_create": snapshot_payload.get("would_create", 0),
+        "scoring_candidates": scoring_payload.get("candidates_without_prediction", 0),
+        "recommended_limits": {
+            "days": days,
+            "pages": pages,
+            "limit": limit,
+            "max_events": max_events,
+            "max_import": max_import,
+            "max_snapshots": max_snapshots,
+            "score_limit": score_limit,
+        },
+        "recommended_next_command_dry_run": _build_next_dry_run_command(
+            days=days,
+            pages=pages,
+            limit=limit,
+            max_events=max_events,
+            max_import=max_import,
+            max_snapshots=max_snapshots,
+            score_limit=score_limit,
+            debug_skips=debug_skips,
+        ),
+        "recommended_apply_command_marked_do_not_run": (
+            "NO EJECUTAR SIN SUPERVISION: "
+            + _build_next_apply_command(
+                days=days,
+                pages=pages,
+                limit=limit,
+                max_events=max_events,
+                max_import=max_import,
+                max_snapshots=max_snapshots,
+                score_limit=score_limit,
+                debug_skips=debug_skips,
+            )
+        ),
     }
 
 

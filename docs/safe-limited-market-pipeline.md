@@ -105,6 +105,24 @@ To save a local dry-run report for review, add `--report-json`:
 The report is dry-run only and redacts secret-like fields defensively. Do not
 commit local reports.
 
+The dry-run report includes an `apply_readiness` section:
+
+- `ready`: whether the current candidate slate is structurally usable.
+- `recommended`: whether the current caps look safe for a supervised add-only
+  apply.
+- `safe_candidate_count`: markets that would be imported.
+- `duplicate_count`: markets already present in the configured database.
+- `risky_candidate_count` and `top_risks`: blocked candidates such as esports,
+  unsupported sports, closed markets, or missing prices.
+- `recommended_limits`: the exact reviewed caps.
+- `recommended_next_command_dry_run`: command to rerun before any write.
+- `recommended_apply_command_marked_do_not_run`: an apply command clearly
+  marked for a future supervised session only.
+
+If the shell is not pointed at Neon, treat duplicate/readiness counts as local
+diagnostics only. Rerun with the Neon pooled `DATABASE_URL` pasted privately
+before any supervised apply.
+
 Default behavior is dry-run even if `--dry-run` is omitted. In dry-run, the
 command:
 
@@ -144,6 +162,27 @@ remote depth so newly imported events can be found again:
 
 Use the matching `--pages` / `--max-pages` value from the reviewed import
 dry-run. The default remains `1` for compatibility.
+
+For existing local markets, `refresh_market_snapshots` can inspect potential
+snapshot updates without importing new events:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.refresh_market_snapshots --dry-run --sport soccer --days 7 --limit 75 --json
+```
+
+This command is dry-run by default and requires explicit `--apply` before it
+can save snapshots. Do not run apply until the dry-run output has been reviewed.
+
+To inspect current soccer health without writing:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.inspect_soccer_market_health --json
+```
+
+It reports total soccer markets, snapshot/prediction coverage, active/closed
+counts, recent/stale counts, missing price/liquidity counts, and a short sample
+of markets that may need refresh. It does not call imports, does not score, and
+does not write data.
 
 ## Scoring Dry-Run
 

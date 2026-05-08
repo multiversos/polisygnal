@@ -1049,6 +1049,64 @@ h2 {
   line-height: 1.4;
 }
 
+.internal-status-page .hero-panel.compact {
+  align-items: center;
+  min-height: auto;
+}
+
+.internal-status-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.internal-status-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+}
+
+.internal-status-card span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+}
+
+.internal-status-card strong {
+  color: var(--text);
+  display: block;
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.internal-status-card p {
+  color: var(--muted);
+  margin: 8px 0 0;
+}
+
+.internal-status-list {
+  display: grid;
+  gap: 10px;
+}
+
+.internal-status-row {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.internal-status-row span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .market-overview-actions {
   align-items: center;
 }
@@ -4263,8 +4321,14 @@ h2 {
 
   .soccer-match-main,
   .soccer-outcome-grid,
-  .soccer-market-summary-row {
+  .soccer-market-summary-row,
+  .internal-status-grid {
     grid-template-columns: 1fr;
+  }
+
+  .internal-status-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .soccer-market-summary-row .watchlist-button.compact {

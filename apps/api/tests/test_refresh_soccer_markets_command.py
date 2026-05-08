@@ -96,6 +96,15 @@ def test_refresh_soccer_markets_dry_run_does_not_write_and_propagates_flags(
     assert payload["dry_run_report"]["candidate_events_count"] == 1
     assert payload["dry_run_report"]["candidate_markets"] == 3
     assert payload["dry_run_report"]["snapshot_would_create"] == 2
+    assert payload["apply_readiness"]["ready"] is True
+    assert payload["apply_readiness"]["recommended"] is True
+    assert payload["apply_readiness"]["safe_candidate_count"] == 3
+    assert payload["apply_readiness"]["recommended_limits"]["limit"] == 77
+    assert "--apply" not in payload["apply_readiness"]["recommended_next_command_dry_run"]
+    assert (
+        "NO EJECUTAR SIN SUPERVISION"
+        in payload["apply_readiness"]["recommended_apply_command_marked_do_not_run"]
+    )
     assert payload["candidate_events"] == [
         {
             "event_slug": "ucl-ars-atm1-2026-05-05",
@@ -214,6 +223,10 @@ def _patch_pipeline(monkeypatch: pytest.MonkeyPatch, calls: dict[str, dict[str, 
             "dry_run": kwargs["dry_run"],
             "would_import": 3 if kwargs["dry_run"] else 0,
             "imported": 0 if kwargs["dry_run"] else 3,
+            "skip_reasons_count": {
+                "already_exists_locally": 5,
+                "unsupported_sport": 2,
+            },
             "event_groups": [
                 {
                     "event_slug": "ucl-ars-atm1-2026-05-05",

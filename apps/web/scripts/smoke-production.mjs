@@ -20,6 +20,7 @@ const SPORTS_SOCCER_PATH = "/sports/soccer";
 const BRIEFING_PATH = "/briefing";
 const ALERTS_PATH = "/alerts";
 const DATA_HEALTH_PATH = "/data-health";
+const INTERNAL_DATA_STATUS_PATH = "/internal/data-status";
 const WORKFLOW_PATH = "/workflow";
 const RENDER_ERROR_TEXT = [
   "Datos no disponibles",
@@ -46,6 +47,10 @@ const INTERNAL_NAV_TEXT = [
   "Salud de datos",
   "Trial E2E",
   "Backtesting",
+  "internal",
+  "diagnostics",
+  "data status",
+  "Estado de datos",
 ];
 const PUBLIC_TECHNICAL_TEXT = [
   "API",
@@ -378,6 +383,20 @@ function validateWorkflowPage(dom) {
   return { prediction_column_found: true, data_only_column_found: true };
 }
 
+function validateInternalDataStatusPage(dom) {
+  const text = visibleText(dom);
+  assertTextIncludes(text, "Estado de datos", "internal data status");
+  assertTextIncludes(text, "Total fútbol", "internal data status");
+  assertTextIncludes(text, "Ver fútbol", "internal data status");
+  assertTextIncludes(text, "Solo lectura", "internal data status");
+  assertTextExcludes(
+    text,
+    ["DATABASE_URL", "postgres://", "postgresql://", "secret", "token"],
+    "internal data status",
+  );
+  return { internal_data_status_found: true, secrets_hidden: true };
+}
+
 async function main() {
   const buildInfo = await fetchJson(BUILD_INFO_PATH);
   validateBuildInfo(buildInfo);
@@ -482,6 +501,8 @@ async function main() {
   const marketDetailRender = validateMarketDetailPage(marketDetailDom, "market detail");
   const dataHealthDom = await dumpDom(urlFor(DATA_HEALTH_PATH));
   const dataHealthRender = validateDataHealthPage(dataHealthDom, totalOrItems);
+  const internalDataStatusDom = await dumpDom(urlFor(INTERNAL_DATA_STATUS_PATH));
+  const internalDataStatusRender = validateInternalDataStatusPage(internalDataStatusDom);
   const workflowDom = await dumpDom(urlFor(WORKFLOW_PATH));
   const workflowRender = validateWorkflowPage(workflowDom);
 
@@ -513,6 +534,7 @@ async function main() {
           market_detail: marketDetailRender,
         },
         data_health: dataHealthRender,
+        internal_data_status: internalDataStatusRender,
         workflow: workflowRender,
       },
       null,
