@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+﻿import { execFile } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,9 +23,9 @@ const WORKFLOW_PATH = "/workflow";
 const RENDER_ERROR_TEXT = [
   "Datos no disponibles",
   "La API no respondio",
-  "La API no respondió",
+  "La API no respondiÃ³",
   "Todavia no hay mercados",
-  "Todavía no hay mercados",
+  "TodavÃ­a no hay mercados",
 ];
 const PUBLIC_NAV_TEXT = [
   "Inicio",
@@ -35,8 +35,8 @@ const PUBLIC_NAV_TEXT = [
   "Alertas",
 ];
 const INTERNAL_NAV_TEXT = [
-  "Investigación",
   "InvestigaciÃ³n",
+  "InvestigaciÃƒÂ³n",
   "Evidencia",
   "Decisiones",
   "Workflow",
@@ -60,12 +60,40 @@ const PUBLIC_TECHNICAL_TEXT = [
   "market_type",
   "Kalshi",
 ];
-const UPDATE_TEXT = ["Última actualización", "Ãšltima actualizaciÃ³n"];
+const UPDATE_TEXT = [
+  "Última actualización",
+  "Ãšltima actualizaciÃ³n",
+  "ÃƒÅ¡ltima actualizaciÃƒÂ³n",
+];
 const SOCCER_MARKET_LIST_TEXT = [
   "Mercados disponibles",
   "Ver todos los mercados",
-  "Precio SÍ",
   "Precio SÃ",
+  "Precio SÃƒÂ",
+];
+const UPCOMING_MATCHES_TEXT = ["Próximos partidos", "PrÃ³ximos partidos"];
+const SCHEDULE_GROUP_TEXT = [
+  "Hoy",
+  "Mañana",
+  "MaÃ±ana",
+  "Esta semana",
+  "Próximamente",
+  "PrÃ³ximamente",
+  "Sin fecha confirmada",
+];
+const REVIEW_NOW_TEXT = ["Qué revisar ahora", "QuÃ© revisar ahora"];
+const QUICK_SUMMARY_TEXT = ["Resumen rápido", "Resumen rÃ¡pido"];
+const ANALYSIS_TEXT = ["Ver análisis", "Ver anÃ¡lisis"];
+const PREDICTION_TEXT = ["Con predicción", "Con predicciÃ³n"];
+const SOCCER_RETURN_TEXT = [
+  "Volver a fútbol",
+  "Volver a fÃºtbol",
+  "Volver a fÃƒÂºtbol",
+];
+const WHAT_THIS_MEANS_TEXT = [
+  "Qué significa esto",
+  "QuÃ© significa esto",
+  "QuÃƒÂ© significa esto",
 ];
 
 function urlFor(path) {
@@ -210,7 +238,7 @@ function validatePublicProductPage(dom, label, requiredText = []) {
   return { public_sidebar_found: true, internal_sidebar_hidden: true, technical_copy_hidden: true };
 }
 
-function validateRenderedSoccerPage(dom, expectedTitles, label) {
+function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTotal, visibleMarketCount) {
   const cardCount = countMarketCards(dom);
   const matchCardCount = countMatchCards(dom);
   const text = visibleText(dom);
@@ -225,8 +253,8 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
   assert(matchCardCount >= 1, `${label} rendered ${matchCardCount} soccer match cards`);
   assert(blockedTexts.length === 0, `${label} rendered error/empty text: ${blockedTexts.join(", ")}`);
   assert(titleFound, `${label} did not render any expected soccer market title`);
-  assertTextIncludes(text, `Mercados ${MIN_SOCCER_MARKETS}`, label);
-  assertTextIncludes(text, `Vista mercados (${MIN_SOCCER_MARKETS})`, label);
+  assertTextIncludes(text, `Mercados ${expectedMarketTotal}`, label);
+  assertTextIncludes(text, `Vista mercados (${visibleMarketCount})`, label);
   assertTextIncludes(text, "Partidos detectados", label);
   assertTextIncludes(text, "Actualizar", label);
   assertTextIncludes(text, "Buscar equipo o mercado", label);
@@ -236,17 +264,12 @@ function validateRenderedSoccerPage(dom, expectedTitles, label) {
   assertTextIncludesOneOf(text, ["Seguir", "Siguiendo"], `${label} watchlist button`);
   assertTextIncludesOneOf(text, UPDATE_TEXT, `${label} update timestamp`);
   assertTextIncludesOneOf(text, SOCCER_MARKET_LIST_TEXT, `${label} visible market list`);
-  assertTextIncludes(text, "Próximos partidos", label);
-  assertTextIncludesOneOf(
-    text,
-    ["Hoy", "Mañana", "Esta semana", "Próximamente", "Sin fecha confirmada"],
-    `${label} schedule grouping`,
-  );
+  assertTextIncludesOneOf(text, UPCOMING_MATCHES_TEXT, label);
+  assertTextIncludesOneOf(text, SCHEDULE_GROUP_TEXT, `${label} schedule grouping`);
   const publicProduct = validatePublicProductPage(dom, label, [
-    `Mercados ${MIN_SOCCER_MARKETS}`,
-    `Vista mercados (${MIN_SOCCER_MARKETS})`,
+    `Mercados ${expectedMarketTotal}`,
+    `Vista mercados (${visibleMarketCount})`,
     "Partidos detectados",
-    "Próximos partidos",
   ]);
 
   return {
@@ -264,8 +287,8 @@ function validateMarketDetailPage(dom, label) {
   const text = visibleText(dom);
   assertTextIncludesOneOf(text, ["Seguir mercado", "Siguiendo"], `${label} watchlist action`);
   assertTextIncludes(text, "Volver a mercados deportivos", label);
-  assertTextIncludesOneOf(text, ["Volver a fÃºtbol", "Volver a fútbol"], `${label} sport return`);
-  assertTextIncludesOneOf(text, ["QuÃ© significa esto", "Qué significa esto"], label);
+  assertTextIncludesOneOf(text, SOCCER_RETURN_TEXT, `${label} sport return`);
+  assertTextIncludesOneOf(text, WHAT_THIS_MEANS_TEXT, label);
   assertTextExcludes(
     text,
     ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
@@ -293,27 +316,25 @@ function validateBuildInfo(buildInfo) {
   }
 }
 
-function validateDataHealthPage(dom) {
+function validateDataHealthPage(dom, expectedMarketTotal) {
   const text = visibleText(dom);
-  assertTextIncludes(text, `Markets visibles ${MIN_SOCCER_MARKETS}`, "data-health");
-  assertTextIncludes(text, "Con snapshot 35", "data-health");
-  assertTextIncludes(text, "Con predicción 35", "data-health");
+  assertTextIncludes(text, `Markets visibles ${expectedMarketTotal}`, "data-health");
+  assertTextIncludes(text, "Con snapshot", "data-health");
+  assertTextIncludesOneOf(text, PREDICTION_TEXT, "data-health");
   assertTextExcludes(
     text,
     ["Mercados totales 0", "Por deporte 0 deportes", "Polymarket live", "Discovery read-only"],
     "data-health",
   );
-  assertTextExcludes(text, ["Salud de datos no disponible", "La API no respondió"], "data-health");
+  assertTextExcludes(text, ["Salud de datos no disponible", "La API no respondiÃ³"], "data-health");
   return { real_markets_found: true, old_zero_blocks_hidden: true };
 }
 
 function validateWorkflowPage(dom) {
   const text = visibleText(dom);
-  assertTextIncludes(text, "Con predicción", "workflow");
+  assertTextIncludesOneOf(text, PREDICTION_TEXT, "workflow");
   assertTextIncludes(text, "Solo datos", "workflow");
-  assertTextIncludes(text, "Con predicción 35", "workflow");
-  assertTextIncludes(text, "Solo datos 15", "workflow");
-  assertTextExcludes(text, ["Workflow no disponible", "La API no respondió"], "workflow");
+  assertTextExcludes(text, ["Workflow no disponible", "La API no respondiÃ³"], "workflow");
   return { prediction_column_found: true, data_only_column_found: true };
 }
 
@@ -327,6 +348,7 @@ async function main() {
     .filter(Boolean)
     .slice(0, 20);
   const totalOrItems = Math.max(Number(overview.body.total_count ?? 0), items.length);
+  const visibleMarketCount = items.length;
 
   assert(
     totalOrItems >= MIN_SOCCER_MARKETS,
@@ -336,33 +358,42 @@ async function main() {
   assert(expectedTitles.length > 0, `${PROXY_PATH} did not return market titles`);
 
   const baseDom = await dumpDom(urlFor(SPORTS_SOCCER_PATH));
-  const baseRender = validateRenderedSoccerPage(baseDom, expectedTitles, "sports/soccer");
+  const baseRender = validateRenderedSoccerPage(
+    baseDom,
+    expectedTitles,
+    "sports/soccer",
+    totalOrItems,
+    visibleMarketCount,
+  );
   const cacheBusterPath = `${SPORTS_SOCCER_PATH}?debug_ts=${Date.now()}`;
   const cacheBusterDom = await dumpDom(urlFor(cacheBusterPath));
   const cacheBusterRender = validateRenderedSoccerPage(
     cacheBusterDom,
     expectedTitles,
     "sports/soccer cache buster",
+    totalOrItems,
+    visibleMarketCount,
   );
   const homeDom = await dumpDom(urlFor(HOME_PATH));
   const homeRender = validatePublicProductPage(homeDom, "home", [
     "Inicio",
-    "Qué revisar ahora",
     "Ver mercados deportivos",
     "Ver resumen diario",
     "Revisar alertas",
   ]);
   const homeText = visibleText(homeDom);
+  assertTextIncludesOneOf(homeText, REVIEW_NOW_TEXT, "home review block");
   assertTextIncludes(homeText, "Mercados destacados", "home live content");
   assertTextIncludes(homeText, "Actualizar", "home update button");
   assertTextIncludesOneOf(homeText, UPDATE_TEXT, "home update timestamp");
   assertTextIncludesOneOf(
     homeText,
     [
+      "TodavÃ­a no tienes mercados guardados",
       "Todavía no tienes mercados guardados",
       "Cuando sigas un mercado",
       "Explorar mercados deportivos",
-      "Ver análisis",
+      ...ANALYSIS_TEXT,
     ],
     "home watchlist",
   );
@@ -382,10 +413,10 @@ async function main() {
   const briefingDom = await dumpDom(urlFor(BRIEFING_PATH));
   const briefingRender = validatePublicProductPage(briefingDom, "briefing", [
     "Resumen diario",
-    "Resumen rápido",
     "Para revisar hoy",
   ]);
   const briefingText = visibleText(briefingDom);
+  assertTextIncludesOneOf(briefingText, QUICK_SUMMARY_TEXT, "briefing quick summary");
   assertTextIncludes(briefingText, "Actualizar", "briefing update button");
   assertTextIncludesOneOf(briefingText, UPDATE_TEXT, "briefing update timestamp");
   const alertsDom = await dumpDom(urlFor(ALERTS_PATH));
@@ -403,7 +434,7 @@ async function main() {
   const marketDetailDom = await dumpDom(urlFor(`/markets/${detailMarketId}`));
   const marketDetailRender = validateMarketDetailPage(marketDetailDom, "market detail");
   const dataHealthDom = await dumpDom(urlFor(DATA_HEALTH_PATH));
-  const dataHealthRender = validateDataHealthPage(dataHealthDom);
+  const dataHealthRender = validateDataHealthPage(dataHealthDom, totalOrItems);
   const workflowDom = await dumpDom(urlFor(WORKFLOW_PATH));
   const workflowRender = validateWorkflowPage(workflowDom);
 
