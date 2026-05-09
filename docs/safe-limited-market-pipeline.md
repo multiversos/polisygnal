@@ -171,7 +171,10 @@ snapshot updates without importing new events:
 ```
 
 This command is dry-run by default and requires explicit `--apply` before it
-can save snapshots. Do not run apply until the dry-run output has been reviewed.
+can save snapshots. However, the command-level dry-run records refresh-run audit
+rows today, so it is not a strict no-write Neon diagnostic. For a future
+production freshness operation, either run it only in a supervised write window
+or first harden/create a no-audit read-only snapshot refresh command.
 
 To inspect current soccer health without writing:
 
@@ -179,10 +182,37 @@ To inspect current soccer health without writing:
 .\.venv\Scripts\python.exe -m app.commands.inspect_soccer_market_health --json
 ```
 
-It reports total soccer markets, snapshot/prediction coverage, active/closed
-counts, recent/stale counts, missing price/liquidity counts, and a short sample
-of markets that may need refresh. It does not call imports, does not score, and
-does not write data.
+It reports total soccer markets, with/without snapshot counts,
+with/without prediction counts, active/closed counts, recent/stale counts,
+missing price/liquidity/volume counts, top stale markets, top missing snapshot
+markets, top missing prediction markets, and a short sample of markets that may
+need refresh. It does not call imports, does not score, and does not write data.
+
+Current soccer freshness baseline, reviewed 2026-05-09:
+
+- 75 soccer markets.
+- 60 with snapshots/updates and 15 without.
+- 50 with predictions/analysis and 25 without.
+- 75 active and 0 closed.
+- 25 updated in the last 48 hours and 50 stale/missing recent update.
+- 60 with visible price, liquidity, and volume.
+
+Before any apply, confirm the shell is connected to Neon with masked output:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.check_database_config --connect
+```
+
+If the command reports localhost or `looks_like_neon=false`, do not use that
+dry-run as authorization for a production apply.
+
+Future strict no-write existing-snapshot refresh command to prepare, not
+executed:
+
+```powershell
+# NO EJECUTADO
+.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_snapshots --dry-run --sport soccer --stale-hours 48 --missing-only --limit 30 --report-json N:\projects\polimarket\logs\reports\dry-runs\soccer-existing-snapshots.json --json
+```
 
 ## Scoring Dry-Run
 

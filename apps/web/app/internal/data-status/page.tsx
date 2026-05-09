@@ -74,6 +74,11 @@ function hasLiquidity(item: MarketOverviewItem): boolean {
   return Number.isFinite(value) && value > 0;
 }
 
+function hasVolume(item: MarketOverviewItem): boolean {
+  const value = Number(item.latest_snapshot?.volume ?? 0);
+  return Number.isFinite(value) && value > 0;
+}
+
 async function fetchSoccerOverview(): Promise<{ items: MarketOverviewItem[]; totalCount: number }> {
   const first = await fetchApiJson<MarketsOverviewResponse>(
     `/markets/overview?sport_type=soccer&limit=${PAGE_SIZE}&offset=0`,
@@ -148,12 +153,27 @@ export default function InternalDataStatusPage() {
         const value = latestUpdate(item);
         return value === null || value < recentThreshold;
       }).length,
+      withCompleteMarketData: state.items.filter(
+        (item) => hasPrice(item) && hasLiquidity(item) && hasVolume(item),
+      ).length,
       withLiquidity: state.items.filter(hasLiquidity).length,
       withPrediction: state.items.filter((item) => Boolean(item.latest_prediction)).length,
       withPrice: state.items.filter(hasPrice).length,
       withSnapshot: state.items.filter((item) => Boolean(item.latest_snapshot)).length,
+      withVolume: state.items.filter(hasVolume).length,
     };
   }, [state.items]);
+
+  const missing = useMemo(
+    () => ({
+      liquidity: state.items.length - summary.withLiquidity,
+      prediction: state.items.length - summary.withPrediction,
+      price: state.items.length - summary.withPrice,
+      snapshot: state.items.length - summary.withSnapshot,
+      volume: state.items.length - summary.withVolume,
+    }),
+    [state.items.length, summary],
+  );
 
   return (
     <main className="page-shell internal-status-page">
@@ -193,12 +213,12 @@ export default function InternalDataStatusPage() {
         <article className="internal-status-card">
           <span>Con actualización</span>
           <strong>{summary.withSnapshot}</strong>
-          <p>{summary.withPrice} con precio visible.</p>
+          <p>{missing.snapshot} sin actualización guardada.</p>
         </article>
         <article className="internal-status-card">
           <span>Con análisis</span>
           <strong>{summary.withPrediction}</strong>
-          <p>{summary.withLiquidity} con liquidez visible.</p>
+          <p>{missing.prediction} sin análisis guardado.</p>
         </article>
         <article className="internal-status-card">
           <span>Estado</span>
@@ -209,6 +229,26 @@ export default function InternalDataStatusPage() {
           <span>Frescura</span>
           <strong>{summary.recent} recientes</strong>
           <p>{summary.stale} sin cambios recientes.</p>
+        </article>
+        <article className="internal-status-card">
+          <span>Con precio visible</span>
+          <strong>{summary.withPrice}</strong>
+          <p>{missing.price} sin precio cargado.</p>
+        </article>
+        <article className="internal-status-card">
+          <span>Con liquidez visible</span>
+          <strong>{summary.withLiquidity}</strong>
+          <p>{missing.liquidity} sin liquidez cargada.</p>
+        </article>
+        <article className="internal-status-card">
+          <span>Con volumen visible</span>
+          <strong>{summary.withVolume}</strong>
+          <p>{missing.volume} sin volumen cargado.</p>
+        </article>
+        <article className="internal-status-card">
+          <span>Datos completos</span>
+          <strong>{summary.withCompleteMarketData}</strong>
+          <p>Precio, liquidez y volumen visibles.</p>
         </article>
         <article className="internal-status-card">
           <span>Última actividad visible</span>

@@ -133,6 +133,23 @@ If this test fails, stop feature work and treat it as a production regression.
 5. Confirm it does not show public links to JSON, API docs, raw IDs, or command
    snippets.
 
+## Hidden Data Status
+
+1. Open `https://polisygnal-web.vercel.app/internal/data-status` directly.
+2. Confirm the route says `Solo lectura`.
+3. Confirm it shows soccer totals, loaded markets, active/closed counts,
+   recent/stale counts, and the latest visible activity.
+4. Confirm it shows both coverage and gaps:
+   - Con actualizacion / Sin actualizacion.
+   - Con analisis / Sin analisis.
+   - Con precio visible.
+   - Con liquidez visible.
+   - Con volumen visible.
+   - Datos completos.
+5. Confirm this page is not linked from the public sidebar or public pages.
+6. Confirm it does not show secrets, connection strings, stack traces, or large
+   raw payloads.
+
 ## Public Insight Language
 
 Use these quick checks when reviewing public pages:

@@ -99,9 +99,13 @@ def inspect_soccer_market_health(
     stale = 0
     missing_price = 0
     missing_liquidity = 0
+    missing_volume = 0
     missing_snapshot = 0
     missing_prediction = 0
     samples: list[dict[str, Any]] = []
+    stale_markets: list[dict[str, Any]] = []
+    markets_missing_snapshot: list[dict[str, Any]] = []
+    markets_missing_prediction: list[dict[str, Any]] = []
     latest_seen_update: datetime | None = None
 
     for market in markets:
@@ -141,21 +145,30 @@ def inspect_soccer_market_health(
         if not snapshot or _is_empty_decimal(snapshot.liquidity):
             missing_liquidity += 1
             reasons.append("missing_liquidity")
+        if not snapshot or _is_empty_decimal(snapshot.volume):
+            missing_volume += 1
+            reasons.append("missing_volume")
+
+        item = _market_health_item(
+            market=market,
+            snapshot=snapshot,
+            prediction=prediction,
+            latest_update=latest_update,
+            reasons=reasons,
+        )
+        if not has_recent_update:
+            stale_markets.append(item)
+        if snapshot is None:
+            markets_missing_snapshot.append(item)
+        if prediction is None:
+            markets_missing_prediction.append(item)
 
         if reasons and len(samples) < sample_limit:
-            samples.append(
-                {
-                    "market_id": market.id,
-                    "title": market.question,
-                    "event_title": market.event.title if market.event else None,
-                    "event_slug": market.event.slug if market.event else None,
-                    "active": bool(market.active),
-                    "closed": bool(market.closed),
-                    "end_date": market.end_date.isoformat() if market.end_date else None,
-                    "latest_update": latest_update.isoformat() if latest_update else None,
-                    "reasons": sorted(set(reasons)),
-                }
-            )
+            samples.append(item)
+
+    stale_markets.sort(key=_health_item_sort_key)
+    markets_missing_snapshot.sort(key=_health_item_sort_key)
+    markets_missing_prediction.sort(key=_health_item_sort_key)
 
     return {
         "status": "ok",
@@ -164,16 +177,22 @@ def inspect_soccer_market_health(
         "stale_hours": stale_hours,
         "total_soccer_markets": len(markets),
         "with_snapshot": with_snapshot,
+        "without_snapshot": len(markets) - with_snapshot,
         "with_prediction": with_prediction,
+        "without_prediction": len(markets) - with_prediction,
         "active": active,
         "closed": closed,
         "recently_updated": recently_updated,
         "stale": stale,
         "missing_price": missing_price,
         "missing_liquidity": missing_liquidity,
+        "missing_volume": missing_volume,
         "missing_snapshot": missing_snapshot,
         "missing_prediction": missing_prediction,
         "latest_seen_update": latest_seen_update.isoformat() if latest_seen_update else None,
+        "top_stale_markets": stale_markets[:sample_limit],
+        "top_missing_snapshot_markets": markets_missing_snapshot[:sample_limit],
+        "top_missing_prediction_markets": markets_missing_prediction[:sample_limit],
         "sample_markets_needing_refresh": samples,
     }
 
@@ -188,11 +207,15 @@ def print_human(payload: dict[str, Any]) -> None:
         )
     )
     print(
+        "without_snapshot={without_snapshot} without_prediction={without_prediction} "
         "missing_price={missing_price} missing_liquidity={missing_liquidity} "
-        "missing_snapshot={missing_snapshot} missing_prediction={missing_prediction}".format(
+        "missing_volume={missing_volume}".format(
             **payload
         )
     )
+    _print_item_list("top_stale_markets", payload["top_stale_markets"])
+    _print_item_list("top_missing_snapshot_markets", payload["top_missing_snapshot_markets"])
+    _print_item_list("top_missing_prediction_markets", payload["top_missing_prediction_markets"])
     if payload["sample_markets_needing_refresh"]:
         print("sample_markets_needing_refresh:")
         for item in payload["sample_markets_needing_refresh"]:
@@ -204,6 +227,58 @@ def print_human(payload: dict[str, Any]) -> None:
                     latest_update=item.get("latest_update") or "none",
                 )
             )
+
+
+def _print_item_list(label: str, items: list[dict[str, Any]]) -> None:
+    if not items:
+        return
+    print(f"{label}:")
+    for item in items:
+        print(
+            "  #{market_id} {title} | event={event_title} | active={active} closed={closed} "
+            "| latest={latest_update} | reasons={reasons}".format(
+                market_id=item["market_id"],
+                title=item["title"],
+                event_title=item.get("event_title") or "none",
+                active=item["active"],
+                closed=item["closed"],
+                latest_update=item.get("latest_update") or "none",
+                reasons=",".join(item["reasons"]),
+            )
+        )
+
+
+def _market_health_item(
+    *,
+    market: Market,
+    snapshot: MarketSnapshot | None,
+    prediction: Prediction | None,
+    latest_update: datetime | None,
+    reasons: list[str],
+) -> dict[str, Any]:
+    return {
+        "market_id": market.id,
+        "title": market.question,
+        "event_title": market.event.title if market.event else None,
+        "event_slug": market.event.slug if market.event else None,
+        "active": bool(market.active),
+        "closed": bool(market.closed),
+        "end_date": market.end_date.isoformat() if market.end_date else None,
+        "latest_update": latest_update.isoformat() if latest_update else None,
+        "has_snapshot": snapshot is not None,
+        "has_prediction": prediction is not None,
+        "has_price": bool(
+            snapshot and (snapshot.yes_price is not None or snapshot.no_price is not None)
+        ),
+        "has_liquidity": bool(snapshot and not _is_empty_decimal(snapshot.liquidity)),
+        "has_volume": bool(snapshot and not _is_empty_decimal(snapshot.volume)),
+        "reasons": sorted(set(reasons)),
+    }
+
+
+def _health_item_sort_key(item: dict[str, Any]) -> tuple[int, str, int]:
+    latest_update = item.get("latest_update")
+    return (0 if latest_update is None else 1, latest_update or "", int(item["market_id"]))
 
 
 def _latest_snapshot(market: Market) -> MarketSnapshot | None:

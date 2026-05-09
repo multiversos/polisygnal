@@ -23,6 +23,29 @@ For a reviewable local report, add:
 
 `--report-json` is intentionally rejected with `--apply`.
 
+## Current Soccer Freshness Baseline
+
+Latest public read-only status, reviewed 2026-05-09:
+
+- Soccer markets: 75.
+- Loaded by the public frontend: 75 through paginated overview requests.
+- With snapshot/update: 60.
+- Without snapshot/update: 15.
+- With prediction/analysis: 50.
+- Without prediction/analysis: 25.
+- Active: 75.
+- Closed: 0.
+- Updated in the last 48 hours: 25.
+- Stale or missing recent update: 50.
+- With visible price/liquidity/volume: 60.
+
+Important caveat: the previous `limit=100` soccer dry-run was run while the
+shell was using local database configuration because Neon `DATABASE_URL` was
+not loaded. Treat that report as local diagnostics only. Before any future
+write, repeat preflight and dry-run after pasting the Neon pooled
+`DATABASE_URL` privately in PowerShell, then confirm the candidate and
+duplicate counts again.
+
 ## Supervised Apply
 
 Only run apply from a supervised PowerShell session after reviewing dry-run
@@ -230,10 +253,14 @@ Production public health was checked through the frontend proxy, read-only:
 - With prediction/analysis: 50.
 - Active: 75.
 - Closed: 0.
-- Updated in the last 48 hours: 45.
-- Stale or missing recent update: 30.
+- Updated in the last 48 hours: 25.
+- Stale or missing recent update: 50.
 - With visible price/liquidity/volume: 60.
 - Latest seen update: 2026-05-08T01:39:42Z.
+
+Follow-up proxy check on 2026-05-09 recalculated the rolling 48-hour window as
+25 recent and 50 stale/missing recent update. That drift is expected when no
+new snapshots are created.
 
 Recommended next step: run a Neon-backed dry-run in a supervised session before
 any apply. If the Neon dry-run is similar, an add-only apply can use the same
@@ -255,6 +282,62 @@ Stop conditions before any apply:
 - Unexpected jump in `would_import`.
 - Proxy/backend errors in `/markets/overview`.
 - Any need for `--delete-existing`.
+
+## Freshness Refresh V2 Plan
+
+Plan A is to refresh existing soccer markets before importing more events. The
+goal is add-only freshness coverage for missing or stale snapshots, not a
+replacement import.
+
+Current status of existing snapshot refresh tooling:
+
+- `refresh_market_snapshots` can evaluate existing markets by sport, days, and
+  limit.
+- It has dry-run/apply modes and conservative market limits.
+- It does not delete data and does not trade.
+- Its command-level dry-run currently records refresh-run audit rows, so it is
+  not a strict no-write command for Neon. Do not use it for a "no writes at all"
+  Neon diagnostic until a follow-up hardens that audit behavior.
+
+Future no-write dry-run command to prepare, not executed:
+
+```powershell
+# NO EJECUTADO
+.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_snapshots --dry-run --sport soccer --stale-hours 48 --missing-only --limit 30 --report-json N:\projects\polimarket\logs\reports\dry-runs\soccer-existing-snapshots.json --json
+```
+
+Future supervised apply command, not executed:
+
+```powershell
+# NO EJECUTADO
+.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_snapshots --apply --yes-i-understand-this-writes-data --sport soccer --stale-hours 48 --missing-only --limit 30 --json
+```
+
+Plan B is to import more soccer markets only after a Neon-backed
+`refresh_soccer_markets` dry-run recommends it. Keep the run add-only and use
+the reviewed caps. Never combine it with `--delete-existing`.
+
+Post-refresh validation for either plan:
+
+- `npm.cmd --workspace apps/web run smoke:production`.
+- Open `/internal/data-status` and confirm "Solo lectura" plus soccer freshness
+  metrics.
+- Open `/sports/soccer` and confirm total count, match cards, filters, and
+  market detail links.
+- Check backend/proxy soccer overview for `total_count`.
+- Confirm snapshots and predictions changed only in the intended sport.
+
+Risks to review before any write:
+
+- Remote candidates that are esports or wrong-sport markets.
+- Closed, expired, or no-price markets.
+- Stale data that looks active in one source but not another.
+- Proxy timeouts when requesting too many overview rows at once.
+- Partial scoring because some markets still lack snapshots.
+
+Logical rollback remains record-based: do not truncate tables. If a supervised
+write imports bad candidates, identify the created soccer records from the
+apply output and review a narrow transaction plan before removing anything.
 
 ## Scheduler Options
 

@@ -395,6 +395,11 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Total fútbol", "internal data status");
   assertTextIncludes(text, "Ver fútbol", "internal data status");
   assertTextIncludes(text, "Solo lectura", "internal data status");
+  assertTextIncludes(text, "Sin actualización", "internal data status");
+  assertTextIncludes(text, "Sin análisis", "internal data status");
+  assertTextIncludes(text, "Con precio visible", "internal data status");
+  assertTextIncludes(text, "Con volumen visible", "internal data status");
+  assertTextIncludes(text, "Datos completos", "internal data status");
   assertTextExcludes(
     text,
     ["DATABASE_URL", "postgres://", "postgresql://", "secret", "token"],

@@ -97,7 +97,9 @@ def test_inspect_soccer_market_health_is_read_only_and_reports_freshness(
     assert payload["read_only"] is True
     assert payload["total_soccer_markets"] == 2
     assert payload["with_snapshot"] == 1
+    assert payload["without_snapshot"] == 1
     assert payload["with_prediction"] == 1
+    assert payload["without_prediction"] == 1
     assert payload["active"] == 2
     assert payload["closed"] == 0
     assert payload["recently_updated"] == 1
@@ -106,5 +108,11 @@ def test_inspect_soccer_market_health_is_read_only_and_reports_freshness(
     assert payload["missing_prediction"] == 1
     assert payload["missing_price"] == 1
     assert payload["missing_liquidity"] == 1
+    assert payload["missing_volume"] == 1
+    assert payload["top_stale_markets"][0]["market_id"] == stale_market.id
+    assert payload["top_missing_snapshot_markets"][0]["market_id"] == stale_market.id
+    assert payload["top_missing_prediction_markets"][0]["market_id"] == stale_market.id
     assert payload["sample_markets_needing_refresh"][0]["market_id"] == stale_market.id
     assert "missing_snapshot" in payload["sample_markets_needing_refresh"][0]["reasons"]
+    assert payload["sample_markets_needing_refresh"][0]["has_snapshot"] is False
+    assert payload["sample_markets_needing_refresh"][0]["has_prediction"] is False
