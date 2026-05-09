@@ -142,6 +142,9 @@ If this test fails, stop feature work and treat it as a production regression.
 4. Confirm it shows both coverage and gaps:
    - Con actualizacion / Sin actualizacion.
    - Con analisis / Sin analisis.
+   - Frescura de datos.
+   - Requiere refresh supervisado, or Frescura estable if everything is fresh.
+   - Stale 48h.
    - Con precio visible.
    - Con liquidez visible.
    - Con volumen visible.

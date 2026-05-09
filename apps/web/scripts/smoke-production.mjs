@@ -51,6 +51,7 @@ const INTERNAL_NAV_TEXT = [
   "diagnostics",
   "data status",
   "Estado de datos",
+  "refresh",
 ];
 const PUBLIC_TECHNICAL_TEXT = [
   "API",
@@ -395,8 +396,15 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Total fútbol", "internal data status");
   assertTextIncludes(text, "Ver fútbol", "internal data status");
   assertTextIncludes(text, "Solo lectura", "internal data status");
+  assertTextIncludes(text, "Frescura de datos", "internal data status");
+  assertTextIncludesOneOf(
+    text,
+    ["Requiere refresh supervisado", "Frescura estable"],
+    "internal data status readiness",
+  );
   assertTextIncludes(text, "Sin actualización", "internal data status");
   assertTextIncludes(text, "Sin análisis", "internal data status");
+  assertTextIncludes(text, "Stale 48h", "internal data status");
   assertTextIncludes(text, "Con precio visible", "internal data status");
   assertTextIncludes(text, "Con volumen visible", "internal data status");
   assertTextIncludes(text, "Datos completos", "internal data status");

@@ -174,6 +174,8 @@ export default function InternalDataStatusPage() {
     }),
     [state.items.length, summary],
   );
+  const needsSupervisedRefresh =
+    summary.stale > 0 || missing.snapshot > 0 || missing.prediction > 0;
 
   return (
     <main className="page-shell internal-status-page">
@@ -255,6 +257,38 @@ export default function InternalDataStatusPage() {
           <strong>{summary.latest ? formatLastUpdated(new Date(summary.latest)) : "Sin fecha"}</strong>
           <p>{state.updatedAt ? `Revisado ${formatLastUpdated(state.updatedAt)}` : "Pendiente"}</p>
         </article>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading compact">
+          <div>
+            <p className="eyebrow">Frescura de datos</p>
+            <h2>{needsSupervisedRefresh ? "Requiere refresh supervisado" : "Frescura estable"}</h2>
+            <p>
+              Esta página es solo lectura: muestra el estado actual y no ejecuta cambios.
+            </p>
+          </div>
+          <Link className="secondary-button" href="/sports/soccer">
+            Ver fútbol
+          </Link>
+        </div>
+        <div className="internal-status-grid">
+          <article className="internal-status-card">
+            <span>Sin actualización</span>
+            <strong>{missing.snapshot}</strong>
+            <p>Mercados que necesitan una lectura nueva antes de analizarlos.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Sin análisis</span>
+            <strong>{missing.prediction}</strong>
+            <p>Mercados que podrían analizarse cuando tengan datos suficientes.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Stale 48h</span>
+            <strong>{summary.stale}</strong>
+            <p>Mercados sin actividad visible reciente en esta ventana.</p>
+          </article>
+        </div>
       </section>
 
       <section className="panel">
