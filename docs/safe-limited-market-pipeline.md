@@ -207,12 +207,18 @@ If the command reports localhost or `looks_like_neon=false`, do not use that
 dry-run as authorization for a production apply.
 
 Future strict no-write existing-snapshot refresh command to prepare, not
-executed:
+execute from a Neon-confirmed shell:
 
 ```powershell
 # NO EJECUTADO
-.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_snapshots --dry-run --sport soccer --stale-hours 48 --missing-only --limit 30 --report-json N:\projects\polimarket\logs\reports\dry-runs\soccer-existing-snapshots.json --json
+.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_markets --sport soccer --limit 25 --stale-hours 48 --report-json N:\projects\polimarket\logs\reports\dry-runs\existing-soccer-refresh-neon-dry-run.json --json
 ```
+
+`refresh_existing_soccer_markets` is dry-run by default. It supports
+`--missing-snapshot-only`, `--missing-prediction-only`, and `--stale-only` for
+focused planning. `--apply` requires `--yes-i-understand-this-writes-data` and
+is still blocked in code until a separate supervised write implementation is
+approved.
 
 ## Scoring Dry-Run
 

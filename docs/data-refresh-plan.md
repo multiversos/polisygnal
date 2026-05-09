@@ -289,28 +289,55 @@ Plan A is to refresh existing soccer markets before importing more events. The
 goal is add-only freshness coverage for missing or stale snapshots, not a
 replacement import.
 
-Current status of existing snapshot refresh tooling:
-
-- `refresh_market_snapshots` can evaluate existing markets by sport, days, and
-  limit.
-- It has dry-run/apply modes and conservative market limits.
-- It does not delete data and does not trade.
-- Its command-level dry-run currently records refresh-run audit rows, so it is
-  not a strict no-write command for Neon. Do not use it for a "no writes at all"
-  Neon diagnostic until a follow-up hardens that audit behavior.
-
-Future no-write dry-run command to prepare, not executed:
+Because local Codex currently resolves to localhost, production dry-runs must
+run from an approved environment that already has the Neon runtime database
+configured, such as a Render shell/one-off job or a manually triggered GitHub
+Actions job with existing secrets. The mandatory preflight is:
 
 ```powershell
-# NO EJECUTADO
-.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_snapshots --dry-run --sport soccer --stale-hours 48 --missing-only --limit 30 --report-json N:\projects\polimarket\logs\reports\dry-runs\soccer-existing-snapshots.json --json
+.\.venv\Scripts\python.exe -m app.commands.check_database_config --connect
 ```
 
-Future supervised apply command, not executed:
+Continue only if the output is masked, `connection_status=ok`, and
+`looks_like_neon=true`. Stop immediately if it reports localhost, missing
+configuration, or an unexpected provider.
+
+Current status of existing snapshot refresh tooling:
+
+- `refresh_existing_soccer_markets` is the no-write readiness command for
+  existing soccer markets.
+- It is dry-run by default and reports snapshot/analyis candidates without
+  importing new markets.
+- It does not delete data, does not trade, does not run migrations, and does
+  not print connection strings.
+- `--apply` is parsed but intentionally blocked for now, even with
+  `--yes-i-understand-this-writes-data`, until a supervised write path is
+  reviewed separately.
+- The older `refresh_market_snapshots` command can evaluate existing markets,
+  but its command-level dry-run records refresh-run audit rows. Do not use that
+  command for a "no writes at all" Neon diagnostic.
+
+Local Codex dry-run, executed against localhost only:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_markets --limit 25 --stale-hours 48 --report-json N:\projects\polimarket\logs\reports\dry-runs\existing-soccer-refresh-local-dry-run.json --json
+```
+
+Result: local database had `total_existing_markets=0`, so it found no
+candidates. This confirms command wiring only; it is not production evidence.
+
+First real production dry-run, not executed:
 
 ```powershell
 # NO EJECUTADO
-.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_snapshots --apply --yes-i-understand-this-writes-data --sport soccer --stale-hours 48 --missing-only --limit 30 --json
+.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_markets --sport soccer --limit 25 --stale-hours 48 --report-json N:\projects\polimarket\logs\reports\dry-runs\existing-soccer-refresh-neon-dry-run.json --json
+```
+
+Future supervised apply shape, not executed and currently blocked in code:
+
+```powershell
+# NO EJECUTADO
+.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_markets --apply --yes-i-understand-this-writes-data --sport soccer --limit 25 --stale-hours 48 --json
 ```
 
 Plan B is to import more soccer markets only after a Neon-backed
