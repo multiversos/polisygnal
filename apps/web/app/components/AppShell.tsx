@@ -16,6 +16,7 @@ type NavIconName =
   | "decisions"
   | "workflow"
   | "alerts"
+  | "analyze"
   | "matches"
   | "sources"
   | "data"
@@ -35,6 +36,7 @@ const publicNavigationItems: Array<{
   { label: "Mi lista", href: "/watchlist", icon: "watchlist" },
   { label: "Alertas", href: "/alerts", icon: "alerts" },
   { label: "Historial", href: "/history", icon: "history" },
+  { label: "Analizar enlace", href: "/analyze", icon: "analyze" },
 ];
 
 function applyThemePreference(theme: ThemePreference) {
@@ -188,6 +190,13 @@ function NavIcon({ name }: { name: NavIconName }) {
       return (
         <svg {...commonProps}>
           <path d="M5 19V5m0 14h15M8 16v-4m4 4V8m4 8v-6M7 6h5m0 0-2-2m2 2-2 2" />
+        </svg>
+      );
+    case "analyze":
+      return (
+        <svg {...commonProps}>
+          <circle cx="10" cy="10" r="4" />
+          <path d="m14 14 5 5M8.5 12.5l-2 2a2.8 2.8 0 0 0 4 4l2-2M15.5 11.5l2-2a2.8 2.8 0 0 0-4-4l-2 2" />
         </svg>
       );
     case "decisions":

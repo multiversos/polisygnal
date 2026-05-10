@@ -34,6 +34,7 @@ Use these checks after a production deploy. Correct domains:
    - Mi lista
    - Alertas
    - Historial
+   - Analizar enlace
    - Modo oscuro
 3. Confirm the sidebar does not show internal sections such as Investigación,
    Evidencia, Workflow, Salud de datos, Trial E2E, or Backtesting.
@@ -161,6 +162,24 @@ If this test fails, stop feature work and treat it as a production regression.
 9. Confirm the page does not promise profit, certainty, or betting advice.
 10. Confirm public copy does not show API, backend, JSON, proxy, snapshot,
     fallback, debug, pipeline, market_type, model_version, or raw data.
+
+## Analizar Enlace
+
+1. Open `https://polisygnal-web.vercel.app/analyze` from the sidebar.
+2. Confirm the page shows an input for a Polymarket link and an `Analizar`
+   button.
+3. Paste an invalid link and confirm the page shows a friendly message.
+4. Paste a Polymarket link and confirm the page either finds a matching market
+   or clearly says it is not in the loaded markets yet.
+5. If a market is found, confirm it shows only real visible data: title, event,
+   status, price if available, volume/liquidity if available, and last update.
+6. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
+   `Ver futbol` when a market is matched.
+7. Save the analysis, open `/history`, and confirm the item appears as
+   `Desde enlace`.
+8. Confirm a no-match link can only be saved as pending and does not invent a
+   probability.
+9. Confirm the page does not promise profit, certainty, or betting advice.
 
 ## Alertas
 

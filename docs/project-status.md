@@ -46,6 +46,8 @@ Estado visible verificado:
 - Alertas se conectan honestamente con mercados seguidos y datos visibles.
 - `/history` esta disponible como Historial local para medir analisis guardados
   sin inventar resultados.
+- `/analyze` esta disponible para validar enlaces de Polymarket, compararlos con
+  mercados ya cargados y guardar resultados locales en Historial.
 - `/internal/data-status` existe como pagina oculta, solo lectura, sin enlace publico.
 - si un navegador normal muestra datos viejos, revisar cache con
   `/api/build-info` y el checklist manual.

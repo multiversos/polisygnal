@@ -7306,6 +7306,82 @@ html:not([data-theme="dark"]) .app-sidebar {
   font-weight: 850;
 }
 
+.history-filter-panel {
+  grid-template-columns: minmax(220px, 360px);
+}
+
+.analyze-form-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.analyze-form {
+  display: grid;
+  gap: 12px;
+}
+
+.analyze-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted-strong);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.analyze-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-elevated);
+  color: var(--foreground);
+  font: inherit;
+}
+
+.analyze-form input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.analyze-results-list {
+  display: grid;
+  gap: 14px;
+}
+
+.analyze-match-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.analyze-result-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.analyze-result-card h3,
+.analyze-result-card p {
+  margin: 0;
+}
+
+.analyze-result-card h3 {
+  color: var(--foreground);
+  font-size: 1.05rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.analyze-result-card p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 @media (max-width: 700px) {
   .app-nav {
     flex-wrap: wrap;
@@ -7328,6 +7404,10 @@ html:not([data-theme="dark"]) .app-sidebar {
   }
 
   .history-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-filter-panel {
     grid-template-columns: 1fr;
   }
 

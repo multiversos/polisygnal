@@ -21,6 +21,7 @@ const BRIEFING_PATH = "/briefing";
 const ALERTS_PATH = "/alerts";
 const WATCHLIST_PATH = "/watchlist";
 const HISTORY_PATH = "/history";
+const ANALYZE_PATH = "/analyze";
 const DATA_HEALTH_PATH = "/data-health";
 const INTERNAL_DATA_STATUS_PATH = "/internal/data-status";
 const WORKFLOW_PATH = "/workflow";
@@ -40,6 +41,7 @@ const PUBLIC_NAV_TEXT = [
   "Mi lista",
   "Alertas",
   "Historial",
+  "Analizar enlace",
 ];
 const INTERNAL_NAV_TEXT = [
   "InvestigaciÃ³n",
@@ -572,6 +574,24 @@ async function main() {
     ["Ver mercados deportivos", "Explorar futbol", "Explorar fÃºtbol"],
     "history market CTA",
   );
+  const analyzeDom = await dumpDom(urlFor(ANALYZE_PATH));
+  const analyzeRender = validatePublicProductPage(analyzeDom, "analyze", ["Analizar enlace"]);
+  const analyzeText = visibleText(analyzeDom);
+  assertTextIncludes(analyzeText, "Polymarket", "analyze polymarket copy");
+  assertTextIncludes(analyzeText, "Analizar", "analyze button");
+  assertTextIncludesOneOf(
+    analyzeText,
+    ["Pega un enlace", "Enlace de Polymarket"],
+    "analyze input copy",
+  );
+  const invalidAnalyzeDom = await dumpDom(urlFor(`${ANALYZE_PATH}?url=not-a-link&auto=1`));
+  const invalidAnalyzeText = visibleText(invalidAnalyzeDom);
+  assertTextIncludesOneOf(
+    invalidAnalyzeText,
+    ["No pudimos analizar ese enlace", "Revisa que este completo", "solo aceptamos enlaces de Polymarket"],
+    "analyze invalid url state",
+  );
+  assertTextExcludes(invalidAnalyzeText, PUBLIC_TECHNICAL_TEXT, "analyze invalid public copy");
   const detailMarketId = items[0]?.market?.id || items[0]?.market_id || 1;
   const marketDetailDom = await dumpDom(urlFor(`/markets/${detailMarketId}`));
   const marketDetailRender = validateMarketDetailPage(marketDetailDom, "market detail");
@@ -615,6 +635,7 @@ async function main() {
           alerts: alertsRender,
           watchlist: watchlistRender,
           history: historyRender,
+          analyze: analyzeRender,
           market_detail: marketDetailRender,
         },
         data_health: dataHealthRender,

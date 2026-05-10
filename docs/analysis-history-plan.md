@@ -7,6 +7,11 @@ The public `Historial` page is a local browser experience. It uses
 summary statistics. It does not write to Neon, does not create backend tables,
 and does not run scoring, imports, trading, or migrations.
 
+The public `/analyze` page can also save records into Historial. In the current
+phase it only validates Polymarket links and compares them with markets already
+loaded in PolySignal. It does not fetch external Polymarket pages or create new
+market records.
+
 The current goal is product validation:
 
 - users can save an analysis from `/markets/[id]`;

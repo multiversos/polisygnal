@@ -13,6 +13,15 @@ import {
 } from "../lib/analysisHistory";
 import { formatLastUpdated } from "../lib/useAutoRefresh";
 
+type HistoryFilter =
+  | "all"
+  | "detail"
+  | "failed"
+  | "finalized"
+  | "from-link"
+  | "hit"
+  | "pending";
+
 function formatPercent(value: number | null): string {
   if (value === null) {
     return "Sin datos suficientes";
@@ -64,6 +73,44 @@ function outcomeLabel(value?: string): string {
     return "Cancelado";
   }
   return "Pendiente";
+}
+
+function sourceLabel(value: AnalysisHistoryItem["source"]): string {
+  if (value === "link_analyzer") {
+    return "Desde enlace";
+  }
+  if (value === "market_detail") {
+    return "Desde detalle";
+  }
+  if (value === "manual") {
+    return "Manual";
+  }
+  return "Origen pendiente";
+}
+
+function filterMatches(item: AnalysisHistoryItem, filter: HistoryFilter): boolean {
+  if (filter === "all") {
+    return true;
+  }
+  if (filter === "from-link") {
+    return item.source === "link_analyzer";
+  }
+  if (filter === "detail") {
+    return item.source === "market_detail";
+  }
+  if (filter === "pending") {
+    return item.result === "pending" || item.status === "open";
+  }
+  if (filter === "finalized") {
+    return item.status === "resolved" || item.result === "hit" || item.result === "miss";
+  }
+  if (filter === "hit") {
+    return item.result === "hit";
+  }
+  if (filter === "failed") {
+    return item.result === "miss";
+  }
+  return true;
 }
 
 function BarChart({
@@ -160,6 +207,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<HistoryFilter>("all");
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   const loadHistory = useCallback(async () => {
@@ -192,6 +240,9 @@ export default function HistoryPage() {
   }, [loadHistory]);
 
   const stats = useMemo(() => calculateAnalysisHistoryStats(items), [items]);
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => filterMatches(item, filter));
+  }, [filter, items]);
 
   const handleRemove = useCallback(async (id: string) => {
     setBusyItemId(id);
@@ -287,6 +338,21 @@ export default function HistoryPage() {
         </section>
       ) : null}
 
+      <section className="filter-panel history-filter-panel" aria-label="Filtros de historial">
+        <label className="filter-group">
+          Vista
+          <select onChange={(event) => setFilter(event.target.value as HistoryFilter)} value={filter}>
+            <option value="all">Todos</option>
+            <option value="from-link">Desde enlace</option>
+            <option value="detail">Desde detalle</option>
+            <option value="pending">Pendientes</option>
+            <option value="finalized">Finalizados</option>
+            <option value="hit">Acertados</option>
+            <option value="failed">Fallados</option>
+          </select>
+        </label>
+      </section>
+
       <section className="history-chart-grid" aria-label="Graficas del historial">
         <BarChart
           label="Aciertos vs fallos"
@@ -313,7 +379,7 @@ export default function HistoryPage() {
             <h2>Analisis guardados</h2>
             <p>Primero se muestran los registros analizados mas recientemente.</p>
           </div>
-          <span className="badge muted">{stats.total} registros</span>
+          <span className="badge muted">{visibleItems.length} visibles</span>
         </div>
 
         {loading ? (
@@ -334,12 +400,21 @@ export default function HistoryPage() {
               </a>
             </div>
           </div>
+        ) : visibleItems.length === 0 ? (
+          <div className="empty-state compact">
+            <strong>No hay analisis para este filtro.</strong>
+            <p>Prueba con otra vista o guarda un analisis desde un mercado.</p>
+            <button className="watchlist-button" onClick={() => setFilter("all")} type="button">
+              Ver todos
+            </button>
+          </div>
         ) : (
           <div className="history-list">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <article className="history-card" key={item.id}>
                 <div className="history-card-header">
                   <div>
+                    <span className="badge external-hint">{sourceLabel(item.source)}</span>
                     <span className="badge muted">{item.sport || "Mercado"}</span>
                     <span className={`history-result-badge ${item.result || "unknown"}`}>
                       {statusLabel(item)}
@@ -374,6 +449,11 @@ export default function HistoryPage() {
                   >
                     {busyItemId === item.id ? "Quitando" : "Quitar"}
                   </button>
+                  {item.url ? (
+                    <a className="analysis-link secondary" href={item.url} rel="noreferrer" target="_blank">
+                      Abrir enlace original
+                    </a>
+                  ) : null}
                 </div>
               </article>
             ))}

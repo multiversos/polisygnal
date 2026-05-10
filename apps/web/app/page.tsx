@@ -363,6 +363,7 @@ const quickLinks = [
   { label: "Mi lista", href: "/watchlist" },
   { label: "Alertas", href: "/alerts" },
   { label: "Historial", href: "/history" },
+  { label: "Analizar enlace", href: "/analyze" },
 ];
 
 const commandCenterLinks = [
@@ -395,6 +396,11 @@ const commandCenterLinks = [
     label: "Historial",
     description: "Aciertos y fallos cuando existan resultados",
     href: "/history",
+  },
+  {
+    label: "Analizar enlace",
+    description: "Comparar un enlace con mercados cargados",
+    href: "/analyze",
   },
 ];
 
