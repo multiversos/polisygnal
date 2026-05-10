@@ -58,7 +58,7 @@ jobs:
             --json
 
       - name: Upload dry-run report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: existing-soccer-refresh-dry-run
           path: reports/existing-soccer-refresh-dry-run.json
