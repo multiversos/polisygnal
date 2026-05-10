@@ -55,6 +55,8 @@ Estado visible verificado:
 - seguridad baseline completada: headers, smoke contra fugas sensibles,
   hardening de `/analyze`, proxy constrained y Dependabot activo.
 - `/internal/data-status` existe como pagina oculta, solo lectura, sin enlace publico.
+- produccion tolera fallas transitorias 502/503/504 con reintentos cortos y
+  mensajes publicos suaves.
 - si un navegador normal muestra datos viejos, revisar cache con
   `/api/build-info` y el checklist manual.
 
@@ -142,6 +144,10 @@ Sprints pendientes inmediatos:
 - `npm audit` encontro vulnerabilidades moderadas via Next/PostCSS; no usar
   `npm audit fix --force` porque propone un cambio rompedor. Revisar en una
   ventana planificada de mantenimiento.
+- `/sports/soccer` usa paginacion offset de 50 porque requests mayores como
+  `limit=75` o `limit=100` pueden dar 504. No subir limites sin medir.
+- El smoke de produccion reintenta errores transitorios, pero sigue fallando si
+  todos los intentos fallan.
 - No hay auth real, tablas de usuario, migraciones de usuario ni backend
   persistente para Historial/Mi lista.
 - Neon real no esta disponible localmente; no usar diagnosticos locales como
@@ -155,6 +161,7 @@ Documentacion preparada:
   futuro por usuario, access control y migracion de localStorage a cuenta.
 - `docs/privacy-launch-checklist.md`: checklist antes de login, DB, pagos,
   investigacion externa y lanzamiento con clientes.
+- `docs/production-troubleshooting.md`: runbook de 504/proxy/backend/frontend.
 - `docs/security-plan.md`: modelo de acceso futuro, privacidad local y controles
   pendientes.
 

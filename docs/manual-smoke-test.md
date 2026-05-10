@@ -15,6 +15,11 @@ Use these checks after a production deploy. Correct domains:
 5. Confirm the proxy returns the same overview shape and does not expose CORS issues.
 6. Open `https://polisygnal-web.vercel.app/api/backend/markets/overview?sport_type=soccer&limit=50&offset=50`.
 7. Confirm pagination returns the remaining soccer markets instead of timing out.
+8. If one proxy request returns 502, 503, or 504, wait briefly and retry before
+   declaring the page broken. A persistent failure across retries is still a
+   production issue.
+9. Do not raise the soccer limit to 75 or 100 to work around a timeout; use the
+   offset pagination checks above.
 
 ## Build Diagnostics
 
@@ -258,9 +263,11 @@ If this test fails, stop feature work and treat it as a production regression.
 
 1. Open `https://polisygnal-web.vercel.app/internal/data-status` directly.
 2. Confirm the route says `Solo lectura`.
-3. Confirm it shows soccer totals, loaded markets, active/closed counts,
+3. Confirm it shows `Estado proxy publico` with a clear available or
+   unavailable state.
+4. Confirm it shows soccer totals, loaded markets, active/closed counts,
    recent/stale counts, and the latest visible activity.
-4. Confirm it shows both coverage and gaps:
+5. Confirm it shows both coverage and gaps:
    - Con actualizacion / Sin actualizacion.
    - Con analisis / Sin analisis.
    - Frescura de datos.
@@ -270,10 +277,10 @@ If this test fails, stop feature work and treat it as a production regression.
    - Con liquidez visible.
    - Con volumen visible.
    - Datos completos.
-5. Confirm this page is not linked from the public sidebar or public pages.
-6. Confirm it does not show secrets, connection strings, stack traces, or large
+6. Confirm this page is not linked from the public sidebar or public pages.
+7. Confirm it does not show secrets, connection strings, stack traces, or large
    raw payloads.
-7. Confirm it is clearly read-only and does not expose buttons or commands that
+8. Confirm it is clearly read-only and does not expose buttons or commands that
    can refresh, score, import, delete, migrate, or trade.
 
 ## Public Insight Language
