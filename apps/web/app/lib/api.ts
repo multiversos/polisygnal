@@ -18,6 +18,9 @@ export const API_HOST_LABEL = (() => {
 })();
 
 export const DEFAULT_REQUEST_TIMEOUT_MS = 10000;
+const DEFAULT_TRANSIENT_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 450;
+const TRANSIENT_STATUS_CODES = new Set([502, 503, 504]);
 
 const SAFE_PROXY_GET_PREFIXES = [
   "/alerts",
@@ -105,41 +108,78 @@ function buildRequestHeaders(init?: RequestInit): Headers {
   return headers;
 }
 
+function requestMethod(init?: RequestInit): string {
+  return (init?.method || "GET").toUpperCase();
+}
+
+function canRetryRequest(init?: RequestInit): boolean {
+  return requestMethod(init) === "GET" && !init?.body;
+}
+
+function isTransientStatus(status?: number): boolean {
+  return status !== undefined && TRANSIENT_STATUS_CODES.has(status);
+}
+
+function isTransientError(error: unknown): boolean {
+  if (error instanceof ApiRequestError) {
+    return error.status === undefined || isTransientStatus(error.status);
+  }
+  return error instanceof TypeError;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
 export async function fetchApiJson<T>(
   path: string,
   init?: RequestInit,
   timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 ): Promise<T> {
-  const controller = new AbortController();
-  const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
   const requestUrl = shouldUseSameOriginProxy(path, init)
     ? buildBackendApiPath(path)
     : buildBackendDirectUrl(path);
+  const attempts = canRetryRequest(init) ? DEFAULT_TRANSIENT_RETRIES + 1 : 1;
+  let lastError: unknown;
 
-  try {
-    const response = await fetch(requestUrl, {
-      cache: "no-store",
-      next: { revalidate: 0 },
-      ...init,
-      signal: controller.signal,
-      headers: buildRequestHeaders(init),
-    } as RequestInit & { next: { revalidate: number } });
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(requestUrl, {
+        cache: "no-store",
+        next: { revalidate: 0 },
+        ...init,
+        signal: controller.signal,
+        headers: buildRequestHeaders(init),
+      } as RequestInit & { next: { revalidate: number } });
 
-    if (!response.ok) {
-      throw new ApiRequestError(`${path} responded ${response.status}`, response.status, path);
+      if (!response.ok) {
+        throw new ApiRequestError(`${path} responded ${response.status}`, response.status, path);
+      }
+      if (response.status === 204) {
+        return null as T;
+      }
+      return response.json() as Promise<T>;
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error && error.name === "AbortError"
+          ? new ApiRequestError(`${path} timed out after ${timeoutMs / 1000}s`, undefined, path)
+          : error;
+      lastError = normalizedError;
+      if (attempt < attempts && isTransientError(normalizedError)) {
+        await wait(RETRY_BASE_DELAY_MS * attempt);
+        continue;
+      }
+      throw normalizedError;
+    } finally {
+      globalThis.clearTimeout(timeoutId);
     }
-    if (response.status === 204) {
-      return null as T;
-    }
-    return response.json() as Promise<T>;
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new ApiRequestError(`${path} timed out after ${timeoutMs / 1000}s`, undefined, path);
-    }
-    throw error;
-  } finally {
-    globalThis.clearTimeout(timeoutId);
   }
+
+  throw lastError;
 }
 
 export function isApiNotFoundError(error: unknown): boolean {
@@ -151,11 +191,10 @@ export function friendlyApiError(error: unknown, moduleName: string): string {
     return `Este módulo (${moduleName}) se conectará en un sprint posterior.`;
   }
   if (error instanceof ApiRequestError) {
-    const status = error.status ? ` (HTTP ${error.status})` : "";
-    return `No pudimos actualizar los datos ahora${status}. Reintentar.`;
+    return "No pudimos actualizar ahora. Mostramos la ultima informacion disponible si existe.";
   }
   if (error instanceof Error) {
-    return "No pudimos actualizar los datos ahora. Reintentar.";
+    return "No pudimos actualizar ahora. Mostramos la ultima informacion disponible si existe.";
   }
   return `No hay datos cargados todavía para ${moduleName}.`;
 }

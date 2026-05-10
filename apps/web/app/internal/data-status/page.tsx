@@ -37,7 +37,9 @@ type MarketsOverviewResponse = {
 type PageState = {
   error: string | null;
   items: MarketOverviewItem[];
+  loadedPages: number;
   loading: boolean;
+  proxyStatus: "checking" | "error" | "ok";
   totalCount: number;
   updatedAt: Date | null;
 };
@@ -79,12 +81,17 @@ function hasVolume(item: MarketOverviewItem): boolean {
   return Number.isFinite(value) && value > 0;
 }
 
-async function fetchSoccerOverview(): Promise<{ items: MarketOverviewItem[]; totalCount: number }> {
+async function fetchSoccerOverview(): Promise<{
+  items: MarketOverviewItem[];
+  loadedPages: number;
+  totalCount: number;
+}> {
   const first = await fetchApiJson<MarketsOverviewResponse>(
     `/markets/overview?sport_type=soccer&limit=${PAGE_SIZE}&offset=0`,
   );
   const totalCount = Number(first.total_count ?? first.items?.length ?? 0);
   const items = [...(first.items ?? [])];
+  let loadedPages = 1;
   let offset = PAGE_SIZE;
 
   while (items.length < totalCount && items.length < MAX_ITEMS) {
@@ -95,38 +102,47 @@ async function fetchSoccerOverview(): Promise<{ items: MarketOverviewItem[]; tot
     if (nextItems.length === 0) {
       break;
     }
+    loadedPages += 1;
     items.push(...nextItems);
     offset += PAGE_SIZE;
   }
 
-  return { items, totalCount };
+  return { items, loadedPages, totalCount };
 }
 
 export default function InternalDataStatusPage() {
   const [state, setState] = useState<PageState>({
     error: null,
     items: [],
+    loadedPages: 0,
     loading: true,
+    proxyStatus: "checking",
     totalCount: 0,
     updatedAt: null,
   });
 
   const load = useCallback(async () => {
-    setState((current) => ({ ...current, error: null, loading: true }));
+    setState((current) => ({ ...current, error: null, loading: true, proxyStatus: "checking" }));
     try {
       const payload = await fetchSoccerOverview();
       setState({
         error: null,
         items: payload.items,
+        loadedPages: payload.loadedPages,
         loading: false,
+        proxyStatus: "ok",
         totalCount: payload.totalCount,
         updatedAt: new Date(),
       });
     } catch (error) {
       setState((current) => ({
         ...current,
-        error: friendlyApiError(error, "estado de datos"),
+        error:
+          current.items.length > 0
+            ? "No se pudo consultar ahora. Mostramos la ultima informacion disponible."
+            : friendlyApiError(error, "estado de datos"),
         loading: false,
+        proxyStatus: "error",
       }));
     }
   }, []);
@@ -207,6 +223,21 @@ export default function InternalDataStatusPage() {
       ) : null}
 
       <section className="internal-status-grid">
+        <article className="internal-status-card">
+          <span>Estado proxy publico</span>
+          <strong>
+            {state.proxyStatus === "checking"
+              ? "Revisando"
+              : state.proxyStatus === "ok"
+                ? "Disponible"
+                : "No se pudo consultar"}
+          </strong>
+          <p>
+            {state.loadedPages > 0
+              ? `${state.loadedPages} paginas leidas desde datos publicos disponibles.`
+              : "Sin consulta exitosa en esta carga."}
+          </p>
+        </article>
         <article className="internal-status-card">
           <span>Total fútbol</span>
           <strong>{state.totalCount}</strong>

@@ -226,8 +226,18 @@ function sleep(ms) {
   });
 }
 
+function isTransientSmokeError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const statusMatch = message.match(/HTTP\s+(\d{3})/);
+  if (!statusMatch) {
+    return true;
+  }
+  const status = Number(statusMatch[1]);
+  return status === 502 || status === 503 || status === 504;
+}
+
 async function fetchJson(path) {
-  const attempts = 3;
+  const attempts = 5;
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
@@ -243,6 +253,9 @@ async function fetchJson(path) {
         body = { raw: text.slice(0, 500) };
       }
       if (response.ok) {
+        if (attempt > 1) {
+          console.warn(`${path} passed on retry ${attempt}/${attempts}`);
+        }
         return { body, contentType: response.headers.get("content-type"), status: response.status };
       }
       lastError = new Error(
@@ -253,11 +266,12 @@ async function fetchJson(path) {
       }
     } catch (error) {
       lastError = error;
-      if (attempt === attempts) {
+      if (attempt === attempts || !isTransientSmokeError(error)) {
         break;
       }
     }
-    await sleep(1200 * attempt);
+    console.warn(`${path} retrying after transient failure on attempt ${attempt}/${attempts}`);
+    await sleep(1600 * attempt);
   }
   throw lastError;
 }
@@ -499,6 +513,12 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Ver fútbol", "internal data status");
   assertTextIncludes(text, "Solo lectura", "internal data status");
   assertTextIncludes(text, "Frescura de datos", "internal data status");
+  assertTextIncludes(text, "Estado proxy publico", "internal data status proxy health");
+  assertTextIncludesOneOf(
+    text,
+    ["Datos publicos disponibles", "datos publicos disponibles", "No se pudo consultar"],
+    "internal data status proxy availability",
+  );
   assertTextIncludesOneOf(
     text,
     ["Requiere refresh supervisado", "Frescura estable"],

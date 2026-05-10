@@ -1719,7 +1719,7 @@ export default function SportDetailPage() {
         </section>
       ) : null}
 
-      {state.error ? (
+      {state.error && state.items.length === 0 ? (
         <ApiErrorState
           message={state.error}
           onRetry={() => void loadSport()}
@@ -1744,20 +1744,34 @@ export default function SportDetailPage() {
         <div>
           <span>Mercados</span>
           <strong>
-            {state.loading ? "..." : state.counts?.total_count ?? state.items.length}
+            {state.loading && state.items.length === 0
+              ? "..."
+              : state.counts?.total_count ?? state.items.length}
           </strong>
         </div>
         <div>
           <span>Completos</span>
-          <strong>{state.loading ? "..." : state.qualitySummary?.complete_count ?? 0}</strong>
+          <strong>
+            {state.loading && state.items.length === 0
+              ? "..."
+              : state.qualitySummary?.complete_count ?? 0}
+          </strong>
         </div>
         <div>
           <span>Parciales</span>
-          <strong>{state.loading ? "..." : state.qualitySummary?.partial_count ?? 0}</strong>
+          <strong>
+            {state.loading && state.items.length === 0
+              ? "..."
+              : state.qualitySummary?.partial_count ?? 0}
+          </strong>
         </div>
         <div>
           <span>Faltan precios</span>
-          <strong>{state.loading ? "..." : state.qualitySummary?.missing_price_count ?? 0}</strong>
+          <strong>
+            {state.loading && state.items.length === 0
+              ? "..."
+              : state.qualitySummary?.missing_price_count ?? 0}
+          </strong>
         </div>
         <p>
           Actualizado {state.updatedAt ? formatDateTime(state.updatedAt.toISOString()) : "al cargar"}.

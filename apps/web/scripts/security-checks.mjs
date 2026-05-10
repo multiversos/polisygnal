@@ -151,13 +151,33 @@ async function validateBackendProxy() {
     );
     assert(unsafeContentType.status === 502, `expected unsafe content-type to be blocked, got ${unsafeContentType.status}`);
 
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ detail: "internal timeout" }), {
+        headers: { "Content-Type": "application/json" },
+        status: 504,
+      });
+    const upstreamTimeout = await route.GET(
+      new Request("https://example.test/api/backend/markets/overview?sport_type=soccer"),
+      { params: Promise.resolve({ path: ["markets", "overview"] }) },
+    );
+    const upstreamTimeoutBody = await upstreamTimeout.json();
+    assert(upstreamTimeout.status === 504, `expected upstream timeout to stay 504, got ${upstreamTimeout.status}`);
+    assert(
+      upstreamTimeoutBody.error === "temporary_unavailable",
+      `expected generic timeout body, got ${JSON.stringify(upstreamTimeoutBody)}`,
+    );
+    assert(
+      upstreamTimeout.headers.get("x-polysignal-proxy-error") === "upstream_timeout",
+      "expected internal proxy diagnostic header for upstream timeout",
+    );
+
     assert(route.POST().status === 405, "expected POST to be rejected");
     assert(route.DELETE().status === 405, "expected DELETE to be rejected");
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  return { proxy_checks: 6 };
+  return { proxy_checks: 7 };
 }
 
 const linkChecks = validatePolymarketLinks();

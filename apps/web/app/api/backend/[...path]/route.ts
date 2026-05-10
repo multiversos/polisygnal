@@ -1,5 +1,5 @@
 const DEFAULT_BACKEND_BASE_URL = "https://polisygnal.onrender.com";
-const REQUEST_TIMEOUT_MS = 10000;
+const REQUEST_TIMEOUT_MS = 15000;
 const MAX_PROXY_QUERY_LENGTH = 1800;
 const SAFE_RESPONSE_CONTENT_TYPES = ["application/json", "text/plain"];
 
@@ -35,7 +35,11 @@ function backendBaseUrl(): string {
   const configured = (process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_BACKEND_BASE_URL).replace(/\/$/, "");
   try {
     const parsed = new URL(configured);
-    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+    if (
+      (parsed.protocol === "https:" || parsed.protocol === "http:") &&
+      !parsed.username &&
+      !parsed.password
+    ) {
       return configured;
     }
   } catch {
@@ -44,15 +48,21 @@ function backendBaseUrl(): string {
   return DEFAULT_BACKEND_BASE_URL;
 }
 
-function jsonResponse(payload: object, status: number): Response {
-  return Response.json(payload, {
-    status,
-    headers: {
-      "Cache-Control": "no-store",
-      "X-PolySignal-Proxy": "enabled",
-      "X-Content-Type-Options": "nosniff",
+function proxyErrorResponse(status: number, diagnostic: string): Response {
+  const error =
+    status === 414 ? "request_too_large" : status === 404 ? "not_found" : "temporary_unavailable";
+  return Response.json(
+    { error },
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+        "X-PolySignal-Proxy": "enabled",
+        "X-PolySignal-Proxy-Error": diagnostic,
+        "X-Content-Type-Options": "nosniff",
+      },
     },
-  });
+  );
 }
 
 function methodNotAllowed(): Response {
@@ -102,12 +112,12 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
   const { path = [] } = await context.params;
   const backendPath = buildBackendPath(path);
   if (!backendPath || !isAllowedBackendPath(backendPath)) {
-    return jsonResponse({ error: "backend_path_not_allowed" }, 404);
+    return proxyErrorResponse(404, "route_not_allowed");
   }
 
   const incomingUrl = new URL(request.url);
   if (incomingUrl.search.length > MAX_PROXY_QUERY_LENGTH) {
-    return jsonResponse({ error: "query_too_large" }, 414);
+    return proxyErrorResponse(414, "query_too_large");
   }
   const targetUrl = new URL(`${backendBaseUrl()}${backendPath}`);
   targetUrl.search = incomingUrl.search;
@@ -129,7 +139,27 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
     const body = await upstream.text();
     const contentType = upstream.headers.get("content-type");
     if (!isSafeResponseContentType(contentType)) {
-      return jsonResponse({ error: "unexpected_backend_response" }, 502);
+      return proxyErrorResponse(502, "unexpected_content_type");
+    }
+    if (!upstream.ok) {
+      const safeStatus =
+        upstream.status === 404
+          ? 404
+          : upstream.status === 414
+            ? 414
+            : upstream.status === 504
+              ? 504
+              : upstream.status >= 500
+                ? 502
+                : upstream.status;
+      return proxyErrorResponse(
+        safeStatus,
+        upstream.status === 504
+          ? "upstream_timeout"
+          : upstream.status >= 500
+            ? "upstream_unavailable"
+            : "upstream_rejected",
+      );
     }
     return new Response(body, {
       status: upstream.status,
@@ -141,11 +171,12 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
       },
     });
   } catch (error) {
-    const message =
+    return proxyErrorResponse(
+      error instanceof Error && error.name === "AbortError" ? 504 : 502,
       error instanceof Error && error.name === "AbortError"
-        ? "backend_request_timeout"
-        : "backend_request_failed";
-    return jsonResponse({ error: message }, 504);
+        ? "proxy_timeout"
+        : "proxy_fetch_failed",
+    );
   } finally {
     clearTimeout(timeoutId);
   }
