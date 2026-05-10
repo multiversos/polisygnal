@@ -4,10 +4,10 @@
 
 - fecha de corte: `2026-05-10`
 - etapa: `visible_product_mvp`
-- foco actual: mantener la experiencia publica util, sobria y fresca con datos reales
+- foco actual: preparar arquitectura futura de usuarios/clientes sin activar auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de esta cola: `3cdf596`
+- ultimo deploy production verificado antes de este bloque: `02dcacd`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -48,6 +48,12 @@ Estado visible verificado:
   sin inventar resultados.
 - `/analyze` esta disponible para validar enlaces de Polymarket, compararlos con
   mercados ya cargados y guardar resultados locales en Historial.
+- `/analyze` muestra probabilidad del mercado basada en precio visible cuando
+  existe y solo muestra estimacion PolySignal si el dato real esta disponible.
+- privacidad local visible: Historial y Mi lista explican que los datos se
+  guardan en este navegador, no se sincronizan todavia y pueden borrarse.
+- seguridad baseline completada: headers, smoke contra fugas sensibles,
+  hardening de `/analyze`, proxy constrained y Dependabot activo.
 - `/internal/data-status` existe como pagina oculta, solo lectura, sin enlace publico.
 - si un navegador normal muestra datos viejos, revisar cache con
   `/api/build-info` y el checklist manual.
@@ -136,12 +142,48 @@ Sprints pendientes inmediatos:
 - `npm audit` encontro vulnerabilidades moderadas via Next/PostCSS; no usar
   `npm audit fix --force` porque propone un cambio rompedor. Revisar en una
   ventana planificada de mantenimiento.
+- No hay auth real, tablas de usuario, migraciones de usuario ni backend
+  persistente para Historial/Mi lista.
+- Neon real no esta disponible localmente; no usar diagnosticos locales como
+  autorizacion para cambios de produccion.
+
+## Customer Data Readiness
+
+Documentacion preparada:
+
+- `docs/customer-data-architecture.md`: auditoria de datos locales, modelo
+  futuro por usuario, access control y migracion de localStorage a cuenta.
+- `docs/privacy-launch-checklist.md`: checklist antes de login, DB, pagos,
+  investigacion externa y lanzamiento con clientes.
+- `docs/security-plan.md`: modelo de acceso futuro, privacidad local y controles
+  pendientes.
+
+Estado actual:
+
+- Historial sigue en localStorage.
+- Mi lista sigue en localStorage.
+- Alertas leen Mi lista local.
+- Analizar enlace puede guardar analisis en historial local.
+- No se creo auth real.
+- No se crearon tablas reales.
+- No se ejecutaron migraciones.
+
+Riesgos pendientes:
+
+- localStorage no sincroniza entre dispositivos;
+- los registros locales pueden ser manipulados por el navegador;
+- no existe backend persistente de usuarios;
+- snapshots/analisis de soccer siguen con datos stale hasta refresh
+  supervisado;
+- npm audit mantiene 2 moderadas via Next/PostCSS, documentadas sin force fix.
 
 ## Proximo Dia
 
 Prioridad recomendada:
 
-1. Ejecutar import dry-run diagnostics para `basketball`, `nfl`, `tennis`, `baseball` y `horse_racing`.
-2. Revisar si los descartes vienen de deporte mal normalizado, `market_type`, fechas, outcomes o precios.
-3. Ajustar discovery por deporte con tests antes de cualquier `--apply`.
-4. Poblar deportes solo con `would_import > 0`, `max-import` explicito y smoke test posterior.
+1. Disenar auth tecnico y proveedor de sesiones, sin implementarlo todavia.
+2. Preparar un schema draft de customer data, sin migracion real.
+3. Definir RLS o backend ownership checks antes de cualquier tabla de usuario.
+4. Repetir diagnostics de frescura solo en entorno con Neon confirmado.
+5. Ejecutar import/refresh real solo con dry-run limpio, supervision explicita y
+   limites conservadores.

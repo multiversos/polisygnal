@@ -59,6 +59,23 @@ Use these checks after a production deploy. Correct domains:
    traces.
 6. Confirm `/internal/data-status` is still not linked from public navigation.
 
+## Local Privacy
+
+1. Open `/history` and confirm it says the historial is local or saved in this
+   browser.
+2. Confirm `/history` offers `Borrar historial local` and requires browser
+   confirmation before clearing.
+3. Open `/watchlist` and confirm it says Mi lista is saved in this browser and
+   does not sync between devices yet.
+4. Confirm `/watchlist` offers `Vaciar Mi lista` and requires browser
+   confirmation before clearing.
+5. Open `/alerts` and confirm it explains that markets followed in Mi lista are
+   read from this browser.
+6. Open `/analyze` and confirm it explains that saved analyses go to the local
+   history in this browser.
+7. Confirm none of these pages claim that accounts, cloud sync, or customer
+   storage already exist.
+
 ## Visual Polish
 
 1. Confirm the app opens in a sober dark theme by default unless a user has

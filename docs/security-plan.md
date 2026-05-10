@@ -291,3 +291,64 @@ Recommended controls before customer data:
 - safe logging;
 - backup/restore plan;
 - incident response checklist.
+
+Detailed future schema and migration notes live in
+`docs/customer-data-architecture.md`.
+
+### Future Access Control Model
+
+Normal users:
+
+- can read and write only their own analysis history;
+- can read and write only their own watchlist;
+- can read and write only their own alert preferences;
+- never send a trusted `owner_id` from the browser.
+
+Admins:
+
+- can view aggregate metrics;
+- should not view individual history unless there is an authorized support
+  reason;
+- must have support actions written to an audit log.
+
+Service role:
+
+- must never be present in frontend code;
+- should only run on backend/server jobs or controlled operations;
+- must never be printed in logs.
+
+API ownership rules:
+
+- derive `owner_id` from the authenticated session;
+- ignore or reject any client-supplied `owner_id`;
+- validate enum values, probability ranges, URL lengths, and title lengths;
+- return generic public errors and keep internal details out of the UI.
+
+RLS or backend enforcement:
+
+- If Postgres RLS is used, each user-owned table needs policies scoped to the
+  authenticated user id.
+- If backend enforcement is used, every read and write query must include the
+  session owner id.
+- In either approach, tests must prove one user cannot read another user's
+  history, watchlist, or alert preferences.
+
+### Local Data Privacy
+
+Current local-only data:
+
+- Historial local in `polysignal-analysis-history-v1`;
+- Mi lista local in `polysignal-local-watchlist-v1`;
+- browser preferences such as theme.
+
+Current controls:
+
+- `/history` explains the data is stored in this browser;
+- `/history` can clear local analysis history;
+- `/watchlist` explains the data is stored in this browser;
+- `/watchlist` can clear local saved markets;
+- corrupt localStorage is cleared defensively instead of breaking public pages.
+
+Before login exists, these local records must not be described as synced,
+backed up, or account-owned. After login exists, the app should ask before
+uploading local records to the account.
