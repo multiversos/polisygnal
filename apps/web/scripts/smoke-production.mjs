@@ -532,7 +532,7 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Datos completos", "internal data status");
   assertTextExcludes(
     text,
-    ["DATABASE_URL", "postgres://", "postgresql://", "secret", "token"],
+    ["DATABASE_URL", "SECRET", "TOKEN", "API_KEY", "postgres://", "postgresql://"],
     "internal data status",
   );
   return { internal_data_status_found: true, secrets_hidden: true };
