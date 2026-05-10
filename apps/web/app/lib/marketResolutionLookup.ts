@@ -8,6 +8,7 @@ import {
 } from "./marketResolution";
 import type { MarketOverviewItem, MarketOverviewResponse } from "./marketOverview";
 import { extractPolymarketSlug, extractPossibleMarketTerms } from "./polymarketLink";
+import type { ExternalResolutionLookupResult } from "./polymarketResolutionAdapter";
 
 type MarketOutcomeRead = {
   market_id?: number;
@@ -49,6 +50,16 @@ function resolutionSourceFromLabel(value?: string | null): "polymarket" | "polys
   return normalized.includes("polymarket") || normalized.includes("gamma") || normalized.includes("clob")
     ? "polymarket"
     : "polysignal_market";
+}
+
+function statusFromExternal(value: ExternalResolutionLookupResult["status"]): AnalysisResolutionResult["status"] {
+  if (value === "open") {
+    return "open";
+  }
+  if (value === "resolved" || value === "cancelled") {
+    return "resolved";
+  }
+  return "unknown";
 }
 
 async function fetchStoredOutcome(marketId: string): Promise<AnalysisResolutionResult | null> {
@@ -161,6 +172,40 @@ async function resolveFromOverview(item: AnalysisHistoryItem): Promise<AnalysisR
   return extractOutcomeFromMarketData(bestMatch.item.market ?? null, "polysignal_market");
 }
 
+async function resolveFromPolymarket(item: AnalysisHistoryItem): Promise<AnalysisResolutionResult | null> {
+  if (!item.url && !item.eventSlug) {
+    return null;
+  }
+  const response = await fetch("/api/resolve-polymarket", {
+    body: JSON.stringify({
+      conditionId: item.conditionId,
+      eventSlug: item.eventSlug,
+      marketId: item.marketId,
+      marketSlug: item.marketSlug,
+      remoteId: item.remoteId,
+      url: item.url,
+    }),
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const result = (await response.json()) as ExternalResolutionLookupResult;
+  return {
+    confidence: result.confidence,
+    outcome: result.outcome,
+    reason: result.reason,
+    resolvedAt: result.resolvedAt,
+    source: result.source,
+    status: statusFromExternal(result.status),
+  };
+}
+
 export async function lookupAnalysisResolution(
   item: AnalysisHistoryItem,
 ): Promise<AnalysisResolutionResult> {
@@ -180,6 +225,11 @@ export async function lookupAnalysisResolution(
     if (overviewResolution) {
       return overviewResolution;
     }
+  }
+
+  const polymarketResolution = await resolveFromPolymarket(item);
+  if (polymarketResolution) {
+    return polymarketResolution;
   }
 
   return {

@@ -14,7 +14,7 @@ export type AnalysisHistoryEvaluationStatus = AnalysisEvaluationStatus;
 export type AnalysisHistoryOutcome = "CANCELLED" | "NO" | "UNKNOWN" | "YES";
 export type AnalysisHistoryPredictedSide = "NO" | "UNKNOWN" | "YES";
 export type AnalysisHistoryResolutionConfidence = "high" | "low" | "medium";
-export type AnalysisHistoryResolutionSource = "polymarket" | "polysignal_market" | "unknown";
+export type AnalysisHistoryResolutionSource = "clob" | "gamma" | "polymarket" | "polysignal" | "polysignal_market" | "unknown";
 export type AnalysisHistoryResult = "cancelled" | "hit" | "miss" | "pending" | "unknown";
 export type AnalysisHistorySource = "link_analyzer" | "manual" | "market_detail" | "unknown";
 export type AnalysisHistoryStatus = "open" | "resolved" | "unknown";
@@ -22,12 +22,15 @@ export type AnalysisHistoryStatus = "open" | "resolved" | "unknown";
 export type AnalysisHistoryItem = {
   analyzedAt: string;
   confidence?: AnalysisHistoryConfidence;
+  conditionId?: string;
   decision?: AnalysisHistoryDecision;
   decisionThreshold?: number;
+  eventSlug?: string;
   evaluationReason?: string;
   evaluationStatus?: AnalysisHistoryEvaluationStatus;
   id: string;
   marketId?: string;
+  marketSlug?: string;
   marketNoProbability?: number;
   marketYesProbability?: number;
   outcome?: AnalysisHistoryOutcome;
@@ -40,6 +43,7 @@ export type AnalysisHistoryItem = {
   resolutionSource?: AnalysisHistoryResolutionSource;
   resolvedAt?: string;
   result?: AnalysisHistoryResult;
+  remoteId?: string;
   source: AnalysisHistorySource;
   sport?: string;
   status: AnalysisHistoryStatus;
@@ -169,7 +173,14 @@ function normalizeSource(value: unknown): AnalysisHistorySource {
 }
 
 function normalizeResolutionSource(value: unknown): AnalysisHistoryResolutionSource {
-  if (value === "polymarket" || value === "polysignal_market" || value === "unknown") {
+  if (
+    value === "clob" ||
+    value === "gamma" ||
+    value === "polymarket" ||
+    value === "polysignal" ||
+    value === "polysignal_market" ||
+    value === "unknown"
+  ) {
     return value;
   }
   return "unknown";
@@ -206,12 +217,15 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
   return {
     analyzedAt: value.analyzedAt || nowIso(),
     confidence: normalizeConfidence(value.confidence),
+    conditionId: normalizeString(value.conditionId),
     decision: decision.decision,
     decisionThreshold: decision.decisionThreshold,
+    eventSlug: normalizeString(value.eventSlug),
     evaluationReason: normalizeString(value.evaluationReason) || decision.evaluationReason,
     evaluationStatus: decision.evaluationStatus,
     id: value.id || randomId(),
     marketId: value.marketId ? String(value.marketId) : undefined,
+    marketSlug: normalizeString(value.marketSlug),
     marketNoProbability: normalizeNumber(value.marketNoProbability),
     marketYesProbability: normalizeNumber(value.marketYesProbability),
     outcome: normalizeOutcome(value.outcome),
@@ -226,6 +240,7 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     resolutionSource: normalizeResolutionSource(value.resolutionSource),
     resolvedAt: normalizeString(value.resolvedAt),
     result,
+    remoteId: normalizeString(value.remoteId),
     source: normalizeSource(value.source),
     sport: value.sport || undefined,
     status,

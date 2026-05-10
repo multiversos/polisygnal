@@ -79,6 +79,33 @@ Rejected inputs:
 - URLs with usernames/passwords or custom ports
 - oversized URLs
 
+## Structured Market Resolution Security
+
+Historial can verify pending saved analyses through `/api/resolve-polymarket`.
+This route is read-only and exists only to normalize final market status; it is
+not a general proxy.
+
+Controls:
+
+- accepts `POST` only;
+- validates Polymarket URLs with the same hardened helper used by `/analyze`;
+- accepts only bounded string fields such as `eventSlug`, `marketSlug`,
+  `remoteId`, `conditionId`, and `url`;
+- builds the outbound Gamma URL internally as
+  `https://gamma-api.polymarket.com/events?slug=...`;
+- rejects arbitrary hosts, credentials, custom ports, private IPs, and oversized
+  inputs;
+- uses `GET`, short timeout, `no-store`, no cookies, no credentials, and
+  dangerous redirects disabled;
+- limits response size before parsing;
+- returns only `status`, `outcome`, `source`, `confidence`, `reason`,
+  `checkedAt`, and optional `resolvedAt`;
+- never returns raw Gamma payloads, stack traces, secrets, or backend URLs.
+
+Outcome parsing is conservative. It marks YES/NO only when Gamma shows a closed
+resolved market and exposes a clear winner or final binary `outcomePrices`.
+Closed markets without a clear structured outcome remain `unknown`.
+
 ## Backend Proxy Security
 
 The frontend proxy at `/api/backend/[...path]` is read-only and only accepts

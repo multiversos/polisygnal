@@ -215,6 +215,11 @@ If this test fails, stop feature work and treat it as a production regression.
     predictions with verified final outcomes count as hit/miss.
 15. Confirm pending, cancelled, unknown, weak-decision, and no-estimate records
     are not counted as failures.
+16. Confirm result source copy is understandable:
+    `Verificado con Polymarket`, `Verificado con datos PolySignal`, or
+    `No verificado todavia`.
+17. Confirm a dangerous `/api/resolve-polymarket` request such as
+    `polymarket.com.evil.com` is rejected and does not return raw payloads.
 
 ## Analizar Enlace
 
@@ -252,6 +257,8 @@ If this test fails, stop feature work and treat it as a production regression.
 18. Confirm the saved record only gets a PolySignal predicted side when a real
     PolySignal estimate crossed the 55% threshold. Market price alone must not
     create a predicted side.
+19. Confirm saved matched records preserve Polymarket identifiers when available
+    so Historial can later verify outcomes automatically.
 
 ## Alertas
 

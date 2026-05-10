@@ -26,8 +26,12 @@ Implemented as a frontend-only flow.
   resultados`. This is automatic and does not ask the user to choose the final
   outcome manually.
 
-This phase does not scrape Polymarket, does not call new external APIs, does not
-write to Neon, and does not invent probabilities.
+This phase does not scrape Polymarket, does not write to Neon, and does not
+invent probabilities. For result verification only, Historial can use a
+server-side read-only adapter that validates Polymarket identifiers and calls
+Gamma's structured `/events?slug=...` endpoint with an allow-list, timeout, no
+cookies, no credentials, no dangerous redirects, and no raw payload returned to
+the browser.
 
 ## Phase 2: Backend Market Lookup
 
@@ -72,10 +76,12 @@ Partially implemented locally, backend version not implemented yet.
 - Show performance charts only from finalized records.
 
 The current local version checks PolySignal's already-loaded market data and
-read-only outcome data. If there is no reliable outcome yet, the analysis stays
-pending or unknown. The future backend version should run this periodically,
-persist results per user, and record `resolved_at`, `resolution_source`, and
-`resolution_reason` for auditability.
+read-only outcome data first. If those are stale, it can call
+`/api/resolve-polymarket`, which queries Gamma by event slug and then matches by
+market id or market slug. If there is no reliable outcome yet, the analysis
+stays pending or unknown. The future backend version should run this
+periodically, persist results per user, and record `resolved_at`,
+`resolution_source`, and `resolution_reason` for auditability.
 
 ## Product Rules
 

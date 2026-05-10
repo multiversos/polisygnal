@@ -56,6 +56,10 @@ Estado visible verificado:
   clara PolySignal guardada. El umbral inicial es `55%`: YES `>=55%` o NO
   `>=55%`. La probabilidad del mercado no crea `predicted_side`; pending,
   cancelled, weak/no-estimate y unknown no cuentan como fallos.
+- Historial verifica resultados en este orden: outcome read-only ya guardado,
+  detalle/overview PolySignal, matching por URL/slug y finalmente
+  `/api/resolve-polymarket`, que consulta Gamma de forma estructurada por
+  `event_slug`. Si Gamma no entrega outcome confiable, no se inventa resultado.
 - privacidad local visible: Historial y Mi lista explican que los datos se
   guardan en este navegador, no se sincronizan todavia y pueden borrarse.
 - seguridad baseline completada: headers, smoke contra fugas sensibles,

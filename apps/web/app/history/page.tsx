@@ -100,13 +100,26 @@ function sourceLabel(value: AnalysisHistoryItem["source"]): string {
 }
 
 function resolutionSourceLabel(value: AnalysisHistoryItem["resolutionSource"]): string {
-  if (value === "polymarket") {
+  if (value === "polymarket" || value === "gamma" || value === "clob") {
     return "Verificado con Polymarket";
   }
-  if (value === "polysignal_market") {
+  if (value === "polysignal" || value === "polysignal_market") {
     return "Datos disponibles en PolySignal";
   }
   return "No verificado todavia";
+}
+
+function resolutionConfidenceLabel(item: AnalysisHistoryItem): string | null {
+  if (item.status === "open" || item.result === "pending") {
+    return "El mercado sigue abierto";
+  }
+  if (item.resolutionConfidence === "low") {
+    return "Resultado no confirmado";
+  }
+  if (item.status === "unknown" && item.outcome === "UNKNOWN") {
+    return "Mercado cerrado, resultado no disponible todavia";
+  }
+  return null;
 }
 
 function decisionLabel(item: AnalysisHistoryItem): string {
@@ -766,6 +779,9 @@ export default function HistoryPage() {
                       No verificado todavia. Usa Actualizar resultados para buscar cierres disponibles.
                     </p>
                   )}
+                  {resolutionConfidenceLabel(item) ? (
+                    <p className="section-note">{resolutionConfidenceLabel(item)}</p>
+                  ) : null}
                   {polySignalProbability ? (
                     probabilityGap ? (
                       <p className="probability-gap-note">{probabilityGap.label}</p>

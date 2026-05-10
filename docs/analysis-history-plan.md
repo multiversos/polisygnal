@@ -65,20 +65,26 @@ verify saved analyses automatically:
    result.
 3. If the item only has a URL, PolySignal extracts the slug and searches the
    already-loaded market overview for a strong match.
-4. If the market is still open, the item remains `pending`.
-5. If the market has a reliable YES/NO outcome and the item has a clear saved
+4. If those sources do not resolve the item, the web app can call the
+   server-side read-only route `/api/resolve-polymarket`. That route validates
+   the Polymarket input and queries Gamma's structured `/events?slug=...`
+   endpoint. It does not proxy arbitrary URLs.
+5. If the market is still open, the item remains `pending`.
+6. If the market has a reliable YES/NO outcome and the item has a clear saved
    PolySignal `predicted_side`, the result becomes `hit` or `miss`.
-6. If the market has a reliable YES/NO outcome but no clear saved PolySignal
+7. If the market has a reliable YES/NO outcome but no clear saved PolySignal
    side, the result becomes `unknown` because there is nothing honest to compare.
-7. If the market is cancelled/invalid, the result becomes `cancelled`.
-8. If PolySignal cannot verify the result, the item remains `unknown` or
+8. If the market is cancelled/invalid, the result becomes `cancelled`.
+9. If PolySignal cannot verify the result, the item remains `unknown` or
    pending rather than inventing an outcome.
 
 This is still localStorage-only. It does not create tables, does not write to
-Neon, does not scrape Polymarket HTML, and does not run scoring. The source is
-limited to data PolySignal can already read safely. A future backend job should
-replace this with periodic read-only checks against a verified structured
-Polymarket source.
+Neon, does not scrape Polymarket HTML, and does not run scoring. External
+resolution is limited to a structured, allow-listed Gamma request with a short
+timeout, no cookies, no credentials, no redirects, no raw payload returned to
+the browser, and conservative outcome parsing. A future backend job should
+replace this with periodic read-only checks against verified structured
+Polymarket/Gamma/CLOB sources.
 
 ## Future Link Analyzer Flow
 
@@ -118,6 +124,10 @@ Resolution lifecycle planned for a future backend phase:
 - `predicted_side`
 - `evaluation_status`
 - `evaluation_reason`
+- `remote_id`
+- `condition_id`
+- `event_slug`
+- `market_slug`
 - `confidence`
 - `final_outcome`
 - `resolved_at`

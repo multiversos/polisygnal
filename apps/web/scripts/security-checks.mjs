@@ -160,6 +160,149 @@ function validateAnalysisDecisionRules() {
   return { cases: 7, threshold: 55 };
 }
 
+async function validatePolymarketResolutionAdapter() {
+  const {
+    buildExternalResolutionRequest,
+    lookupExternalPolymarketResolution,
+  } = loadTsModule("app/lib/polymarketResolutionAdapter.ts");
+
+  const rejected = [
+    { url: "http://localhost:3000/event/test" },
+    { url: "http://127.0.0.1/event/test" },
+    { url: "http://169.254.169.254/latest/meta-data" },
+    { url: "http://192.168.1.1/event/test" },
+    { url: "https://polymarket.com.evil.com/event/test" },
+    { url: "https://user:pass@polymarket.com/event/test" },
+    { url: "https://polymarket.com:444/event/test" },
+    { url: `https://polymarket.com/event/${"x".repeat(2100)}` },
+  ];
+  for (const input of rejected) {
+    const request = buildExternalResolutionRequest(input);
+    assert(request.url === null, `expected resolution adapter to reject ${JSON.stringify(input)}`);
+  }
+
+  const request = buildExternalResolutionRequest({
+    eventSlug: "test-event",
+    marketSlug: "test-market",
+    remoteId: "123",
+    url: "https://polymarket.com/event/test-event",
+  });
+  assert(request.url === "https://gamma-api.polymarket.com/events?slug=test-event", `unexpected gamma URL ${request.url}`);
+
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            slug: "test-event",
+            markets: [
+              {
+                active: false,
+                automaticallyResolved: true,
+                closed: true,
+                closedTime: "2026-05-10T00:00:00Z",
+                id: "123",
+                outcomePrices: "[\"1\", \"0\"]",
+                outcomes: "[\"Yes\", \"No\"]",
+                slug: "test-market",
+                umaResolutionStatus: "resolved",
+                rawPayloadShouldNotLeak: "SECRET",
+              },
+            ],
+          },
+        ]),
+        { headers: { "Content-Type": "application/json" }, status: 200 },
+      );
+    const resolved = await lookupExternalPolymarketResolution({
+      eventSlug: "test-event",
+      marketSlug: "test-market",
+      remoteId: "123",
+      url: "https://polymarket.com/event/test-event",
+    });
+    assert(resolved.status === "resolved", `expected resolved status, got ${resolved.status}`);
+    assert(resolved.outcome === "YES", `expected YES outcome, got ${resolved.outcome}`);
+    assert(resolved.source === "gamma", `expected gamma source, got ${resolved.source}`);
+    assert(!JSON.stringify(resolved).includes("rawPayloadShouldNotLeak"), "resolution result leaked raw payload");
+    assert(!JSON.stringify(resolved).includes("SECRET"), "resolution result leaked secret-like payload");
+
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify([{ slug: "test-event", markets: [{ active: false, closed: true, id: "123", slug: "test-market" }] }]),
+        { headers: { "Content-Type": "application/json" }, status: 200 },
+      );
+    const unknown = await lookupExternalPolymarketResolution({
+      eventSlug: "test-event",
+      marketSlug: "test-market",
+      remoteId: "123",
+      url: "https://polymarket.com/event/test-event",
+    });
+    assert(unknown.status === "unknown", `expected unknown status, got ${unknown.status}`);
+    assert(unknown.outcome === "UNKNOWN", `expected UNKNOWN outcome, got ${unknown.outcome}`);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  return { rejected: rejected.length, safe_resolution_cases: 2 };
+}
+
+async function validateResolvePolymarketRoute() {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            slug: "test-event",
+            markets: [
+              {
+                active: false,
+                automaticallyResolved: true,
+                closed: true,
+                id: "123",
+                outcomePrices: "[\"0\", \"1\"]",
+                outcomes: "[\"Yes\", \"No\"]",
+                slug: "test-market",
+                umaResolutionStatus: "resolved",
+              },
+            ],
+          },
+        ]),
+        { headers: { "Content-Type": "application/json" }, status: 200 },
+      );
+    const route = loadTsModule("app/api/resolve-polymarket/route.ts");
+    const invalid = await route.POST(
+      new Request("https://example.test/api/resolve-polymarket", {
+        body: JSON.stringify({ url: "https://polymarket.com.evil.com/event/test" }),
+        method: "POST",
+      }),
+    );
+    assert(invalid.status === 400, `expected invalid resolution route request to fail, got ${invalid.status}`);
+
+    const resolved = await route.POST(
+      new Request("https://example.test/api/resolve-polymarket", {
+        body: JSON.stringify({
+          eventSlug: "test-event",
+          marketSlug: "test-market",
+          remoteId: "123",
+          url: "https://polymarket.com/event/test-event",
+        }),
+        method: "POST",
+      }),
+    );
+    assert(resolved.status === 200, `expected resolution route to return 200, got ${resolved.status}`);
+    const body = await resolved.json();
+    assert(body.outcome === "NO", `expected sanitized route outcome NO, got ${body.outcome}`);
+    assert(body.source === "gamma", `expected sanitized route source gamma, got ${body.source}`);
+    assert(!JSON.stringify(body).includes("markets"), "resolution route returned raw markets payload");
+    assert(route.GET().status === 405, "expected resolution route GET to be rejected");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  return { route_checks: 4 };
+}
+
 async function validateBackendProxy() {
   const route = loadTsModule("app/api/backend/[...path]/route.ts");
   const originalFetch = globalThis.fetch;
@@ -243,6 +386,8 @@ async function validateBackendProxy() {
 
 const linkChecks = validatePolymarketLinks();
 const decisionChecks = validateAnalysisDecisionRules();
+const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
+const resolutionRouteChecks = await validateResolvePolymarketRoute();
 const proxyChecks = await validateBackendProxy();
 
 console.log(
@@ -250,6 +395,8 @@ console.log(
     {
       link_validation: linkChecks,
       analysis_decision: decisionChecks,
+      polymarket_resolution_adapter: resolutionAdapterChecks,
+      resolve_polymarket_route: resolutionRouteChecks,
       proxy: proxyChecks,
       status: "ok",
     },

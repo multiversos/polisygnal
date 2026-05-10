@@ -251,12 +251,15 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
           : confidenceScore >= 0.4
             ? ("Media" as const)
             : ("Baja" as const),
+    conditionId: undefined,
     decision: decision.decision,
     decisionThreshold: decision.decisionThreshold,
+    eventSlug: item.market?.event_slug || undefined,
     evaluationReason: decision.evaluationReason,
     evaluationStatus: decision.evaluationStatus,
     id: `link-${item.market?.id ?? Date.now()}`,
     marketId: item.market?.id ? String(item.market.id) : undefined,
+    marketSlug: item.market?.market_slug || undefined,
     marketNoProbability: marketProbabilities?.no,
     marketYesProbability: marketProbabilities?.yes,
     outcome: "UNKNOWN" as const,
@@ -267,6 +270,7 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
       (reason): reason is string => Boolean(reason),
     ),
     result: "pending" as const,
+    remoteId: item.market?.remote_id || undefined,
     source: "link_analyzer" as const,
     sport: item.market?.sport_type || undefined,
     status: "open" as const,
@@ -277,15 +281,18 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
 
 function pendingHistoryPayload(normalizedUrl: string) {
   const slug = extractPolymarketSlug(normalizedUrl);
+  const prefix = new URL(normalizedUrl).pathname.split("/").filter(Boolean)[0];
   return {
     analyzedAt: new Date().toISOString(),
     confidence: "Desconocida" as const,
     decision: "none" as const,
     decisionThreshold: 55,
+    eventSlug: prefix === "event" ? slug || undefined : undefined,
     evaluationReason: "Sin estimacion PolySignal.",
     evaluationStatus: "not_countable" as const,
     id: `link-pending-${Date.now()}`,
     outcome: "UNKNOWN" as const,
+    marketSlug: prefix === "market" ? slug || undefined : undefined,
     predictedSide: "UNKNOWN" as const,
     reasons: ["Todavia no encontramos coincidencia dentro de los mercados cargados."],
     result: "unknown" as const,

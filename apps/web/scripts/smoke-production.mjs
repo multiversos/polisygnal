@@ -302,6 +302,23 @@ async function fetchJsonAllowFailure(path) {
   return { body, headers: response.headers, status: response.status };
 }
 
+async function postJsonAllowFailure(path, body) {
+  const response = await fetch(urlFor(path), {
+    body: JSON.stringify(body),
+    cache: "no-store",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    method: "POST",
+  });
+  const text = await response.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = { text: text.slice(0, 200) };
+  }
+  return { body: parsed, headers: response.headers, status: response.status };
+}
+
 function findChrome() {
   if (process.env.CHROME_PATH && existsSync(process.env.CHROME_PATH)) {
     return process.env.CHROME_PATH;
@@ -714,7 +731,7 @@ async function main() {
   );
   assertTextIncludesOneOf(
     historyText,
-    ["Resolucion automatica", "Resolución automática", "verificar automaticamente", "verificar automáticamente"],
+    ["Resolucion automatica", "Resolución automática", "Verificado con Polymarket", "Resultado verificable"],
     "history automatic resolution copy",
   );
   assertTextExcludes(
@@ -756,6 +773,18 @@ async function main() {
     "analyze dangerous url state",
   );
   assertTextExcludes(dangerousAnalyzeText, PUBLIC_SECURITY_TEXT, "analyze dangerous secret leakage");
+  const invalidResolutionRoute = await postJsonAllowFailure("/api/resolve-polymarket", {
+    url: "https://polymarket.com.evil.com/event/test",
+  });
+  assert(
+    invalidResolutionRoute.status === 400,
+    `resolve-polymarket accepted dangerous URL with status ${invalidResolutionRoute.status}`,
+  );
+  assertTextExcludes(
+    JSON.stringify(invalidResolutionRoute.body),
+    ["DATABASE_URL", "SECRET", "TOKEN", "postgres://", "https://polisygnal.onrender.com", "markets"],
+    "resolve-polymarket invalid response",
+  );
   const validAnalyzeUrl = `https://polymarket.com/event/${slugForAnalyzeSmoke(expectedTitles[0])}`;
   const validAnalyzeDom = await dumpDom(
     urlFor(`${ANALYZE_PATH}?url=${encodeURIComponent(validAnalyzeUrl)}&auto=1`),
