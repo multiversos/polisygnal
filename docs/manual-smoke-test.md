@@ -39,6 +39,26 @@ Use these checks after a production deploy. Correct domains:
 3. Confirm the sidebar does not show internal sections such as Investigación,
    Evidencia, Workflow, Salud de datos, Trial E2E, or Backtesting.
 
+## Security Baseline
+
+1. Open `https://polisygnal-web.vercel.app/` and confirm response headers include:
+   - `Content-Security-Policy`.
+   - `X-Content-Type-Options: nosniff`.
+   - `Referrer-Policy: strict-origin-when-cross-origin`.
+   - `X-Frame-Options: DENY`.
+   - `Permissions-Policy`.
+   - `Strict-Transport-Security`.
+2. Confirm public pages do not show `DATABASE_URL`, `SECRET`, `TOKEN`,
+   `API_KEY`, `password`, `postgres://`, stack traces, or connection strings.
+3. Open `/analyze`, paste `http://169.254.169.254/latest/meta-data`, and confirm
+   the page rejects it with a friendly Polymarket-only message.
+4. Paste `javascript:alert(1)`, `file:///etc/passwd`, and `ftp://polymarket.com/event/test`
+   into `/analyze` and confirm each is rejected.
+5. Confirm `/api/backend/https:%2F%2Fexample.com` returns a blocked/not-found
+   response and does not expose backend hostnames, connection strings, or stack
+   traces.
+6. Confirm `/internal/data-status` is still not linked from public navigation.
+
 ## Visual Polish
 
 1. Confirm the app opens in a sober dark theme by default unless a user has

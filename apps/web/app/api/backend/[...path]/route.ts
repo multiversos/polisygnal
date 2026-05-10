@@ -1,5 +1,7 @@
 const DEFAULT_BACKEND_BASE_URL = "https://polisygnal.onrender.com";
 const REQUEST_TIMEOUT_MS = 10000;
+const MAX_PROXY_QUERY_LENGTH = 1800;
+const SAFE_RESPONSE_CONTENT_TYPES = ["application/json", "text/plain"];
 
 const SAFE_GET_PREFIXES = [
   "/alerts",
@@ -30,7 +32,16 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 function backendBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_BACKEND_BASE_URL).replace(/\/$/, "");
+  const configured = (process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_BACKEND_BASE_URL).replace(/\/$/, "");
+  try {
+    const parsed = new URL(configured);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      return configured;
+    }
+  } catch {
+    // Fall through to the production backend.
+  }
+  return DEFAULT_BACKEND_BASE_URL;
 }
 
 function jsonResponse(payload: object, status: number): Response {
@@ -39,6 +50,7 @@ function jsonResponse(payload: object, status: number): Response {
     headers: {
       "Cache-Control": "no-store",
       "X-PolySignal-Proxy": "enabled",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }
@@ -52,6 +64,7 @@ function methodNotAllowed(): Response {
         Allow: "GET",
         "Cache-Control": "no-store",
         "X-PolySignal-Proxy": "enabled",
+        "X-Content-Type-Options": "nosniff",
       },
     },
   );
@@ -77,6 +90,14 @@ function isAllowedBackendPath(pathname: string): boolean {
   );
 }
 
+function isSafeResponseContentType(contentType: string | null): boolean {
+  if (!contentType) {
+    return true;
+  }
+  const normalized = contentType.toLowerCase();
+  return SAFE_RESPONSE_CONTENT_TYPES.some((allowed) => normalized.includes(allowed));
+}
+
 export async function GET(request: Request, context: RouteContext): Promise<Response> {
   const { path = [] } = await context.params;
   const backendPath = buildBackendPath(path);
@@ -85,6 +106,9 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
   }
 
   const incomingUrl = new URL(request.url);
+  if (incomingUrl.search.length > MAX_PROXY_QUERY_LENGTH) {
+    return jsonResponse({ error: "query_too_large" }, 414);
+  }
   const targetUrl = new URL(`${backendBaseUrl()}${backendPath}`);
   targetUrl.search = incomingUrl.search;
 
@@ -103,12 +127,17 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
       signal: controller.signal,
     } as RequestInit & { next: { revalidate: number } });
     const body = await upstream.text();
+    const contentType = upstream.headers.get("content-type");
+    if (!isSafeResponseContentType(contentType)) {
+      return jsonResponse({ error: "unexpected_backend_response" }, 502);
+    }
     return new Response(body, {
       status: upstream.status,
       headers: {
         "Cache-Control": "no-store",
-        "Content-Type": upstream.headers.get("content-type") || "application/json",
+        "Content-Type": contentType || "application/json",
         "X-PolySignal-Proxy": "enabled",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {

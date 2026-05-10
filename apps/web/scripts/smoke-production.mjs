@@ -77,6 +77,18 @@ const PUBLIC_TECHNICAL_TEXT = [
   "raw_data",
   "Kalshi",
 ];
+const PUBLIC_SECURITY_TEXT = [
+  "DATABASE_URL",
+  "SECRET",
+  "TOKEN",
+  "API_KEY",
+  "password",
+  "postgres://",
+  "postgresql://",
+  "Traceback",
+  "stack trace",
+  "connection string",
+];
 const UPDATE_TEXT = [
   "Última actualización",
   "Ãšltima actualizaciÃ³n",
@@ -245,6 +257,32 @@ async function fetchJson(path) {
   throw lastError;
 }
 
+async function fetchPage(path) {
+  const response = await fetch(urlFor(path), {
+    cache: "no-store",
+    headers: { Accept: "text/html,application/xhtml+xml" },
+  });
+  return {
+    headers: response.headers,
+    status: response.status,
+  };
+}
+
+async function fetchJsonAllowFailure(path) {
+  const response = await fetch(urlFor(path), {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  const text = await response.text();
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = { text: text.slice(0, 200) };
+  }
+  return { body, headers: response.headers, status: response.status };
+}
+
 function findChrome() {
   if (process.env.CHROME_PATH && existsSync(process.env.CHROME_PATH)) {
     return process.env.CHROME_PATH;
@@ -306,7 +344,28 @@ function validatePublicProductPage(dom, label, requiredText = []) {
   }
   assertTextExcludes(navText, INTERNAL_NAV_TEXT, `${label} public sidebar`);
   assertTextExcludes(text, PUBLIC_TECHNICAL_TEXT, `${label} public copy`);
+  assertTextExcludes(text, PUBLIC_SECURITY_TEXT, `${label} secret leakage`);
   return { public_sidebar_found: true, internal_sidebar_hidden: true, technical_copy_hidden: true };
+}
+
+function validateSecurityHeaders(page, label) {
+  const csp = page.headers.get("content-security-policy") || "";
+  assert(page.status === 200, `${label} returned HTTP ${page.status}`);
+  assert(
+    page.headers.get("x-content-type-options")?.toLowerCase() === "nosniff",
+    `${label} missing X-Content-Type-Options`,
+  );
+  assert(
+    page.headers.get("referrer-policy") === "strict-origin-when-cross-origin",
+    `${label} missing Referrer-Policy`,
+  );
+  assert(page.headers.get("x-frame-options") === "DENY", `${label} missing X-Frame-Options`);
+  assert(page.headers.get("permissions-policy"), `${label} missing Permissions-Policy`);
+  assert(page.headers.get("strict-transport-security"), `${label} missing Strict-Transport-Security`);
+  assert(csp.includes("default-src 'self'"), `${label} CSP missing default-src`);
+  assert(csp.includes("frame-ancestors 'none'"), `${label} CSP missing frame-ancestors`);
+  assert(csp.includes("object-src 'none'"), `${label} CSP missing object-src`);
+  return { baseline_security_headers_found: true };
 }
 
 function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTotal, visibleMarketCount) {
@@ -456,6 +515,7 @@ function validateInternalDataStatusPage(dom) {
 async function main() {
   const buildInfo = await fetchJson(BUILD_INFO_PATH);
   validateBuildInfo(buildInfo);
+  const securityHeaders = validateSecurityHeaders(await fetchPage(HOME_PATH), "home headers");
   const overview = await fetchJson(PROXY_PATH);
   const items = Array.isArray(overview.body.items) ? overview.body.items : [];
   const expectedTitles = items
@@ -611,6 +671,17 @@ async function main() {
     "analyze invalid url state",
   );
   assertTextExcludes(invalidAnalyzeText, PUBLIC_TECHNICAL_TEXT, "analyze invalid public copy");
+  assertTextExcludes(invalidAnalyzeText, PUBLIC_SECURITY_TEXT, "analyze invalid secret leakage");
+  const dangerousAnalyzeDom = await dumpDom(
+    urlFor(`${ANALYZE_PATH}?url=${encodeURIComponent("http://169.254.169.254/latest/meta-data")}&auto=1`),
+  );
+  const dangerousAnalyzeText = visibleText(dangerousAnalyzeDom);
+  assertTextIncludesOneOf(
+    dangerousAnalyzeText,
+    ["No pudimos analizar ese enlace", "solo aceptamos enlaces de Polymarket"],
+    "analyze dangerous url state",
+  );
+  assertTextExcludes(dangerousAnalyzeText, PUBLIC_SECURITY_TEXT, "analyze dangerous secret leakage");
   const validAnalyzeUrl = `https://polymarket.com/event/${slugForAnalyzeSmoke(expectedTitles[0])}`;
   const validAnalyzeDom = await dumpDom(
     urlFor(`${ANALYZE_PATH}?url=${encodeURIComponent(validAnalyzeUrl)}&auto=1`),
@@ -634,6 +705,17 @@ async function main() {
     "analyze save history action",
   );
   assertTextExcludes(validAnalyzeText, PUBLIC_TECHNICAL_TEXT, "analyze valid public copy");
+  assertTextExcludes(validAnalyzeText, PUBLIC_SECURITY_TEXT, "analyze valid secret leakage");
+  const blockedProxy = await fetchJsonAllowFailure("/api/backend/https:%2F%2Fexample.com");
+  assert(
+    blockedProxy.status === 404 || blockedProxy.status === 400,
+    `backend proxy allowed absolute target with status ${blockedProxy.status}`,
+  );
+  assertTextExcludes(
+    JSON.stringify(blockedProxy.body),
+    ["https://polisygnal.onrender.com", "DATABASE_URL", "postgres://", "postgresql://"],
+    "backend proxy blocked response",
+  );
   const detailMarketId = items[0]?.market?.id || items[0]?.market_id || 1;
   const marketDetailDom = await dumpDom(urlFor(`/markets/${detailMarketId}`));
   const marketDetailRender = validateMarketDetailPage(marketDetailDom, "market detail");
@@ -662,6 +744,7 @@ async function main() {
           api_host: buildInfo.body.api_host,
           proxy: buildInfo.body.proxy,
         },
+        security: securityHeaders,
         proxy: {
           status: overview.status,
           content_type: overview.contentType,

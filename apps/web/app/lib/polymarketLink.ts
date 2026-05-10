@@ -5,6 +5,8 @@ export type PolymarketLinkValidation = {
 };
 
 const ALLOWED_HOSTS = new Set(["polymarket.com", "www.polymarket.com"]);
+const BLOCKED_HOSTS = new Set(["0.0.0.0", "127.0.0.1", "::1", "169.254.169.254", "localhost"]);
+const MAX_POLYMARKET_URL_LENGTH = 2048;
 const POLYMARKET_PATH_PREFIXES = ["/event/", "/market/", "/sports/"];
 const STOP_WORDS = new Set([
   "and",
@@ -36,6 +38,9 @@ function withProtocol(input: string): string {
 }
 
 function parseUrl(input: string): URL | null {
+  if (input.length > MAX_POLYMARKET_URL_LENGTH) {
+    return null;
+  }
   try {
     return new URL(withProtocol(input));
   } catch {
@@ -43,9 +48,43 @@ function parseUrl(input: string): URL | null {
   }
 }
 
+function isPrivateIpv4(hostname: string): boolean {
+  const parts = hostname.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+  const [first, second] = parts;
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 169 && second === 254)
+  );
+}
+
+function isBlockedHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return BLOCKED_HOSTS.has(normalized) || isPrivateIpv4(normalized);
+}
+
+function isSafePolymarketUrl(parsed: URL): boolean {
+  const hostname = parsed.hostname.toLowerCase();
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return false;
+  }
+  if (parsed.username || parsed.password || parsed.port) {
+    return false;
+  }
+  if (isBlockedHost(hostname)) {
+    return false;
+  }
+  return ALLOWED_HOSTS.has(hostname);
+}
+
 export function normalizePolymarketUrl(input: string): string | null {
   const parsed = parseUrl(input);
-  if (!parsed || !ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) {
+  if (!parsed || !isSafePolymarketUrl(parsed)) {
     return null;
   }
   parsed.protocol = "https:";
@@ -108,7 +147,7 @@ export function getPolymarketUrlValidationMessage(input: string): PolymarketLink
       ok: false,
     };
   }
-  if (!ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) {
+  if (!isSafePolymarketUrl(parsed)) {
     return {
       message: "Por ahora solo aceptamos enlaces de Polymarket.",
       normalizedUrl: null,
