@@ -187,6 +187,7 @@ function readLocalHistory(): AnalysisHistoryItem[] {
       .filter((item): item is AnalysisHistoryItem => Boolean(item))
       .sort((left, right) => right.analyzedAt.localeCompare(left.analyzedAt));
   } catch {
+    storage.removeItem(ANALYSIS_HISTORY_STORAGE_KEY);
     return [];
   }
 }

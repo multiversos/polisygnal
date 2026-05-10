@@ -6,6 +6,7 @@ import { MainNavigation } from "../components/MainNavigation";
 import {
   ANALYSIS_HISTORY_STORAGE_EVENT,
   calculateAnalysisHistoryStats,
+  clearAnalysisHistory,
   getAnalysisHistory,
   removeAnalysisHistoryItem,
   type AnalysisHistoryItem,
@@ -226,6 +227,7 @@ export default function HistoryPage() {
   const [items, setItems] = useState<AnalysisHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -297,6 +299,27 @@ export default function HistoryPage() {
     }
   }, []);
 
+  const handleClearAll = useCallback(async () => {
+    if (items.length === 0) {
+      return;
+    }
+    const confirmed = window.confirm("Borrar todo el historial local guardado en este navegador?");
+    if (!confirmed) {
+      return;
+    }
+    setClearing(true);
+    setError(null);
+    try {
+      await clearAnalysisHistory();
+      setItems([]);
+      setUpdatedAt(new Date());
+    } catch {
+      setError("No pudimos borrar el historial local ahora. Intenta de nuevo en unos segundos.");
+    } finally {
+      setClearing(false);
+    }
+  }, [items.length]);
+
   const hasEnoughResolved = stats.resolved >= 5;
 
   return (
@@ -315,6 +338,14 @@ export default function HistoryPage() {
           <span className="timestamp-pill">{formatLastUpdated(updatedAt)}</span>
           <button className="theme-toggle" onClick={() => void loadHistory()} type="button">
             {loading ? "Actualizando" : "Actualizar"}
+          </button>
+          <button
+            className="watchlist-button danger"
+            disabled={clearing || loading || items.length === 0}
+            onClick={() => void handleClearAll()}
+            type="button"
+          >
+            {clearing ? "Borrando" : "Borrar historial local"}
           </button>
         </div>
       </header>

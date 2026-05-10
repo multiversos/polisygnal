@@ -106,6 +106,7 @@ function readLocalWatchlist(): WatchlistItem[] {
       .filter((item): item is WatchlistItem => Boolean(item))
       .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
   } catch {
+    storage.removeItem(WATCHLIST_STORAGE_KEY);
     return [];
   }
 }
@@ -209,5 +210,10 @@ export async function updateWatchlistItem(
 
 export async function removeWatchlistItem(itemId: number): Promise<null> {
   writeLocalWatchlist(readLocalWatchlist().filter((item) => item.id !== itemId));
+  return null;
+}
+
+export async function clearWatchlistItems(): Promise<null> {
+  writeLocalWatchlist([]);
   return null;
 }

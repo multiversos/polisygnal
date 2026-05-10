@@ -9,6 +9,7 @@ import { formatLastUpdated } from "../lib/useAutoRefresh";
 import {
   WATCHLIST_STATUS_LABELS,
   WATCHLIST_STORAGE_EVENT,
+  clearWatchlistItems,
   fetchWatchlistItems,
   removeWatchlistItem,
   type WatchlistItem,
@@ -93,6 +94,7 @@ export default function WatchlistPage() {
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyItemId, setBusyItemId] = useState<number | null>(null);
+  const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
@@ -146,6 +148,27 @@ export default function WatchlistPage() {
     }
   }, []);
 
+  const handleClearAll = useCallback(async () => {
+    if (items.length === 0) {
+      return;
+    }
+    const confirmed = window.confirm("Borrar todos los mercados guardados en este navegador?");
+    if (!confirmed) {
+      return;
+    }
+    setClearing(true);
+    setError(null);
+    try {
+      await clearWatchlistItems();
+      setItems([]);
+      setUpdatedAt(new Date());
+    } catch {
+      setError("No pudimos vaciar Mi lista ahora. Intenta de nuevo en unos segundos.");
+    } finally {
+      setClearing(false);
+    }
+  }, [items.length]);
+
   return (
     <main className="dashboard-shell watchlist-page">
       <MainNavigation />
@@ -161,6 +184,14 @@ export default function WatchlistPage() {
           <span className="timestamp-pill">{formatLastUpdated(updatedAt)}</span>
           <button className="theme-toggle" onClick={() => void loadWatchlist()} type="button">
             {loading ? "Actualizando" : "Actualizar"}
+          </button>
+          <button
+            className="watchlist-button danger"
+            disabled={clearing || loading || items.length === 0}
+            onClick={() => void handleClearAll()}
+            type="button"
+          >
+            {clearing ? "Vaciando" : "Vaciar Mi lista"}
           </button>
         </div>
       </header>
