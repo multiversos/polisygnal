@@ -6687,9 +6687,20 @@ html:not([data-theme="dark"]) .app-sidebar {
 .primary-button,
 .analysis-link {
   border: 1px solid color-mix(in srgb, var(--accent) 58%, var(--line));
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 90%, #ffffff 10%), var(--accent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 74%, var(--surface-elevated)),
+    color-mix(in srgb, var(--accent) 82%, #020617)
+  );
   color: var(--button-foreground);
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+[data-theme="dark"] .refresh-button,
+[data-theme="dark"] .primary-button,
+[data-theme="dark"] .analysis-link {
+  background: linear-gradient(180deg, #2c9dcc, #207ca5);
+  color: #06111f;
 }
 
 .refresh-button:hover,
@@ -6756,7 +6767,8 @@ html:not([data-theme="dark"]) .app-sidebar {
 }
 
 .sport-selector-chip {
-  min-height: 82px;
+  min-height: 62px;
+  padding: 10px 14px 10px 10px;
   border-color: var(--line);
   border-radius: 12px;
   background: var(--surface-raised);
@@ -6784,9 +6796,29 @@ html:not([data-theme="dark"]) .app-sidebar {
 
 .sport-selector-icon,
 .sport-selector-chip.selected .sport-selector-icon {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
   border-color: var(--line);
   background: var(--surface-elevated);
   color: var(--accent);
+}
+
+.sport-icon-svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+.sports-selector-group {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+.sport-overview-icon .sport-icon-svg {
+  width: 26px;
+  height: 26px;
 }
 
 .tone-green,
@@ -7014,6 +7046,58 @@ html:not([data-theme="dark"]) .app-sidebar {
   .metric-card,
   .panel {
     border-radius: 10px;
+  }
+
+  .topbar,
+  .safety-strip,
+  .alert-panel,
+  .sports-selector-heading,
+  .panel-heading {
+    align-items: flex-start;
+  }
+
+  .topbar > *,
+  .safety-strip > *,
+  .alert-panel > *,
+  .sports-selector-heading > *,
+  .panel-heading > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .subtitle,
+  .safety-strip,
+  .alert-panel,
+  .topbar,
+  .panel,
+  .sports-selector-panel,
+  .soccer-match-card,
+  .market-overview-card {
+    overflow-wrap: anywhere;
+  }
+
+  .timestamp-pill {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .sports-selector-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+    padding-right: 0;
+  }
+
+  .sports-selector-group.secondary {
+    grid-template-columns: 1fr;
+  }
+
+  .sport-selector-chip {
+    width: 100%;
+    min-width: 0;
+    min-height: 56px;
+    justify-content: flex-start;
+    white-space: normal;
   }
 
   .soccer-match-header,

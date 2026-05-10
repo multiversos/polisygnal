@@ -131,6 +131,8 @@ const ACTIVITY_TEXT = [
   "PrÃ³ximo partido",
   "Mercado cerrado",
 ];
+const GENERIC_SPORT_ICON_TEXT_PATTERN =
+  /<span class="sport-selector-icon"[^>]*>\s*(?:\*|B|N|F|T|BB|H|U|C|HK)\s*<\/span>/;
 
 function urlFor(path) {
   return `${FRONTEND_BASE_URL}${path}`;
@@ -172,6 +174,14 @@ function assertTextIncludesOneOf(text, expectedValues, label) {
 function assertTextExcludes(text, blocked, label) {
   const found = blocked.filter((value) => text.includes(value));
   assert(found.length === 0, `${label} rendered blocked text: ${found.join(", ")}`);
+}
+
+function assertSportIconsRendered(dom, label) {
+  assert(dom.includes("sport-icon-svg"), `${label} did not render sport SVG icons`);
+  assert(
+    !GENERIC_SPORT_ICON_TEXT_PATTERN.test(dom),
+    `${label} rendered generic letter-only sport icons`,
+  );
 }
 
 function sleep(ms) {
@@ -320,6 +330,7 @@ function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTo
   assertTextIncludesOneOf(text, SCHEDULE_GROUP_TEXT, `${label} schedule grouping`);
   assert(dom.includes("team-crest"), `${label} did not render team initials`);
   assert(dom.includes("team-crest-stack"), `${label} did not render paired team avatars`);
+  assertSportIconsRendered(dom, label);
   const publicProduct = validatePublicProductPage(dom, label, [
     `Mercados ${expectedMarketTotal}`,
     `Vista mercados (${visibleMarketCount})`,
@@ -497,6 +508,7 @@ async function main() {
   const sportsText = visibleText(sportsDom);
   assertTextIncludes(sportsText, "Actualizar", "sports update button");
   assertTextIncludesOneOf(sportsText, UPDATE_TEXT, "sports update timestamp");
+  assertSportIconsRendered(sportsDom, "sports selector");
   const briefingDom = await dumpDom(urlFor(BRIEFING_PATH));
   const briefingRender = validatePublicProductPage(briefingDom, "briefing", [
     "Resumen diario",
@@ -508,6 +520,7 @@ async function main() {
   assertTextIncludesOneOf(briefingText, REVIEW_REASON_TEXT, "briefing review reason");
   assertTextIncludes(briefingText, "Actualizar", "briefing update button");
   assertTextIncludesOneOf(briefingText, UPDATE_TEXT, "briefing update timestamp");
+  assertSportIconsRendered(briefingDom, "briefing sports selector");
   const alertsDom = await dumpDom(urlFor(ALERTS_PATH));
   const alertsRender = validatePublicProductPage(alertsDom, "alerts", ["Alertas"]);
   const alertsText = visibleText(alertsDom);

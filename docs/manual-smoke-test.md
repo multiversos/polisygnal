@@ -54,6 +54,19 @@ Use these checks after a production deploy. Correct domains:
 6. Check one mobile-width viewport and confirm the sidebar, filters, cards, and
    buttons do not overflow horizontally.
 
+7. Confirm the sport selector uses small line icons instead of large generic
+   letters. Expected icons:
+   - Todos: compact grid.
+   - FÃºtbol: soccer ball.
+   - Baloncesto: basketball.
+   - NFL: American football.
+   - Tenis: racket/ball.
+   - BÃ©isbol: baseball.
+   - Carreras de caballos: racing/horseshoe mark.
+   - UFC: glove/fight mark.
+   - CrÃ­quet: bat/ball.
+   - NHL / Hockey: stick/puck mark.
+
 ## Public Home
 
 1. Confirm Inicio shows `Qué revisar ahora`, `Mercados destacados`, and

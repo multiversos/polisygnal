@@ -7,6 +7,7 @@ import { MainNavigation } from "../components/MainNavigation";
 import {
   primarySportOptions,
   secondarySportOptions,
+  SportIcon,
 } from "../components/SportsSelectorBar";
 import { formatLastUpdated, useAutoRefresh } from "../lib/useAutoRefresh";
 
@@ -68,7 +69,7 @@ export default function SportsIndexPage() {
           {primarySportOptions.map((sport) => (
           <article className={`sport-overview-card tone-${sport.tone}`} key={sport.id}>
             <span className="sport-overview-icon" aria-hidden="true">
-              {sport.icon}
+              <SportIcon name={sport.icon} />
             </span>
             <div>
               <h2>{sport.label}</h2>
@@ -96,7 +97,7 @@ export default function SportsIndexPage() {
               key={sport.id}
             >
               <span className="sport-overview-icon" aria-hidden="true">
-                {sport.icon}
+                <SportIcon name={sport.icon} />
               </span>
               <div>
                 <h2>{sport.label}</h2>
