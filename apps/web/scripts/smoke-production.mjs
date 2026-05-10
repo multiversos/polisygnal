@@ -82,12 +82,17 @@ const PUBLIC_SECURITY_TEXT = [
   "SECRET",
   "TOKEN",
   "API_KEY",
+  "PASSWORD",
   "password",
   "postgres://",
   "postgresql://",
   "Traceback",
+  "TypeError:",
+  "ReferenceError:",
+  "Unhandled Runtime Error",
   "stack trace",
   "connection string",
+  "localhost",
 ];
 const UPDATE_TEXT = [
   "Última actualización",
@@ -442,6 +447,7 @@ function validateMarketDetailPage(dom, label) {
     ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
     label,
   );
+  assertTextExcludes(text, PUBLIC_SECURITY_TEXT, `${label} secret leakage`);
   return { watchlist_action_found: true, public_detail_copy_found: true };
 }
 
@@ -630,6 +636,7 @@ async function main() {
     ["Esta lista se guarda en este navegador", "Ver detalle", "Explorar mercados deportivos"],
     "watchlist local storage copy",
   );
+  assertTextIncludes(watchlistText, "Vaciar Mi lista", "watchlist local clear control");
   const historyDom = await dumpDom(urlFor(HISTORY_PATH));
   const historyRender = validatePublicProductPage(historyDom, "history", ["Historial"]);
   const historyText = visibleText(historyDom);
@@ -653,6 +660,7 @@ async function main() {
     ["Comparacion mercado vs PolySignal", "Comparación mercado vs PolySignal"],
     "history probability comparison",
   );
+  assertTextIncludes(historyText, "Borrar historial local", "history local clear control");
   const analyzeDom = await dumpDom(urlFor(ANALYZE_PATH));
   const analyzeRender = validatePublicProductPage(analyzeDom, "analyze", ["Analizar enlace"]);
   const analyzeText = visibleText(analyzeDom);
@@ -715,6 +723,23 @@ async function main() {
     JSON.stringify(blockedProxy.body),
     ["https://polisygnal.onrender.com", "DATABASE_URL", "postgres://", "postgresql://"],
     "backend proxy blocked response",
+  );
+  const unexpectedProxy = await fetchJsonAllowFailure("/api/backend/admin/secrets");
+  assert(
+    unexpectedProxy.status === 404,
+    `backend proxy allowed unexpected path with status ${unexpectedProxy.status}`,
+  );
+  assertTextExcludes(
+    JSON.stringify(unexpectedProxy.body),
+    ["https://polisygnal.onrender.com", "DATABASE_URL", "postgres://", "postgresql://"],
+    "backend proxy unexpected response",
+  );
+  const longProxyQuery = await fetchJsonAllowFailure(`/api/backend/markets/overview?${"q=x&".repeat(500)}`);
+  assert(longProxyQuery.status === 414, `backend proxy allowed oversized query with status ${longProxyQuery.status}`);
+  assertTextExcludes(
+    JSON.stringify(longProxyQuery.body),
+    ["https://polisygnal.onrender.com", "DATABASE_URL", "postgres://", "postgresql://"],
+    "backend proxy long query response",
   );
   const detailMarketId = items[0]?.market?.id || items[0]?.market_id || 1;
   const marketDetailDom = await dumpDom(urlFor(`/markets/${detailMarketId}`));

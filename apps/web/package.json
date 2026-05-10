@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "security:checks": "node scripts/security-checks.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
     "start": "next start"
   },
