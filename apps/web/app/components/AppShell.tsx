@@ -45,16 +45,16 @@ function applyThemePreference(theme: ThemePreference) {
 
 function resolveThemePreference(): ThemePreference {
   if (typeof window === "undefined") {
-    return "light";
+    return "dark";
   }
   try {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (storedTheme === "dark" || storedTheme === "light") {
       return storedTheme;
     }
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return "dark";
   } catch {
-    return "light";
+    return "dark";
   }
 }
 
@@ -68,7 +68,7 @@ function isActivePath(pathname: string, href: string): boolean {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [theme, setTheme] = useState<ThemePreference>("light");
+  const [theme, setTheme] = useState<ThemePreference>("dark");
 
   useEffect(() => {
     const resolvedTheme = resolveThemePreference();

@@ -56,7 +56,7 @@ export function ApiErrorState({
   message,
   onRetry,
   retryLabel = "Reintentar",
-  title = "No se pudo cargar esta vista",
+  title = "No pudimos actualizar esta vista",
 }: ApiErrorStateProps) {
   return (
     <section className={alertClassName(compact)} role="status">

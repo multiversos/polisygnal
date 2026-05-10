@@ -6398,3 +6398,641 @@ h2 {
     width: 100%;
   }
 }
+
+/* Professional public visual refresh */
+:root {
+  --background: #f4f7fb;
+  --surface: #ffffff;
+  --surface-raised: #f8fbff;
+  --surface-elevated: #ffffff;
+  --surface-muted: #eef3f8;
+  --surface-table: #f7fafc;
+  --surface-info: #edf6ff;
+  --surface-warm: #fffaf0;
+  --grid-blue: rgba(37, 99, 235, 0.025);
+  --grid-green: rgba(15, 118, 110, 0.018);
+  --line: #d7e0eb;
+  --line-strong: #b8c6d8;
+  --foreground: #162033;
+  --text: var(--foreground);
+  --muted: #66758a;
+  --muted-strong: #40516a;
+  --accent: #0f766e;
+  --accent-soft: rgba(15, 118, 110, 0.12);
+  --accent-ink: #0d5d57;
+  --blue: #2563eb;
+  --blue-soft: rgba(37, 99, 235, 0.12);
+  --blue-ink: #1d4ed8;
+  --blue-ink-strong: #173fbb;
+  --amber: #b7791f;
+  --amber-soft: rgba(183, 121, 31, 0.13);
+  --amber-ink: #7c4a12;
+  --red: #b42318;
+  --red-soft: rgba(180, 35, 24, 0.12);
+  --red-ink: #9f1f17;
+  --button-foreground: #ffffff;
+  --control-background: #ffffff;
+  --panel-gradient-start: #ffffff;
+  --panel-gradient-end: #f6f9fd;
+  --shadow: 0 18px 40px rgba(20, 31, 49, 0.08);
+  --shadow-sm: 0 8px 22px rgba(20, 31, 49, 0.06);
+  --success: #16a34a;
+}
+
+[data-theme="dark"] {
+  --background: #07111c;
+  --surface: #0d1724;
+  --surface-raised: #111c2b;
+  --surface-elevated: #152234;
+  --surface-muted: #172538;
+  --surface-table: #101b2a;
+  --surface-info: rgba(56, 189, 248, 0.08);
+  --surface-warm: rgba(244, 201, 93, 0.08);
+  --grid-blue: rgba(56, 189, 248, 0.025);
+  --grid-green: rgba(34, 197, 94, 0.018);
+  --line: #25364c;
+  --line-strong: #33475f;
+  --foreground: #f4f7fb;
+  --text: var(--foreground);
+  --muted: #a8b3c7;
+  --muted-strong: #c3ccda;
+  --accent: #38bdf8;
+  --accent-soft: rgba(56, 189, 248, 0.14);
+  --accent-ink: #d7f3ff;
+  --blue: #60a5fa;
+  --blue-soft: rgba(96, 165, 250, 0.13);
+  --blue-ink: #bfdbfe;
+  --blue-ink-strong: #dbeafe;
+  --amber: #f4c95d;
+  --amber-soft: rgba(244, 201, 93, 0.13);
+  --amber-ink: #fde7a4;
+  --red: #f87171;
+  --red-soft: rgba(248, 113, 113, 0.12);
+  --red-ink: #fecaca;
+  --button-foreground: #07111c;
+  --control-background: #0d1724;
+  --panel-gradient-start: #111c2b;
+  --panel-gradient-end: #0d1724;
+  --shadow: 0 22px 52px rgba(0, 0, 0, 0.28);
+  --shadow-sm: 0 12px 28px rgba(0, 0, 0, 0.18);
+  --success: #22c55e;
+}
+
+body {
+  background:
+    radial-gradient(circle at 18% -8%, rgba(56, 189, 248, 0.08), transparent 34rem),
+    radial-gradient(circle at 88% 12%, rgba(34, 197, 94, 0.055), transparent 30rem),
+    linear-gradient(180deg, var(--background), color-mix(in srgb, var(--background) 88%, #020617));
+  background-attachment: fixed;
+  letter-spacing: 0;
+}
+
+html:not([data-theme="dark"]) body {
+  background:
+    radial-gradient(circle at 18% -8%, rgba(37, 99, 235, 0.055), transparent 34rem),
+    radial-gradient(circle at 88% 12%, rgba(15, 118, 110, 0.04), transparent 30rem),
+    linear-gradient(180deg, var(--background), #eaf0f7);
+}
+
+.dashboard-shell,
+.briefing-page {
+  padding-top: 24px;
+}
+
+.app-shell {
+  grid-template-columns: 264px minmax(0, 1fr);
+}
+
+.app-sidebar {
+  gap: 16px;
+  padding: 18px 14px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-raised) 96%, transparent), var(--surface)),
+    var(--surface);
+  box-shadow: 14px 0 36px rgba(2, 6, 23, 0.16);
+}
+
+html:not([data-theme="dark"]) .app-sidebar {
+  box-shadow: 14px 0 36px rgba(20, 31, 49, 0.06);
+}
+
+.app-logo {
+  justify-content: flex-start;
+  min-height: 68px;
+  padding: 10px 12px;
+  border-color: var(--line);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 92%, var(--accent-soft)), var(--surface));
+  box-shadow: var(--shadow-sm);
+}
+
+.app-logo img {
+  max-width: 196px;
+  height: 46px;
+}
+
+.app-nav {
+  gap: 6px;
+}
+
+.app-nav-item {
+  min-height: 42px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-weight: 760;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.app-nav-item:hover {
+  transform: translateX(1px);
+  border-color: var(--line);
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.app-nav-item.active {
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--line));
+  background: linear-gradient(90deg, var(--accent-soft), color-mix(in srgb, var(--surface-muted) 72%, transparent));
+  color: var(--foreground);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.app-nav-icon {
+  stroke-width: 1.9;
+}
+
+.theme-toggle,
+.refresh-button,
+.primary-button,
+.secondary-button,
+.text-link,
+.analysis-link,
+.watchlist-button,
+.briefing-page .briefing-copy-button {
+  border-radius: 10px;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.app-theme-toggle {
+  margin-top: auto;
+  justify-content: center;
+  min-height: 42px;
+  border-color: var(--line);
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+}
+
+.app-header {
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.app-header-title {
+  color: var(--muted);
+}
+
+.app-header-title strong {
+  color: var(--foreground);
+  font-weight: 780;
+}
+
+.topbar,
+.panel,
+.metric-card,
+.sports-selector-panel,
+.filter-panel,
+.command-center-shortcuts,
+.guidance-card,
+.briefing-card,
+.briefing-page .briefing-card,
+.sport-overview-card,
+.sports-market-card,
+.soccer-match-card,
+.market-overview-card,
+.analysis-card,
+.alert-panel,
+.empty-state,
+.internal-status-card,
+.data-status-card,
+.watchlist-card,
+.market-detail-card,
+.readiness-card {
+  border-color: var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--surface-raised), var(--surface));
+  box-shadow: var(--shadow-sm);
+}
+
+.metric-card {
+  min-height: 116px;
+  padding: 18px;
+}
+
+.metric-card span,
+.panel-eyebrow,
+.sports-selector-eyebrow,
+.muted,
+.small-muted,
+.soccer-muted,
+.market-overview-muted,
+.briefing-page .briefing-muted {
+  color: var(--muted);
+}
+
+.metric-card strong,
+.panel-heading h2,
+.sports-selector-heading h2,
+.soccer-section-heading h2,
+.market-overview-title h1,
+.briefing-page h1,
+.dashboard-shell h1 {
+  color: var(--foreground);
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.alert-panel {
+  align-items: center;
+  border-color: color-mix(in srgb, var(--amber) 28%, var(--line));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-warm) 72%, var(--surface)), var(--surface));
+  color: var(--muted-strong);
+}
+
+.alert-panel strong {
+  color: var(--foreground);
+}
+
+.alert-panel span,
+.alert-panel p {
+  color: var(--muted);
+}
+
+.safety-strip {
+  border-color: var(--line);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--muted-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.refresh-button,
+.primary-button,
+.analysis-link {
+  border: 1px solid color-mix(in srgb, var(--accent) 58%, var(--line));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 90%, #ffffff 10%), var(--accent));
+  color: var(--button-foreground);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.refresh-button:hover,
+.primary-button:hover,
+.analysis-link:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.secondary-button,
+.text-link,
+.watchlist-button,
+.briefing-page .briefing-copy-button {
+  border: 1px solid var(--line);
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+}
+
+.secondary-button:hover,
+.text-link:hover,
+.watchlist-button:hover,
+.briefing-page .briefing-copy-button:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.market-status-badge,
+.market-intent-badge,
+.market-activity-badge,
+.soccer-status-chip,
+.sports-selector-active,
+.sport-coming-soon,
+.sport-selector-status,
+.briefing-page .briefing-badge {
+  border-radius: 999px;
+  border-color: var(--line);
+  background: var(--surface-muted);
+  color: var(--muted-strong);
+  box-shadow: none;
+}
+
+.market-intent-badge[data-intent="review"],
+.market-status-badge.is-analyzed,
+.soccer-status-chip.is-active {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.market-status-badge.is-closed,
+.soccer-status-chip.is-closed {
+  border-color: color-mix(in srgb, var(--red) 34%, var(--line));
+  background: var(--red-soft);
+  color: var(--red-ink);
+}
+
+.sports-selector-panel {
+  padding: 18px;
+}
+
+.sports-selector-grid {
+  gap: 10px;
+}
+
+.sport-selector-chip {
+  min-height: 82px;
+  border-color: var(--line);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--muted-strong);
+  box-shadow: none;
+}
+
+.sport-selector-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-strong);
+  background: var(--surface-elevated);
+}
+
+.sport-selector-chip.selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: linear-gradient(180deg, var(--accent-soft), color-mix(in srgb, var(--surface-elevated) 80%, var(--accent-soft)));
+  color: var(--foreground);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.sport-selector-chip.disabled {
+  opacity: 0.62;
+  background: color-mix(in srgb, var(--surface-raised) 84%, var(--surface-muted));
+}
+
+.sport-selector-icon,
+.sport-selector-chip.selected .sport-selector-icon {
+  border-color: var(--line);
+  background: var(--surface-elevated);
+  color: var(--accent);
+}
+
+.tone-green,
+.tone-blue,
+.tone-purple,
+.tone-orange,
+.tone-red,
+.tone-slate,
+.tone-amber,
+.tone-teal,
+.tone-cyan,
+.tone-pink {
+  --sport-tone: var(--accent);
+  --sport-tone-soft: var(--surface-muted);
+  --sport-tone-border: var(--line);
+}
+
+.filter-panel,
+.market-overview-review-filters {
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.filter-panel input,
+.filter-panel select,
+.filter-group select,
+.market-overview-search input,
+.market-overview-sort select,
+.upcoming-filter-row input,
+.upcoming-filter-row select {
+  min-height: 42px;
+  border-color: var(--line);
+  border-radius: 10px;
+  background: var(--control-background);
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.market-overview-review-filters button,
+.view-toggle button,
+.filter-chip,
+.segmented-button {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+  font-weight: 740;
+  box-shadow: none;
+}
+
+.market-overview-review-filters button.active,
+.view-toggle button.active,
+.filter-chip.active,
+.segmented-button.active {
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.soccer-day-section {
+  gap: 14px;
+}
+
+.soccer-day-heading {
+  align-items: center;
+  padding: 0 2px;
+}
+
+.soccer-day-heading h2 {
+  font-size: 1rem;
+  font-weight: 820;
+}
+
+.soccer-day-heading span,
+.soccer-day-count {
+  color: var(--muted);
+}
+
+.soccer-match-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--surface-raised), var(--surface));
+}
+
+.soccer-match-card::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--accent), transparent 72%);
+  content: "";
+  opacity: 0.62;
+}
+
+.soccer-match-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow);
+}
+
+.soccer-match-header,
+.soccer-market-summary-row,
+.soccer-market-summary-footer {
+  border-color: var(--line);
+}
+
+.soccer-match-title h3,
+.soccer-market-summary-title,
+.market-overview-card h3 {
+  color: var(--foreground);
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.team-crest {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+  background:
+    radial-gradient(circle at 35% 25%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 54%),
+    linear-gradient(145deg, var(--surface-elevated), var(--surface-muted));
+  color: var(--foreground);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+.team-crest-stack .team-crest + .team-crest {
+  margin-left: -8px;
+}
+
+.soccer-outcome-pill,
+.soccer-market-summary-row {
+  border-color: var(--line);
+  border-radius: 10px;
+  background: var(--surface-elevated);
+}
+
+.soccer-outcome-pill:hover,
+.soccer-market-summary-row:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-muted);
+}
+
+.soccer-outcome-price,
+.market-overview-price,
+.price-value {
+  color: var(--foreground);
+  font-weight: 820;
+}
+
+.soccer-market-summary-meta,
+.soccer-outcome-label,
+.soccer-match-meta,
+.soccer-match-footer {
+  color: var(--muted);
+}
+
+.internal-status-card {
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    position: sticky;
+    top: 0;
+    height: auto;
+    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .app-logo {
+    width: min(220px, 100%);
+    min-height: 54px;
+  }
+
+  .app-logo img {
+    max-width: 174px;
+    height: 40px;
+  }
+
+  .app-nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .app-nav-item {
+    flex: 0 0 auto;
+    grid-template-columns: 24px max-content;
+    white-space: nowrap;
+  }
+
+  .app-theme-toggle {
+    align-self: flex-start;
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboard-shell,
+  .briefing-page {
+    width: min(100% - 18px, 1280px);
+  }
+
+  .app-sidebar {
+    gap: 8px;
+  }
+
+  .app-nav-item {
+    min-height: 36px;
+    padding: 7px 9px;
+    font-size: 0.78rem;
+  }
+
+  .filter-panel,
+  .market-overview-review-filters,
+  .soccer-match-card,
+  .sports-selector-panel,
+  .metric-card,
+  .panel {
+    border-radius: 10px;
+  }
+
+  .soccer-match-header,
+  .soccer-market-summary-row {
+    gap: 10px;
+  }
+
+  .soccer-market-summary-actions,
+  .soccer-match-actions,
+  .topbar-actions {
+    width: 100%;
+  }
+
+  .soccer-market-summary-actions .watchlist-button,
+  .soccer-market-summary-actions .analysis-link,
+  .soccer-match-actions button,
+  .topbar-actions button,
+  .topbar-actions a {
+    width: 100%;
+    justify-content: center;
+  }
+}

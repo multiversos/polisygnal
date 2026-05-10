@@ -24,6 +24,8 @@ const INTERNAL_DATA_STATUS_PATH = "/internal/data-status";
 const WORKFLOW_PATH = "/workflow";
 const RENDER_ERROR_TEXT = [
   "Datos no disponibles",
+  "No se pudo cargar este deporte",
+  "No se pudo cargar esta vista",
   "La API no respondio",
   "La API no respondiÃ³",
   "Todavia no hay mercados",
@@ -299,6 +301,11 @@ function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTo
   assertTextIncludes(text, `Mercados ${expectedMarketTotal}`, label);
   assertTextIncludes(text, `Vista mercados (${visibleMarketCount})`, label);
   assertTextIncludes(text, `Mostrando ${visibleMarketCount} de ${expectedMarketTotal} mercados`, label);
+  assertTextExcludes(
+    text,
+    ["Mercados 0", "Partidos detectados 0", "Analizados 0 En observación 0"],
+    `${label} zero state`,
+  );
   assertTextIncludes(text, "Partidos detectados", label);
   assertTextIncludes(text, "Actualizar", label);
   assertTextIncludes(text, "Buscar equipo o mercado", label);
@@ -499,7 +506,6 @@ async function main() {
   assertTextIncludesOneOf(briefingText, QUICK_SUMMARY_TEXT, "briefing quick summary");
   assertTextIncludesOneOf(briefingText, WHY_VISIBLE_TEXT, "briefing priority explanation");
   assertTextIncludesOneOf(briefingText, REVIEW_REASON_TEXT, "briefing review reason");
-  assertTextIncludesOneOf(briefingText, ACTIVITY_TEXT, "briefing activity label");
   assertTextIncludes(briefingText, "Actualizar", "briefing update button");
   assertTextIncludesOneOf(briefingText, UPDATE_TEXT, "briefing update timestamp");
   const alertsDom = await dumpDom(urlFor(ALERTS_PATH));

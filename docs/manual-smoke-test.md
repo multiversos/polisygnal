@@ -37,6 +37,23 @@ Use these checks after a production deploy. Correct domains:
 3. Confirm the sidebar does not show internal sections such as Investigación,
    Evidencia, Workflow, Salud de datos, Trial E2E, or Backtesting.
 
+## Visual Polish
+
+1. Confirm the app opens in a sober dark theme by default unless a user has
+   already chosen light mode in this browser.
+2. Confirm the sidebar looks like a product navigation panel: solid dark
+   surface, restrained active state, consistent icons, and the theme toggle at
+   the bottom.
+3. Confirm cards and panels use a consistent dark surface, subtle borders, and
+   limited accent color instead of bright arcade-style blocks.
+4. Confirm filters, chips, and badges are compact and mostly neutral, with only
+   the active item using a clear accent.
+5. Confirm loading and error states are calm: if a refresh fails, existing data
+   should remain visible and the warning should not mention API, backend, or
+   proxy details.
+6. Check one mobile-width viewport and confirm the sidebar, filters, cards, and
+   buttons do not overflow horizontally.
+
 ## Public Home
 
 1. Confirm Inicio shows `Qué revisar ahora`, `Mercados destacados`, and
