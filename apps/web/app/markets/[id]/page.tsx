@@ -52,7 +52,7 @@ import {
   type MarketOutcome,
   type ResolvedOutcome,
 } from "../../lib/backtesting";
-import { predictedSideFromProbabilities } from "../../lib/marketResolution";
+import { getPolySignalDecision } from "../../lib/analysisDecision";
 import {
   DECISION_CONFIDENCE_LABELS,
   MARKET_DECISION_LABELS,
@@ -1137,16 +1137,23 @@ function historyItemFromAnalysis(analysis: MarketAnalysis) {
           no: polySignalNo ?? Math.max(0, Math.min(1, 1 - (polySignalYes ?? 0))),
           yes: polySignalYes ?? Math.max(0, Math.min(1, 1 - (polySignalNo ?? 0))),
         };
-  const predictedSide = predictedSideFromProbabilities(polySignalProbabilities);
+  const decision = getPolySignalDecision({
+    polySignalNoProbability: polySignalProbabilities?.no,
+    polySignalYesProbability: polySignalProbabilities?.yes,
+  });
   const reviewReason = getAnalysisReviewReason(analysis);
   const activity = getAnalysisActivity(analysis);
   const predictionReason =
-    predictedSide === "UNKNOWN"
-      ? "Sin lado PolySignal guardado: no habia estimacion suficiente para comparar."
-      : "Prediccion guardada solo cuando existia estimacion PolySignal.";
+    decision.predictedSide === "UNKNOWN"
+      ? decision.evaluationReason
+      : "Prediccion clara guardada solo cuando la estimacion PolySignal supera 55%.";
   return {
     analyzedAt: new Date().toISOString(),
     confidence: historyConfidenceFromAnalysis(analysis),
+    decision: decision.decision,
+    decisionThreshold: decision.decisionThreshold,
+    evaluationReason: decision.evaluationReason,
+    evaluationStatus: decision.evaluationStatus,
     id: `market-${analysis.market.id}`,
     marketId: String(analysis.market.id),
     marketNoProbability: normalizeProbability(analysis.latest_snapshot?.no_price) ?? undefined,
@@ -1154,7 +1161,7 @@ function historyItemFromAnalysis(analysis: MarketAnalysis) {
     outcome: "UNKNOWN" as const,
     polySignalNoProbability: polySignalNo ?? undefined,
     polySignalYesProbability: polySignalYes ?? undefined,
-    predictedSide,
+    predictedSide: decision.predictedSide,
     reasons: [reviewReason.reason, activity?.detail, predictionReason].filter((reason): reason is string => Boolean(reason)),
     result: "pending" as const,
     source: "market_detail" as const,

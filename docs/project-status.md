@@ -52,8 +52,10 @@ Estado visible verificado:
   existe y solo muestra estimacion PolySignal si el dato real esta disponible.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
-- hit/miss solo se calcula cuando existe outcome confiable y `predicted_side`
-  PolySignal guardado; pending, cancelled y unknown no cuentan como fallos.
+- hit/miss solo se calcula cuando existe outcome confiable y una prediccion
+  clara PolySignal guardada. El umbral inicial es `55%`: YES `>=55%` o NO
+  `>=55%`. La probabilidad del mercado no crea `predicted_side`; pending,
+  cancelled, weak/no-estimate y unknown no cuentan como fallos.
 - privacidad local visible: Historial y Mi lista explican que los datos se
   guardan en este navegador, no se sincronizan todavia y pueden borrarse.
 - seguridad baseline completada: headers, smoke contra fugas sensibles,

@@ -120,7 +120,7 @@ export function getProbabilityDisplayState(
     gap: getProbabilityGap(market, polySignal),
     market,
     marketDetail: market
-      ? "Basado en el precio visible del mercado."
+      ? "Esto refleja el precio visible del mercado, no una prediccion de PolySignal."
       : "No hay precio visible suficiente para calcularlo.",
     polySignal,
     polySignalDetail: polySignal

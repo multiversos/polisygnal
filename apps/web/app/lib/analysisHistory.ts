@@ -1,6 +1,16 @@
 "use client";
 
+import {
+  getPolySignalDecision,
+  hasClearPrediction,
+  shouldCountForAccuracy,
+  type AnalysisDecision,
+  type AnalysisEvaluationStatus,
+} from "./analysisDecision";
+
 export type AnalysisHistoryConfidence = "Alta" | "Baja" | "Desconocida" | "Media";
+export type AnalysisHistoryDecision = AnalysisDecision;
+export type AnalysisHistoryEvaluationStatus = AnalysisEvaluationStatus;
 export type AnalysisHistoryOutcome = "CANCELLED" | "NO" | "UNKNOWN" | "YES";
 export type AnalysisHistoryPredictedSide = "NO" | "UNKNOWN" | "YES";
 export type AnalysisHistoryResolutionConfidence = "high" | "low" | "medium";
@@ -12,6 +22,10 @@ export type AnalysisHistoryStatus = "open" | "resolved" | "unknown";
 export type AnalysisHistoryItem = {
   analyzedAt: string;
   confidence?: AnalysisHistoryConfidence;
+  decision?: AnalysisHistoryDecision;
+  decisionThreshold?: number;
+  evaluationReason?: string;
+  evaluationStatus?: AnalysisHistoryEvaluationStatus;
   id: string;
   marketId?: string;
   marketNoProbability?: number;
@@ -40,18 +54,22 @@ export type AnalysisHistoryStats = {
   averagePolySignalYes: number | null;
   completedByMonth: Array<{ label: string; hits: number; misses: number; resolved: number }>;
   cancelled: number;
+  clearPredictions: number;
+  countableResolved: number;
   finalized: number;
   highConfidenceAccuracy: number | null;
   hits: number;
   lowConfidenceAccuracy: number | null;
   mediumConfidenceAccuracy: number | null;
   misses: number;
+  noPolySignalEstimate: number;
   noAccuracy: number | null;
   noPredictions: number;
   pending: number;
   resolved: number;
   total: number;
   unknown: number;
+  weakDecisions: number;
   yesAccuracy: number | null;
   yesPredictions: number;
 };
@@ -106,13 +124,6 @@ function normalizeConfidence(value: unknown): AnalysisHistoryConfidence {
     return value;
   }
   return "Desconocida";
-}
-
-function normalizePredictedSide(value: unknown): AnalysisHistoryPredictedSide {
-  if (value === "YES" || value === "NO") {
-    return value;
-  }
-  return "UNKNOWN";
 }
 
 function normalizeOutcome(value: unknown): AnalysisHistoryOutcome {
@@ -181,18 +192,32 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     return null;
   }
   const status = normalizeStatus(value.status);
-  const result = normalizeResult(value.result, status);
+  const polySignalNoProbability = normalizeNumber(value.polySignalNoProbability);
+  const polySignalYesProbability = normalizeNumber(value.polySignalYesProbability);
+  const decision = getPolySignalDecision({
+    polySignalNoProbability,
+    polySignalYesProbability,
+  });
+  const rawResult = normalizeResult(value.result, status);
+  const result =
+    (rawResult === "hit" || rawResult === "miss") && decision.decision !== "clear"
+      ? "unknown"
+      : rawResult;
   return {
     analyzedAt: value.analyzedAt || nowIso(),
     confidence: normalizeConfidence(value.confidence),
+    decision: decision.decision,
+    decisionThreshold: decision.decisionThreshold,
+    evaluationReason: normalizeString(value.evaluationReason) || decision.evaluationReason,
+    evaluationStatus: decision.evaluationStatus,
     id: value.id || randomId(),
     marketId: value.marketId ? String(value.marketId) : undefined,
     marketNoProbability: normalizeNumber(value.marketNoProbability),
     marketYesProbability: normalizeNumber(value.marketYesProbability),
     outcome: normalizeOutcome(value.outcome),
-    polySignalNoProbability: normalizeNumber(value.polySignalNoProbability),
-    polySignalYesProbability: normalizeNumber(value.polySignalYesProbability),
-    predictedSide: normalizePredictedSide(value.predictedSide),
+    polySignalNoProbability,
+    polySignalYesProbability,
+    predictedSide: decision.predictedSide,
     reasons: Array.isArray(value.reasons)
       ? value.reasons.filter((reason): reason is string => typeof reason === "string" && reason.trim() !== "")
       : [],
@@ -302,25 +327,30 @@ function average(values: Array<number | undefined>): number | null {
 }
 
 function accuracyFor(items: AnalysisHistoryItem[]): number | null {
-  const hits = items.filter((item) => item.result === "hit").length;
-  const misses = items.filter((item) => item.result === "miss").length;
+  const hits = items.filter((item) => shouldCountForAccuracy(item) && item.result === "hit").length;
+  const misses = items.filter((item) => shouldCountForAccuracy(item) && item.result === "miss").length;
   const resolved = hits + misses;
   return resolved > 0 ? hits / resolved : null;
 }
 
 export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): AnalysisHistoryStats {
-  const hits = items.filter((item) => item.result === "hit").length;
-  const misses = items.filter((item) => item.result === "miss").length;
+  const countableItems = items.filter(shouldCountForAccuracy);
+  const hits = countableItems.filter((item) => item.result === "hit").length;
+  const misses = countableItems.filter((item) => item.result === "miss").length;
   const cancelled = items.filter((item) => item.result === "cancelled" || item.outcome === "CANCELLED").length;
+  const clearPredictions = items.filter(hasClearPrediction).length;
+  const weakDecisions = items.filter((item) => item.decision === "weak" || item.decision === "unknown").length;
+  const noPolySignalEstimate = items.filter((item) => item.decision === "none").length;
   const pending = items.filter((item) => item.result === "pending" || item.status === "open").length;
   const resolved = hits + misses;
+  const countableResolved = resolved;
   const finalized = resolved + cancelled;
   const unknown = items.filter(
     (item) => item.result === "unknown" || item.status === "unknown",
   ).length;
   const byMonth = new Map<string, { hits: number; misses: number; resolved: number }>();
   for (const item of items) {
-    if (item.result !== "hit" && item.result !== "miss") {
+    if (!shouldCountForAccuracy(item)) {
       continue;
     }
     const date = new Date(item.resolvedAt || item.verifiedAt || item.analyzedAt);
@@ -342,6 +372,8 @@ export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): Ana
     averageMarketYes: average(items.map((item) => item.marketYesProbability)),
     averagePolySignalYes: average(items.map((item) => item.polySignalYesProbability)),
     cancelled,
+    clearPredictions,
+    countableResolved,
     completedByMonth: Array.from(byMonth.entries())
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([label, value]) => ({ label, ...value })),
@@ -351,12 +383,14 @@ export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): Ana
     lowConfidenceAccuracy: accuracyFor(items.filter((item) => item.confidence === "Baja")),
     mediumConfidenceAccuracy: accuracyFor(items.filter((item) => item.confidence === "Media")),
     misses,
+    noPolySignalEstimate,
     noAccuracy: accuracyFor(items.filter((item) => item.predictedSide === "NO")),
     noPredictions: items.filter((item) => item.predictedSide === "NO").length,
     pending,
     resolved,
     total: items.length,
     unknown,
+    weakDecisions,
     yesAccuracy: accuracyFor(items.filter((item) => item.predictedSide === "YES")),
     yesPredictions: items.filter((item) => item.predictedSide === "YES").length,
   };

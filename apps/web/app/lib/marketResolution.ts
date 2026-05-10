@@ -6,6 +6,7 @@ import type {
   AnalysisHistoryResult,
   AnalysisHistoryStatus,
 } from "./analysisHistory";
+import { getPolySignalDecision } from "./analysisDecision";
 import type { ProbabilityPair } from "./marketProbabilities";
 
 export type MarketOutcome = "CANCELLED" | "NO" | "OPEN" | "UNKNOWN" | "YES";
@@ -95,11 +96,10 @@ export function predictedSideFromProbabilities(
   if (!probabilities) {
     return "UNKNOWN";
   }
-  const diff = probabilities.yes - probabilities.no;
-  if (Math.abs(diff) < 0.0001) {
-    return "UNKNOWN";
-  }
-  return diff > 0 ? "YES" : "NO";
+  return getPolySignalDecision({
+    polySignalNoProbability: probabilities.no,
+    polySignalYesProbability: probabilities.yes,
+  }).predictedSide;
 }
 
 export function isResolvedMarket(market: MaybeMarketData | null | undefined): boolean {
@@ -187,15 +187,24 @@ export function resolveAnalysisAgainstOutcome(
   item: AnalysisHistoryItem,
   resolution: AnalysisResolutionResult,
 ): Partial<AnalysisHistoryItem> {
-  const result = calculateAnalysisResult(item.predictedSide, resolution.outcome);
+  const decision = getPolySignalDecision({
+    polySignalNoProbability: item.polySignalNoProbability,
+    polySignalYesProbability: item.polySignalYesProbability,
+  });
+  const result = calculateAnalysisResult(decision.predictedSide, resolution.outcome);
   const outcome = resolution.outcome === "OPEN" ? "UNKNOWN" : resolution.outcome;
   const reason =
     result === "unknown" && (resolution.outcome === "YES" || resolution.outcome === "NO")
-      ? "El mercado tiene resultado final, pero no habia una estimacion PolySignal guardada para comparar."
+      ? "El mercado tiene resultado final, pero no habia prediccion clara de PolySignal para comparar."
       : resolution.reason;
 
   return {
+    decision: decision.decision,
+    decisionThreshold: decision.decisionThreshold,
+    evaluationReason: decision.evaluationReason,
+    evaluationStatus: decision.evaluationStatus,
     outcome,
+    predictedSide: decision.predictedSide,
     resolutionConfidence: resolution.confidence,
     resolutionReason: reason,
     resolutionSource: resolution.source,

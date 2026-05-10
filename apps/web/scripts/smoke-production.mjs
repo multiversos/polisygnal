@@ -704,6 +704,16 @@ async function main() {
   assertTextIncludes(historyText, "Actualizar resultados", "history automatic result refresh");
   assertTextIncludesOneOf(
     historyText,
+    ["Como se mide PolySignal", "Cómo se mide PolySignal"],
+    "history clear prediction measurement copy",
+  );
+  assertTextIncludesOneOf(
+    historyText,
+    ["Predicciones claras", "Sin decision fuerte", "Sin decisión fuerte"],
+    "history clear prediction metrics",
+  );
+  assertTextIncludesOneOf(
+    historyText,
     ["Resolucion automatica", "Resolución automática", "verificar automaticamente", "verificar automáticamente"],
     "history automatic resolution copy",
   );
@@ -762,6 +772,12 @@ async function main() {
     validAnalyzeText,
     ["Estimacion PolySignal", "Estimación PolySignal"],
     "analyze polysignal probability",
+  );
+  assertTextIncludes(validAnalyzeText, "Decision de PolySignal", "analyze clear decision panel");
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    ["umbral de decision del 55%", "umbral de decisión del 55%"],
+    "analyze clear decision threshold copy",
   );
   assertTextIncludesOneOf(
     validAnalyzeText,

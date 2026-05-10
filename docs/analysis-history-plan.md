@@ -18,15 +18,35 @@ in the loaded data, it is stored separately as the PolySignal estimate. If that
 estimate is missing, the history record must remain clear about the gap instead
 of filling in a default probability.
 
+## Clear Prediction Rule
+
+PolySignal only creates a measurable `predicted_side` from a real PolySignal
+estimate. The visible market price is saved as reference, but it never creates a
+PolySignal prediction.
+
+Initial rule:
+
+- PolySignal YES `>= 55%`: `predicted_side = YES`, decision `clear`.
+- PolySignal NO `>= 55%`: `predicted_side = NO`, decision `clear`.
+- YES and NO inside the `45%` to `55%` zone: decision `weak`, no measurable
+  predicted side.
+- Missing PolySignal estimate: decision `none`, no measurable predicted side.
+- Pending, cancelled, unknown, and weak/no-estimate records do not count as
+  failures.
+
+Accuracy is calculated only when a record had a clear PolySignal prediction and
+the final outcome came from Polymarket or another structured trusted source.
+
 The current goal is product validation:
 
 - users can save an analysis from `/markets/[id]`;
 - `/history` shows saved analyses from this browser;
 - saved link analyses can show market probability and PolySignal probability
   as two different concepts;
-- accuracy is calculated only from saved records that have a real finalized
-  result;
-- pending and unknown records do not count as misses;
+- accuracy is calculated only from saved records that had a clear PolySignal
+  prediction and a real finalized result;
+- pending, cancelled, weak, no-estimate, and unknown records do not count as
+  misses;
 - the UI does not invent percentages when there are not enough finalized
   results.
 
@@ -46,10 +66,10 @@ verify saved analyses automatically:
 3. If the item only has a URL, PolySignal extracts the slug and searches the
    already-loaded market overview for a strong match.
 4. If the market is still open, the item remains `pending`.
-5. If the market has a reliable YES/NO outcome and the item has a saved
+5. If the market has a reliable YES/NO outcome and the item has a clear saved
    PolySignal `predicted_side`, the result becomes `hit` or `miss`.
-6. If the market has a reliable YES/NO outcome but no saved PolySignal side, the
-   result becomes `unknown` because there is nothing honest to compare.
+6. If the market has a reliable YES/NO outcome but no clear saved PolySignal
+   side, the result becomes `unknown` because there is nothing honest to compare.
 7. If the market is cancelled/invalid, the result becomes `cancelled`.
 8. If PolySignal cannot verify the result, the item remains `unknown` or
    pending rather than inventing an outcome.
@@ -93,7 +113,11 @@ Resolution lifecycle planned for a future backend phase:
 - `market_price_no`
 - `polysignal_probability_yes`
 - `polysignal_probability_no`
+- `decision`
+- `decision_threshold`
 - `predicted_side`
+- `evaluation_status`
+- `evaluation_reason`
 - `confidence`
 - `final_outcome`
 - `resolved_at`

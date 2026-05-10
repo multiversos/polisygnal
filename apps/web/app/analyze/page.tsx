@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
 import { fetchApiJson } from "../lib/api";
+import { getDecisionLabel, getPolySignalDecision } from "../lib/analysisDecision";
 import {
   getPolymarketUrlValidationMessage,
   extractPossibleMarketTerms,
@@ -16,7 +17,6 @@ import {
   getProbabilityDisplayState,
   normalizeProbability,
 } from "../lib/marketProbabilities";
-import { predictedSideFromProbabilities } from "../lib/marketResolution";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { saveAnalysisHistoryItem } from "../lib/analysisHistory";
@@ -233,11 +233,14 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
   const confidenceScore = normalizeProbability(item.latest_prediction?.confidence_score);
   const reviewReason = getMarketReviewReason(insightInput(item));
   const activity = getMarketActivityLabel(insightInput(item));
-  const predictedSide = predictedSideFromProbabilities(polySignalProbabilities);
+  const decision = getPolySignalDecision({
+    polySignalNoProbability: polySignalProbabilities?.no,
+    polySignalYesProbability: polySignalProbabilities?.yes,
+  });
   const predictionReason =
-    predictedSide === "UNKNOWN"
-      ? "Sin lado PolySignal guardado: no habia estimacion suficiente para comparar."
-      : "Prediccion guardada solo cuando existia estimacion PolySignal.";
+    decision.predictedSide === "UNKNOWN"
+      ? decision.evaluationReason
+      : "Prediccion clara guardada solo cuando la estimacion PolySignal supera 55%.";
   return {
     analyzedAt: new Date().toISOString(),
     confidence:
@@ -248,6 +251,10 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
           : confidenceScore >= 0.4
             ? ("Media" as const)
             : ("Baja" as const),
+    decision: decision.decision,
+    decisionThreshold: decision.decisionThreshold,
+    evaluationReason: decision.evaluationReason,
+    evaluationStatus: decision.evaluationStatus,
     id: `link-${item.market?.id ?? Date.now()}`,
     marketId: item.market?.id ? String(item.market.id) : undefined,
     marketNoProbability: marketProbabilities?.no,
@@ -255,7 +262,7 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
     outcome: "UNKNOWN" as const,
     polySignalNoProbability: polySignalProbabilities?.no,
     polySignalYesProbability: polySignalProbabilities?.yes,
-    predictedSide,
+    predictedSide: decision.predictedSide,
     reasons: [reviewReason.reason, activity?.detail, predictionReason].filter(
       (reason): reason is string => Boolean(reason),
     ),
@@ -273,6 +280,10 @@ function pendingHistoryPayload(normalizedUrl: string) {
   return {
     analyzedAt: new Date().toISOString(),
     confidence: "Desconocida" as const,
+    decision: "none" as const,
+    decisionThreshold: 55,
+    evaluationReason: "Sin estimacion PolySignal.",
+    evaluationStatus: "not_countable" as const,
     id: `link-pending-${Date.now()}`,
     outcome: "UNKNOWN" as const,
     predictedSide: "UNKNOWN" as const,
@@ -309,6 +320,10 @@ function MatchCard({
     marketYesPrice: item.latest_snapshot?.yes_price,
     polySignalNoProbability: item.latest_prediction?.no_probability,
     polySignalYesProbability: item.latest_prediction?.yes_probability,
+  });
+  const decision = getPolySignalDecision({
+    polySignalNoProbability: probabilityState.polySignal?.no,
+    polySignalYesProbability: probabilityState.polySignal?.yes,
   });
   return (
     <article className="analyze-result-card">
@@ -357,6 +372,16 @@ function MatchCard({
         {probabilityState.gap ? (
           <p className="probability-gap-note">{probabilityState.gap.label}</p>
         ) : null}
+        <div className={`probability-decision-card ${decision.decision}`}>
+          <span>Decision de PolySignal</span>
+          <strong>{getDecisionLabel(decision.decision, decision.predictedSide)}</strong>
+          <p>{decision.detail}</p>
+          <small>
+            Para medir aciertos, PolySignal solo cuenta mercados donde su estimacion supera
+            el umbral de decision del 55%. El resultado final se verificara con Polymarket
+            cuando el mercado cierre.
+          </small>
+        </div>
         <p className="section-note">{probabilityState.disclaimer}</p>
       </div>
       <div className="history-card-metrics">

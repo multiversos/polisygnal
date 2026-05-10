@@ -13,6 +13,7 @@ import {
   type AnalysisHistoryItem,
   type AnalysisHistoryStats,
 } from "../lib/analysisHistory";
+import { getDecisionLabel, hasClearPrediction } from "../lib/analysisDecision";
 import { resolveAnalysisAgainstOutcome } from "../lib/marketResolution";
 import { lookupAnalysisResolution } from "../lib/marketResolutionLookup";
 import {
@@ -25,12 +26,14 @@ import { formatLastUpdated } from "../lib/useAutoRefresh";
 
 type HistoryFilter =
   | "all"
+  | "clear"
   | "detail"
   | "cancelled"
   | "failed"
   | "finalized"
   | "from-link"
   | "hit"
+  | "not-countable"
   | "pending"
   | "unknown";
 
@@ -106,6 +109,32 @@ function resolutionSourceLabel(value: AnalysisHistoryItem["resolutionSource"]): 
   return "No verificado todavia";
 }
 
+function decisionLabel(item: AnalysisHistoryItem): string {
+  return getDecisionLabel(item.decision ?? "unknown", item.predictedSide);
+}
+
+function evaluationLabel(item: AnalysisHistoryItem): string {
+  if (item.result === "hit") {
+    return "Acerto";
+  }
+  if (item.result === "miss") {
+    return "Fallo";
+  }
+  if (item.result === "cancelled" || item.outcome === "CANCELLED") {
+    return "No cuenta por cancelacion";
+  }
+  if (item.result === "pending" || item.status === "open") {
+    return "No cuenta todavia";
+  }
+  if (item.decision === "weak" || item.decision === "unknown") {
+    return "No cuenta por decision debil";
+  }
+  if (item.decision === "none") {
+    return "No cuenta sin estimacion PolySignal";
+  }
+  return "No verificable";
+}
+
 function filterMatches(item: AnalysisHistoryItem, filter: HistoryFilter): boolean {
   if (filter === "all") {
     return true;
@@ -115,6 +144,12 @@ function filterMatches(item: AnalysisHistoryItem, filter: HistoryFilter): boolea
   }
   if (filter === "detail") {
     return item.source === "market_detail";
+  }
+  if (filter === "clear") {
+    return hasClearPrediction(item);
+  }
+  if (filter === "not-countable") {
+    return !hasClearPrediction(item);
   }
   if (filter === "pending") {
     return item.result === "pending" || item.status === "open";
@@ -229,7 +264,7 @@ function MonthlyChart({ stats }: { stats: AnalysisHistoryStats }) {
     <article className="history-chart-card">
       <h3>Evolucion por fecha</h3>
       {stats.completedByMonth.length === 0 ? (
-        <p className="section-note">Aun no hay resultados finalizados para mostrar evolucion.</p>
+        <p className="section-note">Aun no hay resultados medibles para mostrar evolucion.</p>
       ) : (
         <div className="history-month-list">
           {stats.completedByMonth.map((item) => (
@@ -408,7 +443,7 @@ export default function HistoryPage() {
     }
   }, [items]);
 
-  const hasEnoughResolved = stats.resolved >= 5;
+  const hasEnoughResolved = stats.countableResolved >= 5;
 
   return (
     <main className="dashboard-shell history-page">
@@ -455,17 +490,27 @@ export default function HistoryPage() {
       </section>
 
       <section className="safety-strip">
-        <strong>Medicion honesta:</strong>
+        <strong>Como se mide PolySignal:</strong>
         <span>
-          Esta vista no inventa resultados. Los aciertos y fallos se calculan cuando
-          PolySignal puede verificar automaticamente el cierre del mercado.
+          Solo contamos aciertos y fallos cuando PolySignal hizo una prediccion clara
+          y el mercado ya fue resuelto por Polymarket o una fuente confiable.
         </span>
       </section>
 
       <section className="safety-strip">
         <strong>Resolucion automatica:</strong>
         <span>
-          Pendientes, cancelados o desconocidos no cuentan como fallos. No es una promesa de rendimiento futuro.
+          Los pendientes no cuentan como fallos. Los mercados sin decision fuerte,
+          cancelados o desconocidos tampoco cuentan para precision.
+        </span>
+      </section>
+
+      <section className="safety-strip">
+        <strong>Resultado verificable:</strong>
+        <span>
+          PolySignal intentara verificar los mercados usando datos disponibles de
+          Polymarket o datos ya cargados en PolySignal. El usuario no marca manualmente
+          el resultado final.
         </span>
       </section>
 
@@ -488,6 +533,21 @@ export default function HistoryPage() {
           <p>Esperan resultado final</p>
         </article>
         <article className="metric-card">
+          <span>Predicciones claras</span>
+          <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.clearPredictions}</strong>
+          <p>Superan umbral de 55%</p>
+        </article>
+        <article className="metric-card">
+          <span>Sin decision fuerte</span>
+          <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.weakDecisions}</strong>
+          <p>Zona 45/55 o en observacion</p>
+        </article>
+        <article className="metric-card">
+          <span>Sin estimacion</span>
+          <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.noPolySignalEstimate}</strong>
+          <p>No cuentan para precision</p>
+        </article>
+        <article className="metric-card">
           <span>Finalizados</span>
           <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.finalized}</strong>
           <p>Con estado cerrado o revisado</p>
@@ -495,12 +555,12 @@ export default function HistoryPage() {
         <article className="metric-card">
           <span>Aciertos</span>
           <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.hits}</strong>
-          <p>Lecturas confirmadas</p>
+          <p>Predicciones claras confirmadas</p>
         </article>
         <article className="metric-card">
           <span>Fallos</span>
           <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.misses}</strong>
-          <p>Lecturas no confirmadas</p>
+          <p>Predicciones claras no confirmadas</p>
         </article>
         <article className="metric-card">
           <span>Cancelados</span>
@@ -515,16 +575,17 @@ export default function HistoryPage() {
         <article className="metric-card">
           <span>Porcentaje de acierto</span>
           <strong>{loading ? "..." : formatPercent(stats.accuracyRate)}</strong>
-          <p>{hasEnoughResolved ? "Solo resultados finalizados" : "Aun hay pocos resultados finalizados"}</p>
+          <p>{hasEnoughResolved ? "Solo predicciones claras resueltas" : "Aun hay pocos resultados medibles"}</p>
         </article>
       </section>
 
       {!hasEnoughResolved ? (
         <section className="focus-notice active">
-          <strong>Pocos resultados finalizados</strong>
+          <strong>Pocos resultados medibles</strong>
           <span>
-            Aun hay pocos resultados finalizados para medir precision con confianza.
-            Usa este historial como organizador hasta tener mas cierres reales.
+            Aun no hay suficientes mercados resueltos con prediccion clara para medir
+            precision con confianza. Usa este historial como organizador hasta tener
+            mas cierres reales.
           </span>
         </section>
       ) : null}
@@ -543,6 +604,8 @@ export default function HistoryPage() {
             <option value="all">Todos</option>
             <option value="from-link">Desde enlace</option>
             <option value="detail">Desde detalle</option>
+            <option value="clear">Predicciones claras</option>
+            <option value="not-countable">No cuentan</option>
             <option value="pending">Pendientes</option>
             <option value="finalized">Finalizados</option>
             <option value="hit">Acertados</option>
@@ -555,10 +618,18 @@ export default function HistoryPage() {
 
       <section className="history-chart-grid" aria-label="Graficas del historial">
         <BarChart
-          label="Aciertos vs fallos"
+          label="Aciertos vs fallos medibles"
           segments={[
             { className: "hit", label: "Aciertos", value: stats.hits },
             { className: "miss", label: "Fallos", value: stats.misses },
+          ]}
+        />
+        <BarChart
+          label="Predicciones claras vs sin decision"
+          segments={[
+            { className: "clear", label: "Claras", value: stats.clearPredictions },
+            { className: "weak", label: "Sin decision fuerte", value: stats.weakDecisions },
+            { className: "none", label: "Sin estimacion", value: stats.noPolySignalEstimate },
           ]}
         />
         <BarChart
@@ -665,7 +736,7 @@ export default function HistoryPage() {
                   </div>
                   <h3>{item.title}</h3>
                   <div className="history-card-metrics">
-                    <span>Lectura {item.predictedSide === "UNKNOWN" ? "pendiente" : item.predictedSide}</span>
+                    <span>Decision {decisionLabel(item)}</span>
                     <span>
                       Mercado YES {marketProbability ? formatProbability(marketProbability.yes) : "sin dato"}
                     </span>
@@ -679,10 +750,15 @@ export default function HistoryPage() {
                       PolySignal NO {polySignalProbability ? formatProbability(polySignalProbability.no) : "sin dato"}
                     </span>
                     <span>Confianza {item.confidence ?? "Desconocida"}</span>
-                    <span>Resultado {outcomeLabel(item.outcome)}</span>
+                    <span>Resultado Polymarket {outcomeLabel(item.outcome)}</span>
+                    <span>Evaluacion {evaluationLabel(item)}</span>
                     <span>Fuente {resolutionSourceLabel(item.resolutionSource)}</span>
                     <span>Verificado {item.verifiedAt ? formatDate(item.verifiedAt) : "pendiente"}</span>
                   </div>
+                  <p className="section-note">
+                    {item.evaluationReason ||
+                      "Solo cuenta para precision si hubo prediccion clara y resultado verificable."}
+                  </p>
                   {item.resolutionReason ? (
                     <p className="section-note">{item.resolutionReason}</p>
                   ) : (

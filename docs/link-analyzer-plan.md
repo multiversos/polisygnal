@@ -17,6 +17,11 @@ Implemented as a frontend-only flow.
   separately from the market probability.
 - If the PolySignal estimate is missing, the page says that instead of
   defaulting to 50/50 or inventing a number.
+- The page shows whether PolySignal has a clear decision. The current threshold
+  is `55%`: YES `>= 55%` means clear YES, NO `>= 55%` means clear NO, and the
+  45/55 zone is treated as no strong decision.
+- Market price probability is reference context only. It does not create
+  `predicted_side`.
 - Saved link analyses can later be checked from `/history` with `Actualizar
   resultados`. This is automatic and does not ask the user to choose the final
   outcome manually.
@@ -59,6 +64,8 @@ Partially implemented locally, backend version not implemented yet.
 - Verify final outcome after markets close from a reliable read-only source.
 - Mark each saved analysis as hit, miss, cancelled, pending, or unknown without
   manual YES/NO buttons.
+- Mark hit/miss only when the saved record had a clear PolySignal predicted
+  side and the final outcome is verified.
 - Calibrate accuracy over time by sport, confidence band, and market type.
 - Compare market probability vs PolySignal probability only when both were
   recorded from real data.
@@ -79,6 +86,8 @@ persist results per user, and record `resolved_at`, `resolution_source`, and
 - Pending records do not count as misses.
 - Unknown records do not count as misses.
 - Cancelled records do not count as misses.
+- Weak/no-estimate records do not count as misses.
+- Only clear PolySignal predictions above the 55% threshold count once resolved.
 - Do not ask users to manually mark YES/NO as the main resolution path.
 - Every saved record must keep the analysis time and visible market price when
   available.

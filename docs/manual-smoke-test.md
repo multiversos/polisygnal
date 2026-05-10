@@ -211,7 +211,10 @@ If this test fails, stop feature work and treat it as a production regression.
 12. Confirm `Actualizar resultados` is visible.
 13. Click `Actualizar resultados` and confirm the page says it is verifying
     automatically. It must not ask the user to choose `Gano YES` or `Gano NO`.
-14. Confirm pending, cancelled, and unknown records are not counted as failures.
+14. Confirm the page explains `Como se mide PolySignal`: only clear PolySignal
+    predictions with verified final outcomes count as hit/miss.
+15. Confirm pending, cancelled, unknown, weak-decision, and no-estimate records
+    are not counted as failures.
 
 ## Analizar Enlace
 
@@ -228,22 +231,27 @@ If this test fails, stop feature work and treat it as a production regression.
 7. Confirm `Estimacion PolySignal` appears only when an estimate already exists
    in the loaded data. If it is missing, confirm the page says it does not have
    enough estimation yet.
-8. Confirm it shows only real visible data: title, event, status, price if
+8. Confirm `Decision de PolySignal` follows the 55% threshold:
+   YES `>=55%` is clear YES, NO `>=55%` is clear NO, and 45/55 is `Sin decision fuerte`.
+9. Confirm market price alone never creates a PolySignal predicted side.
+10. Confirm it shows only real visible data: title, event, status, price if
    available, volume/liquidity if available, and last update.
-9. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
+11. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
    `Ver futbol` when a market is matched.
-10. Save the analysis, open `/history`, and confirm the item appears as
+12. Save the analysis, open `/history`, and confirm the item appears as
    `Desde enlace`.
-11. Confirm the saved history item shows market YES/NO probability if it was
+13. Confirm the saved history item shows market YES/NO probability if it was
     available, and PolySignal YES/NO only if it existed.
-12. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
+14. Confirm `/history` shows whether the item counts for precision or does not
+    count yet.
+15. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
     inventing data when there are not enough comparable records.
-13. Confirm a no-match link can only be saved as pending and does not invent a
+16. Confirm a no-match link can only be saved as pending and does not invent a
    probability.
-14. Confirm the page does not promise profit, certainty, or betting advice.
-15. Confirm the saved record only gets a PolySignal predicted side when a real
-    PolySignal estimate existed. Market price alone must not create a predicted
-    side.
+17. Confirm the page does not promise profit, certainty, or betting advice.
+18. Confirm the saved record only gets a PolySignal predicted side when a real
+    PolySignal estimate crossed the 55% threshold. Market price alone must not
+    create a predicted side.
 
 ## Alertas
 

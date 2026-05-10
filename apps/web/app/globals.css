@@ -7209,6 +7209,21 @@ html:not([data-theme="dark"]) .app-sidebar {
   background: color-mix(in srgb, var(--accent) 55%, var(--foreground));
 }
 
+.history-stacked-bar .clear,
+.history-chart-legend .clear {
+  background: var(--accent);
+}
+
+.history-stacked-bar .weak,
+.history-chart-legend .weak {
+  background: color-mix(in srgb, var(--amber-ink) 70%, var(--surface-elevated));
+}
+
+.history-stacked-bar .none,
+.history-chart-legend .none {
+  background: color-mix(in srgb, var(--muted) 72%, var(--surface-elevated));
+}
+
 .history-stacked-bar .unknown,
 .history-chart-legend .unknown {
   background: color-mix(in srgb, var(--muted) 60%, var(--surface-elevated));
@@ -7472,6 +7487,39 @@ html:not([data-theme="dark"]) .app-sidebar {
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.probability-decision-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-elevated) 86%, var(--accent-soft));
+}
+
+.probability-decision-card > span {
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.probability-decision-card strong {
+  color: var(--foreground);
+  font-size: 0.98rem;
+}
+
+.probability-decision-card p,
+.probability-decision-card small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.probability-decision-card.clear {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
 }
 
 .probability-values {

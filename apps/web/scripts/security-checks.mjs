@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 const ts = require("typescript");
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(__dirname, "..");
+const moduleCache = new Map();
 
 function assert(condition, message) {
   if (!condition) {
@@ -17,6 +18,9 @@ function assert(condition, message) {
 
 function loadTsModule(relativePath) {
   const absolutePath = resolve(appRoot, relativePath);
+  if (moduleCache.has(absolutePath)) {
+    return moduleCache.get(absolutePath).exports;
+  }
   const source = readFileSync(absolutePath, "utf8");
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
@@ -27,6 +31,27 @@ function loadTsModule(relativePath) {
     fileName: absolutePath,
   }).outputText;
   const module = { exports: {} };
+  moduleCache.set(absolutePath, module);
+  const localRequire = (specifier) => {
+    if (specifier.startsWith(".")) {
+      const resolvedBase = resolve(dirname(absolutePath), specifier);
+      const candidates = [
+        resolvedBase,
+        `${resolvedBase}.ts`,
+        `${resolvedBase}.tsx`,
+        `${resolvedBase}.js`,
+        `${resolvedBase}.mjs`,
+      ];
+      const found = candidates.find((candidate) => existsSync(candidate));
+      if (found?.endsWith(".ts") || found?.endsWith(".tsx")) {
+        return loadTsModule(found);
+      }
+      if (found) {
+        return require(found);
+      }
+    }
+    return require(specifier);
+  };
   const context = vm.createContext({
     AbortController,
     clearTimeout,
@@ -37,7 +62,7 @@ function loadTsModule(relativePath) {
     module,
     process,
     Request,
-    require,
+    require: localRequire,
     Response,
     setTimeout,
     URL,
@@ -97,6 +122,42 @@ function validatePolymarketLinks() {
   }
 
   return { accepted: accepted.length, rejected: rejected.length };
+}
+
+function validateAnalysisDecisionRules() {
+  const { getPolySignalDecision, shouldCountForAccuracy } = loadTsModule("app/lib/analysisDecision.ts");
+
+  const yesDecision = getPolySignalDecision({ polySignalYesProbability: 0.56, polySignalNoProbability: 0.44 });
+  assert(yesDecision.decision === "clear", "expected YES 56% to be a clear decision");
+  assert(yesDecision.predictedSide === "YES", "expected YES 56% to set predictedSide YES");
+  assert(yesDecision.decisionThreshold === 55, "expected decision threshold to be stored as 55");
+
+  const noDecision = getPolySignalDecision({ polySignalYesProbability: 0.44, polySignalNoProbability: 0.56 });
+  assert(noDecision.decision === "clear", "expected NO 56% to be a clear decision");
+  assert(noDecision.predictedSide === "NO", "expected NO 56% to set predictedSide NO");
+
+  const weakDecision = getPolySignalDecision({ polySignalYesProbability: 0.51, polySignalNoProbability: 0.49 });
+  assert(weakDecision.decision === "weak", "expected 51/49 to stay weak");
+  assert(weakDecision.predictedSide === "UNKNOWN", "expected weak decision not to set predictedSide");
+
+  const noEstimateDecision = getPolySignalDecision({});
+  assert(noEstimateDecision.decision === "none", "expected missing PolySignal estimate to be none");
+  assert(noEstimateDecision.predictedSide === "UNKNOWN", "expected missing estimate not to set predictedSide");
+
+  assert(
+    !shouldCountForAccuracy({ decision: "clear", predictedSide: "YES", result: "pending" }),
+    "expected pending clear prediction not to count for accuracy yet",
+  );
+  assert(
+    !shouldCountForAccuracy({ decision: "weak", predictedSide: "UNKNOWN", result: "miss" }),
+    "expected weak decision not to count as miss",
+  );
+  assert(
+    shouldCountForAccuracy({ decision: "clear", predictedSide: "YES", result: "hit" }),
+    "expected resolved clear prediction to count",
+  );
+
+  return { cases: 7, threshold: 55 };
 }
 
 async function validateBackendProxy() {
@@ -181,12 +242,14 @@ async function validateBackendProxy() {
 }
 
 const linkChecks = validatePolymarketLinks();
+const decisionChecks = validateAnalysisDecisionRules();
 const proxyChecks = await validateBackendProxy();
 
 console.log(
   JSON.stringify(
     {
       link_validation: linkChecks,
+      analysis_decision: decisionChecks,
       proxy: proxyChecks,
       status: "ok",
     },
