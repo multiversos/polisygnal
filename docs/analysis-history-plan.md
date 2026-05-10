@@ -30,16 +30,47 @@ The current goal is product validation:
 - the UI does not invent percentages when there are not enough finalized
   results.
 
+## Automatic Resolution In Local History
+
+The current local Historial now has a read-only `Actualizar resultados` action.
+It does not ask the user to mark whether YES or NO won. Instead, it tries to
+verify saved analyses automatically:
+
+1. If a saved item has `market_id`, PolySignal first checks the read-only
+   outcome data already available through the existing app.
+   Outcome rows whose source is manual are ignored for Historial resolution;
+   they are not used as the main strategy.
+2. If no outcome is available, it checks the loaded market detail/overview data
+   to see whether the market is still open or appears closed without a reliable
+   result.
+3. If the item only has a URL, PolySignal extracts the slug and searches the
+   already-loaded market overview for a strong match.
+4. If the market is still open, the item remains `pending`.
+5. If the market has a reliable YES/NO outcome and the item has a saved
+   PolySignal `predicted_side`, the result becomes `hit` or `miss`.
+6. If the market has a reliable YES/NO outcome but no saved PolySignal side, the
+   result becomes `unknown` because there is nothing honest to compare.
+7. If the market is cancelled/invalid, the result becomes `cancelled`.
+8. If PolySignal cannot verify the result, the item remains `unknown` or
+   pending rather than inventing an outcome.
+
+This is still localStorage-only. It does not create tables, does not write to
+Neon, does not scrape Polymarket HTML, and does not run scoring. The source is
+limited to data PolySignal can already read safely. A future backend job should
+replace this with periodic read-only checks against a verified structured
+Polymarket source.
+
 ## Future Link Analyzer Flow
 
-Not implemented yet.
+Partially implemented locally.
 
 1. User pastes a Polymarket link.
 2. PolySignal identifies the market and loads the matching market data.
 3. PolySignal calculates an estimated probability only when enough real data is
    available.
 4. The analysis is saved to history.
-5. When the market closes, the final outcome is recorded.
+5. When the market closes, the final outcome is verified automatically when a
+   reliable source is available.
 6. The history page compares the original analysis with the final result.
 
 Resolution lifecycle planned for a future backend phase:

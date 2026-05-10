@@ -52,6 +52,7 @@ import {
   type MarketOutcome,
   type ResolvedOutcome,
 } from "../../lib/backtesting";
+import { predictedSideFromProbabilities } from "../../lib/marketResolution";
 import {
   DECISION_CONFIDENCE_LABELS,
   MARKET_DECISION_LABELS,
@@ -1129,8 +1130,20 @@ function historyItemFromAnalysis(analysis: MarketAnalysis) {
     analysis.latest_prediction?.yes_probability ?? analysis.polysignal_score?.score_probability,
   );
   const polySignalNo = normalizeProbability(analysis.latest_prediction?.no_probability);
+  const polySignalProbabilities =
+    polySignalYes === null && polySignalNo === null
+      ? null
+      : {
+          no: polySignalNo ?? Math.max(0, Math.min(1, 1 - (polySignalYes ?? 0))),
+          yes: polySignalYes ?? Math.max(0, Math.min(1, 1 - (polySignalNo ?? 0))),
+        };
+  const predictedSide = predictedSideFromProbabilities(polySignalProbabilities);
   const reviewReason = getAnalysisReviewReason(analysis);
   const activity = getAnalysisActivity(analysis);
+  const predictionReason =
+    predictedSide === "UNKNOWN"
+      ? "Sin lado PolySignal guardado: no habia estimacion suficiente para comparar."
+      : "Prediccion guardada solo cuando existia estimacion PolySignal.";
   return {
     analyzedAt: new Date().toISOString(),
     confidence: historyConfidenceFromAnalysis(analysis),
@@ -1141,9 +1154,8 @@ function historyItemFromAnalysis(analysis: MarketAnalysis) {
     outcome: "UNKNOWN" as const,
     polySignalNoProbability: polySignalNo ?? undefined,
     polySignalYesProbability: polySignalYes ?? undefined,
-    predictedSide:
-      polySignalYes === null ? ("UNKNOWN" as const) : polySignalYes >= 0.5 ? ("YES" as const) : ("NO" as const),
-    reasons: [reviewReason.reason, activity?.detail].filter((reason): reason is string => Boolean(reason)),
+    predictedSide,
+    reasons: [reviewReason.reason, activity?.detail, predictionReason].filter((reason): reason is string => Boolean(reason)),
     result: "pending" as const,
     source: "market_detail" as const,
     sport: analysis.candidate_context?.sport || analysis.market.sport_type || undefined,

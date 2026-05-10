@@ -325,6 +325,36 @@ export default function InternalDataStatusPage() {
       <section className="panel">
         <div className="panel-heading compact">
           <div>
+            <p className="eyebrow">Resolucion de historial</p>
+            <h2>Verificacion local y automatica</h2>
+            <p>
+              Historial sigue en este navegador, no esta sincronizado y no tiene backend persistente.
+              La verificacion automatica depende de resultados disponibles en PolySignal.
+            </p>
+          </div>
+        </div>
+        <div className="internal-status-grid">
+          <article className="internal-status-card">
+            <span>Modo</span>
+            <strong>Solo lectura</strong>
+            <p>Esta pagina no ejecuta cambios ni lee datos personales del historial local.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Resultado</span>
+            <strong>Automatico</strong>
+            <p>Si no hay outcome confiable, el analisis queda pendiente o desconocido.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Persistencia</span>
+            <strong>No sincronizado</strong>
+            <p>La fase actual no crea tablas ni escribe en base de datos.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading compact">
+          <div>
             <h2>Muestras que podrían requerir revisión</h2>
             <p>Se listan mercados sin precio reciente, sin análisis o sin actividad reciente.</p>
           </div>

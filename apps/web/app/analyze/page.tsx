@@ -16,6 +16,7 @@ import {
   getProbabilityDisplayState,
   normalizeProbability,
 } from "../lib/marketProbabilities";
+import { predictedSideFromProbabilities } from "../lib/marketResolution";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { saveAnalysisHistoryItem } from "../lib/analysisHistory";
@@ -232,6 +233,11 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
   const confidenceScore = normalizeProbability(item.latest_prediction?.confidence_score);
   const reviewReason = getMarketReviewReason(insightInput(item));
   const activity = getMarketActivityLabel(insightInput(item));
+  const predictedSide = predictedSideFromProbabilities(polySignalProbabilities);
+  const predictionReason =
+    predictedSide === "UNKNOWN"
+      ? "Sin lado PolySignal guardado: no habia estimacion suficiente para comparar."
+      : "Prediccion guardada solo cuando existia estimacion PolySignal.";
   return {
     analyzedAt: new Date().toISOString(),
     confidence:
@@ -249,13 +255,10 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
     outcome: "UNKNOWN" as const,
     polySignalNoProbability: polySignalProbabilities?.no,
     polySignalYesProbability: polySignalProbabilities?.yes,
-    predictedSide:
-      !polySignalProbabilities
-        ? ("UNKNOWN" as const)
-        : polySignalProbabilities.yes >= polySignalProbabilities.no
-          ? ("YES" as const)
-          : ("NO" as const),
-    reasons: [reviewReason.reason, activity?.detail].filter((reason): reason is string => Boolean(reason)),
+    predictedSide,
+    reasons: [reviewReason.reason, activity?.detail, predictionReason].filter(
+      (reason): reason is string => Boolean(reason),
+    ),
     result: "pending" as const,
     source: "link_analyzer" as const,
     sport: item.market?.sport_type || undefined,

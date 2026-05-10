@@ -17,6 +17,9 @@ Implemented as a frontend-only flow.
   separately from the market probability.
 - If the PolySignal estimate is missing, the page says that instead of
   defaulting to 50/50 or inventing a number.
+- Saved link analyses can later be checked from `/history` with `Actualizar
+  resultados`. This is automatic and does not ask the user to choose the final
+  outcome manually.
 
 This phase does not scrape Polymarket, does not call new external APIs, does not
 write to Neon, and does not invent probabilities.
@@ -51,14 +54,21 @@ Not implemented yet.
 
 ## Phase 5: Resolution And Calibration
 
-Not implemented yet.
+Partially implemented locally, backend version not implemented yet.
 
-- Record final outcome after markets close.
-- Mark each saved analysis as hit, miss, cancelled, pending, or unknown.
+- Verify final outcome after markets close from a reliable read-only source.
+- Mark each saved analysis as hit, miss, cancelled, pending, or unknown without
+  manual YES/NO buttons.
 - Calibrate accuracy over time by sport, confidence band, and market type.
 - Compare market probability vs PolySignal probability only when both were
   recorded from real data.
 - Show performance charts only from finalized records.
+
+The current local version checks PolySignal's already-loaded market data and
+read-only outcome data. If there is no reliable outcome yet, the analysis stays
+pending or unknown. The future backend version should run this periodically,
+persist results per user, and record `resolved_at`, `resolution_source`, and
+`resolution_reason` for auditability.
 
 ## Product Rules
 
@@ -68,5 +78,7 @@ Not implemented yet.
 - No "safe bet" language.
 - Pending records do not count as misses.
 - Unknown records do not count as misses.
+- Cancelled records do not count as misses.
+- Do not ask users to manually mark YES/NO as the main resolution path.
 - Every saved record must keep the analysis time and visible market price when
   available.

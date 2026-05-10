@@ -513,6 +513,11 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Ver fútbol", "internal data status");
   assertTextIncludes(text, "Solo lectura", "internal data status");
   assertTextIncludes(text, "Frescura de datos", "internal data status");
+  assertTextIncludesOneOf(
+    text,
+    ["Resolucion de historial", "Resolución de historial"],
+    "internal history resolution status",
+  );
   assertTextIncludes(text, "Estado proxy publico", "internal data status proxy health");
   assertTextIncludesOneOf(
     text,
@@ -696,6 +701,17 @@ async function main() {
     "history local privacy copy",
   );
   assertTextIncludes(historyText, "Borrar historial local", "history local clear control");
+  assertTextIncludes(historyText, "Actualizar resultados", "history automatic result refresh");
+  assertTextIncludesOneOf(
+    historyText,
+    ["Resolucion automatica", "Resolución automática", "verificar automaticamente", "verificar automáticamente"],
+    "history automatic resolution copy",
+  );
+  assertTextExcludes(
+    historyText,
+    ["Gano YES", "Ganó YES", "Gano NO", "Ganó NO"],
+    "history manual resolution controls",
+  );
   const analyzeDom = await dumpDom(urlFor(ANALYZE_PATH));
   const analyzeRender = validatePublicProductPage(analyzeDom, "analyze", ["Analizar enlace"]);
   const analyzeText = visibleText(analyzeDom);

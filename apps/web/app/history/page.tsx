@@ -9,9 +9,12 @@ import {
   clearAnalysisHistory,
   getAnalysisHistory,
   removeAnalysisHistoryItem,
+  replaceAnalysisHistory,
   type AnalysisHistoryItem,
   type AnalysisHistoryStats,
 } from "../lib/analysisHistory";
+import { resolveAnalysisAgainstOutcome } from "../lib/marketResolution";
+import { lookupAnalysisResolution } from "../lib/marketResolutionLookup";
 import {
   formatProbability,
   getMarketImpliedProbabilities,
@@ -23,11 +26,13 @@ import { formatLastUpdated } from "../lib/useAutoRefresh";
 type HistoryFilter =
   | "all"
   | "detail"
+  | "cancelled"
   | "failed"
   | "finalized"
   | "from-link"
   | "hit"
-  | "pending";
+  | "pending"
+  | "unknown";
 
 function formatPercent(value: number | null): string {
   if (value === null) {
@@ -56,10 +61,13 @@ function statusLabel(item: AnalysisHistoryItem): string {
   if (item.result === "miss") {
     return "Fallo";
   }
+  if (item.result === "cancelled") {
+    return "Cancelado";
+  }
   if (item.result === "pending" || item.status === "open") {
     return "Pendiente";
   }
-  return "Sin resultado";
+  return "Desconocido";
 }
 
 function outcomeLabel(value?: string): string {
@@ -72,7 +80,7 @@ function outcomeLabel(value?: string): string {
   if (value === "CANCELLED") {
     return "Cancelado";
   }
-  return "Pendiente";
+  return "No verificado";
 }
 
 function sourceLabel(value: AnalysisHistoryItem["source"]): string {
@@ -86,6 +94,16 @@ function sourceLabel(value: AnalysisHistoryItem["source"]): string {
     return "Manual";
   }
   return "Origen pendiente";
+}
+
+function resolutionSourceLabel(value: AnalysisHistoryItem["resolutionSource"]): string {
+  if (value === "polymarket") {
+    return "Verificado con Polymarket";
+  }
+  if (value === "polysignal_market") {
+    return "Datos disponibles en PolySignal";
+  }
+  return "No verificado todavia";
 }
 
 function filterMatches(item: AnalysisHistoryItem, filter: HistoryFilter): boolean {
@@ -102,13 +120,19 @@ function filterMatches(item: AnalysisHistoryItem, filter: HistoryFilter): boolea
     return item.result === "pending" || item.status === "open";
   }
   if (filter === "finalized") {
-    return item.status === "resolved" || item.result === "hit" || item.result === "miss";
+    return item.status === "resolved" || item.result === "hit" || item.result === "miss" || item.result === "cancelled";
   }
   if (filter === "hit") {
     return item.result === "hit";
   }
   if (filter === "failed") {
     return item.result === "miss";
+  }
+  if (filter === "cancelled") {
+    return item.result === "cancelled";
+  }
+  if (filter === "unknown") {
+    return item.result === "unknown" || item.status === "unknown";
   }
   return true;
 }
@@ -230,6 +254,8 @@ export default function HistoryPage() {
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>("all");
+  const [refreshingResults, setRefreshingResults] = useState(false);
+  const [resolutionMessage, setResolutionMessage] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   const loadHistory = useCallback(async () => {
@@ -320,6 +346,68 @@ export default function HistoryPage() {
     }
   }, [items.length]);
 
+  const handleRefreshResults = useCallback(async () => {
+    const candidates = items.filter(
+      (item) =>
+        item.result === "pending" ||
+        item.status === "open" ||
+        item.result === "unknown" ||
+        item.status === "unknown",
+    );
+    if (candidates.length === 0) {
+      setResolutionMessage("No hay analisis pendientes para verificar ahora.");
+      return;
+    }
+
+    setRefreshingResults(true);
+    setError(null);
+    setResolutionMessage("Buscando resultados finales disponibles...");
+    try {
+      let updatedCount = 0;
+      let pendingCount = 0;
+      let unknownCount = 0;
+      const patches = new Map<string, Partial<AnalysisHistoryItem>>();
+
+      for (const item of candidates) {
+        try {
+          const resolution = await lookupAnalysisResolution(item);
+          const patch = resolveAnalysisAgainstOutcome(item, resolution);
+          patches.set(item.id, patch);
+          if (patch.result === "hit" || patch.result === "miss" || patch.result === "cancelled") {
+            updatedCount += 1;
+          } else if (patch.result === "pending") {
+            pendingCount += 1;
+          } else {
+            unknownCount += 1;
+          }
+        } catch {
+          patches.set(item.id, {
+            outcome: "UNKNOWN",
+            resolutionConfidence: "low",
+            resolutionReason: "No pudimos verificar este mercado todavia.",
+            resolutionSource: "unknown",
+            result: "unknown",
+            status: "unknown",
+            verifiedAt: new Date().toISOString(),
+          });
+          unknownCount += 1;
+        }
+      }
+
+      const nextItems = items.map((item) => ({ ...item, ...(patches.get(item.id) ?? {}) }));
+      const normalized = await replaceAnalysisHistory(nextItems);
+      setItems(normalized);
+      setUpdatedAt(new Date());
+      setResolutionMessage(
+        `${updatedCount} analisis actualizados. ${pendingCount} siguen pendientes. ${unknownCount} no se pudieron verificar.`,
+      );
+    } catch {
+      setError("No pudimos actualizar los resultados ahora. Intenta de nuevo en unos segundos.");
+    } finally {
+      setRefreshingResults(false);
+    }
+  }, [items]);
+
   const hasEnoughResolved = stats.resolved >= 5;
 
   return (
@@ -338,6 +426,14 @@ export default function HistoryPage() {
           <span className="timestamp-pill">{formatLastUpdated(updatedAt)}</span>
           <button className="theme-toggle" onClick={() => void loadHistory()} type="button">
             {loading ? "Actualizando" : "Actualizar"}
+          </button>
+          <button
+            className="theme-toggle"
+            disabled={refreshingResults || loading || items.length === 0}
+            onClick={() => void handleRefreshResults()}
+            type="button"
+          >
+            {refreshingResults ? "Buscando resultados" : "Actualizar resultados"}
           </button>
           <button
             className="watchlist-button danger"
@@ -361,10 +457,24 @@ export default function HistoryPage() {
       <section className="safety-strip">
         <strong>Medicion honesta:</strong>
         <span>
-          Esta vista no inventa resultados. Los aciertos y fallos solo aparecen cuando
-          existe un resultado guardado.
+          Esta vista no inventa resultados. Los aciertos y fallos se calculan cuando
+          PolySignal puede verificar automaticamente el cierre del mercado.
         </span>
       </section>
+
+      <section className="safety-strip">
+        <strong>Resolucion automatica:</strong>
+        <span>
+          Pendientes, cancelados o desconocidos no cuentan como fallos. No es una promesa de rendimiento futuro.
+        </span>
+      </section>
+
+      {resolutionMessage ? (
+        <section className="focus-notice active" role="status">
+          <strong>Actualizacion de resultados</strong>
+          <span>{resolutionMessage}</span>
+        </section>
+      ) : null}
 
       <section className="metric-grid" aria-label="Resumen del historial">
         <article className="metric-card">
@@ -391,6 +501,16 @@ export default function HistoryPage() {
           <span>Fallos</span>
           <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.misses}</strong>
           <p>Lecturas no confirmadas</p>
+        </article>
+        <article className="metric-card">
+          <span>Cancelados</span>
+          <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.cancelled}</strong>
+          <p>No cuentan como fallo</p>
+        </article>
+        <article className="metric-card">
+          <span>Desconocidos</span>
+          <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.unknown}</strong>
+          <p>Sin verificacion confiable</p>
         </article>
         <article className="metric-card">
           <span>Porcentaje de acierto</span>
@@ -427,6 +547,8 @@ export default function HistoryPage() {
             <option value="finalized">Finalizados</option>
             <option value="hit">Acertados</option>
             <option value="failed">Fallados</option>
+            <option value="cancelled">Cancelados</option>
+            <option value="unknown">Desconocidos</option>
           </select>
         </label>
       </section>
@@ -444,6 +566,7 @@ export default function HistoryPage() {
           segments={[
             { className: "pending", label: "Pendientes", value: stats.pending },
             { className: "resolved", label: "Finalizados", value: stats.finalized },
+            { className: "unknown", label: "Desconocidos", value: stats.unknown },
           ]}
         />
         <ConfidenceChart stats={stats} />
@@ -557,7 +680,16 @@ export default function HistoryPage() {
                     </span>
                     <span>Confianza {item.confidence ?? "Desconocida"}</span>
                     <span>Resultado {outcomeLabel(item.outcome)}</span>
+                    <span>Fuente {resolutionSourceLabel(item.resolutionSource)}</span>
+                    <span>Verificado {item.verifiedAt ? formatDate(item.verifiedAt) : "pendiente"}</span>
                   </div>
+                  {item.resolutionReason ? (
+                    <p className="section-note">{item.resolutionReason}</p>
+                  ) : (
+                    <p className="section-note">
+                      No verificado todavia. Usa Actualizar resultados para buscar cierres disponibles.
+                    </p>
+                  )}
                   {polySignalProbability ? (
                     probabilityGap ? (
                       <p className="probability-gap-note">{probabilityGap.label}</p>

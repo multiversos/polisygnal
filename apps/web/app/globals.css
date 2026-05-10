@@ -7209,6 +7209,11 @@ html:not([data-theme="dark"]) .app-sidebar {
   background: color-mix(in srgb, var(--accent) 55%, var(--foreground));
 }
 
+.history-stacked-bar .unknown,
+.history-chart-legend .unknown {
+  background: color-mix(in srgb, var(--muted) 60%, var(--surface-elevated));
+}
+
 .history-chart-legend,
 .history-card-metrics,
 .history-card-header > div {
@@ -7305,6 +7310,12 @@ html:not([data-theme="dark"]) .app-sidebar {
 .history-result-badge.miss {
   background: var(--amber-soft);
   color: var(--amber-ink);
+}
+
+.history-result-badge.cancelled,
+.history-result-badge.unknown {
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
 }
 
 .history-card-metrics span {

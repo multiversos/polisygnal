@@ -4,7 +4,7 @@
 
 - fecha de corte: `2026-05-10`
 - etapa: `visible_product_mvp`
-- foco actual: preparar arquitectura futura de usuarios/clientes sin activar auth ni escrituras
+- foco actual: historial local con resolucion automatica conservadora, sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
 - ultimo deploy production verificado antes de este bloque: `02dcacd`
@@ -50,6 +50,10 @@ Estado visible verificado:
   mercados ya cargados y guardar resultados locales en Historial.
 - `/analyze` muestra probabilidad del mercado basada en precio visible cuando
   existe y solo muestra estimacion PolySignal si el dato real esta disponible.
+- `/history` puede intentar `Actualizar resultados` de forma automatica usando
+  datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
+- hit/miss solo se calcula cuando existe outcome confiable y `predicted_side`
+  PolySignal guardado; pending, cancelled y unknown no cuentan como fallos.
 - privacidad local visible: Historial y Mi lista explican que los datos se
   guardan en este navegador, no se sincronizan todavia y pueden borrarse.
 - seguridad baseline completada: headers, smoke contra fugas sensibles,
@@ -171,6 +175,8 @@ Estado actual:
 - Mi lista sigue en localStorage.
 - Alertas leen Mi lista local.
 - Analizar enlace puede guardar analisis en historial local.
+- Historial puede verificar resultados de forma automatica cuando hay outcome
+  disponible en datos PolySignal/read-only.
 - No se creo auth real.
 - No se crearon tablas reales.
 - No se ejecutaron migraciones.
@@ -180,6 +186,8 @@ Riesgos pendientes:
 - localStorage no sincroniza entre dispositivos;
 - los registros locales pueden ser manipulados por el navegador;
 - no existe backend persistente de usuarios;
+- la resolucion automatica local depende de datos disponibles y no sustituye
+  un job backend persistente futuro;
 - snapshots/analisis de soccer siguen con datos stale hasta refresh
   supervisado;
 - npm audit mantiene 2 moderadas via Next/PostCSS, documentadas sin force fix.

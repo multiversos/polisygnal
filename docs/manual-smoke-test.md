@@ -208,6 +208,10 @@ If this test fails, stop feature work and treat it as a production regression.
     fallback, debug, pipeline, market_type, model_version, or raw data.
 11. Confirm `Borrar historial local` is visible and requires browser
     confirmation before clearing local data.
+12. Confirm `Actualizar resultados` is visible.
+13. Click `Actualizar resultados` and confirm the page says it is verifying
+    automatically. It must not ask the user to choose `Gano YES` or `Gano NO`.
+14. Confirm pending, cancelled, and unknown records are not counted as failures.
 
 ## Analizar Enlace
 
@@ -237,6 +241,9 @@ If this test fails, stop feature work and treat it as a production regression.
 13. Confirm a no-match link can only be saved as pending and does not invent a
    probability.
 14. Confirm the page does not promise profit, certainty, or betting advice.
+15. Confirm the saved record only gets a PolySignal predicted side when a real
+    PolySignal estimate existed. Market price alone must not create a predicted
+    side.
 
 ## Alertas
 
