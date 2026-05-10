@@ -13,6 +13,7 @@ import { formatLastUpdated, useAutoRefresh } from "../lib/useAutoRefresh";
 import {
   WATCHLIST_STORAGE_EVENT,
   fetchWatchlistItems,
+  removeWatchlistItem,
   type WatchlistItem,
 } from "../lib/watchlist";
 
@@ -321,6 +322,8 @@ export default function AlertsPage() {
   const [sourceNote, setSourceNote] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
+  const [watchlistBusyItemId, setWatchlistBusyItemId] = useState<number | null>(null);
+  const [watchlistError, setWatchlistError] = useState<string | null>(null);
 
   const loadAlerts = useCallback(async () => {
     setLoading(true);
@@ -401,6 +404,20 @@ export default function AlertsPage() {
     }
     return alerts.filter((alert) => alert.type === typeFilter);
   }, [alerts, typeFilter]);
+
+  const handleRemoveWatchlistItem = useCallback(async (itemId: number) => {
+    setWatchlistBusyItemId(itemId);
+    setWatchlistError(null);
+    try {
+      await removeWatchlistItem(itemId);
+      setWatchlistItems((current) => current.filter((item) => item.id !== itemId));
+      setUpdatedAt(new Date());
+    } catch {
+      setWatchlistError("No pudimos quitar este mercado ahora. Intenta de nuevo en unos segundos.");
+    } finally {
+      setWatchlistBusyItemId(null);
+    }
+  }, []);
 
   return (
     <main className="dashboard-shell alerts-page">
@@ -538,6 +555,12 @@ export default function AlertsPage() {
           </div>
         ) : (
           <div className="alerts-list">
+            {watchlistError ? (
+              <div className="alert-panel compact" role="status">
+                <strong>No se pudo actualizar Mi lista</strong>
+                <span>{watchlistError}</span>
+              </div>
+            ) : null}
             {watchlistItems.slice(0, 6).map((item) => (
               <article className="alert-review-card severity-info" key={item.id}>
                 <div className="alert-review-header">
@@ -552,9 +575,19 @@ export default function AlertsPage() {
                 <p className="section-note">
                   Si vemos una actualización confiable, aparecerá como Mercado actualizado.
                 </p>
-                <a className="analysis-link" href={`/markets/${item.market_id}`}>
-                  Ver mercado
-                </a>
+                <div className="watchlist-actions">
+                  <a className="analysis-link" href={`/markets/${item.market_id}`}>
+                    Ver detalle
+                  </a>
+                  <button
+                    className="watchlist-button danger"
+                    disabled={watchlistBusyItemId === item.id}
+                    onClick={() => void handleRemoveWatchlistItem(item.id)}
+                    type="button"
+                  >
+                    {watchlistBusyItemId === item.id ? "Quitando" : "Quitar de Mi lista"}
+                  </button>
+                </div>
               </article>
             ))}
           </div>

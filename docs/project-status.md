@@ -2,12 +2,12 @@
 
 ## Snapshot
 
-- fecha de corte: `2026-05-04`
+- fecha de corte: `2026-05-10`
 - etapa: `visible_product_mvp`
-- foco actual: hacer la app navegable, conectada y util con datos reales
+- foco actual: mantener la experiencia publica util, sobria y fresca con datos reales
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado: `72fbb368593de448bc94b47c1951f591e4df513b`
+- ultimo deploy production verificado antes de esta cola: `3cdf596`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -20,29 +20,63 @@ No usar estos dominios incorrectos:
 
 Estado validado antes de esta cola nocturna:
 
-- `events`: 4
-- `markets`: 20
-- `market_snapshots`: 20
-- `predictions`: 20
-- `predictions_distinct_markets`: 20
-- deporte con datos reales: `soccer`
-- deportes principales aun vacios: `basketball`, `nfl`, `tennis`, `baseball`, `horse_racing`
+- `/sports/soccer` muestra `75` mercados reales mediante paginacion por offset.
+- `match_card_count`: alrededor de `24`.
+- con snapshot: `60`.
+- sin snapshot: `15`.
+- con analisis/prediction: `50`.
+- sin analisis/prediction: `25`.
+- stale 48h: `50`.
+- deporte con datos fuertes: `soccer`.
+- UFC, cricket y NHL/Hockey siguen visibles pero desactivados.
 
 Endpoints backend sanos:
 
 - `/health`
 - `/markets`
 - `/markets/overview`
-- `/markets/overview?sport_type=soccer&limit=20`
+- `/markets/overview?sport_type=soccer&limit=50`
+- `/markets/overview?sport_type=soccer&limit=50&offset=50`
 
 Estado visible verificado:
 
-- dashboard muestra mercados reales.
-- `/sports/soccer` renderiza 20 cards en produccion limpia/headless.
-- `/sports/basketball` muestra empty state limpio porque `total_count=0`.
-- modulos futuros aparecen como "Modulo en preparacion".
+- frontend publico con tema sobrio, deportes con iconos propios y navegacion publica limpia.
+- `/sports/soccer` muestra busqueda, filtros, ordenamiento, cards de partidos, mercados dentro de cada card y auto-refresh.
+- `/watchlist` esta disponible como Mi lista local del navegador.
+- Alertas se conectan honestamente con mercados seguidos y datos visibles.
+- `/history` esta disponible como Historial local para medir analisis guardados
+  sin inventar resultados.
+- `/internal/data-status` existe como pagina oculta, solo lectura, sin enlace publico.
 - si un navegador normal muestra datos viejos, revisar cache con
   `/api/build-info` y el checklist manual.
+
+## Comandos seguros actuales
+
+Validaciones frontend:
+
+```powershell
+npm.cmd --workspace apps/web run build
+npm.cmd --workspace apps/web run smoke:production
+```
+
+Tests backend dirigidos para comandos seguros:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_refresh_existing_soccer_markets_command.py tests/test_refresh_soccer_markets_command.py tests/test_inspect_soccer_market_health_command.py
+```
+
+Diagnosticos read-only/dry-run:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.check_database_config --connect
+.\.venv\Scripts\python.exe -m app.commands.inspect_soccer_market_health --json
+.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_markets --limit 25 --stale-hours 48 --report-json logs\reports\dry-runs\existing-soccer-refresh-local-dry-run.json --json
+```
+
+`refresh_existing_soccer_markets` es dry-run por defecto. Cualquier apply futuro
+debe ejecutarse solo en entorno confirmado con Neon, despues de preflight seguro
+y revision manual del reporte. No usar `--delete-existing`, trading, migraciones
+ni scheduler real sin autorizacion explicita.
 
 ## Sprints Completados 1-11
 

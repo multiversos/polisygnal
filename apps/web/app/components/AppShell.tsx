@@ -11,6 +11,7 @@ type NavIconName =
   | "briefing"
   | "research"
   | "evidence"
+  | "history"
   | "watchlist"
   | "decisions"
   | "workflow"
@@ -31,8 +32,9 @@ const publicNavigationItems: Array<{
   { label: "Inicio", href: "/", icon: "dashboard" },
   { label: "Mercados deportivos", href: "/sports", icon: "sports" },
   { label: "Resumen diario", href: "/briefing", icon: "briefing" },
-  { label: "Mi lista", href: "/#mi-seguimiento", icon: "watchlist" },
+  { label: "Mi lista", href: "/watchlist", icon: "watchlist" },
   { label: "Alertas", href: "/alerts", icon: "alerts" },
+  { label: "Historial", href: "/history", icon: "history" },
 ];
 
 function applyThemePreference(theme: ThemePreference) {
@@ -180,6 +182,12 @@ function NavIcon({ name }: { name: NavIconName }) {
       return (
         <svg {...commonProps}>
           <path d="m12 4 2.4 5 5.6.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.6-.8L12 4Z" />
+        </svg>
+      );
+    case "history":
+      return (
+        <svg {...commonProps}>
+          <path d="M5 19V5m0 14h15M8 16v-4m4 4V8m4 8v-6M7 6h5m0 0-2-2m2 2-2 2" />
         </svg>
       );
     case "decisions":

@@ -21,6 +21,12 @@ import {
   type WatchlistMarketDraft,
   type WatchlistStatus,
 } from "../../lib/watchlist";
+import {
+  ANALYSIS_HISTORY_STORAGE_EVENT,
+  getAnalysisHistory,
+  saveAnalysisHistoryItem,
+  type AnalysisHistoryConfidence,
+} from "../../lib/analysisHistory";
 import { MainNavigation } from "../../components/MainNavigation";
 import {
   INVESTIGATION_STATUS_LABELS,
@@ -1099,6 +1105,51 @@ function watchlistDraftFromAnalysis(analysis: MarketAnalysis): WatchlistMarketDr
     title: translateMarketTitleToSpanish(analysis.market.question),
     updated_at: getLatestAnalysisUpdate(analysis),
     volume: analysis.latest_snapshot?.volume ?? null,
+  };
+}
+
+function historyConfidenceFromAnalysis(analysis: MarketAnalysis): AnalysisHistoryConfidence {
+  const value = normalizeProbability(
+    analysis.latest_prediction?.confidence_score ?? analysis.polysignal_score?.confidence,
+  );
+  if (value === null) {
+    return "Desconocida";
+  }
+  if (value >= 0.7) {
+    return "Alta";
+  }
+  if (value >= 0.4) {
+    return "Media";
+  }
+  return "Baja";
+}
+
+function historyItemFromAnalysis(analysis: MarketAnalysis) {
+  const polySignalYes = normalizeProbability(
+    analysis.latest_prediction?.yes_probability ?? analysis.polysignal_score?.score_probability,
+  );
+  const polySignalNo = normalizeProbability(analysis.latest_prediction?.no_probability);
+  const reviewReason = getAnalysisReviewReason(analysis);
+  const activity = getAnalysisActivity(analysis);
+  return {
+    analyzedAt: new Date().toISOString(),
+    confidence: historyConfidenceFromAnalysis(analysis),
+    id: `market-${analysis.market.id}`,
+    marketId: String(analysis.market.id),
+    marketNoProbability: normalizeProbability(analysis.latest_snapshot?.no_price) ?? undefined,
+    marketYesProbability: normalizeProbability(analysis.latest_snapshot?.yes_price) ?? undefined,
+    outcome: "UNKNOWN" as const,
+    polySignalNoProbability: polySignalNo ?? undefined,
+    polySignalYesProbability: polySignalYes ?? undefined,
+    predictedSide:
+      polySignalYes === null ? ("UNKNOWN" as const) : polySignalYes >= 0.5 ? ("YES" as const) : ("NO" as const),
+    reasons: [reviewReason.reason, activity?.detail].filter((reason): reason is string => Boolean(reason)),
+    result: "pending" as const,
+    source: "market_detail" as const,
+    sport: analysis.candidate_context?.sport || analysis.market.sport_type || undefined,
+    status: "open" as const,
+    title: translateMarketTitleToSpanish(analysis.market.question),
+    url: analysis.links?.polymarket_url || undefined,
   };
 }
 
@@ -3538,6 +3589,17 @@ export default function MarketAnalysisPage() {
     statusDraft: "watching",
     noteDraft: "",
   });
+  const [historyState, setHistoryState] = useState<{
+    error: string | null;
+    loading: boolean;
+    saved: boolean;
+    saving: boolean;
+  }>({
+    error: null,
+    loading: true,
+    saved: false,
+    saving: false,
+  });
   const [investigationState, setInvestigationState] = useState<InvestigationStatusPanelState>({
     item: null,
     loading: true,
@@ -3646,6 +3708,24 @@ export default function MarketAnalysisPage() {
         ...current,
         loading: false,
         error: "Estado de seguimiento en preparacion.",
+      }));
+    }
+  }, [marketId]);
+
+  const loadHistoryStatus = useCallback(async () => {
+    setHistoryState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const history = await getAnalysisHistory();
+      setHistoryState((current) => ({
+        ...current,
+        loading: false,
+        saved: history.some((item) => item.marketId === String(marketId)),
+      }));
+    } catch {
+      setHistoryState((current) => ({
+        ...current,
+        error: "Historial local en preparacion.",
+        loading: false,
       }));
     }
   }, [marketId]);
@@ -3995,6 +4075,28 @@ export default function MarketAnalysisPage() {
     }
   }, [watchlistState.item]);
 
+  const saveToAnalysisHistory = useCallback(async () => {
+    if (!state.analysis) {
+      return;
+    }
+    setHistoryState((current) => ({ ...current, saving: true, error: null }));
+    try {
+      await saveAnalysisHistoryItem(historyItemFromAnalysis(state.analysis));
+      setHistoryState({
+        error: null,
+        loading: false,
+        saved: true,
+        saving: false,
+      });
+    } catch {
+      setHistoryState((current) => ({
+        ...current,
+        error: "No pudimos guardar este analisis en historial.",
+        saving: false,
+      }));
+    }
+  }, [state.analysis]);
+
   const saveInvestigationStatus = useCallback(async () => {
     setInvestigationState((current) => ({ ...current, saving: true, error: null }));
     const priority =
@@ -4295,6 +4397,22 @@ export default function MarketAnalysisPage() {
   }, [loadWatchlistStatus]);
 
   useEffect(() => {
+    void loadHistoryStatus();
+  }, [loadHistoryStatus]);
+
+  useEffect(() => {
+    const syncHistory = () => {
+      void loadHistoryStatus();
+    };
+    window.addEventListener(ANALYSIS_HISTORY_STORAGE_EVENT, syncHistory);
+    window.addEventListener("storage", syncHistory);
+    return () => {
+      window.removeEventListener(ANALYSIS_HISTORY_STORAGE_EVENT, syncHistory);
+      window.removeEventListener("storage", syncHistory);
+    };
+  }, [loadHistoryStatus]);
+
+  useEffect(() => {
     void loadInvestigationStatus();
   }, [loadInvestigationStatus]);
 
@@ -4513,6 +4631,48 @@ export default function MarketAnalysisPage() {
                 }
                 state={watchlistState}
               />
+
+              <section className="analysis-section watchlist-detail-panel">
+                <div className="analysis-section-heading">
+                  <div>
+                    <span className="section-kicker">Historial</span>
+                    <h2>Medir esta lectura</h2>
+                  </div>
+                </div>
+                <p className="section-note">
+                  Guarda este analisis para compararlo con el resultado final cuando
+                  el mercado cierre.
+                </p>
+                {!analysis.latest_prediction && !analysis.polysignal_score ? (
+                  <p className="section-note">
+                    Este mercado se guardara sin porcentaje estimado porque aun no hay
+                    suficiente informacion.
+                  </p>
+                ) : null}
+                {historyState.error ? (
+                  <div className="alert-panel compact" role="status">
+                    <strong>No se pudo actualizar Historial</strong>
+                    <span>{historyState.error}</span>
+                  </div>
+                ) : null}
+                <div className="watchlist-actions">
+                  <button
+                    className={`watchlist-button ${historyState.saved ? "active" : ""}`}
+                    disabled={historyState.loading || historyState.saving}
+                    onClick={() => void saveToAnalysisHistory()}
+                    type="button"
+                  >
+                    {historyState.saving
+                      ? "Guardando"
+                      : historyState.saved
+                        ? "Guardado en historial"
+                        : "Guardar en historial"}
+                  </button>
+                  <Link className="analysis-link secondary" href="/history">
+                    Ver historial
+                  </Link>
+                </div>
+              </section>
 
               <section className="analysis-section">
                 <h2>Qué revisar después</h2>

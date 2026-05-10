@@ -360,8 +360,9 @@ const quickLinks = [
   { label: "Inicio", href: "/" },
   { label: "Mercados deportivos", href: "/sports" },
   { label: "Resumen diario", href: "/briefing" },
-  { label: "Mi lista", href: "/#mi-seguimiento" },
+  { label: "Mi lista", href: "/watchlist" },
   { label: "Alertas", href: "/alerts" },
+  { label: "Historial", href: "/history" },
 ];
 
 const commandCenterLinks = [
@@ -383,12 +384,17 @@ const commandCenterLinks = [
   {
     label: "Mi lista",
     description: "Mercados guardados para revisar después",
-    href: "/#mi-seguimiento",
+    href: "/watchlist",
   },
   {
     label: "Alertas",
     description: "Recordatorios para revisar primero",
     href: "/alerts",
+  },
+  {
+    label: "Historial",
+    description: "Aciertos y fallos cuando existan resultados",
+    href: "/history",
   },
 ];
 

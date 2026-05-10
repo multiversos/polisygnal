@@ -19,6 +19,8 @@ const SPORTS_PATH = "/sports";
 const SPORTS_SOCCER_PATH = "/sports/soccer";
 const BRIEFING_PATH = "/briefing";
 const ALERTS_PATH = "/alerts";
+const WATCHLIST_PATH = "/watchlist";
+const HISTORY_PATH = "/history";
 const DATA_HEALTH_PATH = "/data-health";
 const INTERNAL_DATA_STATUS_PATH = "/internal/data-status";
 const WORKFLOW_PATH = "/workflow";
@@ -37,6 +39,7 @@ const PUBLIC_NAV_TEXT = [
   "Resumen diario",
   "Mi lista",
   "Alertas",
+  "Historial",
 ];
 const INTERNAL_NAV_TEXT = [
   "InvestigaciÃ³n",
@@ -534,9 +537,50 @@ async function main() {
     ["No tienes mercados en seguimiento", "Mercado en seguimiento"],
     "alerts watchlist state",
   );
+  const watchlistDom = await dumpDom(urlFor(WATCHLIST_PATH));
+  const watchlistRender = validatePublicProductPage(watchlistDom, "watchlist", ["Mi lista"]);
+  const watchlistText = visibleText(watchlistDom);
+  assertTextIncludesOneOf(
+    watchlistText,
+    [
+      "Mercados guardados",
+      "Todavia no tienes mercados guardados",
+      "Todavía no tienes mercados guardados",
+    ],
+    "watchlist useful heading",
+  );
+  assertTextIncludesOneOf(
+    watchlistText,
+    ["Esta lista se guarda en este navegador", "Ver detalle", "Explorar mercados deportivos"],
+    "watchlist local storage copy",
+  );
+  const historyDom = await dumpDom(urlFor(HISTORY_PATH));
+  const historyRender = validatePublicProductPage(historyDom, "history", ["Historial"]);
+  const historyText = visibleText(historyDom);
+  assertTextIncludesOneOf(
+    historyText,
+    ["Historial de analisis", "Historial de anÃ¡lisis", "Historial de análisis"],
+    "history heading",
+  );
+  assertTextIncludesOneOf(
+    historyText,
+    ["Todavia no tienes analisis guardados", "Analisis guardados", "Análisis guardados"],
+    "history useful state",
+  );
+  assertTextIncludesOneOf(
+    historyText,
+    ["Ver mercados deportivos", "Explorar futbol", "Explorar fÃºtbol"],
+    "history market CTA",
+  );
   const detailMarketId = items[0]?.market?.id || items[0]?.market_id || 1;
   const marketDetailDom = await dumpDom(urlFor(`/markets/${detailMarketId}`));
   const marketDetailRender = validateMarketDetailPage(marketDetailDom, "market detail");
+  const marketDetailText = visibleText(marketDetailDom);
+  assertTextIncludesOneOf(
+    marketDetailText,
+    ["Guardar en historial", "Guardado en historial"],
+    "market detail history action",
+  );
   const dataHealthDom = await dumpDom(urlFor(DATA_HEALTH_PATH));
   const dataHealthRender = validateDataHealthPage(dataHealthDom, totalOrItems);
   const internalDataStatusDom = await dumpDom(urlFor(INTERNAL_DATA_STATUS_PATH));
@@ -569,6 +613,8 @@ async function main() {
           sports: sportsRender,
           briefing: briefingRender,
           alerts: alertsRender,
+          watchlist: watchlistRender,
+          history: historyRender,
           market_detail: marketDetailRender,
         },
         data_health: dataHealthRender,

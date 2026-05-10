@@ -2249,6 +2249,11 @@ h2 {
   color: var(--accent-ink);
 }
 
+.watchlist-button.danger {
+  border-color: color-mix(in srgb, var(--amber-ink) 20%, var(--line));
+  color: var(--amber-ink);
+}
+
 .watchlist-button.danger:hover:not(:disabled) {
   background: var(--amber-soft);
   color: var(--amber-ink);
@@ -5004,6 +5009,10 @@ h2 {
   line-height: 1.5;
 }
 
+.alert-review-card .watchlist-actions {
+  justify-content: flex-start;
+}
+
 .severity-badge.critical {
   background: rgba(220, 38, 38, 0.12);
   color: #b91c1c;
@@ -7116,6 +7125,224 @@ html:not([data-theme="dark"]) .app-sidebar {
   .soccer-match-actions button,
   .topbar-actions button,
   .topbar-actions a {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.watchlist-page-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.watchlist-page-card {
+  align-content: start;
+}
+
+.watchlist-page-card .section-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.history-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.history-chart-card,
+.history-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.history-chart-card h3,
+.history-card h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.history-stacked-bar {
+  display: flex;
+  min-height: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+}
+
+.history-stacked-bar span,
+.history-chart-legend i,
+.history-confidence-track i {
+  display: block;
+  min-height: 100%;
+}
+
+.history-stacked-bar .hit,
+.history-chart-legend .hit,
+.history-confidence-track i {
+  background: var(--accent);
+}
+
+.history-stacked-bar .miss,
+.history-chart-legend .miss {
+  background: #d97706;
+}
+
+.history-stacked-bar .pending,
+.history-chart-legend .pending {
+  background: var(--muted);
+}
+
+.history-stacked-bar .resolved,
+.history-chart-legend .resolved {
+  background: color-mix(in srgb, var(--accent) 55%, var(--foreground));
+}
+
+.history-chart-legend,
+.history-card-metrics,
+.history-card-header > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.history-chart-legend span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 760;
+}
+
+.history-chart-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.history-confidence-list,
+.history-month-list,
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-confidence-row,
+.history-month-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.55fr) minmax(120px, 1fr) minmax(96px, auto);
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.history-confidence-row strong,
+.history-month-row strong {
+  color: var(--foreground);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.history-confidence-track {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+}
+
+.history-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.history-result-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.history-result-badge.hit {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.history-result-badge.miss {
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+
+.history-card-metrics span {
+  min-height: 25px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+@media (max-width: 700px) {
+  .app-nav {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .app-nav-item {
+    flex: 1 1 170px;
+    grid-template-columns: 22px minmax(0, 1fr);
+    white-space: normal;
+  }
+
+  .app-theme-toggle {
+    align-self: stretch;
+    width: 100%;
+  }
+
+  .watchlist-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-confidence-row,
+  .history-month-row {
+    grid-template-columns: 1fr;
+  }
+
+  .history-confidence-row strong,
+  .history-month-row strong {
+    text-align: left;
+  }
+
+  .watchlist-actions .analysis-link,
+  .watchlist-actions .watchlist-button {
     width: 100%;
     justify-content: center;
   }

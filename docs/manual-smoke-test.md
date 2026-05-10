@@ -33,6 +33,7 @@ Use these checks after a production deploy. Correct domains:
    - Resumen diario
    - Mi lista
    - Alertas
+   - Historial
    - Modo oscuro
 3. Confirm the sidebar does not show internal sections such as Investigación,
    Evidencia, Workflow, Salud de datos, Trial E2E, or Backtesting.
@@ -137,10 +138,29 @@ If this test fails, stop feature work and treat it as a production regression.
 
 ## Mi Lista
 
-1. Open the public Mi lista route from the sidebar.
+1. Open `https://polisygnal-web.vercel.app/watchlist` from the sidebar.
 2. If no items are saved, confirm it says the list is empty in friendly copy.
-3. Confirm it offers a CTA to explore sports markets or soccer.
-4. Confirm it does not pretend persistent saving is complete if it is not.
+3. Confirm it offers CTAs to explore sports markets and soccer.
+4. Confirm it says the list is saved in this browser and does not promise
+   account sync.
+5. If items are saved, confirm each card has `Ver detalle` and `Quitar`.
+6. Confirm removing an item updates the list without a full page reload.
+
+## Historial
+
+1. Open `https://polisygnal-web.vercel.app/history` from the sidebar.
+2. Confirm the page says `Historial de analisis`.
+3. If no analyses are saved, confirm the empty state is clear and links back to
+   soccer or sports markets.
+4. Open a market detail page from `/sports/soccer`.
+5. Click `Guardar en historial`.
+6. Return to `/history` and confirm the saved analysis appears.
+7. Confirm the metric cards update from local browser data.
+8. Confirm charts never invent an accuracy rate when there are no finalized
+   results.
+9. Confirm the page does not promise profit, certainty, or betting advice.
+10. Confirm public copy does not show API, backend, JSON, proxy, snapshot,
+    fallback, debug, pipeline, market_type, model_version, or raw data.
 
 ## Alertas
 
