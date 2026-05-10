@@ -11,6 +11,12 @@ import {
   type AnalysisHistoryItem,
   type AnalysisHistoryStats,
 } from "../lib/analysisHistory";
+import {
+  formatProbability,
+  getMarketImpliedProbabilities,
+  getPolySignalProbabilities,
+  getProbabilityGap,
+} from "../lib/marketProbabilities";
 import { formatLastUpdated } from "../lib/useAutoRefresh";
 
 type HistoryFilter =
@@ -25,13 +31,6 @@ type HistoryFilter =
 function formatPercent(value: number | null): string {
   if (value === null) {
     return "Sin datos suficientes";
-  }
-  return `${Math.round(value * 100)}%`;
-}
-
-function formatProbability(value?: number): string {
-  if (typeof value !== "number") {
-    return "sin dato";
   }
   return `${Math.round(value * 100)}%`;
 }
@@ -111,6 +110,27 @@ function filterMatches(item: AnalysisHistoryItem, filter: HistoryFilter): boolea
     return item.result === "miss";
   }
   return true;
+}
+
+function marketProbabilityForItem(item: AnalysisHistoryItem) {
+  return getMarketImpliedProbabilities({
+    marketNoPrice: item.marketNoProbability,
+    marketYesPrice: item.marketYesProbability,
+  });
+}
+
+function polySignalProbabilityForItem(item: AnalysisHistoryItem) {
+  return getPolySignalProbabilities({
+    polySignalNoProbability: item.polySignalNoProbability,
+    polySignalYesProbability: item.polySignalYesProbability,
+  });
+}
+
+function averageProbability(values: number[]): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+  return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
 function BarChart({
@@ -243,6 +263,25 @@ export default function HistoryPage() {
   const visibleItems = useMemo(() => {
     return items.filter((item) => filterMatches(item, filter));
   }, [filter, items]);
+  const comparisonItems = useMemo(() => {
+    return items.filter((item) => marketProbabilityForItem(item) && polySignalProbabilityForItem(item));
+  }, [items]);
+  const comparisonAverages = useMemo(() => {
+    const marketValues: number[] = [];
+    const polySignalValues: number[] = [];
+    for (const item of comparisonItems) {
+      const market = marketProbabilityForItem(item);
+      const polySignal = polySignalProbabilityForItem(item);
+      if (market && polySignal) {
+        marketValues.push(market.yes);
+        polySignalValues.push(polySignal.yes);
+      }
+    }
+    return {
+      marketYes: averageProbability(marketValues),
+      polySignalYes: averageProbability(polySignalValues),
+    };
+  }, [comparisonItems]);
 
   const handleRemove = useCallback(async (id: string) => {
     setBusyItemId(id);
@@ -372,6 +411,42 @@ export default function HistoryPage() {
         <MonthlyChart stats={stats} />
       </section>
 
+      <section className="dashboard-panel history-comparison-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Comparacion mercado vs PolySignal</p>
+            <h2>Lecturas comparables</h2>
+            <p>
+              Solo se comparan registros que tienen probabilidad del mercado y estimacion
+              PolySignal guardadas.
+            </p>
+          </div>
+          <span className="badge muted">{comparisonItems.length} comparables</span>
+        </div>
+        {comparisonItems.length === 0 ? (
+          <div className="empty-state compact">
+            <strong>Aun no hay datos suficientes para comparar mercado vs PolySignal.</strong>
+            <p>
+              Guarda analisis que incluyan precio del mercado y estimacion PolySignal
+              para ver esta comparacion.
+            </p>
+          </div>
+        ) : (
+          <div className="history-comparison-grid">
+            <article className="history-chart-card">
+              <h3>Promedio del mercado</h3>
+              <strong>{formatProbability(comparisonAverages.marketYes)}</strong>
+              <p className="section-note">Promedio YES de los precios guardados.</p>
+            </article>
+            <article className="history-chart-card">
+              <h3>Promedio PolySignal</h3>
+              <strong>{formatProbability(comparisonAverages.polySignalYes)}</strong>
+              <p className="section-note">Promedio YES de estimaciones disponibles.</p>
+            </article>
+          </div>
+        )}
+      </section>
+
       <section className="dashboard-panel">
         <div className="panel-heading">
           <div>
@@ -410,53 +485,75 @@ export default function HistoryPage() {
           </div>
         ) : (
           <div className="history-list">
-            {visibleItems.map((item) => (
-              <article className="history-card" key={item.id}>
-                <div className="history-card-header">
-                  <div>
-                    <span className="badge external-hint">{sourceLabel(item.source)}</span>
-                    <span className="badge muted">{item.sport || "Mercado"}</span>
-                    <span className={`history-result-badge ${item.result || "unknown"}`}>
-                      {statusLabel(item)}
-                    </span>
+            {visibleItems.map((item) => {
+              const marketProbability = marketProbabilityForItem(item);
+              const polySignalProbability = polySignalProbabilityForItem(item);
+              const probabilityGap = getProbabilityGap(marketProbability, polySignalProbability);
+              return (
+                <article className="history-card" key={item.id}>
+                  <div className="history-card-header">
+                    <div>
+                      <span className="badge external-hint">{sourceLabel(item.source)}</span>
+                      <span className="badge muted">{item.sport || "Mercado"}</span>
+                      <span className={`history-result-badge ${item.result || "unknown"}`}>
+                        {statusLabel(item)}
+                      </span>
+                    </div>
+                    <span className="timestamp-pill">{formatDate(item.analyzedAt)}</span>
                   </div>
-                  <span className="timestamp-pill">{formatDate(item.analyzedAt)}</span>
-                </div>
-                <h3>{item.title}</h3>
-                <div className="history-card-metrics">
-                  <span>Lectura {item.predictedSide === "UNKNOWN" ? "pendiente" : item.predictedSide}</span>
-                  <span>Mercado Si {formatProbability(item.marketYesProbability)}</span>
-                  <span>PolySignal Si {formatProbability(item.polySignalYesProbability)}</span>
-                  <span>Confianza {item.confidence ?? "Desconocida"}</span>
-                  <span>Resultado {outcomeLabel(item.outcome)}</span>
-                </div>
-                {item.reasons && item.reasons.length > 0 ? (
-                  <p className="section-note">{item.reasons.slice(0, 2).join(" ")}</p>
-                ) : (
-                  <p className="section-note">Guardado para comparar cuando exista resultado final.</p>
-                )}
-                <div className="watchlist-actions">
-                  {item.marketId ? (
-                    <a className="analysis-link" href={`/markets/${item.marketId}`}>
-                      Ver detalle
-                    </a>
-                  ) : null}
-                  <button
-                    className="watchlist-button danger"
-                    disabled={busyItemId === item.id}
-                    onClick={() => void handleRemove(item.id)}
-                    type="button"
-                  >
-                    {busyItemId === item.id ? "Quitando" : "Quitar"}
-                  </button>
-                  {item.url ? (
-                    <a className="analysis-link secondary" href={item.url} rel="noreferrer" target="_blank">
-                      Abrir enlace original
-                    </a>
-                  ) : null}
-                </div>
-              </article>
-            ))}
+                  <h3>{item.title}</h3>
+                  <div className="history-card-metrics">
+                    <span>Lectura {item.predictedSide === "UNKNOWN" ? "pendiente" : item.predictedSide}</span>
+                    <span>
+                      Mercado YES {marketProbability ? formatProbability(marketProbability.yes) : "sin dato"}
+                    </span>
+                    <span>
+                      Mercado NO {marketProbability ? formatProbability(marketProbability.no) : "sin dato"}
+                    </span>
+                    <span>
+                      PolySignal YES {polySignalProbability ? formatProbability(polySignalProbability.yes) : "sin dato"}
+                    </span>
+                    <span>
+                      PolySignal NO {polySignalProbability ? formatProbability(polySignalProbability.no) : "sin dato"}
+                    </span>
+                    <span>Confianza {item.confidence ?? "Desconocida"}</span>
+                    <span>Resultado {outcomeLabel(item.outcome)}</span>
+                  </div>
+                  {polySignalProbability ? (
+                    probabilityGap ? (
+                      <p className="probability-gap-note">{probabilityGap.label}</p>
+                    ) : null
+                  ) : (
+                    <p className="section-note">Guardado sin estimacion PolySignal.</p>
+                  )}
+                  {item.reasons && item.reasons.length > 0 ? (
+                    <p className="section-note">{item.reasons.slice(0, 2).join(" ")}</p>
+                  ) : (
+                    <p className="section-note">Guardado para comparar cuando exista resultado final.</p>
+                  )}
+                  <div className="watchlist-actions">
+                    {item.marketId ? (
+                      <a className="analysis-link" href={`/markets/${item.marketId}`}>
+                        Ver detalle
+                      </a>
+                    ) : null}
+                    <button
+                      className="watchlist-button danger"
+                      disabled={busyItemId === item.id}
+                      onClick={() => void handleRemove(item.id)}
+                      type="button"
+                    >
+                      {busyItemId === item.id ? "Quitando" : "Quitar"}
+                    </button>
+                    {item.url ? (
+                      <a className="analysis-link secondary" href={item.url} rel="noreferrer" target="_blank">
+                        Abrir enlace original
+                      </a>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </section>

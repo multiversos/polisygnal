@@ -189,6 +189,20 @@ function assertSportIconsRendered(dom, label) {
   );
 }
 
+function slugForAnalyzeSmoke(value) {
+  const slug = String(value || "soccer market")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .split("-")
+    .filter(Boolean)
+    .slice(0, 14)
+    .join("-");
+  return slug || "soccer-market";
+}
+
 function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -574,6 +588,11 @@ async function main() {
     ["Ver mercados deportivos", "Explorar futbol", "Explorar fÃºtbol"],
     "history market CTA",
   );
+  assertTextIncludesOneOf(
+    historyText,
+    ["Comparacion mercado vs PolySignal", "Comparación mercado vs PolySignal"],
+    "history probability comparison",
+  );
   const analyzeDom = await dumpDom(urlFor(ANALYZE_PATH));
   const analyzeRender = validatePublicProductPage(analyzeDom, "analyze", ["Analizar enlace"]);
   const analyzeText = visibleText(analyzeDom);
@@ -592,6 +611,29 @@ async function main() {
     "analyze invalid url state",
   );
   assertTextExcludes(invalidAnalyzeText, PUBLIC_TECHNICAL_TEXT, "analyze invalid public copy");
+  const validAnalyzeUrl = `https://polymarket.com/event/${slugForAnalyzeSmoke(expectedTitles[0])}`;
+  const validAnalyzeDom = await dumpDom(
+    urlFor(`${ANALYZE_PATH}?url=${encodeURIComponent(validAnalyzeUrl)}&auto=1`),
+  );
+  const validAnalyzeText = visibleText(validAnalyzeDom);
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    ["Coincidencia encontrada", "Posibles coincidencias"],
+    "analyze valid match state",
+  );
+  assertTextIncludes(validAnalyzeText, "Lectura del mercado", "analyze market reading");
+  assertTextIncludes(validAnalyzeText, "Probabilidad del mercado", "analyze market probability");
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    ["Estimacion PolySignal", "Estimación PolySignal"],
+    "analyze polysignal probability",
+  );
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    ["Guardar analisis", "Guardar análisis", "Guardado en historial"],
+    "analyze save history action",
+  );
+  assertTextExcludes(validAnalyzeText, PUBLIC_TECHNICAL_TEXT, "analyze valid public copy");
   const detailMarketId = items[0]?.market?.id || items[0]?.market_id || 1;
   const marketDetailDom = await dumpDom(urlFor(`/markets/${detailMarketId}`));
   const marketDetailRender = validateMarketDetailPage(marketDetailDom, "market detail");

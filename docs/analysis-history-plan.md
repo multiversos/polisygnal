@@ -12,10 +12,18 @@ phase it only validates Polymarket links and compares them with markets already
 loaded in PolySignal. It does not fetch external Polymarket pages or create new
 market records.
 
+When a matched market has visible YES/NO prices, `/analyze` stores the implied
+market probability from those prices. If a PolySignal estimate already exists
+in the loaded data, it is stored separately as the PolySignal estimate. If that
+estimate is missing, the history record must remain clear about the gap instead
+of filling in a default probability.
+
 The current goal is product validation:
 
 - users can save an analysis from `/markets/[id]`;
 - `/history` shows saved analyses from this browser;
+- saved link analyses can show market probability and PolySignal probability
+  as two different concepts;
 - accuracy is calculated only from saved records that have a real finalized
   result;
 - pending and unknown records do not count as misses;
@@ -33,6 +41,15 @@ Not implemented yet.
 4. The analysis is saved to history.
 5. When the market closes, the final outcome is recorded.
 6. The history page compares the original analysis with the final result.
+
+Resolution lifecycle planned for a future backend phase:
+
+1. Detect that the market is closed.
+2. Read the final outcome.
+3. Mark the saved analysis as `hit`, `miss`, `pending`, `unknown`, or
+   `cancelled`.
+4. Recalculate accuracy and calibration only from finalized records.
+5. Keep pending and unknown records out of hit/miss totals.
 
 ## Fields Needed Later
 
@@ -70,6 +87,9 @@ tables and production writes.
 
 - Do not show demo history as real performance.
 - Do not count pending records as failures.
+- Do not count unknown records as failures.
 - Do not report an accuracy rate when there are no finalized hit/miss records.
+- Do not mix market probability with PolySignal probability.
+- Preserve the market price and analysis time when they are available.
 - Do not promise profit, certainty, or betting advice.
 - Do not activate automatic trading or scheduled refresh from this flow.

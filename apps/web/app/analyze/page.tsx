@@ -9,6 +9,13 @@ import {
   extractPossibleMarketTerms,
   extractPolymarketSlug,
 } from "../lib/polymarketLink";
+import {
+  formatProbability as formatPublicProbability,
+  getMarketImpliedProbabilities,
+  getPolySignalProbabilities,
+  getProbabilityDisplayState,
+  normalizeProbability,
+} from "../lib/marketProbabilities";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { saveAnalysisHistoryItem } from "../lib/analysisHistory";
@@ -58,25 +65,6 @@ function toNumber(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
-}
-
-function normalizeProbability(value: unknown): number | null {
-  const parsed = toNumber(value);
-  if (parsed === null || parsed < 0) {
-    return null;
-  }
-  if (parsed <= 1) {
-    return parsed;
-  }
-  if (parsed <= 100) {
-    return parsed / 100;
-  }
-  return null;
-}
-
-function formatProbability(value: unknown): string {
-  const parsed = normalizeProbability(value);
-  return parsed === null ? "sin dato" : `${Math.round(parsed * 100)}%`;
 }
 
 function formatMetric(value: unknown): string {
@@ -233,29 +221,40 @@ function findMatches(items: MarketOverviewItem[], normalizedUrl: string): MatchR
 }
 
 function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: string) {
-  const polySignalYes = normalizeProbability(item.latest_prediction?.yes_probability);
-  const polySignalNo = normalizeProbability(item.latest_prediction?.no_probability);
+  const marketProbabilities = getMarketImpliedProbabilities({
+    marketNoPrice: item.latest_snapshot?.no_price,
+    marketYesPrice: item.latest_snapshot?.yes_price,
+  });
+  const polySignalProbabilities = getPolySignalProbabilities({
+    polySignalNoProbability: item.latest_prediction?.no_probability,
+    polySignalYesProbability: item.latest_prediction?.yes_probability,
+  });
+  const confidenceScore = normalizeProbability(item.latest_prediction?.confidence_score);
   const reviewReason = getMarketReviewReason(insightInput(item));
   const activity = getMarketActivityLabel(insightInput(item));
   return {
     analyzedAt: new Date().toISOString(),
     confidence:
-      normalizeProbability(item.latest_prediction?.confidence_score) === null
+      confidenceScore === null
         ? ("Desconocida" as const)
-        : normalizeProbability(item.latest_prediction?.confidence_score)! >= 0.7
+        : confidenceScore >= 0.7
           ? ("Alta" as const)
-          : normalizeProbability(item.latest_prediction?.confidence_score)! >= 0.4
+          : confidenceScore >= 0.4
             ? ("Media" as const)
             : ("Baja" as const),
     id: `link-${item.market?.id ?? Date.now()}`,
     marketId: item.market?.id ? String(item.market.id) : undefined,
-    marketNoProbability: normalizeProbability(item.latest_snapshot?.no_price) ?? undefined,
-    marketYesProbability: normalizeProbability(item.latest_snapshot?.yes_price) ?? undefined,
+    marketNoProbability: marketProbabilities?.no,
+    marketYesProbability: marketProbabilities?.yes,
     outcome: "UNKNOWN" as const,
-    polySignalNoProbability: polySignalNo ?? undefined,
-    polySignalYesProbability: polySignalYes ?? undefined,
+    polySignalNoProbability: polySignalProbabilities?.no,
+    polySignalYesProbability: polySignalProbabilities?.yes,
     predictedSide:
-      polySignalYes === null ? ("UNKNOWN" as const) : polySignalYes >= 0.5 ? ("YES" as const) : ("NO" as const),
+      !polySignalProbabilities
+        ? ("UNKNOWN" as const)
+        : polySignalProbabilities.yes >= polySignalProbabilities.no
+          ? ("YES" as const)
+          : ("NO" as const),
     reasons: [reviewReason.reason, activity?.detail].filter((reason): reason is string => Boolean(reason)),
     result: "pending" as const,
     source: "link_analyzer" as const,
@@ -302,6 +301,12 @@ function MatchCard({
   const status = getPublicMarketStatus(input);
   const reason = getMarketReviewReason(input);
   const activity = getMarketActivityLabel(input);
+  const probabilityState = getProbabilityDisplayState({
+    marketNoPrice: item.latest_snapshot?.no_price,
+    marketYesPrice: item.latest_snapshot?.yes_price,
+    polySignalNoProbability: item.latest_prediction?.no_probability,
+    polySignalYesProbability: item.latest_prediction?.yes_probability,
+  });
   return (
     <article className="analyze-result-card">
       <div className="history-card-header">
@@ -315,23 +320,51 @@ function MatchCard({
       <h3>{marketTitle(item)}</h3>
       <p className="section-note">{eventTitle(item)}</p>
       <p>{reason.reason}</p>
+      <div className="probability-display-panel">
+        <div className="probability-display-heading">
+          <h4>Lectura del mercado</h4>
+          <span>YES / NO</span>
+        </div>
+        <div className="probability-display-grid">
+          <div className="probability-display-card">
+            <span>Probabilidad del mercado</span>
+            {probabilityState.market ? (
+              <div className="probability-values">
+                <strong>YES {formatPublicProbability(probabilityState.market.yes)}</strong>
+                <strong>NO {formatPublicProbability(probabilityState.market.no)}</strong>
+              </div>
+            ) : (
+              <p>No hay precio visible suficiente para calcularlo.</p>
+            )}
+            <small>{probabilityState.marketDetail}</small>
+          </div>
+          <div className="probability-display-card muted">
+            <span>Estimacion PolySignal</span>
+            {probabilityState.polySignal ? (
+              <div className="probability-values">
+                <strong>YES {formatPublicProbability(probabilityState.polySignal.yes)}</strong>
+                <strong>NO {formatPublicProbability(probabilityState.polySignal.no)}</strong>
+              </div>
+            ) : (
+              <p>{probabilityState.polySignalDetail}</p>
+            )}
+            <small>{probabilityState.polySignal ? probabilityState.polySignalDetail : probabilityState.disclaimer}</small>
+          </div>
+        </div>
+        {probabilityState.gap ? (
+          <p className="probability-gap-note">{probabilityState.gap.label}</p>
+        ) : null}
+        <p className="section-note">{probabilityState.disclaimer}</p>
+      </div>
       <div className="history-card-metrics">
-        <span>Precio Si {formatProbability(item.latest_snapshot?.yes_price)}</span>
-        <span>Precio No {formatProbability(item.latest_snapshot?.no_price)}</span>
+        <span>Precio Si {formatPublicProbability(item.latest_snapshot?.yes_price)}</span>
+        <span>Precio No {formatPublicProbability(item.latest_snapshot?.no_price)}</span>
         <span>Volumen {formatMetric(item.latest_snapshot?.volume)}</span>
         <span>Liquidez {formatMetric(item.latest_snapshot?.liquidity)}</span>
-        <span>Estimacion PolySignal {formatProbability(item.latest_prediction?.yes_probability)}</span>
+        <span>
+          PolySignal YES {probabilityState.polySignal ? formatPublicProbability(probabilityState.polySignal.yes) : "sin dato"}
+        </span>
       </div>
-      {!item.latest_prediction ? (
-        <p className="section-note">
-          Aun no hay porcentaje estimado suficiente para este mercado. Puedes guardarlo
-          y compararlo cuando haya mas informacion.
-        </p>
-      ) : (
-        <p className="section-note">
-          No es una garantia ni una recomendacion de apuesta.
-        </p>
-      )}
       <div className="watchlist-actions">
         <button
           className={`watchlist-button ${saved ? "active" : ""}`}

@@ -171,15 +171,26 @@ If this test fails, stop feature work and treat it as a production regression.
 3. Paste an invalid link and confirm the page shows a friendly message.
 4. Paste a Polymarket link and confirm the page either finds a matching market
    or clearly says it is not in the loaded markets yet.
-5. If a market is found, confirm it shows only real visible data: title, event,
-   status, price if available, volume/liquidity if available, and last update.
-6. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
+5. If a market is found, confirm it shows `Probabilidad del mercado` with YES
+   and NO values only when visible prices exist.
+6. Confirm `Probabilidad del mercado` is described as based on the visible
+   market price, not as a PolySignal estimate.
+7. Confirm `Estimacion PolySignal` appears only when an estimate already exists
+   in the loaded data. If it is missing, confirm the page says it does not have
+   enough estimation yet.
+8. Confirm it shows only real visible data: title, event, status, price if
+   available, volume/liquidity if available, and last update.
+9. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
    `Ver futbol` when a market is matched.
-7. Save the analysis, open `/history`, and confirm the item appears as
+10. Save the analysis, open `/history`, and confirm the item appears as
    `Desde enlace`.
-8. Confirm a no-match link can only be saved as pending and does not invent a
+11. Confirm the saved history item shows market YES/NO probability if it was
+    available, and PolySignal YES/NO only if it existed.
+12. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
+    inventing data when there are not enough comparable records.
+13. Confirm a no-match link can only be saved as pending and does not invent a
    probability.
-9. Confirm the page does not promise profit, certainty, or betting advice.
+14. Confirm the page does not promise profit, certainty, or betting advice.
 
 ## Alertas
 
