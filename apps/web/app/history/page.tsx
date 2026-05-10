@@ -351,6 +351,14 @@ export default function HistoryPage() {
       </header>
 
       <section className="safety-strip">
+        <strong>Guardado en este navegador:</strong>
+        <span>
+          Este historial es local y no se sincroniza entre dispositivos todavia.
+          Puedes borrarlo cuando quieras; mas adelante podra guardarse en una cuenta.
+        </span>
+      </section>
+
+      <section className="safety-strip">
         <strong>Medicion honesta:</strong>
         <span>
           Esta vista no inventa resultados. Los aciertos y fallos solo aparecen cuando

@@ -198,7 +198,11 @@ export default function WatchlistPage() {
 
       <section className="safety-strip">
         <strong>Guardado local:</strong>
-        <span>Esta lista se guarda en este navegador. No se sincroniza entre dispositivos.</span>
+        <span>
+          Esta lista se guarda en este navegador. Si cambias de dispositivo, no se
+          sincroniza todavia. Puedes vaciarla cuando quieras; mas adelante podra
+          guardarse en una cuenta.
+        </span>
       </section>
 
       <section className="metric-grid" aria-label="Resumen de Mi lista">

@@ -564,7 +564,8 @@ export default function AnalyzePage() {
         <strong>Primera version:</strong>
         <span>
           Comparamos el enlace con mercados que PolySignal ya tiene cargados. No
-          buscamos fuentes externas todavia.
+          buscamos fuentes externas todavia. Si guardas el analisis, queda en el
+          historial local de este navegador.
         </span>
       </section>
 

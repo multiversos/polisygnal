@@ -451,7 +451,8 @@ export default function AlertsPage() {
         <span>
           Por ahora mostramos avisos básicos según los mercados que sigues y la
           actividad disponible. Si no sigues mercados, la bandeja puede estar
-          tranquila.
+          tranquila. Mi lista se lee desde este navegador y no se sincroniza con
+          una cuenta todavia.
         </span>
       </section>
 

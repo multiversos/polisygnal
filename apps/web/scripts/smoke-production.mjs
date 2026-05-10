@@ -613,6 +613,11 @@ async function main() {
   assertTextIncludesOneOf(alertsText, UPDATE_TEXT, "alerts update timestamp");
   assertTextIncludes(alertsText, "Mercados que sigues", "alerts local watchlist");
   assertTextIncludes(alertsText, "Cómo leer estas alertas", "alerts meaning copy");
+  assertTextIncludesOneOf(
+    alertsText,
+    ["Mi lista se lee desde este navegador", "este navegador"],
+    "alerts local privacy copy",
+  );
   assertTextIncludesOneOf(alertsText, ["Mercado actualizado", "Listo para revisar", "No tienes mercados en seguimiento"], "alerts real context");
   assertTextIncludesOneOf(
     alertsText,
@@ -635,6 +640,11 @@ async function main() {
     watchlistText,
     ["Esta lista se guarda en este navegador", "Ver detalle", "Explorar mercados deportivos"],
     "watchlist local storage copy",
+  );
+  assertTextIncludesOneOf(
+    watchlistText,
+    ["no se sincroniza todavia", "no se sincroniza entre dispositivos"],
+    "watchlist local privacy copy",
   );
   assertTextIncludes(watchlistText, "Vaciar Mi lista", "watchlist local clear control");
   const historyDom = await dumpDom(urlFor(HISTORY_PATH));
@@ -660,6 +670,11 @@ async function main() {
     ["Comparacion mercado vs PolySignal", "Comparación mercado vs PolySignal"],
     "history probability comparison",
   );
+  assertTextIncludesOneOf(
+    historyText,
+    ["Este historial es local", "este navegador"],
+    "history local privacy copy",
+  );
   assertTextIncludes(historyText, "Borrar historial local", "history local clear control");
   const analyzeDom = await dumpDom(urlFor(ANALYZE_PATH));
   const analyzeRender = validatePublicProductPage(analyzeDom, "analyze", ["Analizar enlace"]);
@@ -670,6 +685,11 @@ async function main() {
     analyzeText,
     ["Pega un enlace", "Enlace de Polymarket"],
     "analyze input copy",
+  );
+  assertTextIncludesOneOf(
+    analyzeText,
+    ["historial local de este navegador", "este navegador"],
+    "analyze local privacy copy",
   );
   const invalidAnalyzeDom = await dumpDom(urlFor(`${ANALYZE_PATH}?url=not-a-link&auto=1`));
   const invalidAnalyzeText = visibleText(invalidAnalyzeDom);
