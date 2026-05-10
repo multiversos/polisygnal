@@ -122,7 +122,7 @@ Rules:
 - Redact secret-like fields from reports before writing JSON artifacts.
 - Keep raw payload dumps out of public UI.
 
-## Dependency Audit
+## Dependency Security Status
 
 Audit commands run:
 
@@ -147,6 +147,10 @@ Recommended next step:
 - Review the Next.js/PostCSS advisory during a planned dependency maintenance
   window and upgrade through a normal Next.js-compatible path, not through
   `npm audit fix --force`.
+- Dependabot is configured for npm, pip, and GitHub Actions. It opens reviewable
+  pull requests only; there is no auto-merge.
+- Any future dependency update should run frontend build, production smoke, and
+  targeted backend tests when backend dependencies change.
 
 ## Rate Limiting And Abuse Prevention Plan
 
@@ -165,6 +169,39 @@ Before customer launch:
 - Add per-user rate limits after login exists.
 - Add daily caps for any future external search/research calls.
 - Log abuse counters without logging submitted secrets or full private URLs.
+
+### Implementation Options
+
+Option A - Vercel middleware + IP headers:
+
+- Good for simple limits near the web edge.
+- Useful for `/analyze` and `/api/backend/*`.
+- Be careful with in-memory counters because serverless instances are not shared
+  across regions or cold starts.
+
+Option B - Upstash Redis:
+
+- Recommended for distributed rate limiting.
+- Requires new secrets and should not be implemented until the deployment
+  secret-management flow is reviewed.
+- Good fit for limits shared across Vercel and backend routes.
+
+Option C - FastAPI middleware:
+
+- Useful for protecting Render backend endpoints directly.
+- Needs shared storage in production; in-memory counters are not enough for
+  multiple instances.
+
+Option D - Cloudflare/WAF:
+
+- Good outer layer for path and IP based rules.
+- Can throttle `/analyze` and `/api/backend/*` before traffic reaches Vercel.
+
+Initial recommended limits before external research is enabled:
+
+- `/analyze`: 20 analyses per IP per 10 minutes.
+- `/api/backend/*`: 100 read requests per IP per 10 minutes.
+- Higher limits only after authenticated users and per-account quotas exist.
 
 ## Customer Data Security Model
 
@@ -203,6 +240,48 @@ Possible future tables:
 - `watchlist`
 - `alerts`
 - `subscriptions`
+
+### Future Customer Data Model
+
+`users` / `profiles`:
+
+- `id`
+- `email`
+- `role`
+- `created_at`
+
+`analysis_history`:
+
+- `owner_id`
+- `market_url`
+- `market_id`
+- `analyzed_at`
+- `market_probability_yes`
+- `polysignal_probability_yes`
+- `result`
+
+`watchlist`:
+
+- `owner_id`
+- `market_id`
+- `created_at`
+
+Rules:
+
+- `owner_id` is required on customer-owned rows.
+- A user can only read and write their own rows.
+- Admin access requires explicit role checks and audit logging.
+- Never expose service-role credentials to frontend code.
+- Do not log secrets, full private URLs, session tokens, or payment artifacts.
+- Support export, history deletion, and account deletion flows.
+- Keep automatic backups and run restore tests before launch.
+
+Incident basics:
+
+- Rotate secrets if a token or connection string leaks.
+- Disable compromised tokens.
+- Review deploy history and logs.
+- Notify affected users if customer data exposure is confirmed.
 
 Recommended controls before customer data:
 

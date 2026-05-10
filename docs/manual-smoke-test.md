@@ -166,6 +166,8 @@ If this test fails, stop feature work and treat it as a production regression.
    account sync.
 5. If items are saved, confirm each card has `Ver detalle` and `Quitar`.
 6. Confirm removing an item updates the list without a full page reload.
+7. Confirm `Vaciar Mi lista` is visible and requires browser confirmation before
+   clearing local data.
 
 ## Historial
 
@@ -182,6 +184,8 @@ If this test fails, stop feature work and treat it as a production regression.
 9. Confirm the page does not promise profit, certainty, or betting advice.
 10. Confirm public copy does not show API, backend, JSON, proxy, snapshot,
     fallback, debug, pipeline, market_type, model_version, or raw data.
+11. Confirm `Borrar historial local` is visible and requires browser
+    confirmation before clearing local data.
 
 ## Analizar Enlace
 

@@ -58,6 +58,7 @@ Validaciones frontend:
 
 ```powershell
 npm.cmd --workspace apps/web run build
+npm.cmd --workspace apps/web run security:checks
 npm.cmd --workspace apps/web run smoke:production
 ```
 
@@ -131,6 +132,10 @@ Sprints pendientes inmediatos:
 - No ejecutar imports, discovery, scoring productivo ni trading desde la UI.
 - Usar `/api/backend/[...path]` como proxy same-origin para evitar CORS en Vercel.
 - Mantener UFC, cricket y NHL/Hockey visibles pero desactivados.
+- Dependabot esta preparado para npm, pip y GitHub Actions, sin auto-merge.
+- `npm audit` encontro vulnerabilidades moderadas via Next/PostCSS; no usar
+  `npm audit fix --force` porque propone un cambio rompedor. Revisar en una
+  ventana planificada de mantenimiento.
 
 ## Proximo Dia
 

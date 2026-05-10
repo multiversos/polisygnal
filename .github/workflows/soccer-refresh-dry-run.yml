@@ -1,6 +1,7 @@
 name: Soccer Existing Refresh Dry Run
 
 on:
+  # Manual only. Do not add schedule here without an explicit supervised rollout.
   workflow_dispatch:
     inputs:
       limit:
@@ -39,6 +40,11 @@ jobs:
           DATABASE_URL: ${{ secrets.POLYSIGNAL_NEON_DATABASE_URL }}
           POLYSIGNAL_ENV: production
         run: |
+          # Safety constraints:
+          # - dry-run only
+          # - no --apply
+          # - no --yes-i-understand-this-writes-data
+          # - no --delete-existing
           if [ -z "$DATABASE_URL" ]; then
             echo "::error::POLYSIGNAL_NEON_DATABASE_URL secret is not configured."
             exit 1
