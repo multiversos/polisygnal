@@ -182,6 +182,8 @@ If this test fails, stop feature work and treat it as a production regression.
 5. Confirm this page is not linked from the public sidebar or public pages.
 6. Confirm it does not show secrets, connection strings, stack traces, or large
    raw payloads.
+7. Confirm it is clearly read-only and does not expose buttons or commands that
+   can refresh, score, import, delete, migrate, or trade.
 
 ## Public Insight Language
 

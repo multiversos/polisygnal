@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.commands.refresh_existing_soccer_markets import (
     build_existing_soccer_refresh_plan,
     parse_args,
+    print_human,
     write_report_json,
 )
 from app.models.event import Event
@@ -31,7 +32,9 @@ def test_existing_soccer_refresh_defaults_to_dry_run(db_session: Session) -> Non
     assert payload["apply_enabled"] is False
     assert payload["writes_planned"] is False
     assert payload["trading_executed"] is False
+    assert payload["candidate_count"] == 1
     assert payload["total_candidates"] == 1
+    assert payload["sample_candidates"][0]["market_id"] == payload["items"][0]["market_id"]
 
 
 def test_existing_soccer_refresh_apply_requires_confirmation_and_is_blocked() -> None:
@@ -65,6 +68,21 @@ def test_existing_soccer_refresh_report_json_has_no_secrets(
     assert "postgresql://" not in encoded
 
 
+def test_existing_soccer_refresh_human_output_has_no_connection_string(
+    db_session: Session,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _create_market(db_session, suffix="human-output")
+    payload = build_existing_soccer_refresh_plan(db_session)
+
+    print_human(payload)
+
+    output = capsys.readouterr().out
+    assert "DATABASE_URL" not in output
+    assert "postgres://" not in output
+    assert "postgresql://" not in output
+
+
 def test_existing_soccer_refresh_respects_limit(db_session: Session) -> None:
     for index in range(3):
         _create_market(db_session, suffix=f"limit-{index}")
@@ -72,6 +90,7 @@ def test_existing_soccer_refresh_respects_limit(db_session: Session) -> None:
     payload = build_existing_soccer_refresh_plan(db_session, limit=2)
 
     assert payload["total_candidates"] == 2
+    assert payload["candidate_count"] == 2
     assert len(payload["items"]) == 2
 
 
@@ -140,6 +159,23 @@ def test_existing_soccer_refresh_dry_run_does_not_write(db_session: Session) -> 
     assert payload["would_refresh_snapshots"] == 1
     assert db_session.scalar(select(func.count()).select_from(MarketSnapshot)) == before_snapshots
     assert db_session.scalar(select(func.count()).select_from(Prediction)) == before_predictions
+
+
+def test_existing_soccer_refresh_returns_ok_with_no_candidates(db_session: Session) -> None:
+    now = datetime(2026, 5, 9, 12, 0, tzinfo=UTC)
+    complete = _create_market(db_session, suffix="no-candidate")
+    _add_snapshot(db_session, complete, captured_at=now - timedelta(hours=1))
+    _add_prediction(db_session, complete, run_at=now - timedelta(hours=1))
+
+    payload = build_existing_soccer_refresh_plan(db_session, stale_hours=48, now=now)
+
+    assert payload["status"] == "ok"
+    assert payload["candidate_count"] == 0
+    assert payload["total_candidates"] == 0
+    assert payload["items"] == []
+    assert payload["sample_candidates"] == []
+    assert payload["skipped"] == 1
+    assert payload["skip_reasons"]["no_refresh_needed"] == 1
 
 
 def _create_market(

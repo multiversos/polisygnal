@@ -39,6 +39,74 @@ Latest public read-only status, reviewed 2026-05-09:
 - Stale or missing recent update: 50.
 - With visible price/liquidity/volume: 60.
 
+## Existing Soccer Refresh Runbook
+
+Use this flow to prepare a refresh for soccer markets that already exist in the
+database. This is not a discovery/import flow and must not add new markets.
+
+Local Codex currently detects a localhost database, not Neon. Treat local runs
+as functional tests only. A production dry-run must run from an environment
+with the Neon pooled `DATABASE_URL`, such as a Render shell/job, a Render
+one-off job, or the manual GitHub Actions workflow if the approved secret is
+configured.
+
+Preflight, from the trusted environment:
+
+```powershell
+cd N:\projects\polimarket\apps\api
+.\.venv\Scripts\python.exe -m app.commands.check_database_config --connect
+```
+
+Continue only if the masked output confirms Neon, for example
+`looks_like_neon=true`. Stop if it reports localhost or any unexpected host.
+
+First real command must be dry-run only:
+
+```powershell
+# NO EJECUTADO EN ESTE SPRINT
+.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_markets --sport soccer --limit 25 --stale-hours 48 --report-json N:\projects\polimarket\logs\reports\dry-runs\existing-soccer-refresh-neon-dry-run.json --json
+```
+
+Review `candidate_count`, `stale_candidates`,
+`missing_snapshot_candidates`, `missing_prediction_candidates`,
+`would_refresh_snapshots`, `would_score_predictions`, `skip_reasons`, and
+`sample_candidates`. Do not proceed if the DB is not Neon, candidates look like
+the wrong sport, more than a small number of errors appear, or `total_count`
+changes unexpectedly.
+
+Apply is deliberately blocked in `refresh_existing_soccer_markets` until a
+separate supervised write implementation is approved. If an apply flow is later
+implemented, it must require both `--apply` and
+`--yes-i-understand-this-writes-data`, and the reviewed command must be marked
+as **NO EJECUTADO** until the operator approves it.
+
+Never use:
+
+- `--delete-existing`
+- trading commands
+- migrations
+- import/discovery apply commands
+- higher limits without explicit approval
+
+Post-refresh validation for a future supervised run:
+
+- `python -m app.commands.inspect_soccer_market_health --json`
+- `/internal/data-status`
+- `/sports/soccer`
+- `npm.cmd --workspace apps/web run smoke:production`
+
+Latest local command smoke, 2026-05-10:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.commands.refresh_existing_soccer_markets --limit 25 --stale-hours 48 --report-json N:\projects\polimarket\logs\reports\dry-runs\existing-soccer-refresh-local-dry-run.json --json
+```
+
+This run used the local database (`host=localhost`, `looks_like_neon=false`).
+It is a functionality check only, not production authorization. Result:
+`candidate_count=0`, `stale_candidates=0`,
+`missing_snapshot_candidates=0`, `missing_prediction_candidates=0`,
+`would_refresh_snapshots=0`, and `would_score_predictions=0`.
+
 Important caveat: the previous `limit=100` soccer dry-run was run while the
 shell was using local database configuration because Neon `DATABASE_URL` was
 not loaded. Treat that report as local diagnostics only. Before any future

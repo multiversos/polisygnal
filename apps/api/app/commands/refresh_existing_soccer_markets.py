@@ -276,6 +276,13 @@ def build_existing_soccer_refresh_plan(
         if len(selected) >= limit:
             break
 
+    skipped_reasons_payload = dict(sorted(skipped_reasons.items()))
+    refresh_skip_reasons_payload = dict(sorted(refresh_skip_reasons.items()))
+    skip_reasons_payload = _merge_reason_counts(
+        skipped_reasons_payload,
+        refresh_skip_reasons_payload,
+    )
+
     return {
         "status": "ok",
         "read_only": True,
@@ -292,6 +299,7 @@ def build_existing_soccer_refresh_plan(
         "total_existing_markets": len(markets),
         "active": active,
         "closed": closed,
+        "candidate_count": len(selected),
         "total_candidates": len(selected),
         "stale_candidates": stale_candidates,
         "missing_snapshot_candidates": missing_snapshot_candidates,
@@ -300,9 +308,11 @@ def build_existing_soccer_refresh_plan(
         "would_score_predictions": would_score_predictions,
         "would_score_predictions_ready_now": would_score_predictions_ready_now,
         "skipped": max(len(markets) - len(selected), 0),
-        "skipped_reasons_count": dict(sorted(skipped_reasons.items())),
-        "refresh_skip_reasons_count": dict(sorted(refresh_skip_reasons.items())),
+        "skip_reasons": skip_reasons_payload,
+        "skipped_reasons_count": skipped_reasons_payload,
+        "refresh_skip_reasons_count": refresh_skip_reasons_payload,
         "top_reasons": _top_reasons(selected),
+        "sample_candidates": selected[:10],
         "items": selected,
         "next_steps": [
             "Rerun this dry-run in an environment with the Neon production database confirmed.",
@@ -428,6 +438,13 @@ def _top_reasons(items: list[dict[str, Any]]) -> dict[str, int]:
     for item in items:
         counter.update(item["reasons"])
     return dict(counter.most_common(10))
+
+
+def _merge_reason_counts(*groups: dict[str, int]) -> dict[str, int]:
+    counter: Counter[str] = Counter()
+    for group in groups:
+        counter.update(group)
+    return dict(sorted(counter.items()))
 
 
 def _latest_snapshot(market: Market) -> MarketSnapshot | None:

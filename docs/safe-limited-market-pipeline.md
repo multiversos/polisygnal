@@ -220,6 +220,13 @@ focused planning. `--apply` requires `--yes-i-understand-this-writes-data` and
 is still blocked in code until a separate supervised write implementation is
 approved.
 
+For a manual GitHub Actions dry-run, use the workflow
+`.github/workflows/soccer-refresh-dry-run.yml`. It is `workflow_dispatch` only,
+has no schedule, does not pass `--apply`, does not pass the write-confirmation
+flag, and writes only a dry-run report artifact. It expects the approved
+`POLYSIGNAL_NEON_DATABASE_URL` repository secret to be configured. If that
+secret is missing, the workflow fails before running the dry-run.
+
 ## Scoring Dry-Run
 
 Only for markets that already exist and have snapshots:
