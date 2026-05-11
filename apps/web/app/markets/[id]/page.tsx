@@ -4967,6 +4967,10 @@ export default function MarketAnalysisPage() {
               <PricePanel snapshot={analysis.latest_snapshot} />
               <SoccerContextPanel analysis={analysis} />
               <EvidenceReadinessPanel analysis={analysis} />
+              <WalletIntelligencePanel
+                error={state.walletIntelligenceError}
+                intelligence={state.walletIntelligence}
+              />
               <PolySignalScorePanel analysis={analysis} />
               <DataQualityPanel
                 dataQuality={analysis.data_quality}
