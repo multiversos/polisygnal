@@ -371,6 +371,47 @@ function validateResearchReadinessRules() {
   return { cases: 5 };
 }
 
+function validateAnalyzeLoadingPanelSource() {
+  const source = readFileSync(resolve(appRoot, "app/components/AnalyzeLoadingPanel.tsx"), "utf8");
+  const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
+  const expectedSteps = [
+    "Validando enlace",
+    "Buscando coincidencias en PolySignal",
+    "Detectando contexto del partido",
+    "Revisando preparacion de datos",
+    "Revisando investigacion externa",
+    "Preparando lectura final",
+  ];
+  const expectedSkeletons = [
+    "Probabilidad del mercado",
+    "Estimacion PolySignal",
+    "Contexto del partido",
+    "Investigacion externa",
+    "Preparacion de datos",
+  ];
+
+  assert(source.includes("export type AnalyzeLoadingPhase"), "expected typed analyze loading phases");
+  assert(source.includes("aria-live=\"polite\""), "expected polite live region in loading panel");
+  assert(source.includes("aria-busy=\"true\""), "expected busy state in loading panel");
+  for (const step of expectedSteps) {
+    assert(source.includes(step), `expected loading step copy: ${step}`);
+  }
+  for (const skeleton of expectedSkeletons) {
+    assert(source.includes(skeleton), `expected loading skeleton copy: ${skeleton}`);
+  }
+  assert(!source.includes("setTimeout"), "loading panel should not use fake timers");
+  assert(!source.includes("setInterval"), "loading panel should not use interval-based fake progress");
+  assert(!source.includes("100%"), "loading panel should not expose invented percent progress");
+  assert(analyzePage.includes("AnalyzeLoadingPanel"), "expected /analyze to render the loading panel");
+  assert(analyzePage.includes('advancePhase("matching")'), "expected /analyze loader to enter matching phase");
+  assert(analyzePage.includes('advancePhase("context")'), "expected /analyze loader to enter context phase");
+  assert(analyzePage.includes('advancePhase("readiness")'), "expected /analyze loader to enter readiness phase");
+  assert(analyzePage.includes('advancePhase("research")'), "expected /analyze loader to enter research phase");
+  assert(analyzePage.includes('advancePhase("preparing")'), "expected /analyze loader to enter preparing phase");
+
+  return { phases: expectedSteps.length, skeletons: expectedSkeletons.length };
+}
+
 async function validatePolymarketResolutionAdapter() {
   const {
     buildExternalResolutionRequest,
@@ -600,6 +641,7 @@ const decisionChecks = validateAnalysisDecisionRules();
 const estimateQualityChecks = validateEstimateQualityRules();
 const estimateEngineChecks = validateEstimateEngineRules();
 const researchReadinessChecks = validateResearchReadinessRules();
+const analyzeLoadingPanelChecks = validateAnalyzeLoadingPanelSource();
 const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
 const resolutionRouteChecks = await validateResolvePolymarketRoute();
 const proxyChecks = await validateBackendProxy();
@@ -612,6 +654,7 @@ console.log(
       estimate_quality: estimateQualityChecks,
       estimate_engine: estimateEngineChecks,
       research_readiness: researchReadinessChecks,
+      analyze_loading_panel: analyzeLoadingPanelChecks,
       polymarket_resolution_adapter: resolutionAdapterChecks,
       resolve_polymarket_route: resolutionRouteChecks,
       proxy: proxyChecks,

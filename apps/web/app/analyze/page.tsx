@@ -1,7 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  AnalyzeLoadingPanel,
+  type AnalyzeLoadingPhase,
+} from "../components/AnalyzeLoadingPanel";
 import { MainNavigation } from "../components/MainNavigation";
 import { fetchApiJson } from "../lib/api";
 import { getDecisionLabel, getPolySignalDecision } from "../lib/analysisDecision";
@@ -581,10 +585,12 @@ export default function AnalyzePage() {
   const [input, setInput] = useState("");
   const [state, setState] = useState<SearchState>({ status: "idle" });
   const [loading, setLoading] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState<AnalyzeLoadingPhase>("validating");
   const [savedHistoryKeys, setSavedHistoryKeys] = useState<Set<string>>(new Set());
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const analysisRunRef = useRef(0);
 
   const watchlistByMarketId = useMemo(() => {
     return new Set(watchlistItems.map((item) => item.market_id));
@@ -610,6 +616,19 @@ export default function AnalyzePage() {
   }, []);
 
   const runAnalysis = useCallback(async (value = input) => {
+    const runId = analysisRunRef.current + 1;
+    analysisRunRef.current = runId;
+    const isCurrentRun = () => analysisRunRef.current === runId;
+    const advancePhase = async (phase: AnalyzeLoadingPhase) => {
+      if (!isCurrentRun()) {
+        return false;
+      }
+      setLoadingPhase(phase);
+      await Promise.resolve();
+      return isCurrentRun();
+    };
+
+    setLoadingPhase("validating");
     const validation = getPolymarketUrlValidationMessage(value);
     setActionMessage(null);
     if (!validation.ok || !validation.normalizedUrl) {
@@ -623,8 +642,40 @@ export default function AnalyzePage() {
       status: "searching",
     });
     try {
+      if (!(await advancePhase("matching"))) {
+        return;
+      }
       const markets = await fetchComparableMarkets();
+      if (!isCurrentRun()) {
+        return;
+      }
       const matches = findMatches(markets, validation.normalizedUrl);
+      const previewMarket = matches[0]?.item;
+
+      if (previewMarket) {
+        if (!(await advancePhase("context"))) {
+          return;
+        }
+        extractSoccerMatchContext(previewMarket);
+
+        if (!(await advancePhase("readiness"))) {
+          return;
+        }
+        getEstimateQuality(previewMarket);
+        getSignalEstimateReadiness(previewMarket);
+        getEstimateReadinessScore(previewMarket);
+        getPolySignalEstimate(previewMarket);
+
+        if (!(await advancePhase("research"))) {
+          return;
+        }
+        getResearchCoverage(previewMarket, []);
+      }
+
+      if (!(await advancePhase("preparing"))) {
+        return;
+      }
+
       if (matches[0]?.score >= 65) {
         setState({
           matches,
@@ -649,13 +700,18 @@ export default function AnalyzePage() {
         });
       }
     } catch {
+      if (!isCurrentRun()) {
+        return;
+      }
       setState({
         message:
           "No pudimos comparar el enlace ahora. Intenta de nuevo en unos segundos.",
         status: "invalid",
       });
     } finally {
-      setLoading(false);
+      if (isCurrentRun()) {
+        setLoading(false);
+      }
     }
   }, [input]);
 
@@ -716,8 +772,11 @@ export default function AnalyzePage() {
   }, []);
 
   const handleClear = useCallback(() => {
+    analysisRunRef.current += 1;
     setInput("");
     setState({ status: "idle" });
+    setLoading(false);
+    setLoadingPhase("validating");
     setActionMessage(null);
   }, []);
 
@@ -803,10 +862,7 @@ export default function AnalyzePage() {
       ) : null}
 
       {state.status === "searching" ? (
-        <section className="empty-state compact">
-          <strong>Comparando enlace</strong>
-          <p>{state.message}</p>
-        </section>
+        <AnalyzeLoadingPanel isVisible={loading} phase={loadingPhase} />
       ) : null}
 
       {state.status === "not_found" ? (

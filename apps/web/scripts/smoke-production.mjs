@@ -1,5 +1,5 @@
 ﻿import { execFile } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -496,6 +496,43 @@ function validateMarketDetailPage(dom, label) {
   return { watchlist_action_found: true, public_detail_copy_found: true };
 }
 
+function validateAnalyzeLoadingPanelSource() {
+  const source = readFileSync(new URL("../app/components/AnalyzeLoadingPanel.tsx", import.meta.url), "utf8");
+  const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
+  const expectedSteps = [
+    "Validando enlace",
+    "Buscando coincidencias en PolySignal",
+    "Detectando contexto del partido",
+    "Revisando preparacion de datos",
+    "Revisando investigacion externa",
+    "Preparando lectura final",
+  ];
+  const expectedSkeletons = [
+    "Probabilidad del mercado",
+    "Estimacion PolySignal",
+    "Contexto del partido",
+    "Investigacion externa",
+    "Preparacion de datos",
+  ];
+
+  assert(source.includes("Analizando mercado"), "analyze loading panel heading is missing");
+  assert(source.includes("aria-live=\"polite\""), "analyze loading panel needs polite live status");
+  for (const step of expectedSteps) {
+    assert(source.includes(step), `analyze loading panel missing step: ${step}`);
+  }
+  for (const skeleton of expectedSkeletons) {
+    assert(source.includes(skeleton), `analyze loading panel missing skeleton: ${skeleton}`);
+  }
+  assert(!source.includes("setTimeout"), "analyze loading panel should not use fake timers");
+  assert(!source.includes("setInterval"), "analyze loading panel should not use fake progress intervals");
+  assert(!source.includes("100%"), "analyze loading panel should not display invented 100% progress");
+  assert(analyzePage.includes("AnalyzeLoadingPanel"), "analyze page does not render AnalyzeLoadingPanel");
+  assert(analyzePage.includes('advancePhase("matching")'), "analyze page does not drive matching phase");
+  assert(analyzePage.includes('advancePhase("preparing")'), "analyze page does not drive preparing phase");
+
+  return { guided_loading_panel_found: true, phases: expectedSteps.length, skeletons: expectedSkeletons.length };
+}
+
 function validateBuildInfo(buildInfo) {
   assert(buildInfo.status === 200, `build-info returned status ${buildInfo.status}`);
   assert(buildInfo.contentType?.includes("application/json"), "build-info did not return JSON");
@@ -583,6 +620,7 @@ function validateInternalDataStatusPage(dom) {
 async function main() {
   const buildInfo = await fetchJson(BUILD_INFO_PATH);
   validateBuildInfo(buildInfo);
+  const analyzeLoadingPanel = validateAnalyzeLoadingPanelSource();
   const securityHeaders = validateSecurityHeaders(await fetchPage(HOME_PATH), "home headers");
   const overview = await fetchJson(PROXY_PATH);
   const items = Array.isArray(overview.body.items) ? overview.body.items : [];
@@ -942,6 +980,7 @@ async function main() {
           analyze: analyzeRender,
           market_detail: marketDetailRender,
         },
+        analyze_loading_panel: analyzeLoadingPanel,
         data_health: dataHealthRender,
         internal_data_status: internalDataStatusRender,
         workflow: workflowRender,

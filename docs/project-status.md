@@ -67,6 +67,10 @@ Estado visible verificado:
 - Existe una primera capa de readiness de investigacion externa:
   `ResearchFinding`, `researchReadiness.ts` y UI de evidencia pendiente. No
   llama fuentes externas ni muestra fixtures/demo como datos reales.
+- `/analyze` muestra un panel de carga guiado mientras compara enlaces: fases
+  reales de validacion, matching, contexto, preparacion de datos, investigacion
+  externa y lectura final; no usa una barra de progreso inventada ni timers
+  falsos para simular avance.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion
