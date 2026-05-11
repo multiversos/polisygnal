@@ -7661,6 +7661,7 @@ html:not([data-theme="dark"]) .app-sidebar {
   height: 23px;
   border: 2px solid var(--accent);
   border-radius: 999px;
+  opacity: 0.22;
 }
 
 .scouting-radar-core-mark::before,
@@ -7682,6 +7683,116 @@ html:not([data-theme="dark"]) .app-sidebar {
   bottom: 5px;
   left: 50%;
   width: 1px;
+}
+
+.scouting-radar-core-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  color: var(--accent-ink);
+  font-size: 0.74rem;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.radar-market-categories {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  --category-radius: 112px;
+}
+
+.radar-market-category {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: 0;
+  height: 0;
+  transform: rotate(var(--category-angle)) translate(var(--category-radius)) rotate(calc(var(--category-angle) * -1));
+}
+
+.radar-market-category-chip {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  width: 108px;
+  min-height: 38px;
+  padding: 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--blue) 12%, transparent);
+  transform: translate(-50%, -50%);
+}
+
+.radar-market-category.detected .radar-market-category-chip {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: color-mix(in srgb, var(--surface) 84%, var(--accent-soft));
+}
+
+.radar-market-category.scanning .radar-market-category-chip {
+  border-color: color-mix(in srgb, var(--blue) 40%, var(--line));
+  background: color-mix(in srgb, var(--surface) 84%, var(--blue-soft));
+}
+
+.radar-market-category-icon {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+}
+
+.radar-market-category.detected .radar-market-category-icon {
+  color: var(--accent-ink);
+}
+
+.radar-market-category.scanning .radar-market-category-icon {
+  color: var(--blue-ink-strong);
+}
+
+.radar-market-category-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.radar-market-category-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.radar-market-category-copy strong,
+.radar-market-category-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.radar-market-category-copy strong {
+  color: var(--foreground);
+  font-size: 0.68rem;
+  font-weight: 950;
+  line-height: 1.05;
+}
+
+.radar-market-category-copy small {
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1.05;
 }
 
 .scouting-legend {
@@ -7866,6 +7977,14 @@ html:not([data-theme="dark"]) .app-sidebar {
 .skeleton-pill-row span {
   width: 42px;
   height: 22px;
+}
+
+.analyze-loading-footnote {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
 }
 
 @keyframes scouting-sweep {
@@ -8088,6 +8207,35 @@ html:not([data-theme="dark"]) .app-sidebar {
 
   .scouting-radar {
     width: min(260px, 74vw);
+  }
+
+  .radar-market-categories {
+    --category-radius: 91px;
+  }
+
+  .radar-market-category-chip {
+    width: 92px;
+    grid-template-columns: 20px minmax(0, 1fr);
+    min-height: 32px;
+    padding: 5px 6px;
+  }
+
+  .radar-market-category-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .radar-market-category-icon svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .radar-market-category-copy strong {
+    font-size: 0.61rem;
+  }
+
+  .radar-market-category-copy small {
+    display: none;
   }
 
   .analyze-loading-step {

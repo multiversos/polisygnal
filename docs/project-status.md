@@ -67,11 +67,13 @@ Estado visible verificado:
 - Existe una primera capa de readiness de investigacion externa:
   `ResearchFinding`, `researchReadiness.ts` y UI de evidencia pendiente. No
   llama fuentes externas ni muestra fixtures/demo como datos reales.
-- `/analyze` muestra un panel de carga guiado tipo Radar Analytics mientras
-  compara enlaces: radar central, pasos laterales, skeletons inferiores y fases
-  reales de validacion, matching, contexto, preparacion de datos, investigacion
-  externa y lectura final; no usa una barra de progreso inventada ni timers
-  falsos para simular avance.
+- `/analyze` muestra un panel de carga guiado tipo Radar Analytics multi-market
+  mientras compara enlaces: radar central con categorias visuales de deportes,
+  noticias, politica, mercados, cripto y eventos globales, pasos laterales,
+  skeletons inferiores y fases reales de validacion, extraccion, categorias,
+  senales disponibles, investigacion externa y resumen final. No usa una barra
+  de progreso inventada, timers falsos, imagenes externas, logos ni rostros
+  reales para simular avance.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion

@@ -1,3 +1,5 @@
+import type { CSSProperties, ReactNode } from "react";
+
 export type AnalyzeLoadingPhase =
   | "validating"
   | "matching"
@@ -19,52 +21,191 @@ type AnalyzeLoadingStep = {
   shortLabel: string;
 };
 
+type RadarMarketCategory = {
+  angle: number;
+  icon: ReactNode;
+  id: string;
+  label: string;
+  shortLabel?: string;
+  status: "detected" | "scanning" | "pending";
+};
+
 const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
   {
-    detail: "Enlace verificado",
-    label: "Validando enlace",
+    detail: "Conexion segura establecida",
+    label: "Verificando enlace",
     phase: "validating",
-    shortLabel: "Ruta segura",
+    shortLabel: "Polymarket",
   },
   {
-    detail: "Mercados cargados",
-    label: "Buscando coincidencias",
+    detail: "Datos del mercado obtenidos",
+    label: "Extrayendo informacion",
     phase: "matching",
-    shortLabel: "Matching local",
+    shortLabel: "Mercado",
   },
   {
-    detail: "Partido y equipos",
-    label: "Detectando contexto",
+    detail: "Identificando mercado relevante",
+    label: "Detectando categorias",
     phase: "context",
-    shortLabel: "Contexto deportivo",
+    shortLabel: "Multi-market",
   },
   {
-    detail: "Datos disponibles",
-    label: "Preparacion de datos",
+    detail: "Revisando actividad y contexto",
+    label: "Evaluando senales disponibles",
     phase: "readiness",
-    shortLabel: "Readiness",
+    shortLabel: "Datos visibles",
   },
   {
-    detail: "Cobertura disponible",
+    detail: "Cobertura pendiente o disponible",
     label: "Investigacion externa",
     phase: "research",
-    shortLabel: "Fuentes pendientes",
+    shortLabel: "Cobertura",
   },
   {
-    detail: "Lectura final",
-    label: "Preparando resultado",
+    detail: "Generando lectura final",
+    label: "Preparando resumen",
     phase: "preparing",
-    shortLabel: "Sin inventar datos",
+    shortLabel: "Resumen",
   },
 ];
 
 const RESULT_SKELETONS = [
-  "Probabilidad del mercado",
-  "Estimacion PolySignal",
-  "Contexto del partido",
-  "Investigacion externa",
-  "Preparacion de datos",
+  "Mercado detectado",
+  "Senales disponibles",
+  "Contexto relevante",
+  "Evidencia pendiente",
+  "Lectura final",
 ] as const;
+
+function CategoryIcon({ id }: { id: string }) {
+  if (id === "sports") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M6 12h12M12 4c2 2 3 5 3 8s-1 6-3 8M12 4c-2 2-3 5-3 8s1 6 3 8" />
+      </svg>
+    );
+  }
+  if (id === "basketball") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M4 12h16M12 4v16M6.5 6.5c3.5 2 5 5.5 5 11M17.5 6.5c-3.5 2-5 5.5-5 11" />
+      </svg>
+    );
+  }
+  if (id === "baseball") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M8 5c2.5 4.5 2.5 9.5 0 14M16 5c-2.5 4.5-2.5 9.5 0 14M7.5 9l2 1M7.5 13l2 1M16.5 9l-2 1M16.5 13l-2 1" />
+      </svg>
+    );
+  }
+  if (id === "news") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M5 6h12a2 2 0 0 1 2 2v10H7a2 2 0 0 1-2-2V6Z" />
+        <path d="M8 9h6M8 12h8M8 15h5M19 9h1v8a1 1 0 0 1-1 1" />
+      </svg>
+    );
+  }
+  if (id === "politics") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M5 10h14M7 10v7M11 10v7M15 10v7M19 17H5M12 4l7 4H5l7-4Z" />
+      </svg>
+    );
+  }
+  if (id === "markets") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M5 18V7M10 18v-5M15 18V9M20 18V5M4 18h17" />
+      </svg>
+    );
+  }
+  if (id === "crypto") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="7" />
+        <path d="M10 7v10M14 7v10M9 9h4.5a2 2 0 0 1 0 4H9M9 13h5a2 2 0 0 1 0 4H9" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M4 12h16M12 4c2 2.5 3 5 3 8s-1 5.5-3 8M12 4c-2 2.5-3 5-3 8s1 5.5 3 8" />
+    </svg>
+  );
+}
+
+const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
+  {
+    angle: 315,
+    icon: <CategoryIcon id="sports" />,
+    id: "sports",
+    label: "Deportes",
+    shortLabel: "en radar",
+    status: "scanning",
+  },
+  {
+    angle: 350,
+    icon: <CategoryIcon id="basketball" />,
+    id: "basketball",
+    label: "Baloncesto",
+    shortLabel: "categoria",
+    status: "pending",
+  },
+  {
+    angle: 25,
+    icon: <CategoryIcon id="baseball" />,
+    id: "baseball",
+    label: "Beisbol",
+    shortLabel: "categoria",
+    status: "pending",
+  },
+  {
+    angle: 70,
+    icon: <CategoryIcon id="news" />,
+    id: "news",
+    label: "Noticias",
+    shortLabel: "contexto",
+    status: "scanning",
+  },
+  {
+    angle: 115,
+    icon: <CategoryIcon id="politics" />,
+    id: "politics",
+    label: "Politica",
+    shortLabel: "neutral",
+    status: "pending",
+  },
+  {
+    angle: 160,
+    icon: <CategoryIcon id="markets" />,
+    id: "markets",
+    label: "Mercados",
+    shortLabel: "actividad",
+    status: "detected",
+  },
+  {
+    angle: 205,
+    icon: <CategoryIcon id="crypto" />,
+    id: "crypto",
+    label: "Cripto",
+    shortLabel: "categoria",
+    status: "pending",
+  },
+  {
+    angle: 250,
+    icon: <CategoryIcon id="global" />,
+    id: "global",
+    label: "Global",
+    shortLabel: "eventos",
+    status: "scanning",
+  },
+];
 
 function stepStatus(stepIndex: number, activeIndex: number): "completed" | "active" | "pending" {
   if (stepIndex < activeIndex) {
@@ -113,15 +254,18 @@ export function AnalyzeLoadingPanel({
           <p className="eyebrow">Analisis en curso</p>
           <h2>Analizando mercado</h2>
           <p>
-            PolySignal esta comparando el enlace con mercados cargados y
-            preparando una lectura segura.
+            PolySignal esta revisando el enlace, detectando el tipo de mercado
+            y preparando una lectura segura.
           </p>
         </div>
         <span className="analyze-loading-phase-pill">{message || activeStep.detail}</span>
       </div>
 
       <div className="analyze-loading-stage">
-        <div className="analyze-scouting-visual" aria-hidden="true">
+        <div
+          aria-label="Radar visual de categorias de mercado"
+          className="analyze-scouting-visual"
+        >
           <div className="scouting-radar-shell">
             <div className="scouting-radar">
               <span className="scouting-radar-grid" />
@@ -137,12 +281,32 @@ export function AnalyzeLoadingPanel({
               <span className="scouting-radar-dot tertiary" />
               <span className="scouting-radar-core">
                 <span className="scouting-radar-core-mark" />
+                <span className="scouting-radar-core-label">PS</span>
               </span>
+              <div className="radar-market-categories">
+                {RADAR_MARKET_CATEGORIES.map((category) => (
+                  <span
+                    className={`radar-market-category ${category.status}`}
+                    key={category.id}
+                    style={{ "--category-angle": `${category.angle}deg` } as CSSProperties}
+                  >
+                    <span className="radar-market-category-chip">
+                      <span className="radar-market-category-icon" aria-hidden="true">
+                        {category.icon}
+                      </span>
+                      <span className="radar-market-category-copy">
+                        <strong>{category.label}</strong>
+                        {category.shortLabel ? <small>{category.shortLabel}</small> : null}
+                      </span>
+                    </span>
+                  </span>
+                ))}
+              </div>
             </div>
             <div className="scouting-legend">
-              <span>Mercado</span>
-              <span>Contexto</span>
-              <span>Evidencia</span>
+              <span>Escaneando categorias</span>
+              <span>Datos disponibles</span>
+              <span>Cobertura pendiente</span>
             </div>
           </div>
         </div>
@@ -183,6 +347,10 @@ export function AnalyzeLoadingPanel({
           </article>
         ))}
       </div>
+      <p className="analyze-loading-footnote">
+        Escaneando categorias y datos disponibles. Esto puede tardar unos
+        segundos segun el mercado.
+      </p>
     </section>
   );
 }

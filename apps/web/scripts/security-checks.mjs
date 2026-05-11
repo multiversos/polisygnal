@@ -375,24 +375,35 @@ function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(resolve(appRoot, "app/components/AnalyzeLoadingPanel.tsx"), "utf8");
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
   const expectedSteps = [
-    "Validando enlace",
-    "Buscando coincidencias",
-    "Detectando contexto",
-    "Preparacion de datos",
+    "Verificando enlace",
+    "Extrayendo informacion",
+    "Detectando categorias",
+    "Evaluando senales disponibles",
     "Investigacion externa",
-    "Preparando resultado",
+    "Preparando resumen",
   ];
   const expectedSkeletons = [
-    "Probabilidad del mercado",
-    "Estimacion PolySignal",
-    "Contexto del partido",
-    "Investigacion externa",
-    "Preparacion de datos",
+    "Mercado detectado",
+    "Senales disponibles",
+    "Contexto relevante",
+    "Evidencia pendiente",
+    "Lectura final",
+  ];
+  const expectedCategories = [
+    "Deportes",
+    "Baloncesto",
+    "Beisbol",
+    "Noticias",
+    "Politica",
+    "Mercados",
+    "Cripto",
+    "Global",
   ];
 
   assert(source.includes("export type AnalyzeLoadingPhase"), "expected typed analyze loading phases");
   assert(source.includes("scouting-radar-shell"), "expected prominent radar analytics visual shell");
   assert(source.includes("scouting-radar-core"), "expected radar center mark");
+  assert(source.includes("RADAR_MARKET_CATEGORIES"), "expected multi-market radar category config");
   assert(source.includes("aria-live=\"polite\""), "expected polite live region in loading panel");
   assert(source.includes("aria-busy=\"true\""), "expected busy state in loading panel");
   for (const step of expectedSteps) {
@@ -400,6 +411,9 @@ function validateAnalyzeLoadingPanelSource() {
   }
   for (const skeleton of expectedSkeletons) {
     assert(source.includes(skeleton), `expected loading skeleton copy: ${skeleton}`);
+  }
+  for (const category of expectedCategories) {
+    assert(source.includes(category), `expected multi-market radar category: ${category}`);
   }
   assert(!source.includes("setTimeout"), "loading panel should not use fake timers");
   assert(!source.includes("setInterval"), "loading panel should not use interval-based fake progress");

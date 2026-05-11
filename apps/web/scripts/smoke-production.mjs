@@ -500,30 +500,40 @@ function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(new URL("../app/components/AnalyzeLoadingPanel.tsx", import.meta.url), "utf8");
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
   const expectedSteps = [
-    "Validando enlace",
-    "Buscando coincidencias",
-    "Detectando contexto",
-    "Preparacion de datos",
+    "Verificando enlace",
+    "Extrayendo informacion",
+    "Detectando categorias",
+    "Evaluando senales disponibles",
     "Investigacion externa",
-    "Preparando resultado",
+    "Preparando resumen",
   ];
   const expectedSkeletons = [
-    "Probabilidad del mercado",
-    "Estimacion PolySignal",
-    "Contexto del partido",
-    "Investigacion externa",
-    "Preparacion de datos",
+    "Mercado detectado",
+    "Senales disponibles",
+    "Contexto relevante",
+    "Evidencia pendiente",
+    "Lectura final",
+  ];
+  const expectedCategories = [
+    "Deportes",
+    "Noticias",
+    "Politica",
+    "Mercados",
   ];
 
   assert(source.includes("Analizando mercado"), "analyze loading panel heading is missing");
   assert(source.includes("scouting-radar-shell"), "analyze loading panel radar shell is missing");
   assert(source.includes("scouting-radar-core"), "analyze loading panel radar core is missing");
+  assert(source.includes("RADAR_MARKET_CATEGORIES"), "analyze loading panel category config is missing");
   assert(source.includes("aria-live=\"polite\""), "analyze loading panel needs polite live status");
   for (const step of expectedSteps) {
     assert(source.includes(step), `analyze loading panel missing step: ${step}`);
   }
   for (const skeleton of expectedSkeletons) {
     assert(source.includes(skeleton), `analyze loading panel missing skeleton: ${skeleton}`);
+  }
+  for (const category of expectedCategories) {
+    assert(source.includes(category), `analyze loading panel missing multi-market category: ${category}`);
   }
   assert(!source.includes("setTimeout"), "analyze loading panel should not use fake timers");
   assert(!source.includes("setInterval"), "analyze loading panel should not use fake progress intervals");
