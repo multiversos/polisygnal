@@ -80,7 +80,8 @@ Estado visible verificado:
   endpoint existente `/markets/{market_id}/wallet-intelligence` a traves del
   proxy same-origin, filtra por `100 USD`, abrevia direcciones, no devuelve
   payloads crudos y deja claro que no identifica personas ni recomienda copiar
-  traders.
+  operaciones. La UI resume capital observado, sesgo YES/NO/Neutral, confianza y
+  advertencias como senal auxiliar, no como prediccion final.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion
@@ -236,8 +237,9 @@ Riesgos pendientes:
 - la investigacion externa real todavia no esta conectada a APIs deportivas,
   odds, noticias o fuentes oficiales;
 - Wallet Intelligence ya esta conectada como consulta read-only sanitizada en
-  el Analizador, pero faltan rate limits mas fuertes, politica de retencion y
-  calculo confiable de win rate/ROI desde historial resuelto;
+  el Analizador y detalle de mercado, pero faltan rate limits mas fuertes,
+  politica de retencion y calculo confiable de win rate/ROI desde historial
+  resuelto;
 - snapshots/analisis de soccer siguen con datos stale hasta refresh
   supervisado;
 - npm audit mantiene 2 moderadas via Next/PostCSS, documentadas sin force fix.

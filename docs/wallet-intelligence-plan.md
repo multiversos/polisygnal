@@ -119,6 +119,27 @@ Rules:
 - if no wallet crosses the threshold, the signal is unavailable;
 - the threshold is not a confidence score.
 
+## Public Readout
+
+The public UI now converts the sanitized endpoint summary into a product-facing
+readout:
+
+- `Capital observado inclinado hacia YES`;
+- `Capital observado inclinado hacia NO`;
+- `Billeteras relevantes divididas`;
+- `Datos de billeteras insuficientes`;
+- `Confianza baja/media/alta`, with low as the default unless reliable
+  historical performance exists.
+
+This readout uses only fields already returned by the read-only endpoint:
+`large_trades`, `large_positions`, `notable_wallets`,
+`concentration_summary`, `threshold_usd`, `warnings`, `generated_at`, side,
+amount USD, prices, and PnL fields only when the public source provides them.
+
+Public copy must always say Wallet Intelligence is an auxiliary signal. It must
+not call a wallet "smart", imply inside knowledge, identify real people, or
+recommend copying operations.
+
 ## Metrics Planned
 
 Future metrics should be computed only from real structured public data:

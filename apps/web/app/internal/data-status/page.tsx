@@ -392,7 +392,7 @@ export default function InternalDataStatusPage() {
         <div className="internal-status-grid">
           <article className="internal-status-card">
             <span>Estado</span>
-            <strong>Read-only conectado</strong>
+            <strong>Disponible parcial read-only</strong>
             <p>La UI consulta resumenes acotados; esta pagina no ejecuta cambios.</p>
           </article>
           <article className="internal-status-card">
@@ -408,12 +408,12 @@ export default function InternalDataStatusPage() {
           <article className="internal-status-card">
             <span>Adapter frontend</span>
             <strong>Con sanitizacion</strong>
-            <p>Usa direcciones abreviadas y no devuelve payloads crudos.</p>
+            <p>Usa GET, direcciones abreviadas y no devuelve payloads crudos.</p>
           </article>
           <article className="internal-status-card">
             <span>Uso en PolySignal</span>
             <strong>Senal auxiliar</strong>
-            <p>No crea estimacion, predictedSide ni recomendacion de copiar traders.</p>
+            <p>No crea estimacion, predictedSide ni recomendacion de copiar operaciones.</p>
           </article>
           <article className="internal-status-card">
             <span>Privacidad</span>

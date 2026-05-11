@@ -17,7 +17,10 @@ import {
   getSoccerContextReadiness,
   type SoccerMatchContextInput,
 } from "./soccerMatchContext";
-import { getWalletIntelligenceSummary } from "./walletIntelligence";
+import {
+  getWalletIntelligenceSummary,
+  shouldUseWalletAsAuxiliarySignal,
+} from "./walletIntelligence";
 import type { WalletSignalDirection } from "./walletIntelligenceTypes";
 
 export type EstimationSignalSource =
@@ -299,7 +302,7 @@ export function collectIndependentSignals(market: EstimationSignalInputWithResea
     });
   }
   const walletSummary = getWalletIntelligenceSummary(market);
-  if (walletSummary.available && walletSummary.relevantWalletsCount > 0) {
+  if (shouldUseWalletAsAuxiliarySignal(walletSummary)) {
     signals.push({
       confidence: walletSummary.confidence === "none" ? "low" : walletSummary.confidence,
       direction: signalDirectionFromWallet(walletSummary.signalDirection),
@@ -307,7 +310,7 @@ export function collectIndependentSignals(market: EstimationSignalInputWithResea
       isIndependent: true,
       label: "Inteligencia de billeteras",
       reason:
-        "Senal auxiliar basada en posiciones publicas estructuradas; no crea una decision ni una estimacion por si sola.",
+        "Senal auxiliar basada en actividad publica estructurada; mejora contexto, pero no crea una decision ni una estimacion por si sola.",
       source: "wallet_intelligence",
       strength: walletSummary.confidence === "high" ? "medium" : "low",
       value: walletSummary.relevantWalletsCount,

@@ -91,6 +91,8 @@ The frontend now has explicit readiness helpers:
 - `getMissingResearchCategories`
 - `getWalletIntelligenceSummary`
 - `getWalletIntelligenceReadiness`
+- `getWalletSignalSummary`
+- `shouldUseWalletAsAuxiliarySignal`
 
 Rules:
 
@@ -118,7 +120,9 @@ wallet signal boundary. The adapter is read-only, uses the existing backend
 wallet-intelligence endpoint through the same-origin proxy, applies a `100 USD`
 threshold, abbreviates wallet addresses, and returns unavailable if the endpoint
 has no reliable data. It does not expose raw wallet payloads and does not
-generate a PolySignal estimate.
+generate a PolySignal estimate. The public readout may summarize capital
+leaning YES/NO/NEUTRAL and confidence, but the estimator remains unavailable
+unless a separate calibrated PolySignal estimate exists.
 
 ## Conservative Engine V0
 

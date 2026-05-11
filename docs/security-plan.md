@@ -125,6 +125,8 @@ Current constraints:
   structured resolved-position data.
 - Wallet Intelligence must not create a PolySignal estimate or `predictedSide`
   by itself.
+- Public copy must describe wallet data as activity from public wallets, not as
+  identity, insider knowledge, guaranteed edge, or copy-trading advice.
 - Lookup failures return a generic unavailable state and must not expose raw
   payloads, backend details, or complete wallet lists.
 

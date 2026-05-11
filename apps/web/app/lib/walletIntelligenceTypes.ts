@@ -60,6 +60,17 @@ export type WalletIntelligenceSummary = {
   yesCapitalUsd?: number;
 };
 
+export type WalletPublicSignalSummary = {
+  auxiliaryLabel: string;
+  available: boolean;
+  biasLabel: string;
+  confidenceLabel: string;
+  explanation: string;
+  headline: string;
+  shouldUseAsAuxiliarySignal: boolean;
+  warnings: string[];
+};
+
 export type WalletReadinessChecklistItem = {
   available: boolean;
   label: string;

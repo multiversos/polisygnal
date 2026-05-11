@@ -3,6 +3,7 @@ import type {
   WalletIntelligenceSummary,
   WalletMarketPosition,
   WalletPerformanceProfile,
+  WalletPublicSignalSummary,
   WalletReliability,
   WalletRiskProfile,
   WalletSide,
@@ -274,6 +275,107 @@ export function getWalletIntelligenceSummary(
       "No crear prediccion PolySignal solo con billeteras.",
     ],
     yesCapitalUsd: bias.yesCapitalUsd,
+  };
+}
+
+const WALLET_WARNING_LABELS: Record<string, string> = {
+  condition_id_unavailable:
+    "Falta un identificador publico confiable para revisar actividad de billeteras.",
+  concentrated_side_activity:
+    "La actividad publica esta concentrada en un lado; revisarla solo como contexto.",
+  large_activity_partial:
+    "La fuente publica trae actividad parcial, no historial completo de desempeno.",
+  no_wallet_activity:
+    "No se detectaron billeteras publicas por encima del umbral configurado.",
+  unavailable:
+    "La fuente de billeteras no esta disponible en este momento.",
+};
+
+function uniqueWarnings(warnings: string[]): string[] {
+  return [...new Set(warnings.map((warning) => warning.trim()).filter(Boolean))];
+}
+
+export function getWalletBiasLabel(summary?: WalletIntelligenceSummary | null): string {
+  if (!summary?.available || summary.relevantWalletsCount <= 0) {
+    return "Datos de billeteras insuficientes";
+  }
+  if (summary.signalDirection === "YES") {
+    return "Capital observado inclinado hacia YES";
+  }
+  if (summary.signalDirection === "NO") {
+    return "Capital observado inclinado hacia NO";
+  }
+  if (summary.signalDirection === "NEUTRAL" || summary.signalDirection === "BOTH") {
+    return "Billeteras relevantes divididas";
+  }
+  return "Datos de billeteras insuficientes";
+}
+
+export function getWalletConfidenceLabel(summary?: WalletIntelligenceSummary | null): string {
+  if (!summary?.available || summary.confidence === "none") {
+    return "Sin confianza suficiente";
+  }
+  if (summary.confidence === "high") {
+    return "Confianza alta";
+  }
+  if (summary.confidence === "medium") {
+    return "Confianza media";
+  }
+  return "Confianza baja";
+}
+
+export function getWalletWarnings(summary?: WalletIntelligenceSummary | null): string[] {
+  const warnings = (summary?.warnings ?? []).map(
+    (warning) => WALLET_WARNING_LABELS[warning] ?? warning,
+  );
+  if (!summary?.available) {
+    warnings.push("No se muestran direcciones completas por defecto.");
+    warnings.push("No se intenta identificar personas reales detras de wallets publicas.");
+    warnings.push("Wallet Intelligence es una senal auxiliar, no una prediccion final.");
+    return uniqueWarnings(warnings);
+  }
+  if (summary.confidence === "low" || summary.confidence === "none") {
+    warnings.push("Sin historial cerrado suficiente para elevar la confianza.");
+  }
+  warnings.push("Actividad publica observada, no decision final.");
+  warnings.push("No se recomienda copiar operaciones de wallets.");
+  warnings.push("No se intenta identificar personas reales detras de wallets publicas.");
+  return uniqueWarnings(warnings);
+}
+
+export function shouldUseWalletAsAuxiliarySignal(summary?: WalletIntelligenceSummary | null): boolean {
+  return Boolean(summary?.available && summary.relevantWalletsCount > 0);
+}
+
+export function getWalletPublicExplanation(summary?: WalletIntelligenceSummary | null): string {
+  if (!summary?.available || summary.relevantWalletsCount <= 0) {
+    return "No hay suficientes datos publicos de billeteras para este mercado.";
+  }
+  if (summary.signalDirection === "YES" || summary.signalDirection === "NO") {
+    return `El capital publico observado se inclina hacia ${summary.signalDirection}, pero esta lectura no identifica personas ni crea una estimacion PolySignal por si sola.`;
+  }
+  if (summary.signalDirection === "NEUTRAL" || summary.signalDirection === "BOTH") {
+    return "Las billeteras relevantes aparecen divididas; la lectura sirve como contexto y no como decision.";
+  }
+  return "Hay actividad publica de billeteras, pero el lado dominante no esta confirmado.";
+}
+
+export function getWalletSignalSummary(
+  summary?: WalletIntelligenceSummary | null,
+): WalletPublicSignalSummary {
+  const warnings = getWalletWarnings(summary);
+  return {
+    auxiliaryLabel: "Senal auxiliar de billeteras",
+    available: Boolean(summary?.available),
+    biasLabel: getWalletBiasLabel(summary),
+    confidenceLabel: getWalletConfidenceLabel(summary),
+    explanation: getWalletPublicExplanation(summary),
+    headline:
+      summary?.available && summary.relevantWalletsCount > 0
+        ? getWalletBiasLabel(summary)
+        : "Datos de billeteras insuficientes",
+    shouldUseAsAuxiliarySignal: shouldUseWalletAsAuxiliarySignal(summary),
+    warnings,
   };
 }
 

@@ -94,6 +94,15 @@ const PUBLIC_SECURITY_TEXT = [
   "connection string",
   "localhost",
 ];
+const PUBLIC_WALLET_FORBIDDEN_TEXT = [
+  "copy this trader",
+  "guaranteed",
+  "whale knows",
+  "insider",
+  "smart money guaranteed",
+  "ROI 100%",
+  "win rate 100%",
+];
 const UPDATE_TEXT = [
   "Última actualización",
   "Ãšltima actualizaciÃ³n",
@@ -492,13 +501,13 @@ function validateMarketDetailPage(dom, label) {
   assertTextIncludes(text, "Billeteras relevantes", `${label} wallet intelligence readiness`);
   assertTextIncludesOneOf(
     text,
-    ["no identifica personas reales", "Datos de billeteras no disponibles", "direcciones completas"],
+    ["no identifica personas reales", "Sin datos suficientes de billeteras", "direcciones completas", "Senal auxiliar"],
     `${label} wallet privacy copy`,
   );
   assertTextIncludes(text, "Preparacion de datos", `${label} non predictive readiness`);
   assertTextIncludes(text, "No predictivo", `${label} readiness is not prediction`);
   assertTextExcludes(text, ["Fake finding", "Demo finding", "fixture de prueba"], `${label} invented evidence`);
-  assertTextExcludes(text, ["0x1234567890abcdef", "ROI 100%", "win rate 100%"], `${label} fake wallet metrics`);
+  assertTextExcludes(text, ["0x1234567890abcdef", ...PUBLIC_WALLET_FORBIDDEN_TEXT], `${label} fake wallet metrics`);
   assertTextExcludes(
     text,
     ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
@@ -523,6 +532,7 @@ function validateAnalyzeLoadingPanelSource() {
     "Mercado detectado",
     "Senales disponibles",
     "Contexto relevante",
+    "Billeteras publicas",
     "Evidencia pendiente",
     "Lectura final",
   ];
@@ -531,6 +541,7 @@ function validateAnalyzeLoadingPanelSource() {
     "Noticias",
     "Politica",
     "Mercados",
+    "Billeteras",
   ];
 
   assert(source.includes("Analizando mercado"), "analyze loading panel heading is missing");
@@ -922,6 +933,8 @@ async function main() {
     validAnalyzeText,
     [
       "no intenta identificar personas reales",
+      "actividad publica de wallets",
+      "Senal auxiliar de billeteras",
       "movimientos relevantes de $100",
       "movimientos relevantes de 100",
       "Billeteras publicas relevantes detectadas",
@@ -940,7 +953,7 @@ async function main() {
     "analyze soccer context is not prediction",
   );
   assertTextExcludes(validAnalyzeText, ["Fake finding", "Demo finding", "fixture de prueba"], "analyze invented evidence");
-  assertTextExcludes(validAnalyzeText, ["0x1234567890abcdef", "ROI 100%", "win rate 100%"], "analyze fake wallet data");
+  assertTextExcludes(validAnalyzeText, ["0x1234567890abcdef", ...PUBLIC_WALLET_FORBIDDEN_TEXT], "analyze fake wallet data");
   assertTextIncludes(validAnalyzeText, "Decision de PolySignal", "analyze clear decision panel");
   assertTextIncludesOneOf(
     validAnalyzeText,

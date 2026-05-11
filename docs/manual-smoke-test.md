@@ -243,8 +243,8 @@ If this test fails, stop feature work and treat it as a production regression.
    - Investigacion externa.
    - Preparando resumen.
 8. Confirm the radar represents multiple prediction-market categories such as
-   Deportes, Noticias, Politica, Mercados, Cripto, and Global. It should not
-   feel like a soccer-only loader.
+   Deportes, Noticias, Politica, Mercados, Cripto, Global, and Billeteras. It
+   should not feel like a soccer-only loader.
 9. Confirm the category visuals use local SVG/CSS only: no external images, no
    real faces, no party logos, and no copyright logos.
 10. Confirm the loading panel shows skeleton placeholders for detected market,
@@ -280,13 +280,14 @@ If this test fails, stop feature work and treat it as a production regression.
    are loaded.
 25. Confirm `Inteligencia de billeteras` is visible.
 26. If wallet data exists, confirm it shows only shortened wallet addresses,
-   threshold `$100+`, side/capital summary, and auxiliary-signal copy.
+   threshold `$100+`, capital observed, YES/NO/Neutral bias, confidence, and
+   auxiliary-signal copy.
 27. If no wallet data exists, confirm it says pending or unavailable without
    breaking the analysis result.
 28. Confirm it does not show fake wallets, full wallet addresses, ROI, win rate,
    or copied-trader advice.
-29. Confirm it says public wallets are not mapped to real people and that the
-   signal is auxiliary, not a prediction.
+29. Confirm it says public wallet activity is not mapped to real people and that
+   the signal is auxiliary, not a prediction or recommendation.
 30. Confirm `Decision de PolySignal` follows the 55% threshold:
    YES `>=55%` is clear YES, NO `>=55%` is clear NO, and 45/55 is `Sin decision fuerte`.
 31. Confirm market price alone never creates a PolySignal predicted side.
@@ -343,8 +344,10 @@ If this test fails, stop feature work and treat it as a production regression.
 12. Confirm it shows `Billeteras relevantes`.
 13. Confirm the wallet section uses shortened addresses only when real public
     data exists, and otherwise says wallet data is not available yet.
-14. Confirm it does not show fake wallet ROI/win-rate values and does not
-    recommend copying traders.
+14. Confirm it shows capital observed, YES/NO/Neutral bias and confidence only
+    from real read-only data.
+15. Confirm it does not show fake wallet ROI/win-rate values and does not
+    recommend copying operations.
 
 ## Hidden Data Status
 

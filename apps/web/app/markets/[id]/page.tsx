@@ -77,8 +77,17 @@ import {
 } from "../../lib/researchReadiness";
 import {
   WALLET_INTELLIGENCE_THRESHOLD_USD,
+  calculateWalletSideBias,
+  filterRelevantWallets,
+  formatWalletAddress,
   getWalletIntelligenceReadiness,
+  getWalletSignalSummary,
 } from "../../lib/walletIntelligence";
+import type {
+  WalletIntelligenceSummary,
+  WalletMarketPosition,
+  WalletSide,
+} from "../../lib/walletIntelligenceTypes";
 import type {
   EvidenceDirection,
   EvidenceReliability,
@@ -1006,6 +1015,117 @@ function formatReasonLabel(value: string): string {
 function formatWarningLabel(value: string): string {
   const key = stripScoreSuffix(value);
   return warningLabels[key] ?? humanizeToken(key);
+}
+
+function normalizeWalletSide(value?: string | null): WalletSide {
+  const normalized = value?.trim().toUpperCase();
+  if (normalized === "YES" || normalized === "SI") {
+    return "YES";
+  }
+  if (normalized === "NO") {
+    return "NO";
+  }
+  return "UNKNOWN";
+}
+
+function walletShortAddress(walletShort?: string | null, walletAddress?: string | null): string {
+  return walletShort?.trim() || formatWalletAddress(walletAddress);
+}
+
+function walletPositionFromTradeSignal(
+  signal: WalletTradeSignal,
+  marketId?: number,
+): WalletMarketPosition | null {
+  const amountUsd = toNumber(signal.trade_size_usd);
+  if (amountUsd === null) {
+    return null;
+  }
+  const shortAddress = walletShortAddress(signal.wallet_short, signal.wallet_address);
+  return {
+    amountUsd,
+    averageEntryPrice: toNumber(signal.price) ?? undefined,
+    lastActivityAt: signal.timestamp ?? undefined,
+    marketId: marketId ? String(marketId) : undefined,
+    shortAddress,
+    side: normalizeWalletSide(signal.side ?? signal.outcome),
+    walletAddress: shortAddress,
+  };
+}
+
+function walletPositionFromPositionSignal(
+  signal: WalletPositionSignal,
+  marketId?: number,
+): WalletMarketPosition | null {
+  const amountUsd = toNumber(signal.position_size_usd);
+  if (amountUsd === null) {
+    return null;
+  }
+  const shortAddress = walletShortAddress(signal.wallet_short, signal.wallet_address);
+  return {
+    amountUsd,
+    averageEntryPrice: toNumber(signal.avg_price) ?? undefined,
+    marketId: marketId ? String(marketId) : undefined,
+    shortAddress,
+    side: normalizeWalletSide(signal.side ?? signal.outcome),
+    unrealizedPnlUsd: toNumber(signal.total_pnl ?? signal.realized_pnl) ?? undefined,
+    walletAddress: shortAddress,
+  };
+}
+
+function walletPositionFromNotableWallet(
+  wallet: NotableWallet,
+  marketId?: number,
+): WalletMarketPosition | null {
+  const amountUsd = toNumber(wallet.position_size_usd ?? wallet.max_trade_size_usd);
+  if (amountUsd === null) {
+    return null;
+  }
+  const shortAddress = walletShortAddress(wallet.wallet_short, wallet.wallet_address);
+  return {
+    amountUsd,
+    marketId: marketId ? String(marketId) : undefined,
+    shortAddress,
+    side: "UNKNOWN",
+    unrealizedPnlUsd: toNumber(wallet.realized_pnl) ?? undefined,
+    walletAddress: shortAddress,
+  };
+}
+
+function getWalletSummaryFromBackend(
+  intelligence?: WalletIntelligence | null,
+): WalletIntelligenceSummary | null {
+  if (!intelligence?.data_available) {
+    return null;
+  }
+  const thresholdUsd = toNumber(intelligence.threshold_usd) ?? WALLET_INTELLIGENCE_THRESHOLD_USD;
+  const walletPositions = [
+    ...intelligence.large_positions
+      .map((position) => walletPositionFromPositionSignal(position, intelligence.market_id))
+      .filter((position): position is WalletMarketPosition => Boolean(position)),
+    ...intelligence.large_trades
+      .map((trade) => walletPositionFromTradeSignal(trade, intelligence.market_id))
+      .filter((position): position is WalletMarketPosition => Boolean(position)),
+    ...intelligence.notable_wallets
+      .map((wallet) => walletPositionFromNotableWallet(wallet, intelligence.market_id))
+      .filter((position): position is WalletMarketPosition => Boolean(position)),
+  ];
+  const relevantWallets = filterRelevantWallets(walletPositions, thresholdUsd);
+  const bias = calculateWalletSideBias(walletPositions, thresholdUsd);
+  return {
+    analyzedCapitalUsd: bias.yesCapitalUsd + bias.noCapitalUsd,
+    available: bias.relevantWalletsCount > 0,
+    checkedAt: intelligence.generated_at,
+    confidence: bias.confidence === "none" ? "low" : bias.confidence,
+    noCapitalUsd: bias.noCapitalUsd,
+    reason: "Actividad publica de billeteras detectada por el endpoint read-only.",
+    relevantWalletsCount: bias.relevantWalletsCount,
+    signalDirection: bias.direction,
+    source: "backend",
+    thresholdUsd,
+    topWallets: relevantWallets.slice(0, 5),
+    warnings: intelligence.warnings,
+    yesCapitalUsd: bias.yesCapitalUsd,
+  };
 }
 
 function formatFreshnessStatus(value?: string | null): string {
@@ -2537,10 +2657,20 @@ function WalletIntelligencePanel({
   error?: string | null;
   intelligence?: WalletIntelligence | null;
 }) {
-  const readiness = getWalletIntelligenceReadiness(null);
-  const hasLargeTrades = (intelligence?.large_trades.length ?? 0) > 0;
-  const hasLargePositions = (intelligence?.large_positions.length ?? 0) > 0;
-  const hasNotableWallets = (intelligence?.notable_wallets.length ?? 0) > 0;
+  const walletSummary = getWalletSummaryFromBackend(intelligence);
+  const reading = getWalletSignalSummary(walletSummary);
+  const readiness = getWalletIntelligenceReadiness(
+    walletSummary
+      ? { walletIntelligence: { positions: walletSummary.topWallets, summary: walletSummary } }
+      : null,
+  );
+  const largeTrades = intelligence?.large_trades ?? [];
+  const largePositions = intelligence?.large_positions ?? [];
+  const notableWallets = intelligence?.notable_wallets ?? [];
+  const concentrationSides = intelligence?.concentration_summary?.sides ?? [];
+  const hasLargeTrades = largeTrades.length > 0;
+  const hasLargePositions = largePositions.length > 0;
+  const hasNotableWallets = notableWallets.length > 0;
   const walletWarnings = intelligence?.warnings ?? [];
   const missingConditionId = walletWarnings.includes("condition_id_unavailable");
   const emptyMessage = missingConditionId
@@ -2554,14 +2684,14 @@ function WalletIntelligencePanel({
           <span className="section-kicker">Senales publicas</span>
           <h2>Billeteras relevantes</h2>
           <p className="section-note">
-            En una fase futura, PolySignal analizara billeteras publicas con posiciones
-            de ${WALLET_INTELLIGENCE_THRESHOLD_USD}+ para detectar inclinacion YES/NO.
-            Es una senal auxiliar: no identifica personas reales ni recomienda copiar traders.
+            PolySignal revisa actividad publica read-only de wallets con posiciones
+            de ${WALLET_INTELLIGENCE_THRESHOLD_USD}+ cuando la fuente estructurada trae datos.
+            Es una senal auxiliar: no identifica personas reales ni recomienda copiar operaciones.
           </p>
         </div>
         {intelligence ? (
           <span className="timestamp-pill">
-            {intelligence.condition_id ? `Identificador ${shortIdentifier(intelligence.condition_id)}` : `Umbral ${formatUsd(intelligence.threshold_usd)}`}
+            {walletSummary?.checkedAt ? formatDateTime(walletSummary.checkedAt) : `Umbral ${formatUsd(intelligence.threshold_usd)}`}
           </span>
         ) : (
           <span className="timestamp-pill">Plan ${WALLET_INTELLIGENCE_THRESHOLD_USD}+</span>
@@ -2575,11 +2705,11 @@ function WalletIntelligencePanel({
         </div>
       ) : null}
 
-      {!intelligence || !intelligence.data_available ? (
+      {!walletSummary?.available ? (
         <>
-          {walletWarnings.length > 0 ? (
+          {reading.warnings.length > 0 ? (
             <div className="candidate-chip-list">
-              {walletWarnings.map((warning) => (
+              {reading.warnings.slice(0, 5).map((warning) => (
                 <span className="warning-chip" key={warning}>
                   {formatWarningLabel(warning)}
                 </span>
@@ -2590,7 +2720,7 @@ function WalletIntelligencePanel({
             <strong>{emptyMessage}</strong>
             <p>
               La probabilidad del mercado se mantiene como referencia, pero no cuenta
-              como estimacion PolySignal ni como inteligencia de billeteras.
+              como estimacion PolySignal ni como senal de billeteras.
             </p>
             <div className="data-health-notes">
               {readiness.checklist.map((item) => (
@@ -2603,28 +2733,61 @@ function WalletIntelligencePanel({
         </>
       ) : (
         <>
-          <div className="analysis-stat-grid">
+          <div className="wallet-signal-hero">
+            <span>{reading.auxiliaryLabel}</span>
+            <strong>{reading.headline}</strong>
+            <small>{reading.confidenceLabel}</small>
+          </div>
+
+          <div className="analysis-stat-grid wallet-signal-summary">
             <div>
-              <span>Operaciones grandes</span>
-              <strong>{intelligence.large_trades.length}</strong>
+              <span>Capital observado</span>
+              <strong>{formatUsd(walletSummary.analyzedCapitalUsd)}</strong>
             </div>
             <div>
-              <span>Posiciones grandes</span>
-              <strong>{intelligence.large_positions.length}</strong>
+              <span>Sesgo observado</span>
+              <strong>{reading.biasLabel}</strong>
             </div>
             <div>
               <span>Billeteras relevantes</span>
-              <strong>{intelligence.notable_wallets.length}</strong>
+              <strong>{walletSummary.relevantWalletsCount}</strong>
             </div>
             <div>
-              <span>Generado</span>
-              <strong>{formatDateTime(intelligence.generated_at)}</strong>
+              <span>Umbral</span>
+              <strong>{formatUsd(walletSummary.thresholdUsd)}</strong>
+            </div>
+            <div>
+              <span>Capital YES</span>
+              <strong>{formatUsd(walletSummary.yesCapitalUsd)}</strong>
+            </div>
+            <div>
+              <span>Capital NO</span>
+              <strong>{formatUsd(walletSummary.noCapitalUsd)}</strong>
             </div>
           </div>
 
-          {intelligence.warnings.length > 0 ? (
+          <div className="analysis-stat-grid compact">
+            <div>
+              <span>Operaciones grandes</span>
+              <strong>{largeTrades.length}</strong>
+            </div>
+            <div>
+              <span>Posiciones grandes</span>
+              <strong>{largePositions.length}</strong>
+            </div>
+            <div>
+              <span>Billeteras para revision</span>
+              <strong>{notableWallets.length}</strong>
+            </div>
+            <div>
+              <span>Actualizado</span>
+              <strong>{formatDateTime(walletSummary.checkedAt)}</strong>
+            </div>
+          </div>
+
+          {reading.warnings.length > 0 ? (
             <div className="candidate-chip-list">
-              {intelligence.warnings.map((warning) => (
+              {reading.warnings.slice(0, 5).map((warning) => (
                 <span className="warning-chip" key={warning}>
                   {formatWarningLabel(warning)}
                 </span>
@@ -2632,10 +2795,31 @@ function WalletIntelligencePanel({
             </div>
           ) : null}
 
+          {walletSummary.topWallets && walletSummary.topWallets.length > 0 ? (
+            <div className="wallet-activity-list compact">
+              <h3>Top wallets observadas</h3>
+              {walletSummary.topWallets.map((wallet) => (
+                <article className="wallet-activity-card compact" key={`${wallet.shortAddress}-${wallet.side}-${wallet.amountUsd}`}>
+                  <div className="wallet-activity-heading">
+                    <strong>{wallet.shortAddress}</strong>
+                    <span>{wallet.side === "UNKNOWN" ? "lado no confirmado" : wallet.side}</span>
+                  </div>
+                  <div className="wallet-activity-metrics">
+                    <span>{formatUsd(wallet.amountUsd)}</span>
+                    {typeof wallet.unrealizedPnlUsd === "number" ? (
+                      <span>PnL publico {formatUsd(wallet.unrealizedPnlUsd)}</span>
+                    ) : null}
+                    <span>Senal auxiliar</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+
           {hasLargeTrades ? (
             <div className="wallet-activity-list">
               <h3>Operaciones grandes</h3>
-              {intelligence.large_trades.slice(0, 5).map((trade) => (
+              {largeTrades.slice(0, 5).map((trade) => (
                 <article className="wallet-activity-card" key={`${trade.wallet_short}-${trade.timestamp}-${trade.trade_size_usd}`}>
                   <div className="wallet-activity-heading">
                     <strong>{trade.wallet_short}</strong>
@@ -2655,7 +2839,7 @@ function WalletIntelligencePanel({
           {hasLargePositions ? (
             <div className="wallet-activity-list">
               <h3>Posiciones grandes</h3>
-              {intelligence.large_positions.slice(0, 5).map((position) => (
+              {largePositions.slice(0, 5).map((position) => (
                 <article className="wallet-activity-card" key={`${position.wallet_short}-${position.side}-${position.position_size_usd}`}>
                   <div className="wallet-activity-heading">
                     <strong>{position.wallet_short}</strong>
@@ -2675,7 +2859,7 @@ function WalletIntelligencePanel({
           {hasNotableWallets ? (
             <div className="wallet-activity-list compact">
               <h3>Billeteras para revision</h3>
-              {intelligence.notable_wallets.slice(0, 5).map((wallet) => (
+              {notableWallets.slice(0, 5).map((wallet) => (
                 <article className="wallet-activity-card compact" key={wallet.wallet_short}>
                   <div className="wallet-activity-heading">
                     <strong>{wallet.wallet_short}</strong>
@@ -2693,11 +2877,11 @@ function WalletIntelligencePanel({
             </div>
           ) : null}
 
-          {intelligence.concentration_summary.sides.length > 0 ? (
+          {concentrationSides.length > 0 ? (
             <div className="wallet-concentration-box">
-              <h3>Concentración por lado</h3>
+              <h3>Concentracion por lado</h3>
               <div className="wallet-activity-metrics">
-                {intelligence.concentration_summary.sides.map((side) => (
+                {concentrationSides.map((side) => (
                   <span key={side.side}>
                     {side.side.toUpperCase()}: {formatUsd(side.total_position_size_usd)}
                   </span>
@@ -2713,7 +2897,8 @@ function WalletIntelligencePanel({
           ) : null}
           <p className="section-note">
             No se muestran direcciones completas por defecto. Sin historial cerrado
-            confiable, no se muestra tasa de acierto ni rentabilidad historica.
+            confiable, no se muestra tasa de acierto ni rentabilidad historica. Esta
+            senal contextualiza el mercado y no recomienda copiar operaciones.
           </p>
         </>
       )}

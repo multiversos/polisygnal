@@ -26,8 +26,10 @@ type BackendWalletSignal = {
   outcome?: string | null;
   position_size_usd?: number | string | null;
   price?: number | string | null;
+  realized_pnl?: number | string | null;
   side?: string | null;
   timestamp?: string | null;
+  total_pnl?: number | string | null;
   trade_size_usd?: number | string | null;
   wallet_address?: string | null;
   wallet_short?: string | null;
@@ -90,6 +92,7 @@ function safeWalletPosition(signal: BackendWalletSignal, fallbackMarketId?: stri
     marketId: fallbackMarketId,
     shortAddress,
     side: normalizeSide(signal.side ?? signal.outcome),
+    unrealizedPnlUsd: normalizeNumber(signal.total_pnl ?? signal.realized_pnl),
     walletAddress: shortAddress,
   };
 }

@@ -5353,6 +5353,57 @@ h2 {
   gap: 14px;
 }
 
+.wallet-signal-panel {
+  gap: 14px;
+}
+
+.wallet-signal-heading {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.wallet-signal-heading p {
+  margin: 6px 0 0;
+}
+
+.wallet-signal-hero {
+  border: 1px solid color-mix(in srgb, var(--blue) 28%, var(--line));
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface) 88%, var(--blue-soft)), var(--surface));
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.wallet-signal-hero span,
+.wallet-signal-hero small {
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.wallet-signal-hero strong {
+  color: var(--foreground);
+  font-size: clamp(1rem, 1.5vw, 1.25rem);
+  line-height: 1.2;
+}
+
+.wallet-signal-summary strong {
+  font-size: clamp(0.95rem, 1.2vw, 1.08rem);
+  line-height: 1.2;
+}
+
+.wallet-warning-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .wallet-activity-list {
   display: grid;
   gap: 10px;
@@ -7911,7 +7962,7 @@ html:not([data-theme="dark"]) .app-sidebar {
 
 .analyze-loading-skeletons {
   display: grid;
-  grid-template-columns: repeat(5, minmax(132px, 1fr));
+  grid-template-columns: repeat(6, minmax(118px, 1fr));
   gap: 10px;
 }
 
@@ -8214,7 +8265,7 @@ html:not([data-theme="dark"]) .app-sidebar {
   }
 
   .radar-market-category-chip {
-    width: 92px;
+    width: 86px;
     grid-template-columns: 20px minmax(0, 1fr);
     min-height: 32px;
     padding: 5px 6px;
@@ -8231,7 +8282,7 @@ html:not([data-theme="dark"]) .app-sidebar {
   }
 
   .radar-market-category-copy strong {
-    font-size: 0.61rem;
+    font-size: 0.58rem;
   }
 
   .radar-market-category-copy small {

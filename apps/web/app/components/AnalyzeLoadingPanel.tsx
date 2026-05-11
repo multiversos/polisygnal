@@ -50,7 +50,7 @@ const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
     shortLabel: "Multi-market",
   },
   {
-    detail: "Revisando actividad y contexto",
+    detail: "Revisando actividad, wallets publicas y contexto",
     label: "Evaluando senales disponibles",
     phase: "readiness",
     shortLabel: "Datos visibles",
@@ -73,6 +73,7 @@ const RESULT_SKELETONS = [
   "Mercado detectado",
   "Senales disponibles",
   "Contexto relevante",
+  "Billeteras publicas",
   "Evidencia pendiente",
   "Lectura final",
 ] as const;
@@ -132,6 +133,15 @@ function CategoryIcon({ id }: { id: string }) {
       </svg>
     );
   }
+  if (id === "wallets") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M5 7.5h12.5A2.5 2.5 0 0 1 20 10v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8.5A2.5 2.5 0 0 1 6.5 6H17" />
+        <path d="M16 12h4M16 15h4M8 11h4M8 14h3" />
+        <circle cx="17" cy="13.5" r=".7" />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="8" />
@@ -142,7 +152,7 @@ function CategoryIcon({ id }: { id: string }) {
 
 const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
   {
-    angle: 315,
+    angle: 320,
     icon: <CategoryIcon id="sports" />,
     id: "sports",
     label: "Deportes",
@@ -150,7 +160,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "scanning",
   },
   {
-    angle: 350,
+    angle: 0,
     icon: <CategoryIcon id="basketball" />,
     id: "basketball",
     label: "Baloncesto",
@@ -158,7 +168,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "pending",
   },
   {
-    angle: 25,
+    angle: 40,
     icon: <CategoryIcon id="baseball" />,
     id: "baseball",
     label: "Beisbol",
@@ -198,11 +208,19 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "pending",
   },
   {
-    angle: 250,
+    angle: 240,
     icon: <CategoryIcon id="global" />,
     id: "global",
     label: "Global",
     shortLabel: "eventos",
+    status: "scanning",
+  },
+  {
+    angle: 285,
+    icon: <CategoryIcon id="wallets" />,
+    id: "wallets",
+    label: "Billeteras",
+    shortLabel: "publicas",
     status: "scanning",
   },
 ];
@@ -348,8 +366,8 @@ export function AnalyzeLoadingPanel({
         ))}
       </div>
       <p className="analyze-loading-footnote">
-        Escaneando categorias y datos disponibles. Esto puede tardar unos
-        segundos segun el mercado.
+        Escaneando categorias, wallets publicas y datos disponibles. Esto puede
+        tardar unos segundos segun el mercado.
       </p>
     </section>
   );

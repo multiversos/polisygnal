@@ -41,6 +41,7 @@ import {
 import { getResearchCoverage } from "../lib/researchReadiness";
 import {
   getWalletIntelligenceReadiness,
+  getWalletSignalSummary,
   getWalletIntelligenceSummary,
 } from "../lib/walletIntelligence";
 import { getWalletIntelligenceForMarket } from "../lib/walletIntelligenceAdapter";
@@ -57,7 +58,6 @@ import type { MarketOverviewItem, MarketOverviewResponse } from "../lib/marketOv
 import type {
   WalletIntelligenceSummary,
   WalletMarketPosition,
-  WalletSignalDirection,
 } from "../lib/walletIntelligenceTypes";
 
 type AnalyzeMarketItem = MarketOverviewItem & {
@@ -128,22 +128,6 @@ function formatUsd(value: unknown): string {
     maximumFractionDigits: parsed >= 100 ? 0 : 2,
     style: "currency",
   }).format(parsed);
-}
-
-function walletDirectionLabel(direction: WalletSignalDirection): string {
-  if (direction === "YES") {
-    return "inclinacion YES";
-  }
-  if (direction === "NO") {
-    return "inclinacion NO";
-  }
-  if (direction === "NEUTRAL") {
-    return "neutral";
-  }
-  if (direction === "BOTH") {
-    return "ambos lados";
-  }
-  return "sin senal";
 }
 
 function formatDate(value?: string | null): string {
@@ -506,38 +490,69 @@ function ExternalResearchBlock({ item }: { item: MarketOverviewItem }) {
 function WalletIntelligenceBlock({ item }: { item: MarketOverviewItem }) {
   const summary = getWalletIntelligenceSummary(item);
   const readiness = getWalletIntelligenceReadiness(item);
+  const reading = getWalletSignalSummary(summary);
   const topWallets = summary.topWallets ?? [];
   return (
-    <div className="empty-state compact">
-      <strong>Inteligencia de billeteras</strong>
+    <div className="wallet-signal-panel empty-state compact">
+      <div className="wallet-signal-heading">
+        <div>
+          <strong>Inteligencia de billeteras</strong>
+          <p>{reading.explanation}</p>
+        </div>
+        <span className={summary.available ? "badge external-hint" : "badge muted"}>
+          {summary.available ? "Read-only conectado" : "Pendiente"}
+        </span>
+      </div>
       {summary.available ? (
-        <p>
-          Billeteras publicas relevantes detectadas por encima de ${summary.thresholdUsd}+.
-          Esta lectura muestra actividad publica agregada y solo sirve como senal auxiliar.
-        </p>
+        <div className="wallet-signal-hero">
+          <span>{reading.auxiliaryLabel}</span>
+          <strong>{reading.headline}</strong>
+          <small>{reading.confidenceLabel}</small>
+        </div>
       ) : (
         <p>
-          Aun no hay datos suficientes de billeteras para este mercado. PolySignal puede
-          revisar billeteras publicas con movimientos relevantes de $100 o mas cuando haya
-          una fuente estructurada disponible.
+          No hay suficientes datos publicos de billeteras para este mercado. PolySignal
+          puede revisar wallets publicas con movimientos relevantes de $100 o mas cuando
+          la fuente estructurada traiga actividad.
         </p>
       )}
-      <div className="data-health-notes">
-        <span className={summary.available ? "badge external-hint" : "badge muted"}>
-          Estado: {summary.available ? "datos publicos disponibles" : "pendiente"}
-        </span>
-        <span className="badge muted">Umbral: ${summary.thresholdUsd}+</span>
-        <span className="badge muted">Billeteras relevantes: {summary.relevantWalletsCount}</span>
-        <span className="badge muted">Sesgo: {walletDirectionLabel(summary.signalDirection)}</span>
+      <div className="analysis-stat-grid wallet-signal-summary">
+        <div>
+          <span>Billeteras relevantes</span>
+          <strong>{summary.relevantWalletsCount}</strong>
+        </div>
+        <div>
+          <span>Umbral usado</span>
+          <strong>${summary.thresholdUsd}+</strong>
+        </div>
+        <div>
+          <span>Sesgo observado</span>
+          <strong>{reading.biasLabel}</strong>
+        </div>
+        <div>
+          <span>Confianza</span>
+          <strong>{reading.confidenceLabel}</strong>
+        </div>
         {summary.analyzedCapitalUsd !== undefined ? (
-          <span className="badge muted">Capital observado: {formatUsd(summary.analyzedCapitalUsd)}</span>
+          <div>
+            <span>Capital observado</span>
+            <strong>{formatUsd(summary.analyzedCapitalUsd)}</strong>
+          </div>
         ) : null}
         {summary.yesCapitalUsd !== undefined ? (
-          <span className="badge muted">YES: {formatUsd(summary.yesCapitalUsd)}</span>
+          <div>
+            <span>Capital YES</span>
+            <strong>{formatUsd(summary.yesCapitalUsd)}</strong>
+          </div>
         ) : null}
         {summary.noCapitalUsd !== undefined ? (
-          <span className="badge muted">NO: {formatUsd(summary.noCapitalUsd)}</span>
+          <div>
+            <span>Capital NO</span>
+            <strong>{formatUsd(summary.noCapitalUsd)}</strong>
+          </div>
         ) : null}
+      </div>
+      <div className="data-health-notes">
         {readiness.checklist.slice(0, 5).map((item) => (
           <span className={item.available ? "badge external-hint" : "badge muted"} key={item.label}>
             {item.label}: {item.available ? "disponible" : "pendiente"}
@@ -555,15 +570,27 @@ function WalletIntelligenceBlock({ item }: { item: MarketOverviewItem }) {
               </div>
               <div className="wallet-activity-metrics">
                 <span>{formatUsd(wallet.amountUsd)}</span>
+                {typeof wallet.unrealizedPnlUsd === "number" ? (
+                  <span>PnL publico {formatUsd(wallet.unrealizedPnlUsd)}</span>
+                ) : null}
                 <span>Senal auxiliar</span>
               </div>
             </article>
           ))}
         </div>
       ) : null}
+      {reading.warnings.length > 0 ? (
+        <div className="wallet-warning-list">
+          {reading.warnings.slice(0, 4).map((warning) => (
+            <span className="warning-chip" key={warning}>
+              {warning}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <p className="section-note">
-        Esta senal revisara billeteras publicas con movimientos relevantes, pero no intenta
-        identificar personas reales ni recomienda copiar traders. No crea estimaciones por si sola.
+        Esta senal usa actividad publica de wallets y no intenta identificar personas reales.
+        Wallet Intelligence ayuda a contextualizar el mercado, pero no basta para una estimacion propia.
       </p>
       <p className="section-note">
         {summary.available
