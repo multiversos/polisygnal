@@ -279,34 +279,36 @@ If this test fails, stop feature work and treat it as a production regression.
 24. Confirm it says there are no verified external sources if no real findings
    are loaded.
 25. Confirm `Inteligencia de billeteras` is visible.
-26. Confirm it says wallet data is pending or unavailable when no real source is
-   connected.
-27. Confirm it does not show fake wallets, full wallet addresses, ROI, win rate,
+26. If wallet data exists, confirm it shows only shortened wallet addresses,
+   threshold `$100+`, side/capital summary, and auxiliary-signal copy.
+27. If no wallet data exists, confirm it says pending or unavailable without
+   breaking the analysis result.
+28. Confirm it does not show fake wallets, full wallet addresses, ROI, win rate,
    or copied-trader advice.
-28. Confirm it says public wallets are not mapped to real people and that the
-   signal will be auxiliary.
-29. Confirm `Decision de PolySignal` follows the 55% threshold:
+29. Confirm it says public wallets are not mapped to real people and that the
+   signal is auxiliary, not a prediction.
+30. Confirm `Decision de PolySignal` follows the 55% threshold:
    YES `>=55%` is clear YES, NO `>=55%` is clear NO, and 45/55 is `Sin decision fuerte`.
-30. Confirm market price alone never creates a PolySignal predicted side.
-31. Confirm it shows only real visible data: title, event, status, price if
+31. Confirm market price alone never creates a PolySignal predicted side.
+32. Confirm it shows only real visible data: title, event, status, price if
    available, volume/liquidity if available, and last update.
-32. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
+33. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
    `Ver futbol` when a market is matched.
-33. Save the analysis, open `/history`, and confirm the item appears as
+34. Save the analysis, open `/history`, and confirm the item appears as
    `Desde enlace`.
-34. Confirm the saved history item shows market YES/NO probability if it was
+35. Confirm the saved history item shows market YES/NO probability if it was
     available, and PolySignal YES/NO only if it existed.
-35. Confirm `/history` shows whether the item counts for precision or does not
+36. Confirm `/history` shows whether the item counts for precision or does not
     count yet.
-36. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
+37. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
     inventing data when there are not enough comparable records.
-37. Confirm a no-match link can only be saved as pending and does not invent a
+38. Confirm a no-match link can only be saved as pending and does not invent a
    probability.
-38. Confirm the page does not promise profit, certainty, or betting advice.
-39. Confirm the saved record only gets a PolySignal predicted side when a real
+39. Confirm the page does not promise profit, certainty, or betting advice.
+40. Confirm the saved record only gets a PolySignal predicted side when a real
     PolySignal estimate crossed the 55% threshold. Market price alone must not
     create a predicted side.
-40. Confirm saved matched records preserve Polymarket identifiers when available
+41. Confirm saved matched records preserve Polymarket identifiers when available
     so Historial can later verify outcomes automatically.
 
 ## Alertas
@@ -374,8 +376,8 @@ If this test fails, stop feature work and treat it as a production regression.
    - Sin evidencia externa.
    - Pendiente de integracion de fuentes.
 8. Confirm it shows Wallet Intelligence readiness:
-   - Pendiente de fuente estructurada.
-   - Umbral planificado `$100+`.
+   - Disponible parcial read-only or Read-only conectado.
+   - Umbral activo `$100+`.
    - No addresses or personal data.
 9. Confirm this page is not linked from the public sidebar or public pages.
 10. Confirm it does not show secrets, connection strings, stack traces, or large

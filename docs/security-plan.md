@@ -113,18 +113,22 @@ not a customer-data feature and does not store wallet history today.
 
 Current constraints:
 
-- `/analyze` does not call external wallet APIs.
-- Frontend helper `walletIntelligenceAdapter.ts` returns unavailable until a
-  structured source is explicitly connected.
-- Wallet summaries use a planned `100 USD` relevance threshold.
-- Full wallet addresses must not be shown by default; use shortened addresses.
+- `/analyze` uses the existing read-only backend endpoint through the constrained
+  same-origin proxy; it does not call wallet sources directly from the browser.
+- `walletIntelligenceAdapter.ts` requests only
+  `/markets/{market_id}/wallet-intelligence` for numeric local market IDs.
+- Wallet summaries use a `100 USD` relevance threshold.
+- Full wallet addresses must not be shown by default; public UI renders
+  shortened addresses only.
 - Public wallet data must never be mapped to real-world identities.
 - No ROI, win rate, or wallet history is shown unless computed from reliable
-  structured data.
+  structured resolved-position data.
 - Wallet Intelligence must not create a PolySignal estimate or `predictedSide`
   by itself.
+- Lookup failures return a generic unavailable state and must not expose raw
+  payloads, backend details, or complete wallet lists.
 
-Before enabling real wallet lookups from `/analyze`:
+Before expanding real wallet lookups:
 
 - add rate limiting;
 - keep lookups server-side;

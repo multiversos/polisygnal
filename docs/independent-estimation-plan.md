@@ -114,9 +114,11 @@ If no real source exists, findings stay empty and the UI shows missing
 categories instead of demo data.
 
 `walletIntelligence.ts` and `walletIntelligenceAdapter.ts` now define the
-future wallet signal boundary. They default to unavailable, use a planned
-`100 USD` threshold, abbreviate wallet addresses, and do not fetch external
-data from the frontend.
+wallet signal boundary. The adapter is read-only, uses the existing backend
+wallet-intelligence endpoint through the same-origin proxy, applies a `100 USD`
+threshold, abbreviates wallet addresses, and returns unavailable if the endpoint
+has no reliable data. It does not expose raw wallet payloads and does not
+generate a PolySignal estimate.
 
 ## Conservative Engine V0
 

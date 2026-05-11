@@ -66,6 +66,7 @@ function loadTsModule(relativePath) {
     Response,
     setTimeout,
     URL,
+    URLSearchParams,
   });
   new vm.Script(compiled, { filename: absolutePath }).runInContext(context);
   return module.exports;
@@ -371,7 +372,7 @@ function validateResearchReadinessRules() {
   return { cases: 5 };
 }
 
-function validateWalletIntelligenceRules() {
+async function validateWalletIntelligenceRules() {
   const {
     WALLET_INTELLIGENCE_THRESHOLD_USD,
     calculateWalletSideBias,
@@ -387,34 +388,37 @@ function validateWalletIntelligenceRules() {
   const { collectIndependentSignals } = loadTsModule("app/lib/estimationSignals.ts");
   const { getPolySignalEstimate } = loadTsModule("app/lib/polySignalEstimateEngine.ts");
 
+  const fullWallet = "0x1234567890abcdef1234567890abcdef12345678";
+  const secondWallet = "0x2222222222222222222222222222222222222222";
+
   assert(WALLET_INTELLIGENCE_THRESHOLD_USD === 100, "expected wallet intelligence threshold to be $100");
-  assert(formatWalletAddress("0x1234567890abcdef") === "0x1234...cdef", "expected wallet addresses to be shortened");
+  assert(formatWalletAddress(fullWallet) === "0x1234...5678", "expected wallet addresses to be shortened");
   const empty = getWalletIntelligenceSummary({});
   assert(!empty.available, "expected empty wallet intelligence to be unavailable");
   assert(empty.relevantWalletsCount === 0, "expected empty wallet intelligence not to invent wallets");
   assert(empty.signalDirection === "UNKNOWN", "expected empty wallet intelligence not to invent a side");
-  assert(!JSON.stringify(empty).includes("0x1234567890abcdef"), "empty wallet summary should not include wallet addresses");
+  assert(!JSON.stringify(empty).includes(fullWallet), "empty wallet summary should not include wallet addresses");
 
   const belowThreshold = filterRelevantWallets(
-    [{ amountUsd: 99, shortAddress: "", side: "YES", walletAddress: "0x1234567890abcdef" }],
+    [{ amountUsd: 99, shortAddress: "", side: "YES", walletAddress: fullWallet }],
     100,
   );
   assert(belowThreshold.length === 0, "expected wallets below $100 to be ignored");
 
   const relevant = filterRelevantWallets(
     [
-      { amountUsd: 150, shortAddress: "", side: "YES", walletAddress: "0x1234567890abcdef" },
-      { amountUsd: 40, shortAddress: "", side: "NO", walletAddress: "0x2222222222222222" },
+      { amountUsd: 150, shortAddress: "", side: "YES", walletAddress: fullWallet },
+      { amountUsd: 40, shortAddress: "", side: "NO", walletAddress: secondWallet },
     ],
     100,
   );
   assert(relevant.length === 1, "expected only $100+ wallets to be relevant");
-  assert(relevant[0].shortAddress === "0x1234...cdef", "expected relevant wallet to store short address");
+  assert(relevant[0].shortAddress === "0x1234...5678", "expected relevant wallet to store short address");
 
   const bias = calculateWalletSideBias(
     [
-      { amountUsd: 150, shortAddress: "", side: "YES", walletAddress: "0x1234567890abcdef" },
-      { amountUsd: 140, shortAddress: "", side: "NO", walletAddress: "0x2222222222222222" },
+      { amountUsd: 150, shortAddress: "", side: "YES", walletAddress: fullWallet },
+      { amountUsd: 140, shortAddress: "", side: "NO", walletAddress: secondWallet },
     ],
     100,
   );
@@ -424,12 +428,92 @@ function validateWalletIntelligenceRules() {
   assert(!readiness.available, "expected wallet readiness to be unavailable without data");
   assert(readiness.missing.includes("Posiciones por billetera"), "expected wallet readiness to list missing positions");
 
-  const adapter = getWalletIntelligenceForMarket({ marketId: "1" });
-  assert(!adapter.available, "expected wallet adapter scaffold not to fetch or invent data");
-  assert(adapter.reason.includes("Pendiente"), "expected adapter to explain pending structured source");
+  const invalidAdapter = await getWalletIntelligenceForMarket({ marketId: "bad-id" });
+  assert(!invalidAdapter.available, "expected invalid wallet adapter input to stay unavailable");
+
+  const originalFetch = globalThis.fetch;
+  try {
+    const calls = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({ init, url: String(url) });
+      return new Response(
+        JSON.stringify({
+          concentration_summary: {
+            sides: [{ side: "yes", total_position_size_usd: "1500", wallet_count: 1 }],
+            total_position_size_usd: "1500",
+          },
+          data_available: true,
+          generated_at: "2026-05-11T00:00:00Z",
+          large_positions: [
+            {
+              avg_price: "0.41",
+              current_price: "0.44",
+              outcome: "yes",
+              position_size_usd: "1500",
+              wallet_address: fullWallet,
+              wallet_short: "0x1234...5678",
+            },
+          ],
+          large_trades: [
+            {
+              outcome: "no",
+              price: "0.31",
+              trade_size_usd: "80",
+              wallet_address: secondWallet,
+              wallet_short: "0x2222...2222",
+            },
+          ],
+          threshold_usd: "100",
+          warnings: ["concentrated_side_activity"],
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 200 },
+      );
+    };
+    const adapter = await getWalletIntelligenceForMarket({ marketId: "46" });
+    assert(adapter.available, "expected real backend wallet data to become available");
+    assert(adapter.source === "backend", "expected connected adapter to mark backend source");
+    assert(adapter.relevantWalletsCount === 1, "expected adapter to filter below-threshold wallet rows");
+    assert(adapter.signalDirection === "YES", "expected adapter to use real side bias");
+    assert(adapter.topWallets?.[0]?.shortAddress === "0x1234...5678", "expected adapter to keep short wallet address");
+    assert(
+      adapter.topWallets?.every((wallet) => wallet.walletAddress === wallet.shortAddress),
+      "expected adapter not to keep full wallet addresses in sanitized positions",
+    );
+    assert(calls[0].url.includes("/api/backend/markets/46/wallet-intelligence"), "expected adapter to use backend proxy route");
+    assert(calls[0].init?.method === "GET", "expected adapter to use GET only");
+    assert(calls[0].init?.credentials === "omit", "expected adapter not to send browser credentials");
+    assert(calls[0].init?.redirect === "error", "expected adapter not to follow redirects");
+    assert(!JSON.stringify(adapter).includes(fullWallet), "connected adapter leaked a full wallet address");
+    assert(!JSON.stringify(adapter).includes("winRate"), "connected adapter should not invent win rate");
+    assert(!JSON.stringify(adapter).includes("estimatedRoi"), "connected adapter should not invent ROI");
+
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ data_available: false, warnings: ["condition_id_unavailable"] }), {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      });
+    const unavailable = await getWalletIntelligenceForMarket({ marketId: "47" });
+    assert(!unavailable.available, "expected no wallet data response to stay unavailable");
+    assert(unavailable.reason.includes("Aun no hay datos"), "expected no-data adapter to explain unavailable data");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 
   const marketWithWalletData = {
-    walletPositions: [{ amountUsd: 150, shortAddress: "", side: "YES", walletAddress: "0x1234567890abcdef" }],
+    walletIntelligence: {
+      positions: [{ amountUsd: 150, shortAddress: "0x1234...5678", side: "YES", walletAddress: "0x1234...5678" }],
+      summary: {
+        available: true,
+        confidence: "low",
+        reason: "Fixture only.",
+        relevantWalletsCount: 1,
+        signalDirection: "YES",
+        source: "backend",
+        thresholdUsd: 100,
+        topWallets: [{ amountUsd: 150, shortAddress: "0x1234...5678", side: "YES", walletAddress: "0x1234...5678" }],
+        warnings: [],
+      },
+    },
   };
   const walletSignals = collectIndependentSignals(marketWithWalletData);
   assert(
@@ -441,7 +525,7 @@ function validateWalletIntelligenceRules() {
     "expected wallet data alone not to create a PolySignal estimate",
   );
 
-  return { cases: 11, threshold_usd: WALLET_INTELLIGENCE_THRESHOLD_USD };
+  return { cases: 17, threshold_usd: WALLET_INTELLIGENCE_THRESHOLD_USD };
 }
 
 function validateAnalyzeLoadingPanelSource() {
@@ -730,7 +814,7 @@ const decisionChecks = validateAnalysisDecisionRules();
 const estimateQualityChecks = validateEstimateQualityRules();
 const estimateEngineChecks = validateEstimateEngineRules();
 const researchReadinessChecks = validateResearchReadinessRules();
-const walletIntelligenceChecks = validateWalletIntelligenceRules();
+const walletIntelligenceChecks = await validateWalletIntelligenceRules();
 const analyzeLoadingPanelChecks = validateAnalyzeLoadingPanelSource();
 const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
 const resolutionRouteChecks = await validateResolvePolymarketRoute();

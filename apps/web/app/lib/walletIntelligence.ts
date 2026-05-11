@@ -64,7 +64,9 @@ function cleanProfiles(profiles?: WalletPerformanceProfile[] | null): WalletPerf
 
 function getWalletPositions(input: WalletIntelligenceSource): WalletMarketPosition[] {
   return [
+    ...cleanPositions(input.walletIntelligence?.summary?.topWallets),
     ...cleanPositions(input.walletIntelligence?.positions),
+    ...cleanPositions(input.wallet_intelligence?.summary?.topWallets),
     ...cleanPositions(input.wallet_intelligence?.positions),
     ...cleanPositions(input.walletPositions),
     ...cleanPositions(input.wallet_positions),
@@ -216,7 +218,9 @@ export function getWalletIntelligenceSummary(
   if (savedSummary?.available) {
     return {
       ...savedSummary,
+      source: savedSummary.source ?? "local",
       thresholdUsd: savedSummary.thresholdUsd ?? thresholdUsd,
+      topWallets: filterRelevantWallets(savedSummary.topWallets, savedSummary.thresholdUsd ?? thresholdUsd),
       warnings: savedSummary.warnings ?? [],
     };
   }
@@ -230,6 +234,7 @@ export function getWalletIntelligenceSummary(
       reason: "Aun no hay datos de billeteras suficientes para este mercado.",
       relevantWalletsCount: 0,
       signalDirection: "UNKNOWN",
+      source: "unavailable",
       thresholdUsd,
       warnings: [
         "No se muestran direcciones completas por defecto.",
@@ -258,7 +263,9 @@ export function getWalletIntelligenceSummary(
       "Hay posiciones publicas por encima del umbral. Esta lectura requiere validacion antes de usarse como senal de estimacion.",
     relevantWalletsCount: bias.relevantWalletsCount,
     signalDirection: bias.direction,
+    source: "local",
     thresholdUsd,
+    topWallets: relevantPositions.slice(0, 5),
     trustedNoWallets,
     trustedYesWallets,
     warnings: [

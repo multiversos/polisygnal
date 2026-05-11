@@ -45,12 +45,15 @@ export type WalletPerformanceProfile = {
 export type WalletIntelligenceSummary = {
   analyzedCapitalUsd?: number;
   available: boolean;
+  checkedAt?: string;
   confidence: "high" | "low" | "medium" | "none";
   noCapitalUsd?: number;
   reason: string;
   relevantWalletsCount: number;
   signalDirection: WalletSignalDirection;
+  source?: "backend" | "local" | "unavailable";
   thresholdUsd: number;
+  topWallets?: WalletMarketPosition[];
   trustedNoWallets?: number;
   trustedYesWallets?: number;
   warnings: string[];

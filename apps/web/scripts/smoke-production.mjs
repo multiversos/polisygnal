@@ -198,6 +198,10 @@ function assertTextExcludes(text, blocked, label) {
   assert(found.length === 0, `${label} rendered blocked text: ${found.join(", ")}`);
 }
 
+function assertNoFullWalletAddress(text, label) {
+  assert(!/0x[a-fA-F0-9]{40}/.test(text), `${label} rendered a full wallet address`);
+}
+
 function assertSportIconsRendered(dom, label) {
   assert(dom.includes("sport-icon-svg"), `${label} did not render sport SVG icons`);
   assert(
@@ -466,6 +470,7 @@ function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTo
 
 function validateMarketDetailPage(dom, label) {
   const text = visibleText(dom);
+  assertNoFullWalletAddress(text, label);
   assertTextIncludesOneOf(text, ["Seguir mercado", "Siguiendo"], `${label} watchlist action`);
   assertTextIncludes(text, "Volver a mercados deportivos", label);
   assertTextIncludesOneOf(text, SOCCER_RETURN_TEXT, `${label} sport return`);
@@ -629,8 +634,16 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Con evidencia externa real", "internal external research readiness");
   assertTextIncludes(text, "Sin evidencia externa", "internal external research readiness");
   assertTextIncludes(text, "Inteligencia de billeteras", "internal wallet intelligence readiness");
-  assertTextIncludes(text, "Pendiente de fuente estructurada", "internal wallet intelligence readiness");
-  assertTextIncludes(text, "Umbral planificado", "internal wallet intelligence threshold");
+  assertTextIncludesOneOf(
+    text,
+    ["Disponible parcial read-only", "Read-only conectado", "Pendiente de fuente estructurada"],
+    "internal wallet intelligence readiness",
+  );
+  assertTextIncludesOneOf(
+    text,
+    ["Umbral planificado", "Umbral activo"],
+    "internal wallet intelligence threshold",
+  );
   assertTextExcludes(
     text,
     ["DATABASE_URL", "SECRET", "TOKEN", "API_KEY", "postgres://", "postgresql://"],
@@ -875,6 +888,7 @@ async function main() {
     urlFor(`${ANALYZE_PATH}?url=${encodeURIComponent(validAnalyzeUrl)}&auto=1`),
   );
   const validAnalyzeText = visibleText(validAnalyzeDom);
+  assertNoFullWalletAddress(validAnalyzeText, "analyze valid wallet privacy");
   assertTextIncludesOneOf(
     validAnalyzeText,
     ["Coincidencia encontrada", "Posibles coincidencias"],
@@ -906,7 +920,12 @@ async function main() {
   assertTextIncludes(validAnalyzeText, "Inteligencia de billeteras", "analyze wallet intelligence readiness");
   assertTextIncludesOneOf(
     validAnalyzeText,
-    ["no intenta identificar personas reales", "movimientos relevantes de $100", "movimientos relevantes de 100"],
+    [
+      "no intenta identificar personas reales",
+      "movimientos relevantes de $100",
+      "movimientos relevantes de 100",
+      "Billeteras publicas relevantes detectadas",
+    ],
     "analyze wallet privacy copy",
   );
   assertTextIncludesOneOf(

@@ -76,10 +76,11 @@ Estado visible verificado:
   reales para simular avance.
 - Existe una primera capa de Wallet Intelligence:
   `walletIntelligenceTypes.ts`, `walletIntelligence.ts` y
-  `walletIntelligenceAdapter.ts`. La capa frontend no hace fetch externo,
-  devuelve no disponible cuando no hay datos reales, usa umbral planificado de
-  `100 USD`, abrevia direcciones y deja claro que no identifica personas ni
-  recomienda copiar traders.
+  `walletIntelligenceAdapter.ts`. El adapter consulta de forma read-only el
+  endpoint existente `/markets/{market_id}/wallet-intelligence` a traves del
+  proxy same-origin, filtra por `100 USD`, abrevia direcciones, no devuelve
+  payloads crudos y deja claro que no identifica personas ni recomienda copiar
+  traders.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion
@@ -234,9 +235,9 @@ Riesgos pendientes:
   forma reciente, lesiones, suspensiones, odds externas ni calibracion;
 - la investigacion externa real todavia no esta conectada a APIs deportivas,
   odds, noticias o fuentes oficiales;
-- Wallet Intelligence aun no esta conectada al Analizador como consulta real;
-  faltan rate limits, fuente estructurada aprobada, politica de retencion y
-  calculo confiable de win rate/ROI;
+- Wallet Intelligence ya esta conectada como consulta read-only sanitizada en
+  el Analizador, pero faltan rate limits mas fuertes, politica de retencion y
+  calculo confiable de win rate/ROI desde historial resuelto;
 - snapshots/analisis de soccer siguen con datos stale hasta refresh
   supervisado;
 - npm audit mantiene 2 moderadas via Next/PostCSS, documentadas sin force fix.

@@ -43,6 +43,7 @@ import {
   getWalletIntelligenceReadiness,
   getWalletIntelligenceSummary,
 } from "../lib/walletIntelligence";
+import { getWalletIntelligenceForMarket } from "../lib/walletIntelligenceAdapter";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { saveAnalysisHistoryItem } from "../lib/analysisHistory";
@@ -53,9 +54,21 @@ import {
   type WatchlistMarketDraft,
 } from "../lib/watchlist";
 import type { MarketOverviewItem, MarketOverviewResponse } from "../lib/marketOverview";
+import type {
+  WalletIntelligenceSummary,
+  WalletMarketPosition,
+  WalletSignalDirection,
+} from "../lib/walletIntelligenceTypes";
+
+type AnalyzeMarketItem = MarketOverviewItem & {
+  walletIntelligence?: {
+    positions?: WalletMarketPosition[] | null;
+    summary?: WalletIntelligenceSummary | null;
+  } | null;
+};
 
 type MatchResult = {
-  item: MarketOverviewItem;
+  item: AnalyzeMarketItem;
   reasons: string[];
   score: number;
 };
@@ -103,6 +116,34 @@ function formatMetric(value: unknown): string {
     maximumFractionDigits: parsed >= 100 ? 0 : 1,
     notation: parsed >= 100000 ? "compact" : "standard",
   }).format(parsed);
+}
+
+function formatUsd(value: unknown): string {
+  const parsed = toNumber(value);
+  if (parsed === null) {
+    return "sin dato";
+  }
+  return new Intl.NumberFormat("es", {
+    currency: "USD",
+    maximumFractionDigits: parsed >= 100 ? 0 : 2,
+    style: "currency",
+  }).format(parsed);
+}
+
+function walletDirectionLabel(direction: WalletSignalDirection): string {
+  if (direction === "YES") {
+    return "inclinacion YES";
+  }
+  if (direction === "NO") {
+    return "inclinacion NO";
+  }
+  if (direction === "NEUTRAL") {
+    return "neutral";
+  }
+  if (direction === "BOTH") {
+    return "ambos lados";
+  }
+  return "sin senal";
 }
 
 function formatDate(value?: string | null): string {
@@ -216,8 +257,8 @@ function scoreMarketMatch(item: MarketOverviewItem, normalizedUrl: string, terms
   return { item, reasons, score };
 }
 
-async function fetchComparableMarkets(): Promise<MarketOverviewItem[]> {
-  const allItems: MarketOverviewItem[] = [];
+async function fetchComparableMarkets(): Promise<AnalyzeMarketItem[]> {
+  const allItems: AnalyzeMarketItem[] = [];
   let total = 0;
   for (let offset = 0; offset < MAX_MARKETS_TO_COMPARE; offset += MARKET_PAGE_SIZE) {
     const params = new URLSearchParams({
@@ -238,13 +279,39 @@ async function fetchComparableMarkets(): Promise<MarketOverviewItem[]> {
   return allItems;
 }
 
-function findMatches(items: MarketOverviewItem[], normalizedUrl: string): MatchResult[] {
+function findMatches(items: AnalyzeMarketItem[], normalizedUrl: string): MatchResult[] {
   const terms = extractPossibleMarketTerms(normalizedUrl);
   return items
     .map((item) => scoreMarketMatch(item, normalizedUrl, terms))
     .filter((match) => match.score >= 35)
     .sort((left, right) => right.score - left.score)
     .slice(0, 5);
+}
+
+async function enrichMatchesWithWalletIntelligence(matches: MatchResult[]): Promise<MatchResult[]> {
+  return Promise.all(
+    matches.map(async (match, index) => {
+      if (index >= 3 || !match.item.market?.id) {
+        return match;
+      }
+      const summary = await getWalletIntelligenceForMarket({
+        eventSlug: match.item.market.event_slug ?? undefined,
+        marketId: String(match.item.market.id),
+        marketSlug: match.item.market.market_slug ?? undefined,
+        remoteId: match.item.market.remote_id ?? undefined,
+      });
+      return {
+        ...match,
+        item: {
+          ...match.item,
+          walletIntelligence: {
+            positions: summary.topWallets ?? [],
+            summary,
+          },
+        },
+      };
+    }),
+  );
 }
 
 function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: string) {
@@ -439,29 +506,69 @@ function ExternalResearchBlock({ item }: { item: MarketOverviewItem }) {
 function WalletIntelligenceBlock({ item }: { item: MarketOverviewItem }) {
   const summary = getWalletIntelligenceSummary(item);
   const readiness = getWalletIntelligenceReadiness(item);
+  const topWallets = summary.topWallets ?? [];
   return (
     <div className="empty-state compact">
       <strong>Inteligencia de billeteras</strong>
-      <p>
-        Aun no hay datos suficientes de billeteras para este mercado. En una fase futura,
-        PolySignal podra analizar billeteras publicas con movimientos relevantes de $100 o mas.
-      </p>
+      {summary.available ? (
+        <p>
+          Billeteras publicas relevantes detectadas por encima de ${summary.thresholdUsd}+.
+          Esta lectura muestra actividad publica agregada y solo sirve como senal auxiliar.
+        </p>
+      ) : (
+        <p>
+          Aun no hay datos suficientes de billeteras para este mercado. PolySignal puede
+          revisar billeteras publicas con movimientos relevantes de $100 o mas cuando haya
+          una fuente estructurada disponible.
+        </p>
+      )}
       <div className="data-health-notes">
         <span className={summary.available ? "badge external-hint" : "badge muted"}>
-          Estado: {summary.available ? "datos estructurados disponibles" : "pendiente"}
+          Estado: {summary.available ? "datos publicos disponibles" : "pendiente"}
         </span>
-        <span className="badge muted">Umbral planificado: ${summary.thresholdUsd}+</span>
+        <span className="badge muted">Umbral: ${summary.thresholdUsd}+</span>
         <span className="badge muted">Billeteras relevantes: {summary.relevantWalletsCount}</span>
-        <span className="badge muted">Direccion: {summary.signalDirection === "UNKNOWN" ? "sin senal" : summary.signalDirection}</span>
+        <span className="badge muted">Sesgo: {walletDirectionLabel(summary.signalDirection)}</span>
+        {summary.analyzedCapitalUsd !== undefined ? (
+          <span className="badge muted">Capital observado: {formatUsd(summary.analyzedCapitalUsd)}</span>
+        ) : null}
+        {summary.yesCapitalUsd !== undefined ? (
+          <span className="badge muted">YES: {formatUsd(summary.yesCapitalUsd)}</span>
+        ) : null}
+        {summary.noCapitalUsd !== undefined ? (
+          <span className="badge muted">NO: {formatUsd(summary.noCapitalUsd)}</span>
+        ) : null}
         {readiness.checklist.slice(0, 5).map((item) => (
           <span className={item.available ? "badge external-hint" : "badge muted"} key={item.label}>
             {item.label}: {item.available ? "disponible" : "pendiente"}
           </span>
         ))}
       </div>
+      {topWallets.length > 0 ? (
+        <div className="wallet-activity-list compact">
+          <h4>Billeteras destacadas</h4>
+          {topWallets.slice(0, 5).map((wallet) => (
+            <article className="wallet-activity-card compact" key={`${wallet.shortAddress}-${wallet.side}-${wallet.amountUsd}`}>
+              <div className="wallet-activity-heading">
+                <strong>{wallet.shortAddress}</strong>
+                <span>{wallet.side === "UNKNOWN" ? "lado no confirmado" : wallet.side}</span>
+              </div>
+              <div className="wallet-activity-metrics">
+                <span>{formatUsd(wallet.amountUsd)}</span>
+                <span>Senal auxiliar</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
       <p className="section-note">
         Esta senal revisara billeteras publicas con movimientos relevantes, pero no intenta
         identificar personas reales ni recomienda copiar traders. No crea estimaciones por si sola.
+      </p>
+      <p className="section-note">
+        {summary.available
+          ? "No se muestra ROI ni tasa de acierto si no hay historial cerrado confiable."
+          : summary.reason}
       </p>
     </div>
   );
@@ -686,6 +793,7 @@ export default function AnalyzePage() {
         return;
       }
       const matches = findMatches(markets, validation.normalizedUrl);
+      let enrichedMatches = matches;
       const previewMarket = matches[0]?.item;
 
       if (previewMarket) {
@@ -706,23 +814,27 @@ export default function AnalyzePage() {
           return;
         }
         getResearchCoverage(previewMarket, []);
-        getWalletIntelligenceSummary(previewMarket);
+        enrichedMatches = await enrichMatchesWithWalletIntelligence(matches);
+        if (!isCurrentRun()) {
+          return;
+        }
+        getWalletIntelligenceSummary(enrichedMatches[0]?.item);
       }
 
       if (!(await advancePhase("preparing"))) {
         return;
       }
 
-      if (matches[0]?.score >= 65) {
+      if (enrichedMatches[0]?.score >= 65) {
         setState({
-          matches,
+          matches: enrichedMatches,
           message: "Encontramos una coincidencia fuerte con los mercados cargados.",
           normalizedUrl: validation.normalizedUrl,
           status: "matched",
         });
-      } else if (matches.length > 0) {
+      } else if (enrichedMatches.length > 0) {
         setState({
-          matches,
+          matches: enrichedMatches,
           message: "Encontramos posibles coincidencias. Revisa cual corresponde al enlace.",
           normalizedUrl: validation.normalizedUrl,
           status: "possible",

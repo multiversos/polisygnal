@@ -34,9 +34,11 @@ Existing structured wallet-related code was found in the backend:
 - `apps/api/app/api/routes.py`
   - exposes `GET /markets/{market_id}/wallet-intelligence`.
 
-No frontend wallet intelligence is connected to `/analyze` yet. The new web
-helpers are conservative and return unavailable unless real structured wallet
-data is passed in.
+The frontend adapter is now connected read-only through the existing same-origin
+backend proxy. `/analyze` may request a bounded summary for matched local
+`marketId` values and stores only sanitized summary fields in component state.
+The adapter does not expose raw payloads, does not keep full wallet addresses in
+its public summary, and returns unavailable on any lookup failure.
 
 ## Data Available Today
 
@@ -61,6 +63,37 @@ Current limitations:
 - Win rate requires resolved historical positions and outcome matching.
 - A public profile or pseudonym is not a real-world identity.
 - The endpoint should remain read-only and bounded.
+- Backend payloads can include full public wallet addresses, so public UI must
+  render `wallet_short` only. The frontend adapter redacts by keeping
+  `walletAddress` equal to the shortened display value.
+
+## Read-Only Endpoint Probe
+
+Production was probed with `GET /markets/{market_id}/wallet-intelligence` using
+`min_usd=100` and a small limit. The report was redacted before documenting.
+
+Observed shape:
+
+- `data_available`;
+- `threshold_usd`;
+- `large_trades`;
+- `large_positions`;
+- `notable_wallets`;
+- `concentration_summary.sides`;
+- `warnings`;
+- `generated_at`.
+
+Observed data:
+
+- some soccer market IDs returned `data_available=true`;
+- `large_positions` can include shortened wallet address, side/outcome, position
+  size USD, average/current price, and PnL fields when the public source returns
+  them;
+- `large_trades` can include shortened wallet address, side/outcome, trade size
+  USD, price, timestamp, and action fields;
+- `amount USD` and YES/NO side are available for some markets;
+- `win rate`, `estimated ROI`, and resolved historical performance are not
+  returned as complete, reliable metrics today.
 
 ## Identifiers Needed
 
@@ -143,20 +176,21 @@ It must not:
 
 ## Implementation Path
 
-1. Keep the frontend scaffold read-only and unavailable by default.
+1. Keep the frontend integration read-only and bounded through the backend
+   proxy.
 2. Add tests that verify no fake wallets, ROI, win rate or full addresses are
    emitted without real data.
-3. Decide whether `/analyze` should call a server-side endpoint after rate
-   limits exist.
-4. Add allowlists, timeout, response-size caps, and no-store behavior before
-   any new wallet lookup route is exposed.
+3. Keep `/analyze` display limited to shortened addresses, amount, side,
+   aggregate capital, bias, and safety warnings.
+4. Add stronger rate limits before expanding volume or adding new wallet lookup
+   routes.
 5. Cache only minimal summaries, not raw wallet payloads.
 6. Add documentation for retention and deletion before storing any customer or
    wallet-derived history.
 
 ## Not In This Sprint
 
-- No new external calls from `/analyze`.
+- No new external source beyond the existing read-only backend endpoint.
 - No scraping.
 - No database writes.
 - No wallet storage.
