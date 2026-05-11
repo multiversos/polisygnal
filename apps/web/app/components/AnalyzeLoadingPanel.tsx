@@ -16,38 +16,45 @@ type AnalyzeLoadingStep = {
   detail: string;
   label: string;
   phase: AnalyzeLoadingPhase;
+  shortLabel: string;
 };
 
 const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
   {
-    detail: "Revisamos que el enlace pertenezca a Polymarket y tenga una ruta segura.",
+    detail: "Enlace verificado",
     label: "Validando enlace",
     phase: "validating",
+    shortLabel: "Ruta segura",
   },
   {
-    detail: "Comparamos el enlace con los mercados que PolySignal ya tiene cargados.",
-    label: "Buscando coincidencias en PolySignal",
+    detail: "Mercados cargados",
+    label: "Buscando coincidencias",
     phase: "matching",
+    shortLabel: "Matching local",
   },
   {
-    detail: "Detectamos partido, equipos y fecha cuando esos datos estan disponibles.",
-    label: "Detectando contexto del partido",
+    detail: "Partido y equipos",
+    label: "Detectando contexto",
     phase: "context",
+    shortLabel: "Contexto deportivo",
   },
   {
-    detail: "Separamos probabilidad del mercado, datos recientes y senales independientes.",
-    label: "Revisando preparacion de datos",
+    detail: "Datos disponibles",
+    label: "Preparacion de datos",
     phase: "readiness",
+    shortLabel: "Readiness",
   },
   {
-    detail: "Comprobamos si ya hay evidencia externa real o si sigue pendiente.",
-    label: "Revisando investigacion externa",
+    detail: "Cobertura disponible",
+    label: "Investigacion externa",
     phase: "research",
+    shortLabel: "Fuentes pendientes",
   },
   {
-    detail: "Armamos la lectura final sin inventar estimaciones ni evidencia.",
-    label: "Preparando lectura final",
+    detail: "Lectura final",
+    label: "Preparando resultado",
     phase: "preparing",
+    shortLabel: "Sin inventar datos",
   },
 ];
 
@@ -71,7 +78,7 @@ function stepStatus(stepIndex: number, activeIndex: number): "completed" | "acti
 
 function statusLabel(status: "completed" | "active" | "pending"): string {
   if (status === "completed") {
-    return "Listo";
+    return "OK";
   }
   if (status === "active") {
     return "Ahora";
@@ -101,52 +108,63 @@ export function AnalyzeLoadingPanel({
       className="analyze-loading-panel"
       role="status"
     >
-      <div className="analyze-loading-top">
-        <div className="analyze-loading-copy">
+      <div className="analyze-loading-header">
+        <div>
           <p className="eyebrow">Analisis en curso</p>
           <h2>Analizando mercado</h2>
           <p>
-            PolySignal esta revisando el enlace y preparando la lectura con los
-            datos disponibles.
+            PolySignal esta comparando el enlace con mercados cargados y
+            preparando una lectura segura.
           </p>
-          <strong>{message || activeStep.detail}</strong>
         </div>
-        <div className="analyze-scouting-visual" aria-hidden="true">
-          <div className="scouting-radar">
-            <span className="scouting-radar-ring outer" />
-            <span className="scouting-radar-ring middle" />
-            <span className="scouting-radar-ring inner" />
-            <span className="scouting-radar-line horizontal" />
-            <span className="scouting-radar-line vertical" />
-            <span className="scouting-radar-sweep" />
-            <span className="scouting-radar-dot primary" />
-            <span className="scouting-radar-dot secondary" />
-          </div>
-          <div className="scouting-legend">
-            <span>Mercado</span>
-            <span>Contexto</span>
-            <span>Evidencia</span>
-          </div>
-        </div>
+        <span className="analyze-loading-phase-pill">{message || activeStep.detail}</span>
       </div>
 
-      <ol className="analyze-loading-steps" aria-label="Pasos del analisis">
-        {ANALYZE_LOADING_STEPS.map((step, index) => {
-          const status = stepStatus(index, activeIndex);
-          return (
-            <li className={`analyze-loading-step ${status}`} key={step.phase}>
-              <span className="analyze-loading-step-marker" aria-hidden="true">
-                {index + 1}
+      <div className="analyze-loading-stage">
+        <div className="analyze-scouting-visual" aria-hidden="true">
+          <div className="scouting-radar-shell">
+            <div className="scouting-radar">
+              <span className="scouting-radar-grid" />
+              <span className="scouting-radar-ring outer" />
+              <span className="scouting-radar-ring middle" />
+              <span className="scouting-radar-ring inner" />
+              <span className="scouting-radar-line horizontal" />
+              <span className="scouting-radar-line vertical" />
+              <span className="scouting-radar-sweep" />
+              <span className="scouting-radar-pulse" />
+              <span className="scouting-radar-dot primary" />
+              <span className="scouting-radar-dot secondary" />
+              <span className="scouting-radar-dot tertiary" />
+              <span className="scouting-radar-core">
+                <span className="scouting-radar-core-mark" />
               </span>
-              <span className="analyze-loading-step-copy">
-                <strong>{step.label}</strong>
-                <small>{step.detail}</small>
-              </span>
-              <span className="analyze-loading-step-status">{statusLabel(status)}</span>
-            </li>
-          );
-        })}
-      </ol>
+            </div>
+            <div className="scouting-legend">
+              <span>Mercado</span>
+              <span>Contexto</span>
+              <span>Evidencia</span>
+            </div>
+          </div>
+        </div>
+
+        <ol className="analyze-loading-steps" aria-label="Pasos del analisis">
+          {ANALYZE_LOADING_STEPS.map((step, index) => {
+            const status = stepStatus(index, activeIndex);
+            return (
+              <li className={`analyze-loading-step ${status}`} key={step.phase}>
+                <span className="analyze-loading-step-marker" aria-hidden="true">
+                  {status === "completed" ? "OK" : index + 1}
+                </span>
+                <span className="analyze-loading-step-copy">
+                  <strong>{step.label}</strong>
+                  <small>{step.detail}</small>
+                </span>
+                <span className="analyze-loading-step-status">{status === "active" ? step.shortLabel : statusLabel(status)}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
 
       <div className="analyze-loading-skeletons" aria-label="Vista previa del resultado">
         {RESULT_SKELETONS.map((label, index) => (

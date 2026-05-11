@@ -67,7 +67,8 @@ Estado visible verificado:
 - Existe una primera capa de readiness de investigacion externa:
   `ResearchFinding`, `researchReadiness.ts` y UI de evidencia pendiente. No
   llama fuentes externas ni muestra fixtures/demo como datos reales.
-- `/analyze` muestra un panel de carga guiado mientras compara enlaces: fases
+- `/analyze` muestra un panel de carga guiado tipo Radar Analytics mientras
+  compara enlaces: radar central, pasos laterales, skeletons inferiores y fases
   reales de validacion, matching, contexto, preparacion de datos, investigacion
   externa y lectura final; no usa una barra de progreso inventada ni timers
   falsos para simular avance.

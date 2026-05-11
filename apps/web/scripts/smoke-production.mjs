@@ -501,11 +501,11 @@ function validateAnalyzeLoadingPanelSource() {
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
   const expectedSteps = [
     "Validando enlace",
-    "Buscando coincidencias en PolySignal",
-    "Detectando contexto del partido",
-    "Revisando preparacion de datos",
-    "Revisando investigacion externa",
-    "Preparando lectura final",
+    "Buscando coincidencias",
+    "Detectando contexto",
+    "Preparacion de datos",
+    "Investigacion externa",
+    "Preparando resultado",
   ];
   const expectedSkeletons = [
     "Probabilidad del mercado",
@@ -516,6 +516,8 @@ function validateAnalyzeLoadingPanelSource() {
   ];
 
   assert(source.includes("Analizando mercado"), "analyze loading panel heading is missing");
+  assert(source.includes("scouting-radar-shell"), "analyze loading panel radar shell is missing");
+  assert(source.includes("scouting-radar-core"), "analyze loading panel radar core is missing");
   assert(source.includes("aria-live=\"polite\""), "analyze loading panel needs polite live status");
   for (const step of expectedSteps) {
     assert(source.includes(step), `analyze loading panel missing step: ${step}`);

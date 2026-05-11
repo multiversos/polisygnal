@@ -376,11 +376,11 @@ function validateAnalyzeLoadingPanelSource() {
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
   const expectedSteps = [
     "Validando enlace",
-    "Buscando coincidencias en PolySignal",
-    "Detectando contexto del partido",
-    "Revisando preparacion de datos",
-    "Revisando investigacion externa",
-    "Preparando lectura final",
+    "Buscando coincidencias",
+    "Detectando contexto",
+    "Preparacion de datos",
+    "Investigacion externa",
+    "Preparando resultado",
   ];
   const expectedSkeletons = [
     "Probabilidad del mercado",
@@ -391,6 +391,8 @@ function validateAnalyzeLoadingPanelSource() {
   ];
 
   assert(source.includes("export type AnalyzeLoadingPhase"), "expected typed analyze loading phases");
+  assert(source.includes("scouting-radar-shell"), "expected prominent radar analytics visual shell");
+  assert(source.includes("scouting-radar-core"), "expected radar center mark");
   assert(source.includes("aria-live=\"polite\""), "expected polite live region in loading panel");
   assert(source.includes("aria-busy=\"true\""), "expected busy state in loading panel");
   for (const step of expectedSteps) {
