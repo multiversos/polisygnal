@@ -64,6 +64,9 @@ Estado visible verificado:
 - `/analyze`, `/markets/[id]` e `/internal/data-status` muestran preparacion
   de datos de futbol. El score de preparacion es no predictivo: mide datos
   disponibles, no probabilidad de resultado.
+- Existe una primera capa de readiness de investigacion externa:
+  `ResearchFinding`, `researchReadiness.ts` y UI de evidencia pendiente. No
+  llama fuentes externas ni muestra fixtures/demo como datos reales.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion
@@ -190,6 +193,8 @@ Documentacion preparada:
   pendientes.
 - `docs/soccer-data-readiness.md`: auditoria de datos futbolisticos disponibles,
   inferencias seguras y fuentes deportivas futuras.
+- `docs/external-research-plan.md`: plan de integracion segura de fuentes
+  externas con allowlist, rate limit, cache y backend server-side.
 
 Estado actual:
 
@@ -212,6 +217,8 @@ Riesgos pendientes:
   un job backend persistente futuro;
 - el contexto de futbol todavia no incluye liga estructurada, local/visitante,
   forma reciente, lesiones, suspensiones, odds externas ni calibracion;
+- la investigacion externa real todavia no esta conectada a APIs deportivas,
+  odds, noticias o fuentes oficiales;
 - snapshots/analisis de soccer siguen con datos stale hasta refresh
   supervisado;
 - npm audit mantiene 2 moderadas via Next/PostCSS, documentadas sin force fix.

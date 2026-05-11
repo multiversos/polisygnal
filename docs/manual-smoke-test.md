@@ -248,28 +248,32 @@ If this test fails, stop feature work and treat it as a production regression.
    probability of winning.
 12. Confirm no league, local/visitor role, recent form, injuries, suspensions,
    or external odds are invented.
-13. Confirm `Decision de PolySignal` follows the 55% threshold:
+13. Confirm `Investigacion externa` is visible and shows missing categories
+   rather than fake sources.
+14. Confirm it says there are no verified external sources if no real findings
+   are loaded.
+15. Confirm `Decision de PolySignal` follows the 55% threshold:
    YES `>=55%` is clear YES, NO `>=55%` is clear NO, and 45/55 is `Sin decision fuerte`.
-14. Confirm market price alone never creates a PolySignal predicted side.
-15. Confirm it shows only real visible data: title, event, status, price if
+16. Confirm market price alone never creates a PolySignal predicted side.
+17. Confirm it shows only real visible data: title, event, status, price if
    available, volume/liquidity if available, and last update.
-16. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
+18. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
    `Ver futbol` when a market is matched.
-17. Save the analysis, open `/history`, and confirm the item appears as
+19. Save the analysis, open `/history`, and confirm the item appears as
    `Desde enlace`.
-18. Confirm the saved history item shows market YES/NO probability if it was
+20. Confirm the saved history item shows market YES/NO probability if it was
     available, and PolySignal YES/NO only if it existed.
-19. Confirm `/history` shows whether the item counts for precision or does not
+21. Confirm `/history` shows whether the item counts for precision or does not
     count yet.
-20. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
+22. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
     inventing data when there are not enough comparable records.
-21. Confirm a no-match link can only be saved as pending and does not invent a
+23. Confirm a no-match link can only be saved as pending and does not invent a
    probability.
-22. Confirm the page does not promise profit, certainty, or betting advice.
-23. Confirm the saved record only gets a PolySignal predicted side when a real
+24. Confirm the page does not promise profit, certainty, or betting advice.
+25. Confirm the saved record only gets a PolySignal predicted side when a real
     PolySignal estimate crossed the 55% threshold. Market price alone must not
     create a predicted side.
-24. Confirm saved matched records preserve Polymarket identifiers when available
+26. Confirm saved matched records preserve Polymarket identifiers when available
     so Historial can later verify outcomes automatically.
 
 ## Alertas
@@ -298,6 +302,9 @@ If this test fails, stop feature work and treat it as a production regression.
 8. Confirm `Preparacion de datos` is labelled as non-predictive.
 9. Confirm it does not invent league, home/away, form, injuries, suspensions,
    external odds, or calibration.
+10. Confirm it shows `Evidencia para estimacion`.
+11. Confirm empty evidence states say external verified sources are not
+   available yet instead of showing demo findings.
 
 ## Hidden Data Status
 
@@ -323,8 +330,13 @@ If this test fails, stop feature work and treat it as a production regression.
    - Contexto parcial.
    - Listos para investigacion.
    - Top missing data categories.
-7. Confirm this page is not linked from the public sidebar or public pages.
-8. Confirm it does not show secrets, connection strings, stack traces, or large
+7. Confirm it shows external research readiness:
+   - Con contexto deportivo.
+   - Con evidencia externa real.
+   - Sin evidencia externa.
+   - Pendiente de integracion de fuentes.
+8. Confirm this page is not linked from the public sidebar or public pages.
+9. Confirm it does not show secrets, connection strings, stack traces, or large
    raw payloads.
 8. Confirm it is clearly read-only and does not expose buttons or commands that
    can refresh, score, import, delete, migrate, or trade.

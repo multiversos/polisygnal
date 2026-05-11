@@ -73,6 +73,15 @@ import {
   getSoccerContextReadiness,
 } from "../../lib/soccerMatchContext";
 import {
+  getResearchCoverage,
+} from "../../lib/researchReadiness";
+import type {
+  EvidenceDirection,
+  EvidenceReliability,
+  ResearchFinding,
+  ResearchSourceType,
+} from "../../lib/evidenceTypes";
+import {
   DECISION_CONFIDENCE_LABELS,
   MARKET_DECISION_LABELS,
   createMarketDecision,
@@ -1117,6 +1126,111 @@ function getLatestAnalysisUpdate(analysis: MarketAnalysis): string | null {
   );
 }
 
+function reliabilityFromValue(value: unknown): EvidenceReliability {
+  const normalized = normalizeProbability(value);
+  if (normalized === null) {
+    return "unknown";
+  }
+  if (normalized >= 0.7) {
+    return "high";
+  }
+  if (normalized >= 0.4) {
+    return "medium";
+  }
+  return "low";
+}
+
+function directionFromStance(value?: string | null): EvidenceDirection {
+  const normalized = (value || "").toLowerCase();
+  if (normalized.includes("yes") || normalized.includes("favor")) {
+    return "YES";
+  }
+  if (normalized.includes("no") || normalized.includes("against")) {
+    return "NO";
+  }
+  if (normalized.includes("neutral")) {
+    return "NEUTRAL";
+  }
+  return "UNKNOWN";
+}
+
+function sourceTypeFromEvidence(value?: string | null): ResearchSourceType {
+  const normalized = (value || "").toLowerCase();
+  if (normalized.includes("injury") || normalized.includes("suspension")) {
+    return "injury_report";
+  }
+  if (normalized.includes("odds") || normalized.includes("book")) {
+    return "odds_reference";
+  }
+  if (normalized.includes("official") || normalized.includes("team")) {
+    return "official_team";
+  }
+  if (normalized.includes("league") || normalized.includes("fixture")) {
+    return "league";
+  }
+  if (normalized.includes("stat") || normalized.includes("elo") || normalized.includes("xg")) {
+    return "stats_provider";
+  }
+  if (normalized.includes("social") || normalized.includes("reddit")) {
+    return "social_signal";
+  }
+  if (normalized.includes("news") || normalized.includes("report")) {
+    return "sports_news";
+  }
+  return "unknown";
+}
+
+function researchFindingsFromAnalysis(analysis: MarketAnalysis): ResearchFinding[] {
+  const capturedAt = getLatestAnalysisUpdate(analysis) ?? new Date().toISOString();
+  const evidenceFindings: ResearchFinding[] = analysis.evidence_items.map((item) => ({
+    capturedAt: item.fetched_at ?? capturedAt,
+    direction: directionFromStance(item.stance),
+    eventSlug: analysis.links?.polymarket_event_slug ?? undefined,
+    id: `evidence-${item.id}`,
+    isReal: true,
+    isUserVisible: true,
+    marketId: String(analysis.market.id),
+    publishedAt: item.published_at ?? undefined,
+    reliability: reliabilityFromValue(item.confidence ?? item.strength),
+    sourceName: item.source_name ?? item.provider,
+    sourceType: sourceTypeFromEvidence(`${item.evidence_type} ${item.provider} ${item.source_name ?? ""}`),
+    summary: item.summary,
+    title: item.title || item.summary.slice(0, 80) || "Evidencia disponible",
+    url: item.url ?? item.citation_url ?? undefined,
+  }));
+  const findingRecords: ResearchFinding[] = analysis.research_findings.map((item) => ({
+    capturedAt: item.published_at ?? capturedAt,
+    direction: directionFromStance(item.stance),
+    eventSlug: analysis.links?.polymarket_event_slug ?? undefined,
+    id: `finding-${item.id}`,
+    isReal: true,
+    isUserVisible: true,
+    marketId: String(analysis.market.id),
+    publishedAt: item.published_at ?? undefined,
+    reliability: reliabilityFromValue(item.credibility_score),
+    sourceName: item.source_name ?? undefined,
+    sourceType: sourceTypeFromEvidence(`${item.factor_type} ${item.source_name ?? ""}`),
+    summary: item.evidence_summary,
+    title: item.claim,
+    url: item.citation_url ?? undefined,
+  }));
+  const externalSignals: ResearchFinding[] = analysis.external_signals.map((signal) => ({
+    capturedAt: signal.fetched_at,
+    direction: signal.yes_probability || signal.mid_price ? "UNKNOWN" : "NEUTRAL",
+    eventSlug: analysis.links?.polymarket_event_slug ?? undefined,
+    id: `external-${signal.id}`,
+    isReal: true,
+    isUserVisible: true,
+    marketId: String(analysis.market.id),
+    reliability: reliabilityFromValue(signal.source_confidence),
+    sourceName: formatSourceLabel(signal.source),
+    sourceType: "odds_reference",
+    summary: signal.match_reason || "Referencia externa vinculada al mercado.",
+    title: signal.title || "Referencia externa",
+  }));
+  return [...evidenceFindings, ...findingRecords, ...externalSignals];
+}
+
 function watchlistDraftFromAnalysis(analysis: MarketAnalysis): WatchlistMarketDraft {
   return {
     active: analysis.market.active,
@@ -1883,14 +1997,16 @@ function PricePanel({ snapshot }: { snapshot?: AnalysisSnapshot | null }) {
 
 function PolySignalScorePanel({ analysis }: { analysis: MarketAnalysis }) {
   const score = analysis.polysignal_score;
+  const researchFindings = researchFindingsFromAnalysis(analysis);
+  const signalInput = { ...analysis, externalResearchFindings: researchFindings };
   const estimateQuality = getEstimateQuality(analysis);
-  const estimateResult = getPolySignalEstimate(analysis);
+  const estimateResult = getPolySignalEstimate(signalInput);
   const realEstimate = getRealPolySignalProbabilities(analysis);
-  const readiness = getSignalEstimateReadiness(analysis);
-  const readinessScore = getEstimateReadinessScore(analysis);
-  const marketSignals = collectMarketSignals(analysis);
-  const independentSignals = collectIndependentSignals(analysis);
-  const missingReasons = explainMissingEstimateData(analysis);
+  const readiness = getSignalEstimateReadiness(signalInput);
+  const readinessScore = getEstimateReadinessScore(signalInput);
+  const marketSignals = collectMarketSignals(signalInput);
+  const independentSignals = collectIndependentSignals(signalInput);
+  const missingReasons = explainMissingEstimateData(signalInput);
 
   return (
     <section className={`analysis-section polysignal-detail-section ${score?.color_hint || "warning"}`}>
@@ -2005,7 +2121,10 @@ function PolySignalScorePanel({ analysis }: { analysis: MarketAnalysis }) {
 function SoccerContextPanel({ analysis }: { analysis: MarketAnalysis }) {
   const context = extractSoccerMatchContext(analysis);
   const readiness = getSoccerContextReadiness(context);
-  const readinessScore = getEstimateReadinessScore(analysis);
+  const readinessScore = getEstimateReadinessScore({
+    ...analysis,
+    externalResearchFindings: researchFindingsFromAnalysis(analysis),
+  });
   const isSoccer = (analysis.market.sport_type || analysis.candidate_context?.sport || "").toLowerCase() === "soccer";
   if (!isSoccer) {
     return null;
@@ -2049,6 +2168,71 @@ function SoccerContextPanel({ analysis }: { analysis: MarketAnalysis }) {
         PolySignal necesita forma reciente, lesiones, suspensiones, odds externas e historial calibrado
         antes de mostrar una estimacion propia.
       </p>
+    </section>
+  );
+}
+
+function EvidenceReadinessPanel({ analysis }: { analysis: MarketAnalysis }) {
+  const researchFindings = researchFindingsFromAnalysis(analysis);
+  const coverage = getResearchCoverage(analysis, researchFindings);
+  const hasFindings = coverage.realFindingCount > 0;
+
+  return (
+    <section className="analysis-section data-quality-detail-section">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Investigacion externa</span>
+          <h2>Evidencia para estimacion</h2>
+          <p className="section-note">
+            Esta seccion mide cobertura de fuentes. No genera porcentajes ni recomendaciones.
+          </p>
+        </div>
+        <span className={`data-quality-label ${hasFindings ? "partial" : "pending"}`}>
+          {coverage.label}
+        </span>
+      </div>
+
+      {!hasFindings ? (
+        <div className="empty-state compact">
+          <strong>Sin evidencia externa suficiente</strong>
+          <p>
+            Aun no hay fuentes externas verificadas para este mercado. La probabilidad del mercado
+            se muestra como referencia, pero no cuenta como estimacion PolySignal.
+          </p>
+        </div>
+      ) : (
+        <div className="analysis-card-grid">
+          {researchFindings.slice(0, 4).map((finding) => (
+            <article className="external-signal-card" key={finding.id}>
+              <div className="badge-row">
+                <span className="badge source-badge">{humanizeToken(finding.sourceType)}</span>
+                <span className="badge muted">{finding.reliability}</span>
+              </div>
+              <h3>{finding.title}</h3>
+              <p>{finding.summary}</p>
+              <p className="section-note">{finding.sourceName ?? "Fuente externa"}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <div className="analysis-stat-grid">
+        <div><span>Datos de mercado</span><strong>{analysis.latest_snapshot ? "Disponible" : "Pendiente"}</strong></div>
+        <div><span>Contexto del partido</span><strong>{getSoccerContextReadiness(extractSoccerMatchContext(analysis)).level === "none" ? "Pendiente" : "Parcial"}</strong></div>
+        <div><span>Investigacion externa</span><strong>{hasFindings ? "Parcial" : "Pendiente"}</strong></div>
+        <div><span>Odds externas</span><strong>{coverage.categories.find((item) => item.id === "external_odds")?.status === "available" ? "Disponible" : "Pendiente"}</strong></div>
+        <div><span>Historial/calibracion</span><strong>Pendiente</strong></div>
+        <div><span>Fuentes verificadas</span><strong>{coverage.verifiedVisibleCount}</strong></div>
+      </div>
+
+      <div>
+        <h3>Faltantes principales</h3>
+        <div className="candidate-chip-list">
+          {coverage.missing.slice(0, 7).map((label) => (
+            <span className="warning-chip" key={label}>{label}</span>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
@@ -4759,6 +4943,7 @@ export default function MarketAnalysisPage() {
               <QuickReadPanel analysis={analysis} />
               <PricePanel snapshot={analysis.latest_snapshot} />
               <SoccerContextPanel analysis={analysis} />
+              <EvidenceReadinessPanel analysis={analysis} />
               <PolySignalScorePanel analysis={analysis} />
               <DataQualityPanel
                 dataQuality={analysis.data_quality}

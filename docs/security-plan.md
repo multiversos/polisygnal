@@ -379,3 +379,22 @@ Current controls:
 Before login exists, these local records must not be described as synced,
 backed up, or account-owned. After login exists, the app should ask before
 uploading local records to the account.
+
+### External Research Controls
+
+The external research layer is currently a model and readiness UI only. Before
+real source calls are enabled:
+
+- run all research from backend/server jobs, not browser fetches;
+- use allowlisted hosts only;
+- enforce rate limits and timeouts;
+- cache responses to control cost and abuse;
+- do not scrape aggressively;
+- do not store raw HTML or raw third-party payloads;
+- do not log secrets, API keys, private URLs, or tokens;
+- treat social sources as low reliability by default;
+- keep evidence separate from PolySignal estimates;
+- do not generate a percentage unless the estimator has sufficient real
+  evidence and calibration.
+
+See `docs/external-research-plan.md` for the implementation roadmap.

@@ -75,6 +75,22 @@ Rangos:
 Aunque el score sea alto, PolySignal no muestra una estimacion propia si no hay
 senales independientes suficientes.
 
+## Readiness de investigacion externa
+
+`researchReadiness.ts` mide cobertura de investigacion por categoria:
+
+- forma reciente;
+- lesiones/suspensiones;
+- noticias del equipo;
+- datos de liga/fixture;
+- odds externas;
+- estadisticas avanzadas;
+- historial/calibracion.
+
+Si no hay hallazgos reales (`ResearchFinding.isReal=true`), todas las
+categorias permanecen pendientes o parciales. No se usan fixtures de demo como
+datos visibles.
+
 ## Riesgos de inferencia
 
 - Un titulo puede contener mercados derivados y no solo partido principal.

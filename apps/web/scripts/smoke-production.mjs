@@ -479,8 +479,14 @@ function validateMarketDetailPage(dom, label) {
     `${label} honest polysignal estimate state`,
   );
   assertTextIncludes(text, "Contexto deportivo", `${label} soccer context`);
+  assertTextIncludesOneOf(
+    text,
+    ["Evidencia para estimacion", "Evidencia para estimación"],
+    `${label} evidence readiness`,
+  );
   assertTextIncludes(text, "Preparacion de datos", `${label} non predictive readiness`);
   assertTextIncludes(text, "No predictivo", `${label} readiness is not prediction`);
+  assertTextExcludes(text, ["Fake finding", "Demo finding", "fixture de prueba"], `${label} invented evidence`);
   assertTextExcludes(
     text,
     ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
@@ -563,6 +569,9 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Readiness deportivo", "internal soccer readiness");
   assertTextIncludes(text, "Contexto de futbol", "internal soccer readiness");
   assertTextIncludes(text, "Equipos identificados", "internal soccer readiness");
+  assertTextIncludes(text, "Investigacion externa", "internal external research readiness");
+  assertTextIncludes(text, "Con evidencia externa real", "internal external research readiness");
+  assertTextIncludes(text, "Sin evidencia externa", "internal external research readiness");
   assertTextExcludes(
     text,
     ["DATABASE_URL", "SECRET", "TOKEN", "API_KEY", "postgres://", "postgresql://"],
@@ -833,12 +842,19 @@ async function main() {
     "analyze estimate readiness",
   );
   assertTextIncludes(validAnalyzeText, "Contexto del partido", "analyze soccer context");
+  assertTextIncludes(validAnalyzeText, "Investigacion externa", "analyze external research readiness");
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    ["Fuentes verificadas: 0", "Fuentes verificadas"],
+    "analyze no fake external sources",
+  );
   assertTextIncludes(validAnalyzeText, "Preparacion de datos", "analyze non predictive readiness");
   assertTextIncludesOneOf(
     validAnalyzeText,
     ["no genera una prediccion PolySignal", "no genera una predicción PolySignal"],
     "analyze soccer context is not prediction",
   );
+  assertTextExcludes(validAnalyzeText, ["Fake finding", "Demo finding", "fixture de prueba"], "analyze invented evidence");
   assertTextIncludes(validAnalyzeText, "Decision de PolySignal", "analyze clear decision panel");
   assertTextIncludesOneOf(
     validAnalyzeText,

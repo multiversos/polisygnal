@@ -25,6 +25,9 @@ Implemented as a frontend-only flow.
   preparation but does not create a PolySignal probability.
 - `Preparacion de datos` is a non-predictive readiness score. It must never be
   shown as probability of a team winning.
+- The page also shows external research readiness. If no real findings are
+  loaded, it lists missing categories such as recent form, injuries, team news,
+  external odds, advanced stats, and calibration.
 - If the PolySignal estimate is missing, the page says that instead of
   defaulting to 50/50 or inventing a number.
 - The page shows whether PolySignal has a clear decision. The current threshold

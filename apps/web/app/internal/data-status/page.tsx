@@ -33,6 +33,11 @@ type MarketOverviewItem = {
     volume?: string | number | null;
     yes_price?: string | number | null;
   } | null;
+  evidence_summary?: {
+    evidence_count?: number | string | null;
+    news_evidence_count?: number | string | null;
+    odds_evidence_count?: number | string | null;
+  } | null;
 };
 
 type MarketsOverviewResponse = {
@@ -87,6 +92,14 @@ function hasLiquidity(item: MarketOverviewItem): boolean {
 function hasVolume(item: MarketOverviewItem): boolean {
   const value = Number(item.latest_snapshot?.volume ?? 0);
   return Number.isFinite(value) && value > 0;
+}
+
+function hasExternalEvidence(item: MarketOverviewItem): boolean {
+  const evidence =
+    Number(item.evidence_summary?.evidence_count ?? 0) +
+    Number(item.evidence_summary?.news_evidence_count ?? 0) +
+    Number(item.evidence_summary?.odds_evidence_count ?? 0);
+  return Number.isFinite(evidence) && evidence > 0;
 }
 
 async function fetchSoccerOverview(): Promise<{
@@ -218,6 +231,16 @@ export default function InternalDataStatusPage() {
       withoutDate: readiness.filter((item) => !item.hasDate).length,
     };
   }, [state.items]);
+  const externalResearchReadiness = useMemo(() => {
+    const withContext = soccerReadiness.readyForExternalResearch;
+    const withExternalEvidence = state.items.filter(hasExternalEvidence).length;
+    return {
+      missingExternalEvidence: state.items.length - withExternalEvidence,
+      status: "Pendiente de integracion de fuentes",
+      withContext,
+      withExternalEvidence,
+    };
+  }, [soccerReadiness.readyForExternalResearch, state.items]);
   const needsSupervisedRefresh =
     summary.stale > 0 || missing.snapshot > 0 || missing.prediction > 0;
 
@@ -316,6 +339,41 @@ export default function InternalDataStatusPage() {
           <strong>{summary.latest ? formatLastUpdated(new Date(summary.latest)) : "Sin fecha"}</strong>
           <p>{state.updatedAt ? `Revisado ${formatLastUpdated(state.updatedAt)}` : "Pendiente"}</p>
         </article>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading compact">
+          <div>
+            <p className="eyebrow">Investigacion externa</p>
+            <h2>{externalResearchReadiness.status}</h2>
+            <p>
+              Diagnostico read-only para saber cuantos mercados tienen contexto deportivo
+              y cuantos siguen sin fuentes externas verificadas.
+            </p>
+          </div>
+        </div>
+        <div className="internal-status-grid">
+          <article className="internal-status-card">
+            <span>Mercados soccer</span>
+            <strong>{state.totalCount}</strong>
+            <p>{state.items.length} cargados en esta revision.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Con contexto deportivo</span>
+            <strong>{externalResearchReadiness.withContext}</strong>
+            <p>Equipos y fecha suficientes para investigar despues.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Con evidencia externa real</span>
+            <strong>{externalResearchReadiness.withExternalEvidence}</strong>
+            <p>Segun resumen de evidencias ya cargado.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Sin evidencia externa</span>
+            <strong>{externalResearchReadiness.missingExternalEvidence}</strong>
+            <p>No hay fuentes externas verificadas disponibles todavia.</p>
+          </article>
+        </div>
       </section>
 
       <section className="panel">

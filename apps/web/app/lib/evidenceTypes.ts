@@ -1,5 +1,14 @@
 export type EvidenceDirection = "NEUTRAL" | "NO" | "UNKNOWN" | "YES";
 export type EvidenceReliability = "high" | "low" | "medium" | "unknown";
+export type ResearchSourceType =
+  | "injury_report"
+  | "league"
+  | "odds_reference"
+  | "official_team"
+  | "social_signal"
+  | "sports_news"
+  | "stats_provider"
+  | "unknown";
 
 export type EvidenceSource = {
   isExternal: boolean;
@@ -31,6 +40,33 @@ export type EvidenceSummary = {
   latestPublishedAt?: string;
   visibleCount: number;
 };
+
+export type ResearchFinding = {
+  capturedAt: string;
+  direction: EvidenceDirection;
+  eventSlug?: string;
+  id: string;
+  isReal: boolean;
+  isUserVisible: boolean;
+  marketId?: string;
+  publishedAt?: string;
+  reliability: EvidenceReliability;
+  sourceName?: string;
+  sourceType: ResearchSourceType;
+  summary: string;
+  title: string;
+  url?: string;
+};
+
+export function normalizeResearchReliability(
+  sourceType: ResearchSourceType,
+  reliability: EvidenceReliability = "unknown",
+): EvidenceReliability {
+  if (sourceType === "social_signal") {
+    return reliability === "unknown" ? "low" : reliability;
+  }
+  return reliability;
+}
 
 export function summarizeEvidence(items: EvidenceItem[]): EvidenceSummary {
   const visibleItems = items.filter((item) => item.isUserVisible);

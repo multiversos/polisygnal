@@ -87,6 +87,8 @@ The frontend now has explicit readiness helpers:
 - `shouldAllowPolySignalEstimate`
 - `explainMissingEstimateData`
 - `extractSoccerMatchContext`
+- `getResearchCoverage`
+- `getMissingResearchCategories`
 
 Rules:
 
@@ -100,6 +102,10 @@ Rules:
 
 `Preparacion de datos` is a non-predictive 0-100 score. It indicates how much
 input data exists for future analysis; it is not a probability of YES or NO.
+
+`ResearchFinding` and `researchReadiness.ts` now model future external evidence.
+If no real source exists, findings stay empty and the UI shows missing
+categories instead of demo data.
 
 ## Conservative Engine V0
 

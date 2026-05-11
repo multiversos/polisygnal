@@ -1,4 +1,9 @@
 import {
+  normalizeResearchReliability,
+  type ResearchFinding,
+  type ResearchSourceType,
+} from "./evidenceTypes";
+import {
   getEstimateQuality,
   getMarketProbabilityPair,
   getMissingEstimateReasons,
@@ -63,6 +68,10 @@ export type EstimateReadinessScore = {
 };
 
 export type EstimationSignalInput = MarketEstimateQualityInput & SoccerMatchContextInput;
+type EstimationSignalInputWithResearch = EstimationSignalInput & {
+  externalResearchFindings?: ResearchFinding[] | null;
+  researchFindings?: ResearchFinding[] | null;
+};
 
 function normalizeCount(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -89,7 +98,7 @@ function signalStrength(value: ProbabilityValue): EstimationSignalStrength {
   return "low";
 }
 
-export function collectMarketSignals(market: EstimationSignalInput): EstimationSignal[] {
+export function collectMarketSignals(market: EstimationSignalInputWithResearch): EstimationSignal[] {
   const signals: EstimationSignal[] = [];
   const marketProbability = getMarketProbabilityPair(market);
   if (marketProbability) {
@@ -140,7 +149,37 @@ export function collectMarketSignals(market: EstimationSignalInput): EstimationS
   return signals;
 }
 
-export function collectIndependentSignals(market: EstimationSignalInput): EstimationSignal[] {
+function strengthFromReliability(reliability: ResearchFinding["reliability"]): EstimationSignalStrength {
+  if (reliability === "high") {
+    return "high";
+  }
+  if (reliability === "medium") {
+    return "medium";
+  }
+  return "low";
+}
+
+function signalSourceFromResearchSource(sourceType: ResearchSourceType): EstimationSignalSource {
+  if (sourceType === "odds_reference") {
+    return "odds_reference";
+  }
+  if (sourceType === "stats_provider") {
+    return "sports_stats";
+  }
+  if (sourceType === "sports_news" || sourceType === "official_team" || sourceType === "injury_report" || sourceType === "league") {
+    return "external_news";
+  }
+  return "unknown";
+}
+
+function researchFindingsFromInput(market: EstimationSignalInputWithResearch): ResearchFinding[] {
+  return [
+    ...(market.researchFindings ?? []),
+    ...(market.externalResearchFindings ?? []),
+  ].filter((finding) => finding.isReal);
+}
+
+export function collectIndependentSignals(market: EstimationSignalInputWithResearch): EstimationSignal[] {
   const signals: EstimationSignal[] = [];
   const prediction = market.latest_prediction;
   const oddsCount = normalizeCount(prediction?.used_odds_count);
@@ -191,6 +230,21 @@ export function collectIndependentSignals(market: EstimationSignalInput): Estima
       updatedAt: market.evidence_summary?.latest_evidence_at ?? undefined,
     });
   }
+  researchFindingsFromInput(market).forEach((finding) => {
+    const reliability = normalizeResearchReliability(finding.sourceType, finding.reliability);
+    signals.push({
+      confidence: strengthFromReliability(reliability),
+      direction: finding.direction,
+      id: `research-${finding.id}`,
+      isIndependent: true,
+      label: finding.title,
+      reason: finding.summary,
+      source: signalSourceFromResearchSource(finding.sourceType),
+      strength: strengthFromReliability(reliability),
+      updatedAt: finding.capturedAt,
+      value: finding.sourceName,
+    });
+  });
   const soccerContext = extractSoccerMatchContext(market);
   const soccerReadiness = getSoccerContextReadiness(soccerContext);
   const sport = (soccerContext.sport || market.market?.sport_type || market.sport_type || "").toLowerCase();
@@ -252,7 +306,7 @@ export function collectIndependentSignals(market: EstimationSignalInput): Estima
   return signals;
 }
 
-export function getEstimateReadiness(market: EstimationSignalInput): EstimateReadiness {
+export function getEstimateReadiness(market: EstimationSignalInputWithResearch): EstimateReadiness {
   const independentSignalCount = collectIndependentSignals(market).length;
   const quality = getEstimateQuality(market);
   const soccerContext = extractSoccerMatchContext(market);
@@ -301,20 +355,20 @@ export function getEstimateReadiness(market: EstimationSignalInput): EstimateRea
   };
 }
 
-export function shouldAllowPolySignalEstimate(market: EstimationSignalInput): boolean {
+export function shouldAllowPolySignalEstimate(market: EstimationSignalInputWithResearch): boolean {
   return getEstimateReadiness(market).ready;
 }
 
-export function explainMissingEstimateData(market: EstimationSignalInput): string[] {
+export function explainMissingEstimateData(market: EstimationSignalInputWithResearch): string[] {
   const readiness = getEstimateReadiness(market);
   return [...new Set([...readiness.missing, ...readiness.warnings])];
 }
 
-function hasActivity(market: EstimationSignalInput): boolean {
+function hasActivity(market: EstimationSignalInputWithResearch): boolean {
   return normalizeCount(market.latest_snapshot?.volume) > 0 || normalizeCount(market.latest_snapshot?.liquidity) > 0;
 }
 
-function hasRecentData(market: EstimationSignalInput): boolean {
+function hasRecentData(market: EstimationSignalInputWithResearch): boolean {
   return Boolean(
     market.latest_snapshot?.captured_at ||
       market.latest_prediction?.run_at ||
@@ -336,7 +390,7 @@ function scoreLabel(score: number): Pick<EstimateReadinessScore, "label" | "leve
   return { label: "Datos insuficientes", level: "insufficient" };
 }
 
-export function getEstimateReadinessScore(market: EstimationSignalInput): EstimateReadinessScore {
+export function getEstimateReadinessScore(market: EstimationSignalInputWithResearch): EstimateReadinessScore {
   const soccerContext = extractSoccerMatchContext(market);
   const soccerReadiness = getSoccerContextReadiness(soccerContext);
   const independentSignals = collectIndependentSignals(market);

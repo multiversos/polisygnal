@@ -34,6 +34,7 @@ import {
   formatSoccerMatchContext,
   getSoccerContextReadiness,
 } from "../lib/soccerMatchContext";
+import { getResearchCoverage } from "../lib/researchReadiness";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { saveAnalysisHistoryItem } from "../lib/analysisHistory";
@@ -399,6 +400,34 @@ function SoccerContextBlock({ item }: { item: MarketOverviewItem }) {
   );
 }
 
+function ExternalResearchBlock({ item }: { item: MarketOverviewItem }) {
+  const coverage = getResearchCoverage(item, []);
+  return (
+    <div className="empty-state compact">
+      <strong>Investigacion externa</strong>
+      <p>
+        PolySignal todavia no tiene investigacion externa suficiente para este mercado.
+        Por eso no muestra una estimacion propia.
+      </p>
+      <div className="data-health-notes">
+        <span className="badge muted">{coverage.label}</span>
+        <span className="badge muted">Fuentes verificadas: {coverage.verifiedVisibleCount}</span>
+        {coverage.categories.slice(0, 6).map((category) => (
+          <span
+            className={category.status === "available" ? "badge external-hint" : "badge muted"}
+            key={category.id}
+          >
+            {category.label}: {category.status === "available" ? "disponible" : category.status === "partial" ? "parcial" : "pendiente"}
+          </span>
+        ))}
+      </div>
+      <p className="section-note">
+        No hay noticias, lesiones, forma reciente ni odds externas verificadas cargadas para este mercado.
+      </p>
+    </div>
+  );
+}
+
 function MatchCard({
   busy,
   item,
@@ -445,6 +474,7 @@ function MatchCard({
       <p className="section-note">{eventTitle(item)}</p>
       <p>{reason.reason}</p>
       <SoccerContextBlock item={item} />
+      <ExternalResearchBlock item={item} />
       <div className="probability-display-panel">
         <div className="probability-display-heading">
           <h4>Lectura del mercado</h4>

@@ -306,6 +306,71 @@ function validateEstimateEngineRules() {
   return { cases: 6 };
 }
 
+function validateResearchReadinessRules() {
+  const { getResearchCoverage, getMissingResearchCategories } = loadTsModule("app/lib/researchReadiness.ts");
+  const { collectIndependentSignals } = loadTsModule("app/lib/estimationSignals.ts");
+  const { getPolySignalEstimate } = loadTsModule("app/lib/polySignalEstimateEngine.ts");
+
+  const soccerMarket = {
+    market: {
+      end_date: "2026-05-09T14:00:00Z",
+      event_slug: "epl-bri-wol-2026-05-09",
+      event_title: "Brighton & Hove Albion FC vs. Wolverhampton Wanderers FC",
+      sport_type: "soccer",
+    },
+  };
+  const emptyCoverage = getResearchCoverage(soccerMarket, []);
+  assert(emptyCoverage.realFindingCount === 0, "expected no real findings in empty research coverage");
+  assert(emptyCoverage.label === "Sin investigacion externa", `unexpected empty research label ${emptyCoverage.label}`);
+  assert(
+    getMissingResearchCategories(soccerMarket, []).includes("Forma reciente"),
+    "expected missing recent form category",
+  );
+
+  const fakeFinding = {
+    capturedAt: "2026-05-11T00:00:00Z",
+    direction: "NEUTRAL",
+    id: "fake",
+    isReal: false,
+    isUserVisible: false,
+    reliability: "high",
+    sourceType: "official_team",
+    summary: "Fixture-only test record.",
+    title: "Fake finding",
+  };
+  const fakeCoverage = getResearchCoverage(soccerMarket, [fakeFinding]);
+  assert(fakeCoverage.realFindingCount === 0, "expected fake findings to be ignored");
+
+  const realFinding = {
+    capturedAt: "2026-05-11T00:00:00Z",
+    direction: "NEUTRAL",
+    id: "official-team-news",
+    isReal: true,
+    isUserVisible: true,
+    reliability: "high",
+    sourceName: "Official club site",
+    sourceType: "official_team",
+    summary: "Verified team news record for test coverage.",
+    title: "Official team news",
+  };
+  const realCoverage = getResearchCoverage(soccerMarket, [realFinding]);
+  assert(realCoverage.realFindingCount === 1, "expected one real finding");
+  assert(realCoverage.label === "Investigacion parcial", `unexpected real research label ${realCoverage.label}`);
+
+  const signalInput = { ...soccerMarket, externalResearchFindings: [realFinding] };
+  const signals = collectIndependentSignals(signalInput);
+  assert(
+    signals.some((signal) => signal.id === "research-official-team-news"),
+    "expected real finding to become an independent signal",
+  );
+  assert(
+    !getPolySignalEstimate(signalInput).available,
+    "expected research evidence alone not to create a PolySignal estimate",
+  );
+
+  return { cases: 5 };
+}
+
 async function validatePolymarketResolutionAdapter() {
   const {
     buildExternalResolutionRequest,
@@ -534,6 +599,7 @@ const linkChecks = validatePolymarketLinks();
 const decisionChecks = validateAnalysisDecisionRules();
 const estimateQualityChecks = validateEstimateQualityRules();
 const estimateEngineChecks = validateEstimateEngineRules();
+const researchReadinessChecks = validateResearchReadinessRules();
 const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
 const resolutionRouteChecks = await validateResolvePolymarketRoute();
 const proxyChecks = await validateBackendProxy();
@@ -545,6 +611,7 @@ console.log(
       analysis_decision: decisionChecks,
       estimate_quality: estimateQualityChecks,
       estimate_engine: estimateEngineChecks,
+      research_readiness: researchReadinessChecks,
       polymarket_resolution_adapter: resolutionAdapterChecks,
       resolve_polymarket_route: resolutionRouteChecks,
       proxy: proxyChecks,
