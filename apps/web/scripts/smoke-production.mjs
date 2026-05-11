@@ -630,7 +630,7 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Sin evidencia externa", "internal external research readiness");
   assertTextIncludes(text, "Inteligencia de billeteras", "internal wallet intelligence readiness");
   assertTextIncludes(text, "Pendiente de fuente estructurada", "internal wallet intelligence readiness");
-  assertTextIncludesOneOf(text, ["$100+", "100+"], "internal wallet intelligence threshold");
+  assertTextIncludes(text, "Umbral planificado", "internal wallet intelligence threshold");
   assertTextExcludes(
     text,
     ["DATABASE_URL", "SECRET", "TOKEN", "API_KEY", "postgres://", "postgresql://"],
