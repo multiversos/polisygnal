@@ -227,10 +227,23 @@ function validateEstimateQualityRules() {
 }
 
 function validateEstimateEngineRules() {
-  const { getEstimateReadiness } = loadTsModule("app/lib/estimationSignals.ts");
+  const {
+    getEstimateReadiness,
+    getEstimateReadinessScore,
+  } = loadTsModule("app/lib/estimationSignals.ts");
   const { getPolySignalEstimate } = loadTsModule("app/lib/polySignalEstimateEngine.ts");
+  const {
+    extractSoccerMatchContext,
+    getSoccerContextReadiness,
+    getTeamNamesFromTitle,
+  } = loadTsModule("app/lib/soccerMatchContext.ts");
 
   const marketOnly = {
+    market: {
+      end_date: "2026-05-09T14:00:00Z",
+      event_title: "Brighton & Hove Albion FC vs. Wolverhampton Wanderers FC",
+      sport_type: "soccer",
+    },
     latest_prediction: {
       edge_signed: 0,
       no_probability: 0.835,
@@ -250,11 +263,25 @@ function validateEstimateEngineRules() {
   const marketOnlyEstimate = getPolySignalEstimate(marketOnly);
   assert(!marketOnlyReadiness.ready, "expected market-only data not to be estimate-ready");
   assert(
-    marketOnlyReadiness.independentSignalCount === 0,
-    `expected no independent signals, got ${marketOnlyReadiness.independentSignalCount}`,
+    marketOnlyReadiness.independentSignalCount === 2,
+    `expected two neutral soccer context signals, got ${marketOnlyReadiness.independentSignalCount}`,
   );
   assert(!marketOnlyEstimate.available, "expected market-only estimate engine result to be unavailable");
   assert(marketOnlyEstimate.yesProbability === undefined, "expected market-only estimate not to expose YES probability");
+  const marketOnlyScore = getEstimateReadinessScore(marketOnly);
+  assert(marketOnlyScore.score > 0, "expected non-predictive data readiness score to exist");
+  assert(
+    marketOnlyScore.disclaimer.includes("no probabilidad"),
+    "expected readiness score disclaimer to say it is not outcome probability",
+  );
+
+  const teams = getTeamNamesFromTitle("Brighton & Hove Albion FC vs. Wolverhampton Wanderers FC");
+  assert(teams.length === 2, `expected two teams from soccer title, got ${teams.length}`);
+  const soccerContext = extractSoccerMatchContext(marketOnly);
+  const soccerReadiness = getSoccerContextReadiness(soccerContext);
+  assert(soccerReadiness.hasTeams, "expected soccer context to identify teams");
+  assert(soccerReadiness.hasDate, "expected soccer context to identify match date");
+  assert(!soccerReadiness.hasLeague, "expected soccer context not to invent league");
 
   const realEstimate = {
     latest_prediction: {
@@ -276,7 +303,7 @@ function validateEstimateEngineRules() {
   assert(realResult.yesProbability === 0.245, "expected evidence-backed YES probability to be preserved");
   assert(realResult.signalsUsed.length > 0, "expected evidence-backed estimate to list signals used");
 
-  return { cases: 2 };
+  return { cases: 6 };
 }
 
 async function validatePolymarketResolutionAdapter() {

@@ -57,6 +57,13 @@ Estado visible verificado:
   `estimationSignals.ts`, `polySignalEstimateEngine.ts` y
   `evidenceTypes.ts`. Por ahora devuelve `available=false` cuando faltan
   senales independientes; no inventa porcentajes.
+- Existe una primera capa de contexto deportivo para futbol:
+  `soccerMatchContext.ts` extrae equipos y fecha desde datos ya cargados,
+  mantiene local/visitante como desconocido si no esta estructurado y no
+  inventa liga desde slugs.
+- `/analyze`, `/markets/[id]` e `/internal/data-status` muestran preparacion
+  de datos de futbol. El score de preparacion es no predictivo: mide datos
+  disponibles, no probabilidad de resultado.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion
@@ -181,6 +188,8 @@ Documentacion preparada:
 - `docs/production-troubleshooting.md`: runbook de 504/proxy/backend/frontend.
 - `docs/security-plan.md`: modelo de acceso futuro, privacidad local y controles
   pendientes.
+- `docs/soccer-data-readiness.md`: auditoria de datos futbolisticos disponibles,
+  inferencias seguras y fuentes deportivas futuras.
 
 Estado actual:
 
@@ -201,6 +210,8 @@ Riesgos pendientes:
 - no existe backend persistente de usuarios;
 - la resolucion automatica local depende de datos disponibles y no sustituye
   un job backend persistente futuro;
+- el contexto de futbol todavia no incluye liga estructurada, local/visitante,
+  forma reciente, lesiones, suspensiones, odds externas ni calibracion;
 - snapshots/analisis de soccer siguen con datos stale hasta refresh
   supervisado;
 - npm audit mantiene 2 moderadas via Next/PostCSS, documentadas sin force fix.

@@ -478,6 +478,9 @@ function validateMarketDetailPage(dom, label) {
     ["Estimacion PolySignal", "Estimación PolySignal", "Estimacion propia no disponible", "Estimación propia no disponible"],
     `${label} honest polysignal estimate state`,
   );
+  assertTextIncludes(text, "Contexto deportivo", `${label} soccer context`);
+  assertTextIncludes(text, "Preparacion de datos", `${label} non predictive readiness`);
+  assertTextIncludes(text, "No predictivo", `${label} readiness is not prediction`);
   assertTextExcludes(
     text,
     ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
@@ -557,6 +560,9 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Con precio visible", "internal data status");
   assertTextIncludes(text, "Con volumen visible", "internal data status");
   assertTextIncludes(text, "Datos completos", "internal data status");
+  assertTextIncludes(text, "Readiness deportivo", "internal soccer readiness");
+  assertTextIncludes(text, "Contexto de futbol", "internal soccer readiness");
+  assertTextIncludes(text, "Equipos identificados", "internal soccer readiness");
   assertTextExcludes(
     text,
     ["DATABASE_URL", "SECRET", "TOKEN", "API_KEY", "postgres://", "postgresql://"],
@@ -825,6 +831,13 @@ async function main() {
     validAnalyzeText,
     ["Preparacion de estimacion PolySignal", "Preparación de estimación PolySignal", "Senales independientes"],
     "analyze estimate readiness",
+  );
+  assertTextIncludes(validAnalyzeText, "Contexto del partido", "analyze soccer context");
+  assertTextIncludes(validAnalyzeText, "Preparacion de datos", "analyze non predictive readiness");
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    ["no genera una prediccion PolySignal", "no genera una predicción PolySignal"],
+    "analyze soccer context is not prediction",
   );
   assertTextIncludes(validAnalyzeText, "Decision de PolySignal", "analyze clear decision panel");
   assertTextIncludesOneOf(

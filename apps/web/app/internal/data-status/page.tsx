@@ -5,6 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { MainNavigation } from "../../components/MainNavigation";
 import { fetchApiJson, friendlyApiError } from "../../lib/api";
+import {
+  extractSoccerMatchContext,
+  getSoccerContextReadiness,
+} from "../../lib/soccerMatchContext";
 import { formatLastUpdated } from "../../lib/useAutoRefresh";
 
 type MarketOverviewItem = {
@@ -12,8 +16,12 @@ type MarketOverviewItem = {
     active?: boolean | null;
     closed?: boolean | null;
     end_date?: string | null;
+    event_slug?: string | null;
+    event_title?: string | null;
     id?: number | null;
+    market_slug?: string | null;
     question?: string | null;
+    sport_type?: string | null;
   } | null;
   latest_prediction?: {
     run_at?: string | null;
@@ -190,6 +198,26 @@ export default function InternalDataStatusPage() {
     }),
     [state.items.length, summary],
   );
+  const soccerReadiness = useMemo(() => {
+    const contexts = state.items.map((item) => extractSoccerMatchContext(item));
+    const readiness = contexts.map(getSoccerContextReadiness);
+    const missingCounts = new Map<string, number>();
+    for (const item of readiness) {
+      for (const reason of item.missing) {
+        missingCounts.set(reason, (missingCounts.get(reason) ?? 0) + 1);
+      }
+    }
+    return {
+      contextPartial: readiness.filter((item) => item.level === "partial").length,
+      readyForExternalResearch: readiness.filter((item) => item.readyForExternalResearch).length,
+      topMissing: Array.from(missingCounts.entries())
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 5),
+      withDate: readiness.filter((item) => item.hasDate).length,
+      withTeams: readiness.filter((item) => item.hasTeams).length,
+      withoutDate: readiness.filter((item) => !item.hasDate).length,
+    };
+  }, [state.items]);
   const needsSupervisedRefresh =
     summary.stale > 0 || missing.snapshot > 0 || missing.prediction > 0;
 
@@ -288,6 +316,49 @@ export default function InternalDataStatusPage() {
           <strong>{summary.latest ? formatLastUpdated(new Date(summary.latest)) : "Sin fecha"}</strong>
           <p>{state.updatedAt ? `Revisado ${formatLastUpdated(state.updatedAt)}` : "Pendiente"}</p>
         </article>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading compact">
+          <div>
+            <p className="eyebrow">Readiness deportivo</p>
+            <h2>Contexto de futbol</h2>
+            <p>
+              Solo lectura: mide si los mercados tienen partido, equipos y fecha suficientes
+              para preparar investigacion deportiva futura.
+            </p>
+          </div>
+        </div>
+        <div className="internal-status-grid">
+          <article className="internal-status-card">
+            <span>Equipos identificados</span>
+            <strong>{soccerReadiness.withTeams}</strong>
+            <p>Mercados donde el evento permite ver dos equipos.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Con fecha</span>
+            <strong>{soccerReadiness.withDate}</strong>
+            <p>{soccerReadiness.withoutDate} sin fecha clara.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Contexto parcial</span>
+            <strong>{soccerReadiness.contextPartial}</strong>
+            <p>Mercados con algunos datos, pero todavia incompletos.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Listos para investigacion</span>
+            <strong>{soccerReadiness.readyForExternalResearch}</strong>
+            <p>Tienen equipos y fecha para buscar fuentes externas despues.</p>
+          </article>
+        </div>
+        <div className="internal-status-list">
+          {soccerReadiness.topMissing.map(([reason, count]) => (
+            <article className="internal-status-row" key={reason}>
+              <strong>{reason}</strong>
+              <span>{count} mercados</span>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="panel">

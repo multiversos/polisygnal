@@ -7,6 +7,11 @@ import {
   type MarketEstimateQualityInput,
 } from "./marketEstimateQuality";
 import { normalizeProbability, type ProbabilityValue } from "./marketProbabilities";
+import {
+  extractSoccerMatchContext,
+  getSoccerContextReadiness,
+  type SoccerMatchContextInput,
+} from "./soccerMatchContext";
 
 export type EstimationSignalSource =
   | "external_news"
@@ -41,6 +46,24 @@ export type EstimateReadiness = {
   warnings: string[];
 };
 
+export type EstimateReadinessScoreFactor = {
+  available: boolean;
+  label: string;
+  maxPoints: number;
+  points: number;
+  reason: string;
+};
+
+export type EstimateReadinessScore = {
+  disclaimer: string;
+  factors: EstimateReadinessScoreFactor[];
+  label: "Datos insuficientes" | "Datos parciales" | "Datos suficientes para estimacion" | "Preparacion media";
+  level: "insufficient" | "medium" | "partial" | "ready";
+  score: number;
+};
+
+export type EstimationSignalInput = MarketEstimateQualityInput & SoccerMatchContextInput;
+
 function normalizeCount(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -66,7 +89,7 @@ function signalStrength(value: ProbabilityValue): EstimationSignalStrength {
   return "low";
 }
 
-export function collectMarketSignals(market: MarketEstimateQualityInput): EstimationSignal[] {
+export function collectMarketSignals(market: EstimationSignalInput): EstimationSignal[] {
   const signals: EstimationSignal[] = [];
   const marketProbability = getMarketProbabilityPair(market);
   if (marketProbability) {
@@ -117,7 +140,7 @@ export function collectMarketSignals(market: MarketEstimateQualityInput): Estima
   return signals;
 }
 
-export function collectIndependentSignals(market: MarketEstimateQualityInput): EstimationSignal[] {
+export function collectIndependentSignals(market: EstimationSignalInput): EstimationSignal[] {
   const signals: EstimationSignal[] = [];
   const prediction = market.latest_prediction;
   const oddsCount = normalizeCount(prediction?.used_odds_count);
@@ -168,6 +191,49 @@ export function collectIndependentSignals(market: MarketEstimateQualityInput): E
       updatedAt: market.evidence_summary?.latest_evidence_at ?? undefined,
     });
   }
+  const soccerContext = extractSoccerMatchContext(market);
+  const soccerReadiness = getSoccerContextReadiness(soccerContext);
+  const sport = (soccerContext.sport || market.market?.sport_type || market.sport_type || "").toLowerCase();
+  if (sport === "soccer" && soccerReadiness.hasTeams) {
+    signals.push({
+      confidence: soccerContext.teamA?.confidence ?? "low",
+      direction: "NEUTRAL",
+      id: "soccer-teams-identified",
+      isIndependent: true,
+      label: "Equipos identificados",
+      reason: "El partido y los equipos fueron identificados desde datos del evento; no define ventaja por si solo.",
+      source: "sports_stats",
+      strength: soccerContext.teamA?.confidence === "high" ? "medium" : "low",
+      value: `${soccerContext.teamA?.name} vs ${soccerContext.teamB?.name}`,
+    });
+  }
+  if (sport === "soccer" && soccerReadiness.hasDate) {
+    signals.push({
+      confidence: soccerContext.dateConfidence === "high" ? "medium" : "low",
+      direction: "NEUTRAL",
+      id: "soccer-match-date",
+      isIndependent: true,
+      label: "Fecha del partido",
+      reason: "La fecha ayuda a preparar investigacion deportiva futura, pero no genera probabilidad.",
+      source: "sports_stats",
+      strength: "low",
+      updatedAt: soccerContext.startTime,
+      value: soccerContext.startTime,
+    });
+  }
+  if (sport === "soccer" && soccerContext.league) {
+    signals.push({
+      confidence: "medium",
+      direction: "NEUTRAL",
+      id: "soccer-league",
+      isIndependent: true,
+      label: "Liga o competicion",
+      reason: "La competicion esta disponible como contexto deportivo, sin crear prediccion.",
+      source: "sports_stats",
+      strength: "low",
+      value: soccerContext.league,
+    });
+  }
   if (hasRealPolySignalEstimate(market)) {
     const estimate = getRealPolySignalProbabilities(market);
     signals.push({
@@ -186,10 +252,16 @@ export function collectIndependentSignals(market: MarketEstimateQualityInput): E
   return signals;
 }
 
-export function getEstimateReadiness(market: MarketEstimateQualityInput): EstimateReadiness {
+export function getEstimateReadiness(market: EstimationSignalInput): EstimateReadiness {
   const independentSignalCount = collectIndependentSignals(market).length;
   const quality = getEstimateQuality(market);
-  const missing = getMissingEstimateReasons(market);
+  const soccerContext = extractSoccerMatchContext(market);
+  const soccerReadiness = getSoccerContextReadiness(soccerContext);
+  const sport = (soccerContext.sport || market.market?.sport_type || market.sport_type || "").toLowerCase();
+  const missing = [
+    ...getMissingEstimateReasons(market),
+    ...(sport === "soccer" ? soccerReadiness.missing : []),
+  ];
   const warnings: string[] = [];
 
   if (quality === "market_price_only") {
@@ -229,11 +301,106 @@ export function getEstimateReadiness(market: MarketEstimateQualityInput): Estima
   };
 }
 
-export function shouldAllowPolySignalEstimate(market: MarketEstimateQualityInput): boolean {
+export function shouldAllowPolySignalEstimate(market: EstimationSignalInput): boolean {
   return getEstimateReadiness(market).ready;
 }
 
-export function explainMissingEstimateData(market: MarketEstimateQualityInput): string[] {
+export function explainMissingEstimateData(market: EstimationSignalInput): string[] {
   const readiness = getEstimateReadiness(market);
   return [...new Set([...readiness.missing, ...readiness.warnings])];
+}
+
+function hasActivity(market: EstimationSignalInput): boolean {
+  return normalizeCount(market.latest_snapshot?.volume) > 0 || normalizeCount(market.latest_snapshot?.liquidity) > 0;
+}
+
+function hasRecentData(market: EstimationSignalInput): boolean {
+  return Boolean(
+    market.latest_snapshot?.captured_at ||
+      market.latest_prediction?.run_at ||
+      market.evidence_summary?.latest_evidence_at ||
+      market.data_quality?.has_snapshot,
+  );
+}
+
+function scoreLabel(score: number): Pick<EstimateReadinessScore, "label" | "level"> {
+  if (score >= 76) {
+    return { label: "Datos suficientes para estimacion", level: "ready" };
+  }
+  if (score >= 51) {
+    return { label: "Preparacion media", level: "medium" };
+  }
+  if (score >= 26) {
+    return { label: "Datos parciales", level: "partial" };
+  }
+  return { label: "Datos insuficientes", level: "insufficient" };
+}
+
+export function getEstimateReadinessScore(market: EstimationSignalInput): EstimateReadinessScore {
+  const soccerContext = extractSoccerMatchContext(market);
+  const soccerReadiness = getSoccerContextReadiness(soccerContext);
+  const independentSignals = collectIndependentSignals(market);
+  const externalSignals = independentSignals.filter(
+    (signal) => !signal.id.startsWith("soccer-") && signal.id !== "real-polysignal-estimate",
+  );
+  const factors: EstimateReadinessScoreFactor[] = [
+    {
+      available: Boolean(getMarketProbabilityPair(market)),
+      label: "Probabilidad del mercado",
+      maxPoints: 15,
+      points: getMarketProbabilityPair(market) ? 15 : 0,
+      reason: "Referencia de precio disponible; no es prediccion PolySignal.",
+    },
+    {
+      available: hasActivity(market),
+      label: "Actividad del mercado",
+      maxPoints: 15,
+      points: hasActivity(market) ? 15 : 0,
+      reason: "Volumen o liquidez ayudan a evaluar si el mercado tiene actividad suficiente.",
+    },
+    {
+      available: hasRecentData(market),
+      label: "Datos recientes",
+      maxPoints: 15,
+      points: hasRecentData(market) ? 15 : 0,
+      reason: "La frescura permite decidir si conviene investigar ahora.",
+    },
+    {
+      available: soccerReadiness.hasTeams,
+      label: "Equipos identificados",
+      maxPoints: 15,
+      points: soccerReadiness.hasTeams ? 15 : soccerReadiness.teamCount > 0 ? 7 : 0,
+      reason: "Los equipos se usan para preparar busqueda deportiva futura.",
+    },
+    {
+      available: soccerReadiness.hasDate,
+      label: "Fecha del partido",
+      maxPoints: 10,
+      points: soccerReadiness.hasDate ? 10 : 0,
+      reason: "La fecha permite ubicar forma reciente, lesiones y calendario.",
+    },
+    {
+      available: externalSignals.length > 0,
+      label: "Senales independientes externas",
+      maxPoints: 20,
+      points: Math.min(20, externalSignals.length * 10),
+      reason: "Evidencia, noticias u odds externas ya cargadas.",
+    },
+    {
+      available: false,
+      label: "Historial y calibracion",
+      maxPoints: 10,
+      points: 0,
+      reason: "La calibracion historica persistente todavia no esta disponible.",
+    },
+  ];
+  const score = Math.min(100, factors.reduce((total, factor) => total + factor.points, 0));
+  const label = scoreLabel(score);
+  return {
+    disclaimer: "Esto mide datos disponibles, no probabilidad del resultado.",
+    factors,
+    label: label.label,
+    level: label.level,
+    score,
+  };
 }

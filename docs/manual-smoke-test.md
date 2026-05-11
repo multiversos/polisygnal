@@ -241,28 +241,35 @@ If this test fails, stop feature work and treat it as a production regression.
    analysis.
 9. Confirm `Preparacion de estimacion PolySignal` or equivalent readiness copy
    is visible and lists whether independent signals are available.
-10. Confirm `Decision de PolySignal` follows the 55% threshold:
+10. Confirm `Contexto del partido` appears for matched soccer markets and shows
+   only available data: teams from title, date if present, sport, and missing
+   league/home-away/form/injury/odds fields.
+11. Confirm `Preparacion de datos` is presented as data availability, not as a
+   probability of winning.
+12. Confirm no league, local/visitor role, recent form, injuries, suspensions,
+   or external odds are invented.
+13. Confirm `Decision de PolySignal` follows the 55% threshold:
    YES `>=55%` is clear YES, NO `>=55%` is clear NO, and 45/55 is `Sin decision fuerte`.
-11. Confirm market price alone never creates a PolySignal predicted side.
-12. Confirm it shows only real visible data: title, event, status, price if
+14. Confirm market price alone never creates a PolySignal predicted side.
+15. Confirm it shows only real visible data: title, event, status, price if
    available, volume/liquidity if available, and last update.
-13. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
+16. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
    `Ver futbol` when a market is matched.
-14. Save the analysis, open `/history`, and confirm the item appears as
+17. Save the analysis, open `/history`, and confirm the item appears as
    `Desde enlace`.
-15. Confirm the saved history item shows market YES/NO probability if it was
+18. Confirm the saved history item shows market YES/NO probability if it was
     available, and PolySignal YES/NO only if it existed.
-16. Confirm `/history` shows whether the item counts for precision or does not
+19. Confirm `/history` shows whether the item counts for precision or does not
     count yet.
-17. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
+20. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
     inventing data when there are not enough comparable records.
-18. Confirm a no-match link can only be saved as pending and does not invent a
+21. Confirm a no-match link can only be saved as pending and does not invent a
    probability.
-19. Confirm the page does not promise profit, certainty, or betting advice.
-20. Confirm the saved record only gets a PolySignal predicted side when a real
+22. Confirm the page does not promise profit, certainty, or betting advice.
+23. Confirm the saved record only gets a PolySignal predicted side when a real
     PolySignal estimate crossed the 55% threshold. Market price alone must not
     create a predicted side.
-21. Confirm saved matched records preserve Polymarket identifiers when available
+24. Confirm saved matched records preserve Polymarket identifiers when available
     so Historial can later verify outcomes automatically.
 
 ## Alertas
@@ -287,6 +294,10 @@ If this test fails, stop feature work and treat it as a production regression.
    snippets.
 6. Confirm it shows `Estimacion propia no disponible` when independent signals
    are missing and explains what data is needed.
+7. Confirm it shows `Contexto deportivo` for soccer markets.
+8. Confirm `Preparacion de datos` is labelled as non-predictive.
+9. Confirm it does not invent league, home/away, form, injuries, suspensions,
+   external odds, or calibration.
 
 ## Hidden Data Status
 
@@ -306,8 +317,14 @@ If this test fails, stop feature work and treat it as a production regression.
    - Con liquidez visible.
    - Con volumen visible.
    - Datos completos.
-6. Confirm this page is not linked from the public sidebar or public pages.
-7. Confirm it does not show secrets, connection strings, stack traces, or large
+6. Confirm it shows soccer data readiness:
+   - Equipos identificados.
+   - Con fecha.
+   - Contexto parcial.
+   - Listos para investigacion.
+   - Top missing data categories.
+7. Confirm this page is not linked from the public sidebar or public pages.
+8. Confirm it does not show secrets, connection strings, stack traces, or large
    raw payloads.
 8. Confirm it is clearly read-only and does not expose buttons or commands that
    can refresh, score, import, delete, migrate, or trade.

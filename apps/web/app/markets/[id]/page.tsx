@@ -63,9 +63,15 @@ import {
   collectIndependentSignals,
   collectMarketSignals,
   explainMissingEstimateData,
+  getEstimateReadinessScore,
   getEstimateReadiness as getSignalEstimateReadiness,
 } from "../../lib/estimationSignals";
 import { getPolySignalEstimate } from "../../lib/polySignalEstimateEngine";
+import {
+  extractSoccerMatchContext,
+  formatSoccerMatchContext,
+  getSoccerContextReadiness,
+} from "../../lib/soccerMatchContext";
 import {
   DECISION_CONFIDENCE_LABELS,
   MARKET_DECISION_LABELS,
@@ -1881,6 +1887,7 @@ function PolySignalScorePanel({ analysis }: { analysis: MarketAnalysis }) {
   const estimateResult = getPolySignalEstimate(analysis);
   const realEstimate = getRealPolySignalProbabilities(analysis);
   const readiness = getSignalEstimateReadiness(analysis);
+  const readinessScore = getEstimateReadinessScore(analysis);
   const marketSignals = collectMarketSignals(analysis);
   const independentSignals = collectIndependentSignals(analysis);
   const missingReasons = explainMissingEstimateData(analysis);
@@ -1908,6 +1915,9 @@ function PolySignalScorePanel({ analysis }: { analysis: MarketAnalysis }) {
             puede verse como referencia, pero no cuenta como prediccion propia.
           </p>
           <div className="data-health-notes">
+            <span className={`badge ${readinessScore.level === "ready" ? "external-hint" : "muted"}`}>
+              Preparacion de datos: {readinessScore.score}/100
+            </span>
             <span className={`badge ${readiness.ready ? "external-hint" : "muted"}`}>
               Estado: {readiness.ready ? "estimacion disponible" : readiness.level === "partial" ? "datos parciales" : "sin estimacion suficiente"}
             </span>
@@ -1920,6 +1930,7 @@ function PolySignalScorePanel({ analysis }: { analysis: MarketAnalysis }) {
             ))}
           </div>
           <p className="section-note">Motor v0: {estimateResult.reason}</p>
+          <p className="section-note">{readinessScore.disclaimer}</p>
         </div>
       ) : (
         <div className="polysignal-detail-grid">
@@ -1981,9 +1992,63 @@ function PolySignalScorePanel({ analysis }: { analysis: MarketAnalysis }) {
                 <span className="reason-chip" key={signal.id}>{signal.label}</span>
               ))}
             </div>
+            <p className="section-note">
+              Preparacion de datos: {readinessScore.score}/100. {readinessScore.disclaimer}
+            </p>
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+function SoccerContextPanel({ analysis }: { analysis: MarketAnalysis }) {
+  const context = extractSoccerMatchContext(analysis);
+  const readiness = getSoccerContextReadiness(context);
+  const readinessScore = getEstimateReadinessScore(analysis);
+  const isSoccer = (analysis.market.sport_type || analysis.candidate_context?.sport || "").toLowerCase() === "soccer";
+  if (!isSoccer) {
+    return null;
+  }
+
+  return (
+    <section className="analysis-section data-quality-detail-section">
+      <div className="analysis-section-heading">
+        <div>
+          <span className="section-kicker">Preparacion deportiva</span>
+          <h2>Contexto deportivo</h2>
+          <p className="section-note">
+            Estos datos preparan investigacion futura. No son una prediccion ni una probabilidad de resultado.
+          </p>
+        </div>
+        <span className={`data-quality-label ${readiness.level}`}>
+          {readiness.level === "ready" ? "Contexto util" : readiness.level === "partial" ? "Parcial" : "Pendiente"}
+        </span>
+      </div>
+
+      <div className="analysis-stat-grid">
+        <div><span>Partido</span><strong>{formatSoccerMatchContext(context)}</strong></div>
+        <div><span>Equipo A</span><strong>{context.teamA?.name ?? "Pendiente"}</strong></div>
+        <div><span>Equipo B</span><strong>{context.teamB?.name ?? "Pendiente"}</strong></div>
+        <div><span>Fecha</span><strong>{formatDateTime(context.startTime)}</strong></div>
+        <div><span>Liga</span><strong>{context.league ?? "No disponible"}</strong></div>
+        <div><span>Fuente</span><strong>{humanizeToken(context.source)}</strong></div>
+        <div><span>Preparacion de datos</span><strong>{readinessScore.score}/100</strong></div>
+        <div><span>Tipo</span><strong>No predictivo</strong></div>
+      </div>
+
+      <div>
+        <h3>Datos deportivos faltantes</h3>
+        <div className="candidate-chip-list">
+          {readiness.missing.slice(0, 8).map((reason) => (
+            <span className="warning-chip" key={reason}>{reason}</span>
+          ))}
+        </div>
+      </div>
+      <p className="section-note">
+        PolySignal necesita forma reciente, lesiones, suspensiones, odds externas e historial calibrado
+        antes de mostrar una estimacion propia.
+      </p>
     </section>
   );
 }
@@ -4693,6 +4758,7 @@ export default function MarketAnalysisPage() {
             <div className="analysis-main">
               <QuickReadPanel analysis={analysis} />
               <PricePanel snapshot={analysis.latest_snapshot} />
+              <SoccerContextPanel analysis={analysis} />
               <PolySignalScorePanel analysis={analysis} />
               <DataQualityPanel
                 dataQuality={analysis.data_quality}

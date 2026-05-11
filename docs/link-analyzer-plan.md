@@ -20,6 +20,11 @@ Implemented as a frontend-only flow.
   market probability only.
 - The conservative estimate engine v0 returns `available=false` unless those
   independent signals already exist. It does not synthesize a new percentage.
+- For soccer, the page can now extract match context from already-loaded event
+  data: teams, date, sport, and missing categories. This context improves data
+  preparation but does not create a PolySignal probability.
+- `Preparacion de datos` is a non-predictive readiness score. It must never be
+  shown as probability of a team winning.
 - If the PolySignal estimate is missing, the page says that instead of
   defaulting to 50/50 or inventing a number.
 - The page shows whether PolySignal has a clear decision. The current threshold

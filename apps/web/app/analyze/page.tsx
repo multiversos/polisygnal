@@ -25,9 +25,15 @@ import {
   collectIndependentSignals,
   collectMarketSignals,
   explainMissingEstimateData,
+  getEstimateReadinessScore,
   getEstimateReadiness as getSignalEstimateReadiness,
 } from "../lib/estimationSignals";
 import { getPolySignalEstimate } from "../lib/polySignalEstimateEngine";
+import {
+  extractSoccerMatchContext,
+  formatSoccerMatchContext,
+  getSoccerContextReadiness,
+} from "../lib/soccerMatchContext";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { saveAnalysisHistoryItem } from "../lib/analysisHistory";
@@ -328,11 +334,15 @@ function pendingHistoryPayload(normalizedUrl: string) {
 
 function EstimateReadinessBlock({ item }: { item: MarketOverviewItem }) {
   const readiness = getSignalEstimateReadiness(item);
+  const readinessScore = getEstimateReadinessScore(item);
   const marketSignals = collectMarketSignals(item);
   const independentSignals = collectIndependentSignals(item);
   const missing = explainMissingEstimateData(item);
   return (
     <div className="data-health-notes" aria-label="Datos necesarios para estimacion propia">
+      <span className={`badge ${readinessScore.level === "ready" ? "external-hint" : "muted"}`}>
+        Preparacion de datos: {readinessScore.score}/100
+      </span>
       <span className={`badge ${readiness.ready ? "external-hint" : "muted"}`}>
         Estado: {readiness.ready ? "estimacion disponible" : readiness.level === "partial" ? "datos parciales" : "sin estimacion suficiente"}
       </span>
@@ -343,6 +353,48 @@ function EstimateReadinessBlock({ item }: { item: MarketOverviewItem }) {
       {missing.slice(0, 3).map((reason) => (
         <span className="badge muted" key={reason}>{reason}</span>
       ))}
+    </div>
+  );
+}
+
+function SoccerContextBlock({ item }: { item: MarketOverviewItem }) {
+  const context = extractSoccerMatchContext(item);
+  const readiness = getSoccerContextReadiness(context);
+  const isSoccer = (item.market?.sport_type || context.sport || "").toLowerCase() === "soccer";
+  if (!isSoccer) {
+    return null;
+  }
+  return (
+    <div className="empty-state compact">
+      <strong>Contexto del partido</strong>
+      <p>
+        Este contexto ayuda a preparar una estimacion futura, pero por si solo no genera
+        una prediccion PolySignal.
+      </p>
+      <div className="history-card-metrics">
+        <span>Partido {formatSoccerMatchContext(context)}</span>
+        <span>
+          Equipos {context.teamA?.name && context.teamB?.name ? `${context.teamA.name} / ${context.teamB.name}` : "pendientes"}
+        </span>
+        <span>Fecha {context.startTime ? formatDate(context.startTime) : "pendiente"}</span>
+        <span>Deporte futbol</span>
+        <span>Liga {context.league ?? "no disponible"}</span>
+        <span>Confianza {readiness.level === "ready" ? "media" : readiness.level === "partial" ? "baja" : "pendiente"}</span>
+      </div>
+      <div className="data-health-notes">
+        <span className={readiness.hasTeams ? "badge external-hint" : "badge muted"}>
+          Equipos: {readiness.hasTeams ? "disponibles" : "pendientes"}
+        </span>
+        <span className={readiness.hasDate ? "badge external-hint" : "badge muted"}>
+          Fecha: {readiness.hasDate ? "disponible" : "pendiente"}
+        </span>
+        <span className={readiness.hasLeague ? "badge external-hint" : "badge muted"}>
+          Liga: {readiness.hasLeague ? "disponible" : "pendiente"}
+        </span>
+        {readiness.missing.slice(0, 5).map((reason) => (
+          <span className="badge muted" key={reason}>{reason}</span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -392,6 +444,7 @@ function MatchCard({
       <h3>{marketTitle(item)}</h3>
       <p className="section-note">{eventTitle(item)}</p>
       <p>{reason.reason}</p>
+      <SoccerContextBlock item={item} />
       <div className="probability-display-panel">
         <div className="probability-display-heading">
           <h4>Lectura del mercado</h4>
@@ -450,6 +503,9 @@ function MatchCard({
           <EstimateReadinessBlock item={item} />
           <p className="section-note">Estado actual: {getEstimateQualityLabel(estimateQuality)}.</p>
           <p className="section-note">Motor v0: {estimateResult.reason}</p>
+          <p className="section-note">
+            Preparacion de datos no es probabilidad de ganar ni recomendacion.
+          </p>
         </div>
       </div>
       <div className="history-card-metrics">

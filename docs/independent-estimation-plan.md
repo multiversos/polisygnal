@@ -83,16 +83,23 @@ The frontend now has explicit readiness helpers:
 - `collectMarketSignals`
 - `collectIndependentSignals`
 - `getEstimateReadiness`
+- `getEstimateReadinessScore`
 - `shouldAllowPolySignalEstimate`
 - `explainMissingEstimateData`
+- `extractSoccerMatchContext`
 
 Rules:
 
 - Market price can be collected as a signal with `isIndependent=false`.
 - Volume and liquidity can support confidence but do not create a prediction.
-- `independentSignalCount=0` means no PolySignal estimate is allowed.
+- Soccer match context can be an independent neutral signal when teams or dates
+  are identified from existing event data.
+- Match context alone is still not enough to create a PolySignal probability.
 - A clear `predictedSide` can exist only after a real PolySignal estimate
   exists and crosses the 55% threshold.
+
+`Preparacion de datos` is a non-predictive 0-100 score. It indicates how much
+input data exists for future analysis; it is not a probability of YES or NO.
 
 ## Conservative Engine V0
 
@@ -105,8 +112,26 @@ Behavior:
 - If a real PolySignal estimate already exists and passes quality checks:
   `available=true` and the stored estimate is returned.
 - If partial signals exist but are insufficient: `available=false`.
+- If only soccer context exists, the engine may show partial readiness but still
+  returns `available=false`.
 
 This keeps the UI honest while preparing the future estimator API.
+
+## Soccer Context Layer
+
+The first sports-specific layer lives in `soccerMatchContext.ts`.
+
+It extracts only from already-loaded fields:
+
+- event title;
+- market question;
+- event/market slug as fallback context;
+- sport type;
+- close/end time.
+
+It can identify `Team A vs Team B` from clear titles, but keeps home/away as
+`unknown` unless a future structured source provides it. It does not infer league
+from slug abbreviations.
 
 ## Future Sources
 
