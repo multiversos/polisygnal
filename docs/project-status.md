@@ -74,6 +74,12 @@ Estado visible verificado:
   senales disponibles, investigacion externa y resumen final. No usa una barra
   de progreso inventada, timers falsos, imagenes externas, logos ni rostros
   reales para simular avance.
+- Existe una primera capa de Wallet Intelligence:
+  `walletIntelligenceTypes.ts`, `walletIntelligence.ts` y
+  `walletIntelligenceAdapter.ts`. La capa frontend no hace fetch externo,
+  devuelve no disponible cuando no hay datos reales, usa umbral planificado de
+  `100 USD`, abrevia direcciones y deja claro que no identifica personas ni
+  recomienda copiar traders.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion
@@ -202,6 +208,8 @@ Documentacion preparada:
   inferencias seguras y fuentes deportivas futuras.
 - `docs/external-research-plan.md`: plan de integracion segura de fuentes
   externas con allowlist, rate limit, cache y backend server-side.
+- `docs/wallet-intelligence-plan.md`: auditoria de fuentes de wallets/trades,
+  modelo futuro, umbral, privacidad y reglas anti copy-trading.
 
 Estado actual:
 
@@ -226,6 +234,9 @@ Riesgos pendientes:
   forma reciente, lesiones, suspensiones, odds externas ni calibracion;
 - la investigacion externa real todavia no esta conectada a APIs deportivas,
   odds, noticias o fuentes oficiales;
+- Wallet Intelligence aun no esta conectada al Analizador como consulta real;
+  faltan rate limits, fuente estructurada aprobada, politica de retencion y
+  calculo confiable de win rate/ROI;
 - snapshots/analisis de soccer siguen con datos stale hasta refresh
   supervisado;
 - npm audit mantiene 2 moderadas via Next/PostCSS, documentadas sin force fix.

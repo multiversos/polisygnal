@@ -17,6 +17,8 @@ import {
   getSoccerContextReadiness,
   type SoccerMatchContextInput,
 } from "./soccerMatchContext";
+import { getWalletIntelligenceSummary } from "./walletIntelligence";
+import type { WalletSignalDirection } from "./walletIntelligenceTypes";
 
 export type EstimationSignalSource =
   | "external_news"
@@ -25,6 +27,7 @@ export type EstimationSignalSource =
   | "odds_reference"
   | "polysignal"
   | "sports_stats"
+  | "wallet_intelligence"
   | "unknown";
 
 export type EstimationSignalDirection = "NEUTRAL" | "NO" | "UNKNOWN" | "YES";
@@ -172,6 +175,13 @@ function signalSourceFromResearchSource(sourceType: ResearchSourceType): Estimat
   return "unknown";
 }
 
+function signalDirectionFromWallet(value: WalletSignalDirection): EstimationSignalDirection {
+  if (value === "YES" || value === "NO" || value === "NEUTRAL") {
+    return value;
+  }
+  return "UNKNOWN";
+}
+
 function researchFindingsFromInput(market: EstimationSignalInputWithResearch): ResearchFinding[] {
   return [
     ...(market.researchFindings ?? []),
@@ -286,6 +296,21 @@ export function collectIndependentSignals(market: EstimationSignalInputWithResea
       source: "sports_stats",
       strength: "low",
       value: soccerContext.league,
+    });
+  }
+  const walletSummary = getWalletIntelligenceSummary(market);
+  if (walletSummary.available && walletSummary.relevantWalletsCount > 0) {
+    signals.push({
+      confidence: walletSummary.confidence === "none" ? "low" : walletSummary.confidence,
+      direction: signalDirectionFromWallet(walletSummary.signalDirection),
+      id: "wallet-intelligence",
+      isIndependent: true,
+      label: "Inteligencia de billeteras",
+      reason:
+        "Senal auxiliar basada en posiciones publicas estructuradas; no crea una decision ni una estimacion por si sola.",
+      source: "wallet_intelligence",
+      strength: walletSummary.confidence === "high" ? "medium" : "low",
+      value: walletSummary.relevantWalletsCount,
     });
   }
   if (hasRealPolySignalEstimate(market)) {

@@ -484,9 +484,16 @@ function validateMarketDetailPage(dom, label) {
     ["Evidencia para estimacion", "Evidencia para estimación"],
     `${label} evidence readiness`,
   );
+  assertTextIncludes(text, "Billeteras relevantes", `${label} wallet intelligence readiness`);
+  assertTextIncludesOneOf(
+    text,
+    ["no identifica personas reales", "Datos de billeteras no disponibles", "direcciones completas"],
+    `${label} wallet privacy copy`,
+  );
   assertTextIncludes(text, "Preparacion de datos", `${label} non predictive readiness`);
   assertTextIncludes(text, "No predictivo", `${label} readiness is not prediction`);
   assertTextExcludes(text, ["Fake finding", "Demo finding", "fixture de prueba"], `${label} invented evidence`);
+  assertTextExcludes(text, ["0x1234567890abcdef", "ROI 100%", "win rate 100%"], `${label} fake wallet metrics`);
   assertTextExcludes(
     text,
     ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
@@ -621,6 +628,9 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Investigacion externa", "internal external research readiness");
   assertTextIncludes(text, "Con evidencia externa real", "internal external research readiness");
   assertTextIncludes(text, "Sin evidencia externa", "internal external research readiness");
+  assertTextIncludes(text, "Inteligencia de billeteras", "internal wallet intelligence readiness");
+  assertTextIncludes(text, "Pendiente de fuente estructurada", "internal wallet intelligence readiness");
+  assertTextIncludesOneOf(text, ["$100+", "100+"], "internal wallet intelligence threshold");
   assertTextExcludes(
     text,
     ["DATABASE_URL", "SECRET", "TOKEN", "API_KEY", "postgres://", "postgresql://"],
@@ -893,6 +903,12 @@ async function main() {
   );
   assertTextIncludes(validAnalyzeText, "Contexto del partido", "analyze soccer context");
   assertTextIncludes(validAnalyzeText, "Investigacion externa", "analyze external research readiness");
+  assertTextIncludes(validAnalyzeText, "Inteligencia de billeteras", "analyze wallet intelligence readiness");
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    ["no intenta identificar personas reales", "movimientos relevantes de $100", "movimientos relevantes de 100"],
+    "analyze wallet privacy copy",
+  );
   assertTextIncludesOneOf(
     validAnalyzeText,
     ["Fuentes verificadas: 0", "Fuentes verificadas"],
@@ -905,6 +921,7 @@ async function main() {
     "analyze soccer context is not prediction",
   );
   assertTextExcludes(validAnalyzeText, ["Fake finding", "Demo finding", "fixture de prueba"], "analyze invented evidence");
+  assertTextExcludes(validAnalyzeText, ["0x1234567890abcdef", "ROI 100%", "win rate 100%"], "analyze fake wallet data");
   assertTextIncludes(validAnalyzeText, "Decision de PolySignal", "analyze clear decision panel");
   assertTextIncludesOneOf(
     validAnalyzeText,

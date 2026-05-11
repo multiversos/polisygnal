@@ -89,6 +89,8 @@ The frontend now has explicit readiness helpers:
 - `extractSoccerMatchContext`
 - `getResearchCoverage`
 - `getMissingResearchCategories`
+- `getWalletIntelligenceSummary`
+- `getWalletIntelligenceReadiness`
 
 Rules:
 
@@ -97,6 +99,10 @@ Rules:
 - Soccer match context can be an independent neutral signal when teams or dates
   are identified from existing event data.
 - Match context alone is still not enough to create a PolySignal probability.
+- Wallet intelligence can become an independent auxiliary signal only when real
+  structured wallet positions/trades are available.
+- Wallet data alone is still not enough to create a PolySignal probability or
+  a `predictedSide`.
 - A clear `predictedSide` can exist only after a real PolySignal estimate
   exists and crosses the 55% threshold.
 
@@ -106,6 +112,11 @@ input data exists for future analysis; it is not a probability of YES or NO.
 `ResearchFinding` and `researchReadiness.ts` now model future external evidence.
 If no real source exists, findings stay empty and the UI shows missing
 categories instead of demo data.
+
+`walletIntelligence.ts` and `walletIntelligenceAdapter.ts` now define the
+future wallet signal boundary. They default to unavailable, use a planned
+`100 USD` threshold, abbreviate wallet addresses, and do not fetch external
+data from the frontend.
 
 ## Conservative Engine V0
 
@@ -120,6 +131,9 @@ Behavior:
 - If partial signals exist but are insufficient: `available=false`.
 - If only soccer context exists, the engine may show partial readiness but still
   returns `available=false`.
+- If wallet intelligence exists later, it is treated as an auxiliary signal.
+  Without a calibrated estimator and other evidence, the engine still returns
+  `available=false`.
 
 This keeps the UI honest while preparing the future estimator API.
 
@@ -170,10 +184,21 @@ from slug abbreviations.
 - Market-vs-PolySignal edge performance.
 - Model drift and stale-data checks.
 
+### Wallet Intelligence
+
+- Public market positions/trades by wallet.
+- Minimum relevant position/trade threshold of `100 USD`.
+- Side bias by capital leaning YES/NO.
+- Historical win rate and ROI only after closed-position outcomes can be
+  reconstructed from reliable data.
+- Shortened addresses only; no identity inference.
+
 ## Guardrails
 
 - Do not estimate when data is insufficient.
 - Do not promise profit.
+- Do not copy traders or imply wallet activity is a guaranteed edge.
+- Do not identify people behind wallets.
 - Show sources and missing data.
 - Store analysis time, market price, signals used, and estimator version later.
 - Keep external fetches rate-limited and allow-listed.

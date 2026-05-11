@@ -106,6 +106,34 @@ Outcome parsing is conservative. It marks YES/NO only when Gamma shows a closed
 resolved market and exposes a clear winner or final binary `outcomePrices`.
 Closed markets without a clear structured outcome remain `unknown`.
 
+## Wallet Intelligence Safety
+
+Wallet Intelligence is prepared as a future read-only auxiliary signal. It is
+not a customer-data feature and does not store wallet history today.
+
+Current constraints:
+
+- `/analyze` does not call external wallet APIs.
+- Frontend helper `walletIntelligenceAdapter.ts` returns unavailable until a
+  structured source is explicitly connected.
+- Wallet summaries use a planned `100 USD` relevance threshold.
+- Full wallet addresses must not be shown by default; use shortened addresses.
+- Public wallet data must never be mapped to real-world identities.
+- No ROI, win rate, or wallet history is shown unless computed from reliable
+  structured data.
+- Wallet Intelligence must not create a PolySignal estimate or `predictedSide`
+  by itself.
+
+Before enabling real wallet lookups from `/analyze`:
+
+- add rate limiting;
+- keep lookups server-side;
+- allowlist the structured source;
+- use short timeout and response-size caps;
+- avoid storing raw payloads;
+- document retention and deletion rules;
+- keep logs free of complete wallet lists.
+
 ## Backend Proxy Security
 
 The frontend proxy at `/api/backend/[...path]` is read-only and only accepts

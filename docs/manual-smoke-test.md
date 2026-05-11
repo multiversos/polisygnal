@@ -278,28 +278,35 @@ If this test fails, stop feature work and treat it as a production regression.
    rather than fake sources.
 24. Confirm it says there are no verified external sources if no real findings
    are loaded.
-25. Confirm `Decision de PolySignal` follows the 55% threshold:
+25. Confirm `Inteligencia de billeteras` is visible.
+26. Confirm it says wallet data is pending or unavailable when no real source is
+   connected.
+27. Confirm it does not show fake wallets, full wallet addresses, ROI, win rate,
+   or copied-trader advice.
+28. Confirm it says public wallets are not mapped to real people and that the
+   signal will be auxiliary.
+29. Confirm `Decision de PolySignal` follows the 55% threshold:
    YES `>=55%` is clear YES, NO `>=55%` is clear NO, and 45/55 is `Sin decision fuerte`.
-26. Confirm market price alone never creates a PolySignal predicted side.
-27. Confirm it shows only real visible data: title, event, status, price if
+30. Confirm market price alone never creates a PolySignal predicted side.
+31. Confirm it shows only real visible data: title, event, status, price if
    available, volume/liquidity if available, and last update.
-28. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
+32. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
    `Ver futbol` when a market is matched.
-29. Save the analysis, open `/history`, and confirm the item appears as
+33. Save the analysis, open `/history`, and confirm the item appears as
    `Desde enlace`.
-30. Confirm the saved history item shows market YES/NO probability if it was
+34. Confirm the saved history item shows market YES/NO probability if it was
     available, and PolySignal YES/NO only if it existed.
-31. Confirm `/history` shows whether the item counts for precision or does not
+35. Confirm `/history` shows whether the item counts for precision or does not
     count yet.
-32. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
+36. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
     inventing data when there are not enough comparable records.
-33. Confirm a no-match link can only be saved as pending and does not invent a
+37. Confirm a no-match link can only be saved as pending and does not invent a
    probability.
-34. Confirm the page does not promise profit, certainty, or betting advice.
-35. Confirm the saved record only gets a PolySignal predicted side when a real
+38. Confirm the page does not promise profit, certainty, or betting advice.
+39. Confirm the saved record only gets a PolySignal predicted side when a real
     PolySignal estimate crossed the 55% threshold. Market price alone must not
     create a predicted side.
-36. Confirm saved matched records preserve Polymarket identifiers when available
+40. Confirm saved matched records preserve Polymarket identifiers when available
     so Historial can later verify outcomes automatically.
 
 ## Alertas
@@ -331,6 +338,11 @@ If this test fails, stop feature work and treat it as a production regression.
 10. Confirm it shows `Evidencia para estimacion`.
 11. Confirm empty evidence states say external verified sources are not
    available yet instead of showing demo findings.
+12. Confirm it shows `Billeteras relevantes`.
+13. Confirm the wallet section uses shortened addresses only when real public
+    data exists, and otherwise says wallet data is not available yet.
+14. Confirm it does not show fake wallet ROI/win-rate values and does not
+    recommend copying traders.
 
 ## Hidden Data Status
 
@@ -361,10 +373,14 @@ If this test fails, stop feature work and treat it as a production regression.
    - Con evidencia externa real.
    - Sin evidencia externa.
    - Pendiente de integracion de fuentes.
-8. Confirm this page is not linked from the public sidebar or public pages.
-9. Confirm it does not show secrets, connection strings, stack traces, or large
+8. Confirm it shows Wallet Intelligence readiness:
+   - Pendiente de fuente estructurada.
+   - Umbral planificado `$100+`.
+   - No addresses or personal data.
+9. Confirm this page is not linked from the public sidebar or public pages.
+10. Confirm it does not show secrets, connection strings, stack traces, or large
    raw payloads.
-8. Confirm it is clearly read-only and does not expose buttons or commands that
+11. Confirm it is clearly read-only and does not expose buttons or commands that
    can refresh, score, import, delete, migrate, or trade.
 
 ## Public Insight Language

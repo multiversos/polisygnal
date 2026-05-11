@@ -39,6 +39,10 @@ import {
   getSoccerContextReadiness,
 } from "../lib/soccerMatchContext";
 import { getResearchCoverage } from "../lib/researchReadiness";
+import {
+  getWalletIntelligenceReadiness,
+  getWalletIntelligenceSummary,
+} from "../lib/walletIntelligence";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { saveAnalysisHistoryItem } from "../lib/analysisHistory";
@@ -432,6 +436,37 @@ function ExternalResearchBlock({ item }: { item: MarketOverviewItem }) {
   );
 }
 
+function WalletIntelligenceBlock({ item }: { item: MarketOverviewItem }) {
+  const summary = getWalletIntelligenceSummary(item);
+  const readiness = getWalletIntelligenceReadiness(item);
+  return (
+    <div className="empty-state compact">
+      <strong>Inteligencia de billeteras</strong>
+      <p>
+        Aun no hay datos suficientes de billeteras para este mercado. En una fase futura,
+        PolySignal podra analizar billeteras publicas con movimientos relevantes de $100 o mas.
+      </p>
+      <div className="data-health-notes">
+        <span className={summary.available ? "badge external-hint" : "badge muted"}>
+          Estado: {summary.available ? "datos estructurados disponibles" : "pendiente"}
+        </span>
+        <span className="badge muted">Umbral planificado: ${summary.thresholdUsd}+</span>
+        <span className="badge muted">Billeteras relevantes: {summary.relevantWalletsCount}</span>
+        <span className="badge muted">Direccion: {summary.signalDirection === "UNKNOWN" ? "sin senal" : summary.signalDirection}</span>
+        {readiness.checklist.slice(0, 5).map((item) => (
+          <span className={item.available ? "badge external-hint" : "badge muted"} key={item.label}>
+            {item.label}: {item.available ? "disponible" : "pendiente"}
+          </span>
+        ))}
+      </div>
+      <p className="section-note">
+        Esta senal revisara billeteras publicas con movimientos relevantes, pero no intenta
+        identificar personas reales ni recomienda copiar traders. No crea estimaciones por si sola.
+      </p>
+    </div>
+  );
+}
+
 function MatchCard({
   busy,
   item,
@@ -479,6 +514,7 @@ function MatchCard({
       <p>{reason.reason}</p>
       <SoccerContextBlock item={item} />
       <ExternalResearchBlock item={item} />
+      <WalletIntelligenceBlock item={item} />
       <div className="probability-display-panel">
         <div className="probability-display-heading">
           <h4>Lectura del mercado</h4>
@@ -670,6 +706,7 @@ export default function AnalyzePage() {
           return;
         }
         getResearchCoverage(previewMarket, []);
+        getWalletIntelligenceSummary(previewMarket);
       }
 
       if (!(await advancePhase("preparing"))) {

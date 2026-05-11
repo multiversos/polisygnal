@@ -75,6 +75,10 @@ import {
 import {
   getResearchCoverage,
 } from "../../lib/researchReadiness";
+import {
+  WALLET_INTELLIGENCE_THRESHOLD_USD,
+  getWalletIntelligenceReadiness,
+} from "../../lib/walletIntelligence";
 import type {
   EvidenceDirection,
   EvidenceReliability,
@@ -2533,31 +2537,35 @@ function WalletIntelligencePanel({
   error?: string | null;
   intelligence?: WalletIntelligence | null;
 }) {
+  const readiness = getWalletIntelligenceReadiness(null);
   const hasLargeTrades = (intelligence?.large_trades.length ?? 0) > 0;
   const hasLargePositions = (intelligence?.large_positions.length ?? 0) > 0;
   const hasNotableWallets = (intelligence?.notable_wallets.length ?? 0) > 0;
   const walletWarnings = intelligence?.warnings ?? [];
   const missingConditionId = walletWarnings.includes("condition_id_unavailable");
   const emptyMessage = missingConditionId
-    ? "Falta condition_id para consultar actividad de billeteras. Refresca metadata de mercado para intentar obtener identificadores públicos."
-    : "No hay actividad de billeteras disponible para este mercado.";
+    ? "Falta condition_id para consultar actividad de billeteras. Se necesita un identificador publico confiable del mercado."
+    : "Datos de billeteras no disponibles todavia.";
 
   return (
     <section className="analysis-section wallet-intelligence-section">
       <div className="analysis-section-heading">
         <div>
-          <span className="section-kicker">Señales públicas</span>
-          <h2>Actividad de billeteras</h2>
+          <span className="section-kicker">Senales publicas</span>
+          <h2>Billeteras relevantes</h2>
           <p className="section-note">
-            Las wallets son direcciones publicas/pseudonimas. Esta seccion muestra
-            actividad de mercado, no identidad personal ni acusaciones.
+            En una fase futura, PolySignal analizara billeteras publicas con posiciones
+            de ${WALLET_INTELLIGENCE_THRESHOLD_USD}+ para detectar inclinacion YES/NO.
+            Es una senal auxiliar: no identifica personas reales ni recomienda copiar traders.
           </p>
         </div>
         {intelligence ? (
           <span className="timestamp-pill">
-            {intelligence.condition_id ? `condition_id ${shortIdentifier(intelligence.condition_id)}` : `Umbral ${formatUsd(intelligence.threshold_usd)}`}
+            {intelligence.condition_id ? `Identificador ${shortIdentifier(intelligence.condition_id)}` : `Umbral ${formatUsd(intelligence.threshold_usd)}`}
           </span>
-        ) : null}
+        ) : (
+          <span className="timestamp-pill">Plan ${WALLET_INTELLIGENCE_THRESHOLD_USD}+</span>
+        )}
       </div>
 
       {error ? (
@@ -2578,7 +2586,20 @@ function WalletIntelligencePanel({
               ))}
             </div>
           ) : null}
-          <div className="empty-state compact">{emptyMessage}</div>
+          <div className="empty-state compact">
+            <strong>{emptyMessage}</strong>
+            <p>
+              La probabilidad del mercado se mantiene como referencia, pero no cuenta
+              como estimacion PolySignal ni como inteligencia de billeteras.
+            </p>
+            <div className="data-health-notes">
+              {readiness.checklist.map((item) => (
+                <span className={item.available ? "badge external-hint" : "badge muted"} key={item.label}>
+                  {item.label}: {item.available ? "disponible" : "pendiente"}
+                </span>
+              ))}
+            </div>
+          </div>
         </>
       ) : (
         <>
@@ -2592,7 +2613,7 @@ function WalletIntelligencePanel({
               <strong>{intelligence.large_positions.length}</strong>
             </div>
             <div>
-              <span>Wallets relevantes</span>
+              <span>Billeteras relevantes</span>
               <strong>{intelligence.notable_wallets.length}</strong>
             </div>
             <div>
@@ -2626,7 +2647,6 @@ function WalletIntelligencePanel({
                     <span>Precio {formatProbability(trade.price)}</span>
                     <span>{formatDateTime(trade.timestamp)}</span>
                   </div>
-                  {trade.profile_name ? <small>{trade.profile_name}</small> : null}
                 </article>
               ))}
             </div>
@@ -2647,7 +2667,6 @@ function WalletIntelligencePanel({
                     <span>Prom. {formatProbability(position.avg_price)}</span>
                     <span>Actual {formatProbability(position.current_price)}</span>
                   </div>
-                  {position.profile_name ? <small>{position.profile_name}</small> : null}
                 </article>
               ))}
             </div>
@@ -2655,12 +2674,12 @@ function WalletIntelligencePanel({
 
           {hasNotableWallets ? (
             <div className="wallet-activity-list compact">
-              <h3>Wallets para revisión</h3>
+              <h3>Billeteras para revision</h3>
               {intelligence.notable_wallets.slice(0, 5).map((wallet) => (
                 <article className="wallet-activity-card compact" key={wallet.wallet_short}>
                   <div className="wallet-activity-heading">
                     <strong>{wallet.wallet_short}</strong>
-                    <span>Score {formatScore(wallet.signal_score)}</span>
+                    <span>Relevancia {formatScore(wallet.signal_score)}</span>
                   </div>
                   <div className="candidate-chip-list">
                     {wallet.signal_types.map((signal) => (
@@ -2689,9 +2708,13 @@ function WalletIntelligencePanel({
 
           {!hasLargeTrades && !hasLargePositions ? (
             <div className="empty-state compact">
-              Hay datos públicos, pero no se detectaron operaciones o posiciones por encima del umbral.
+              Hay datos publicos, pero no se detectaron operaciones o posiciones por encima del umbral.
             </div>
           ) : null}
+          <p className="section-note">
+            No se muestran direcciones completas por defecto. Sin historial cerrado
+            confiable, no se muestra tasa de acierto ni rentabilidad historica.
+          </p>
         </>
       )}
     </section>
@@ -3986,7 +4009,7 @@ export default function MarketAnalysisPage() {
       const [analysisResult, historyResult, walletResult] = await Promise.allSettled([
         fetchJson<MarketAnalysis>(`/markets/${marketId}/analysis`),
         fetchJson<PriceHistoryResponse>(`/markets/${marketId}/price-history?limit=50&order=asc`),
-        fetchJson<WalletIntelligence>(`/markets/${marketId}/wallet-intelligence?min_usd=10000&limit=20`),
+        fetchJson<WalletIntelligence>(`/markets/${marketId}/wallet-intelligence?min_usd=${WALLET_INTELLIGENCE_THRESHOLD_USD}&limit=20`),
       ]);
       if (analysisResult.status === "rejected") {
         throw analysisResult.reason;

@@ -10,6 +10,7 @@ import {
   getSoccerContextReadiness,
 } from "../../lib/soccerMatchContext";
 import { formatLastUpdated } from "../../lib/useAutoRefresh";
+import { WALLET_INTELLIGENCE_THRESHOLD_USD } from "../../lib/walletIntelligence";
 
 type MarketOverviewItem = {
   market?: {
@@ -372,6 +373,41 @@ export default function InternalDataStatusPage() {
             <span>Sin evidencia externa</span>
             <strong>{externalResearchReadiness.missingExternalEvidence}</strong>
             <p>No hay fuentes externas verificadas disponibles todavia.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading compact">
+          <div>
+            <p className="eyebrow">Inteligencia de billeteras</p>
+            <h2>Pendiente de fuente estructurada</h2>
+            <p>
+              Diagnostico read-only para preparar analisis de billeteras publicas
+              sin mostrar direcciones reales, historial personal ni datos sensibles.
+            </p>
+          </div>
+        </div>
+        <div className="internal-status-grid">
+          <article className="internal-status-card">
+            <span>Estado</span>
+            <strong>Pendiente</strong>
+            <p>No se consultan wallets desde esta pagina.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Fuente trades/positions</span>
+            <strong>No conectada a UI publica</strong>
+            <p>Requiere fuente estructurada, rate limit y revision manual.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Umbral planificado</span>
+            <strong>${WALLET_INTELLIGENCE_THRESHOLD_USD}+</strong>
+            <p>Solo movimientos relevantes por encima del umbral.</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Privacidad</span>
+            <strong>Sin identidades</strong>
+            <p>Solo direcciones abreviadas cuando exista una fuente real.</p>
           </article>
         </div>
       </section>

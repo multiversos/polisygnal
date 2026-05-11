@@ -55,13 +55,16 @@ export function getPolySignalEstimate(input: MarketEstimateQualityInput): PolySi
   const quality = getEstimateQuality(input);
 
   if (!estimate || quality !== "real_polysignal_estimate") {
+    const hasWalletSignal = independentSignals.some((signal) => signal.source === "wallet_intelligence");
     return {
       available: false,
       confidence: "none",
       decision: "NONE",
       missing: readiness.missing,
       reason:
-        readiness.independentSignalCount === 0
+        hasWalletSignal
+          ? "La inteligencia de billeteras es una senal auxiliar; todavia no alcanza para mostrar una estimacion propia."
+          : readiness.independentSignalCount === 0
           ? "Faltan senales independientes."
           : "Hay datos parciales, pero todavia no alcanzan para mostrar una estimacion propia.",
       signalsUsed: independentSignals,
