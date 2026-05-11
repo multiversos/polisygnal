@@ -19,9 +19,15 @@ import {
 import {
   getEstimateQuality,
   getEstimateQualityLabel,
-  getEstimateReadiness,
   getRealPolySignalProbabilities,
 } from "../lib/marketEstimateQuality";
+import {
+  collectIndependentSignals,
+  collectMarketSignals,
+  explainMissingEstimateData,
+  getEstimateReadiness as getSignalEstimateReadiness,
+} from "../lib/estimationSignals";
+import { getPolySignalEstimate } from "../lib/polySignalEstimateEngine";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { saveAnalysisHistoryItem } from "../lib/analysisHistory";
@@ -321,13 +327,21 @@ function pendingHistoryPayload(normalizedUrl: string) {
 }
 
 function EstimateReadinessBlock({ item }: { item: MarketOverviewItem }) {
-  const readiness = getEstimateReadiness(item);
+  const readiness = getSignalEstimateReadiness(item);
+  const marketSignals = collectMarketSignals(item);
+  const independentSignals = collectIndependentSignals(item);
+  const missing = explainMissingEstimateData(item);
   return (
     <div className="data-health-notes" aria-label="Datos necesarios para estimacion propia">
-      {readiness.map((entry) => (
-        <span className={`badge ${entry.available ? "external-hint" : "muted"}`} key={entry.label}>
-          {entry.label}: {entry.available ? "disponible" : entry.status === "pending" ? "pendiente" : "no disponible"}
-        </span>
+      <span className={`badge ${readiness.ready ? "external-hint" : "muted"}`}>
+        Estado: {readiness.ready ? "estimacion disponible" : readiness.level === "partial" ? "datos parciales" : "sin estimacion suficiente"}
+      </span>
+      <span className="badge muted">Senales de mercado: {marketSignals.length}</span>
+      <span className={independentSignals.length > 0 ? "badge external-hint" : "badge muted"}>
+        Senales independientes: {independentSignals.length}
+      </span>
+      {missing.slice(0, 3).map((reason) => (
+        <span className="badge muted" key={reason}>{reason}</span>
       ))}
     </div>
   );
@@ -353,6 +367,7 @@ function MatchCard({
   const reason = getMarketReviewReason(input);
   const activity = getMarketActivityLabel(input);
   const estimateQuality = getEstimateQuality(item);
+  const estimateResult = getPolySignalEstimate(item);
   const realPolySignalProbabilities = getRealPolySignalProbabilities(item);
   const probabilityState = getProbabilityDisplayState({
     marketNoPrice: item.latest_snapshot?.no_price,
@@ -427,13 +442,14 @@ function MatchCard({
         </div>
         <p className="section-note">{probabilityState.disclaimer}</p>
         <div className="empty-state compact">
-          <strong>Datos necesarios para una estimacion propia</strong>
+          <strong>Preparacion de estimacion PolySignal</strong>
           <p>
             PolySignal necesita senales independientes para mostrar una estimacion propia. Si solo
             tenemos el precio del mercado, lo mostramos como referencia, pero no lo contamos como prediccion.
           </p>
           <EstimateReadinessBlock item={item} />
           <p className="section-note">Estado actual: {getEstimateQualityLabel(estimateQuality)}.</p>
+          <p className="section-note">Motor v0: {estimateResult.reason}</p>
         </div>
       </div>
       <div className="history-card-metrics">

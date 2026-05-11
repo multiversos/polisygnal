@@ -736,6 +736,11 @@ async function main() {
   );
   assertTextIncludesOneOf(
     historyText,
+    ["Solo probabilidad de mercado", "Con estimacion PolySignal real", "Con estimación PolySignal real"],
+    "history estimate readiness metrics",
+  );
+  assertTextIncludesOneOf(
+    historyText,
     ["Resolucion automatica", "Resolución automática", "Verificado con Polymarket", "Resultado verificable"],
     "history automatic resolution copy",
   );
@@ -815,6 +820,11 @@ async function main() {
       "Por ahora solo mostramos la probabilidad del mercado",
     ],
     "analyze market price is not polysignal estimate",
+  );
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    ["Preparacion de estimacion PolySignal", "Preparación de estimación PolySignal", "Senales independientes"],
+    "analyze estimate readiness",
   );
   assertTextIncludes(validAnalyzeText, "Decision de PolySignal", "analyze clear decision panel");
   assertTextIncludesOneOf(

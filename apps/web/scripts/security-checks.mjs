@@ -226,6 +226,59 @@ function validateEstimateQualityRules() {
   return { cases: 3 };
 }
 
+function validateEstimateEngineRules() {
+  const { getEstimateReadiness } = loadTsModule("app/lib/estimationSignals.ts");
+  const { getPolySignalEstimate } = loadTsModule("app/lib/polySignalEstimateEngine.ts");
+
+  const marketOnly = {
+    latest_prediction: {
+      edge_signed: 0,
+      no_probability: 0.835,
+      used_evidence_in_scoring: false,
+      used_news_count: 0,
+      used_odds_count: 0,
+      yes_probability: 0.165,
+    },
+    latest_snapshot: {
+      liquidity: 1000,
+      no_price: 0.835,
+      volume: 5000,
+      yes_price: 0.165,
+    },
+  };
+  const marketOnlyReadiness = getEstimateReadiness(marketOnly);
+  const marketOnlyEstimate = getPolySignalEstimate(marketOnly);
+  assert(!marketOnlyReadiness.ready, "expected market-only data not to be estimate-ready");
+  assert(
+    marketOnlyReadiness.independentSignalCount === 0,
+    `expected no independent signals, got ${marketOnlyReadiness.independentSignalCount}`,
+  );
+  assert(!marketOnlyEstimate.available, "expected market-only estimate engine result to be unavailable");
+  assert(marketOnlyEstimate.yesProbability === undefined, "expected market-only estimate not to expose YES probability");
+
+  const realEstimate = {
+    latest_prediction: {
+      confidence_score: 0.63,
+      edge_signed: 0.08,
+      no_probability: 0.755,
+      used_evidence_in_scoring: true,
+      used_news_count: 1,
+      used_odds_count: 1,
+      yes_probability: 0.245,
+    },
+    latest_snapshot: {
+      no_price: 0.835,
+      yes_price: 0.165,
+    },
+  };
+  const realResult = getPolySignalEstimate(realEstimate);
+  assert(realResult.available, "expected evidence-backed estimate to be available");
+  assert(realResult.yesProbability === 0.245, "expected evidence-backed YES probability to be preserved");
+  assert(realResult.signalsUsed.length > 0, "expected evidence-backed estimate to list signals used");
+
+  return { cases: 2 };
+}
+
 async function validatePolymarketResolutionAdapter() {
   const {
     buildExternalResolutionRequest,
@@ -453,6 +506,7 @@ async function validateBackendProxy() {
 const linkChecks = validatePolymarketLinks();
 const decisionChecks = validateAnalysisDecisionRules();
 const estimateQualityChecks = validateEstimateQualityRules();
+const estimateEngineChecks = validateEstimateEngineRules();
 const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
 const resolutionRouteChecks = await validateResolvePolymarketRoute();
 const proxyChecks = await validateBackendProxy();
@@ -463,6 +517,7 @@ console.log(
       link_validation: linkChecks,
       analysis_decision: decisionChecks,
       estimate_quality: estimateQualityChecks,
+      estimate_engine: estimateEngineChecks,
       polymarket_resolution_adapter: resolutionAdapterChecks,
       resolve_polymarket_route: resolutionRouteChecks,
       proxy: proxyChecks,

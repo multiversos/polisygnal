@@ -56,10 +56,16 @@ import { getPolySignalDecision } from "../../lib/analysisDecision";
 import {
   getEstimateQuality,
   getEstimateQualityLabel,
-  getEstimateReadiness,
   getRealPolySignalProbabilities,
   hasRealPolySignalEstimate,
 } from "../../lib/marketEstimateQuality";
+import {
+  collectIndependentSignals,
+  collectMarketSignals,
+  explainMissingEstimateData,
+  getEstimateReadiness as getSignalEstimateReadiness,
+} from "../../lib/estimationSignals";
+import { getPolySignalEstimate } from "../../lib/polySignalEstimateEngine";
 import {
   DECISION_CONFIDENCE_LABELS,
   MARKET_DECISION_LABELS,
@@ -1872,8 +1878,12 @@ function PricePanel({ snapshot }: { snapshot?: AnalysisSnapshot | null }) {
 function PolySignalScorePanel({ analysis }: { analysis: MarketAnalysis }) {
   const score = analysis.polysignal_score;
   const estimateQuality = getEstimateQuality(analysis);
+  const estimateResult = getPolySignalEstimate(analysis);
   const realEstimate = getRealPolySignalProbabilities(analysis);
-  const readiness = getEstimateReadiness(analysis);
+  const readiness = getSignalEstimateReadiness(analysis);
+  const marketSignals = collectMarketSignals(analysis);
+  const independentSignals = collectIndependentSignals(analysis);
+  const missingReasons = explainMissingEstimateData(analysis);
 
   return (
     <section className={`analysis-section polysignal-detail-section ${score?.color_hint || "warning"}`}>
@@ -1898,12 +1908,18 @@ function PolySignalScorePanel({ analysis }: { analysis: MarketAnalysis }) {
             puede verse como referencia, pero no cuenta como prediccion propia.
           </p>
           <div className="data-health-notes">
-            {readiness.map((entry) => (
-              <span className={`badge ${entry.available ? "external-hint" : "muted"}`} key={entry.label}>
-                {entry.label}: {entry.available ? "disponible" : entry.status === "pending" ? "pendiente" : "no disponible"}
-              </span>
+            <span className={`badge ${readiness.ready ? "external-hint" : "muted"}`}>
+              Estado: {readiness.ready ? "estimacion disponible" : readiness.level === "partial" ? "datos parciales" : "sin estimacion suficiente"}
+            </span>
+            <span className="badge muted">Senales de mercado: {marketSignals.length}</span>
+            <span className={independentSignals.length > 0 ? "badge external-hint" : "badge muted"}>
+              Senales independientes: {independentSignals.length}
+            </span>
+            {missingReasons.slice(0, 3).map((reason) => (
+              <span className="badge muted" key={reason}>{reason}</span>
             ))}
           </div>
+          <p className="section-note">Motor v0: {estimateResult.reason}</p>
         </div>
       ) : (
         <div className="polysignal-detail-grid">
@@ -1957,6 +1973,14 @@ function PolySignalScorePanel({ analysis }: { analysis: MarketAnalysis }) {
             ) : (
               <p className="quiet-text">Sin advertencias críticas.</p>
             )}
+          </div>
+          <div>
+            <h3>Senales usadas</h3>
+            <div className="candidate-chip-list">
+              {estimateResult.signalsUsed.map((signal) => (
+                <span className="reason-chip" key={signal.id}>{signal.label}</span>
+              ))}
+            </div>
           </div>
         </div>
       )}

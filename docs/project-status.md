@@ -53,6 +53,10 @@ Estado visible verificado:
 - La estimacion PolySignal pasa por una compuerta de calidad: si el valor solo
   replica el precio visible del mercado, se muestra como probabilidad del
   mercado y no como estimacion propia.
+- Existe una arquitectura v0 para estimacion independiente:
+  `estimationSignals.ts`, `polySignalEstimateEngine.ts` y
+  `evidenceTypes.ts`. Por ahora devuelve `available=false` cuando faltan
+  senales independientes; no inventa porcentajes.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion

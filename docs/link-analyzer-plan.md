@@ -18,6 +18,8 @@ Implemented as a frontend-only flow.
 - A value is treated as a PolySignal estimate only when it has independent
   evidence or a meaningful model edge. A market-price mirror is labelled as
   market probability only.
+- The conservative estimate engine v0 returns `available=false` unless those
+  independent signals already exist. It does not synthesize a new percentage.
 - If the PolySignal estimate is missing, the page says that instead of
   defaulting to 50/50 or inventing a number.
 - The page shows whether PolySignal has a clear decision. The current threshold
@@ -53,6 +55,8 @@ Not implemented yet.
 Not implemented yet.
 
 - Collect official sports data, team news, and relevant public sources.
+- Add team form, injuries, suspensions, schedule context, ratings/ELO/xG, and
+  comparable sport stats before generating a new estimate.
 - Treat Reddit and social discussion as weak/contextual signals only.
 - Store sources and timestamps.
 - Separate market probability from PolySignal probability.
@@ -62,6 +66,8 @@ Not implemented yet.
 Not implemented yet.
 
 - Estimate YES/NO probability only when sufficient data exists.
+- Use the readiness helpers from `estimationSignals.ts` and return unavailable
+  when independent signals are missing.
 - Explain confidence and data gaps.
 - Compare PolySignal probability with the visible market price.
 - Avoid language that implies guaranteed outcomes.

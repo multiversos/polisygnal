@@ -72,6 +72,7 @@ export type AnalysisHistoryStats = {
   lowConfidenceAccuracy: number | null;
   mediumConfidenceAccuracy: number | null;
   misses: number;
+  marketPriceOnly: number;
   noPolySignalEstimate: number;
   noAccuracy: number | null;
   noPredictions: number;
@@ -396,6 +397,7 @@ export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): Ana
   const clearPredictions = items.filter(hasClearPrediction).length;
   const weakDecisions = items.filter((item) => item.decision === "weak" || item.decision === "unknown").length;
   const realPolySignalEstimates = items.filter((item) => item.estimateQuality === "real_polysignal_estimate").length;
+  const marketPriceOnly = items.filter((item) => item.estimateQuality === "market_price_only").length;
   const noPolySignalEstimate = items.filter(
     (item) => item.estimateQuality !== "real_polysignal_estimate" || item.decision === "none",
   ).length;
@@ -440,6 +442,7 @@ export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): Ana
     hits,
     lowConfidenceAccuracy: accuracyFor(items.filter((item) => item.confidence === "Baja")),
     mediumConfidenceAccuracy: accuracyFor(items.filter((item) => item.confidence === "Media")),
+    marketPriceOnly,
     misses,
     noPolySignalEstimate,
     noAccuracy: accuracyFor(items.filter((item) => item.predictedSide === "NO")),

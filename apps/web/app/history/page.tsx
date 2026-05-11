@@ -567,6 +567,11 @@ export default function HistoryPage() {
           <p>Separadas del precio del mercado</p>
         </article>
         <article className="metric-card">
+          <span>Solo probabilidad de mercado</span>
+          <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.marketPriceOnly}</strong>
+          <p>No cuentan para precision</p>
+        </article>
+        <article className="metric-card">
           <span>Sin estimacion</span>
           <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.noPolySignalEstimate}</strong>
           <p>No cuentan para precision</p>

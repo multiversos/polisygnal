@@ -23,6 +23,11 @@ PolySignal YES/NO values. If the available value only mirrors the visible
 market price, it is treated as `market_price_only`, hidden from the PolySignal
 estimate fields, and does not create a predicted side.
 
+The conservative estimate engine v0 is now represented in frontend helpers. It
+collects market signals and independent signals, then returns `available=false`
+unless a real PolySignal estimate already exists. This is intentional: v0 is a
+readiness layer, not a heuristic estimator.
+
 ## Clear Prediction Rule
 
 PolySignal only creates a measurable `predicted_side` from a real PolySignal
@@ -135,6 +140,9 @@ Resolution lifecycle planned for a future backend phase:
 - `event_slug`
 - `market_slug`
 - `confidence`
+- `signals_used`
+- `estimate_quality`
+- `estimator_version`
 - `final_outcome`
 - `resolved_at`
 - `result`
