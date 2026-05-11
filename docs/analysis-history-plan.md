@@ -18,6 +18,11 @@ in the loaded data, it is stored separately as the PolySignal estimate. If that
 estimate is missing, the history record must remain clear about the gap instead
 of filling in a default probability.
 
+PolySignal now applies an estimate-quality gate before showing or saving
+PolySignal YES/NO values. If the available value only mirrors the visible
+market price, it is treated as `market_price_only`, hidden from the PolySignal
+estimate fields, and does not create a predicted side.
+
 ## Clear Prediction Rule
 
 PolySignal only creates a measurable `predicted_side` from a real PolySignal
@@ -31,6 +36,7 @@ Initial rule:
 - YES and NO inside the `45%` to `55%` zone: decision `weak`, no measurable
   predicted side.
 - Missing PolySignal estimate: decision `none`, no measurable predicted side.
+- Market-price-only records: decision `none`, no measurable predicted side.
 - Pending, cancelled, unknown, and weak/no-estimate records do not count as
   failures.
 
@@ -155,6 +161,8 @@ tables and production writes.
 - Do not count unknown records as failures.
 - Do not report an accuracy rate when there are no finalized hit/miss records.
 - Do not mix market probability with PolySignal probability.
+- Do not show a PolySignal estimate unless there is independent evidence or a
+  meaningful model edge.
 - Preserve the market price and analysis time when they are available.
 - Do not promise profit, certainty, or betting advice.
 - Do not activate automatic trading or scheduled refresh from this flow.

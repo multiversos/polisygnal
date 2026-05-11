@@ -473,6 +473,11 @@ function validateMarketDetailPage(dom, label) {
   assertTextIncludesOneOf(text, WHY_VISIBLE_TEXT, `${label} visible reason`);
   assertTextIncludesOneOf(text, REVIEW_REASON_TEXT, `${label} public state`);
   assertTextIncludesOneOf(text, ACTIVITY_TEXT, `${label} activity context`);
+  assertTextIncludesOneOf(
+    text,
+    ["Estimacion PolySignal", "Estimación PolySignal", "Estimacion propia no disponible", "Estimación propia no disponible"],
+    `${label} honest polysignal estimate state`,
+  );
   assertTextExcludes(
     text,
     ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
@@ -801,6 +806,15 @@ async function main() {
     validAnalyzeText,
     ["Estimacion PolySignal", "Estimación PolySignal"],
     "analyze polysignal probability",
+  );
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    [
+      "no una prediccion propia de PolySignal",
+      "no una predicción propia de PolySignal",
+      "Por ahora solo mostramos la probabilidad del mercado",
+    ],
+    "analyze market price is not polysignal estimate",
   );
   assertTextIncludes(validAnalyzeText, "Decision de PolySignal", "analyze clear decision panel");
   assertTextIncludesOneOf(

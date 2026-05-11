@@ -7,10 +7,15 @@ import {
   type AnalysisDecision,
   type AnalysisEvaluationStatus,
 } from "./analysisDecision";
+import {
+  getEstimateQuality,
+  type EstimateQuality,
+} from "./marketEstimateQuality";
 
 export type AnalysisHistoryConfidence = "Alta" | "Baja" | "Desconocida" | "Media";
 export type AnalysisHistoryDecision = AnalysisDecision;
 export type AnalysisHistoryEvaluationStatus = AnalysisEvaluationStatus;
+export type AnalysisHistoryEstimateQuality = EstimateQuality;
 export type AnalysisHistoryOutcome = "CANCELLED" | "NO" | "UNKNOWN" | "YES";
 export type AnalysisHistoryPredictedSide = "NO" | "UNKNOWN" | "YES";
 export type AnalysisHistoryResolutionConfidence = "high" | "low" | "medium";
@@ -26,6 +31,7 @@ export type AnalysisHistoryItem = {
   decision?: AnalysisHistoryDecision;
   decisionThreshold?: number;
   eventSlug?: string;
+  estimateQuality?: AnalysisHistoryEstimateQuality;
   evaluationReason?: string;
   evaluationStatus?: AnalysisHistoryEvaluationStatus;
   id: string;
@@ -70,6 +76,7 @@ export type AnalysisHistoryStats = {
   noAccuracy: number | null;
   noPredictions: number;
   pending: number;
+  realPolySignalEstimates: number;
   resolved: number;
   total: number;
   unknown: number;
@@ -197,14 +204,40 @@ function normalizeString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function normalizeEstimateQuality(value: unknown): AnalysisHistoryEstimateQuality | undefined {
+  if (
+    value === "insufficient_data" ||
+    value === "market_price_only" ||
+    value === "real_polysignal_estimate" ||
+    value === "saved_without_evidence" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
 function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem | null {
   const title = typeof value.title === "string" ? value.title.trim() : "";
   if (!title) {
     return null;
   }
   const status = normalizeStatus(value.status);
-  const polySignalNoProbability = normalizeNumber(value.polySignalNoProbability);
-  const polySignalYesProbability = normalizeNumber(value.polySignalYesProbability);
+  const rawPolySignalNoProbability = normalizeNumber(value.polySignalNoProbability);
+  const rawPolySignalYesProbability = normalizeNumber(value.polySignalYesProbability);
+  const marketNoProbability = normalizeNumber(value.marketNoProbability);
+  const marketYesProbability = normalizeNumber(value.marketYesProbability);
+  const estimateQuality = getEstimateQuality({
+    estimateQuality: normalizeEstimateQuality(value.estimateQuality),
+    marketNoProbability,
+    marketYesProbability,
+    polySignalNoProbability: rawPolySignalNoProbability,
+    polySignalYesProbability: rawPolySignalYesProbability,
+  });
+  const polySignalNoProbability =
+    estimateQuality === "real_polysignal_estimate" ? rawPolySignalNoProbability : undefined;
+  const polySignalYesProbability =
+    estimateQuality === "real_polysignal_estimate" ? rawPolySignalYesProbability : undefined;
   const decision = getPolySignalDecision({
     polySignalNoProbability,
     polySignalYesProbability,
@@ -221,13 +254,20 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     decision: decision.decision,
     decisionThreshold: decision.decisionThreshold,
     eventSlug: normalizeString(value.eventSlug),
-    evaluationReason: normalizeString(value.evaluationReason) || decision.evaluationReason,
+    estimateQuality,
+    evaluationReason:
+      normalizeString(value.evaluationReason) ||
+      (estimateQuality === "market_price_only"
+        ? "Solo habia probabilidad del mercado."
+        : estimateQuality === "saved_without_evidence"
+          ? "Guardado sin evidencia de estimacion propia."
+          : decision.evaluationReason),
     evaluationStatus: decision.evaluationStatus,
     id: value.id || randomId(),
     marketId: value.marketId ? String(value.marketId) : undefined,
     marketSlug: normalizeString(value.marketSlug),
-    marketNoProbability: normalizeNumber(value.marketNoProbability),
-    marketYesProbability: normalizeNumber(value.marketYesProbability),
+    marketNoProbability,
+    marketYesProbability,
     outcome: normalizeOutcome(value.outcome),
     polySignalNoProbability,
     polySignalYesProbability,
@@ -355,7 +395,10 @@ export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): Ana
   const cancelled = items.filter((item) => item.result === "cancelled" || item.outcome === "CANCELLED").length;
   const clearPredictions = items.filter(hasClearPrediction).length;
   const weakDecisions = items.filter((item) => item.decision === "weak" || item.decision === "unknown").length;
-  const noPolySignalEstimate = items.filter((item) => item.decision === "none").length;
+  const realPolySignalEstimates = items.filter((item) => item.estimateQuality === "real_polysignal_estimate").length;
+  const noPolySignalEstimate = items.filter(
+    (item) => item.estimateQuality !== "real_polysignal_estimate" || item.decision === "none",
+  ).length;
   const pending = items.filter((item) => item.result === "pending" || item.status === "open").length;
   const resolved = hits + misses;
   const countableResolved = resolved;
@@ -402,6 +445,7 @@ export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): Ana
     noAccuracy: accuracyFor(items.filter((item) => item.predictedSide === "NO")),
     noPredictions: items.filter((item) => item.predictedSide === "NO").length,
     pending,
+    realPolySignalEstimates,
     resolved,
     total: items.length,
     unknown,

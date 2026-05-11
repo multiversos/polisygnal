@@ -22,6 +22,7 @@ import {
   getPolySignalProbabilities,
   getProbabilityGap,
 } from "../lib/marketProbabilities";
+import { getEstimateQualityLabel } from "../lib/marketEstimateQuality";
 import { formatLastUpdated } from "../lib/useAutoRefresh";
 
 type HistoryFilter =
@@ -143,7 +144,9 @@ function evaluationLabel(item: AnalysisHistoryItem): string {
     return "No cuenta por decision debil";
   }
   if (item.decision === "none") {
-    return "No cuenta sin estimacion PolySignal";
+    return item.estimateQuality === "market_price_only"
+      ? "No cuenta: solo probabilidad del mercado"
+      : "No cuenta sin estimacion PolySignal";
   }
   return "No verificable";
 }
@@ -193,6 +196,9 @@ function marketProbabilityForItem(item: AnalysisHistoryItem) {
 }
 
 function polySignalProbabilityForItem(item: AnalysisHistoryItem) {
+  if (item.estimateQuality !== "real_polysignal_estimate") {
+    return null;
+  }
   return getPolySignalProbabilities({
     polySignalNoProbability: item.polySignalNoProbability,
     polySignalYesProbability: item.polySignalYesProbability,
@@ -556,6 +562,11 @@ export default function HistoryPage() {
           <p>Zona 45/55 o en observacion</p>
         </article>
         <article className="metric-card">
+          <span>Con estimacion PolySignal real</span>
+          <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.realPolySignalEstimates}</strong>
+          <p>Separadas del precio del mercado</p>
+        </article>
+        <article className="metric-card">
           <span>Sin estimacion</span>
           <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.noPolySignalEstimate}</strong>
           <p>No cuentan para precision</p>
@@ -762,6 +773,7 @@ export default function HistoryPage() {
                     <span>
                       PolySignal NO {polySignalProbability ? formatProbability(polySignalProbability.no) : "sin dato"}
                     </span>
+                    <span>Estimacion {getEstimateQualityLabel(item.estimateQuality ?? "unknown")}</span>
                     <span>Confianza {item.confidence ?? "Desconocida"}</span>
                     <span>Resultado Polymarket {outcomeLabel(item.outcome)}</span>
                     <span>Evaluacion {evaluationLabel(item)}</span>
@@ -787,7 +799,9 @@ export default function HistoryPage() {
                       <p className="probability-gap-note">{probabilityGap.label}</p>
                     ) : null
                   ) : (
-                    <p className="section-note">Guardado sin estimacion PolySignal.</p>
+                    <p className="section-note">
+                      Guardado con probabilidad del mercado, sin estimacion PolySignal suficiente.
+                    </p>
                   )}
                   {item.reasons && item.reasons.length > 0 ? (
                     <p className="section-note">{item.reasons.slice(0, 2).join(" ")}</p>

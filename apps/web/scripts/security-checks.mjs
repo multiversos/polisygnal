@@ -160,6 +160,72 @@ function validateAnalysisDecisionRules() {
   return { cases: 7, threshold: 55 };
 }
 
+function validateEstimateQualityRules() {
+  const {
+    getEstimateQuality,
+    getRealPolySignalProbabilities,
+    hasRealPolySignalEstimate,
+  } = loadTsModule("app/lib/marketEstimateQuality.ts");
+
+  const marketPriceOnly = {
+    latest_prediction: {
+      edge_signed: 0,
+      no_probability: 0.835,
+      used_evidence_in_scoring: false,
+      used_news_count: 0,
+      used_odds_count: 0,
+      yes_probability: 0.165,
+    },
+    latest_snapshot: {
+      no_price: 0.835,
+      yes_price: 0.165,
+    },
+  };
+  assert(
+    getEstimateQuality(marketPriceOnly) === "market_price_only",
+    "expected market-price mirror not to be treated as PolySignal estimate",
+  );
+  assert(
+    getRealPolySignalProbabilities(marketPriceOnly) === null,
+    "expected market-price mirror to hide PolySignal probabilities",
+  );
+
+  const realEstimate = {
+    latest_prediction: {
+      edge_signed: 0.08,
+      no_probability: 0.755,
+      used_evidence_in_scoring: true,
+      used_news_count: 1,
+      used_odds_count: 1,
+      yes_probability: 0.245,
+    },
+    latest_snapshot: {
+      no_price: 0.835,
+      yes_price: 0.165,
+    },
+  };
+  assert(hasRealPolySignalEstimate(realEstimate), "expected evidence-backed estimate to be real");
+  assert(
+    getRealPolySignalProbabilities(realEstimate)?.yes === 0.245,
+    "expected real PolySignal probability to be preserved",
+  );
+
+  const savedWithoutEvidence = {
+    polySignalNoProbability: 0.44,
+    polySignalYesProbability: 0.56,
+  };
+  assert(
+    getEstimateQuality(savedWithoutEvidence) === "saved_without_evidence",
+    "expected raw saved PolySignal probability without quality to be downgraded",
+  );
+  assert(
+    getRealPolySignalProbabilities(savedWithoutEvidence) === null,
+    "expected raw saved probability without quality to be hidden",
+  );
+
+  return { cases: 3 };
+}
+
 async function validatePolymarketResolutionAdapter() {
   const {
     buildExternalResolutionRequest,
@@ -386,6 +452,7 @@ async function validateBackendProxy() {
 
 const linkChecks = validatePolymarketLinks();
 const decisionChecks = validateAnalysisDecisionRules();
+const estimateQualityChecks = validateEstimateQualityRules();
 const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
 const resolutionRouteChecks = await validateResolvePolymarketRoute();
 const proxyChecks = await validateBackendProxy();
@@ -395,6 +462,7 @@ console.log(
     {
       link_validation: linkChecks,
       analysis_decision: decisionChecks,
+      estimate_quality: estimateQualityChecks,
       polymarket_resolution_adapter: resolutionAdapterChecks,
       resolve_polymarket_route: resolutionRouteChecks,
       proxy: proxyChecks,

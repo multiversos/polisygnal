@@ -50,6 +50,9 @@ Estado visible verificado:
   mercados ya cargados y guardar resultados locales en Historial.
 - `/analyze` muestra probabilidad del mercado basada en precio visible cuando
   existe y solo muestra estimacion PolySignal si el dato real esta disponible.
+- La estimacion PolySignal pasa por una compuerta de calidad: si el valor solo
+  replica el precio visible del mercado, se muestra como probabilidad del
+  mercado y no como estimacion propia.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion

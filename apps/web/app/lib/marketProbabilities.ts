@@ -124,7 +124,7 @@ export function getProbabilityDisplayState(
       : "No hay precio visible suficiente para calcularlo.",
     polySignal,
     polySignalDetail: polySignal
-      ? "Lectura disponible en PolySignal."
+      ? "Estimacion propia disponible en PolySignal."
       : "Aun no hay estimacion PolySignal suficiente para este mercado.",
   };
 }

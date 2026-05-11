@@ -54,6 +54,13 @@ import {
 } from "../../lib/backtesting";
 import { getPolySignalDecision } from "../../lib/analysisDecision";
 import {
+  getEstimateQuality,
+  getEstimateQualityLabel,
+  getEstimateReadiness,
+  getRealPolySignalProbabilities,
+  hasRealPolySignalEstimate,
+} from "../../lib/marketEstimateQuality";
+import {
   DECISION_CONFIDENCE_LABELS,
   MARKET_DECISION_LABELS,
   createMarketDecision,
@@ -205,6 +212,9 @@ type AnalysisPrediction = {
   opportunity: boolean;
   recommendation?: string | null;
   run_at: string;
+  used_evidence_in_scoring?: boolean | null;
+  used_news_count?: number | string | null;
+  used_odds_count?: number | string | null;
 };
 
 type AnalysisResearchRun = {
@@ -1008,6 +1018,7 @@ function getAnalysisStatus(analysis: MarketAnalysis): {
 } {
   const prediction = analysis.latest_prediction;
   const score = analysis.polysignal_score;
+  const hasRealEstimate = hasRealPolySignalEstimate(analysis);
   const confidence = normalizeProbability(prediction?.confidence_score ?? score?.confidence);
   const edgeMagnitude = normalizeProbability(prediction?.edge_magnitude);
 
@@ -1016,6 +1027,13 @@ function getAnalysisStatus(analysis: MarketAnalysis): {
       label: "En observación",
       tone: "neutral",
       detail: "Aún falta información para destacarlo.",
+    };
+  }
+  if (!hasRealEstimate) {
+    return {
+      label: "En observacion",
+      tone: "neutral",
+      detail: "Hay precio de mercado, pero falta una estimacion propia de PolySignal.",
     };
   }
   if (prediction?.opportunity) {
@@ -1051,7 +1069,7 @@ function getAnalysisReviewReason(analysis: MarketAnalysis) {
     active: analysis.market.active,
     closed: analysis.market.closed,
     closeTime: analysis.market.end_date ?? null,
-    hasAnalysis: Boolean(analysis.latest_prediction || analysis.polysignal_score),
+    hasAnalysis: hasRealPolySignalEstimate(analysis),
     hasPrice:
       analysis.latest_snapshot?.yes_price !== null &&
       analysis.latest_snapshot?.yes_price !== undefined,
@@ -1067,7 +1085,7 @@ function getAnalysisActivity(analysis: MarketAnalysis) {
     active: analysis.market.active,
     closed: analysis.market.closed,
     closeTime: analysis.market.end_date ?? null,
-    hasAnalysis: Boolean(analysis.latest_prediction || analysis.polysignal_score),
+    hasAnalysis: hasRealPolySignalEstimate(analysis),
     hasPrice:
       analysis.latest_snapshot?.yes_price !== null &&
       analysis.latest_snapshot?.yes_price !== undefined,
@@ -1110,6 +1128,9 @@ function watchlistDraftFromAnalysis(analysis: MarketAnalysis): WatchlistMarketDr
 }
 
 function historyConfidenceFromAnalysis(analysis: MarketAnalysis): AnalysisHistoryConfidence {
+  if (!hasRealPolySignalEstimate(analysis)) {
+    return "Desconocida";
+  }
   const value = normalizeProbability(
     analysis.latest_prediction?.confidence_score ?? analysis.polysignal_score?.confidence,
   );
@@ -1126,17 +1147,8 @@ function historyConfidenceFromAnalysis(analysis: MarketAnalysis): AnalysisHistor
 }
 
 function historyItemFromAnalysis(analysis: MarketAnalysis) {
-  const polySignalYes = normalizeProbability(
-    analysis.latest_prediction?.yes_probability ?? analysis.polysignal_score?.score_probability,
-  );
-  const polySignalNo = normalizeProbability(analysis.latest_prediction?.no_probability);
-  const polySignalProbabilities =
-    polySignalYes === null && polySignalNo === null
-      ? null
-      : {
-          no: polySignalNo ?? Math.max(0, Math.min(1, 1 - (polySignalYes ?? 0))),
-          yes: polySignalYes ?? Math.max(0, Math.min(1, 1 - (polySignalNo ?? 0))),
-        };
+  const estimateQuality = getEstimateQuality(analysis);
+  const polySignalProbabilities = getRealPolySignalProbabilities(analysis);
   const decision = getPolySignalDecision({
     polySignalNoProbability: polySignalProbabilities?.no,
     polySignalYesProbability: polySignalProbabilities?.yes,
@@ -1144,9 +1156,13 @@ function historyItemFromAnalysis(analysis: MarketAnalysis) {
   const reviewReason = getAnalysisReviewReason(analysis);
   const activity = getAnalysisActivity(analysis);
   const predictionReason =
-    decision.predictedSide === "UNKNOWN"
-      ? decision.evaluationReason
-      : "Prediccion clara guardada solo cuando la estimacion PolySignal supera 55%.";
+    estimateQuality === "market_price_only"
+      ? "Solo habia probabilidad del mercado; no se guardo prediccion PolySignal."
+      : estimateQuality !== "real_polysignal_estimate"
+        ? "Sin estimacion PolySignal suficiente."
+        : decision.predictedSide === "UNKNOWN"
+          ? decision.evaluationReason
+          : "Prediccion clara guardada solo cuando la estimacion PolySignal supera 55%.";
   return {
     analyzedAt: new Date().toISOString(),
     confidence: historyConfidenceFromAnalysis(analysis),
@@ -1154,7 +1170,13 @@ function historyItemFromAnalysis(analysis: MarketAnalysis) {
     decision: decision.decision,
     decisionThreshold: decision.decisionThreshold,
     eventSlug: analysis.links?.polymarket_event_slug || undefined,
-    evaluationReason: decision.evaluationReason,
+    estimateQuality,
+    evaluationReason:
+      estimateQuality === "market_price_only"
+        ? "Solo habia probabilidad del mercado."
+        : estimateQuality === "real_polysignal_estimate"
+          ? decision.evaluationReason
+          : "Sin estimacion PolySignal suficiente.",
     evaluationStatus: decision.evaluationStatus,
     id: `market-${analysis.market.id}`,
     marketId: String(analysis.market.id),
@@ -1162,8 +1184,8 @@ function historyItemFromAnalysis(analysis: MarketAnalysis) {
     marketNoProbability: normalizeProbability(analysis.latest_snapshot?.no_price) ?? undefined,
     marketYesProbability: normalizeProbability(analysis.latest_snapshot?.yes_price) ?? undefined,
     outcome: "UNKNOWN" as const,
-    polySignalNoProbability: polySignalNo ?? undefined,
-    polySignalYesProbability: polySignalYes ?? undefined,
+    polySignalNoProbability: polySignalProbabilities?.no,
+    polySignalYesProbability: polySignalProbabilities?.yes,
     predictedSide: decision.predictedSide,
     reasons: [reviewReason.reason, activity?.detail, predictionReason].filter((reason): reason is string => Boolean(reason)),
     result: "pending" as const,
@@ -1847,44 +1869,58 @@ function PricePanel({ snapshot }: { snapshot?: AnalysisSnapshot | null }) {
   );
 }
 
-function PolySignalScorePanel({ score }: { score?: PolySignalScore | null }) {
-  const hasScore = score?.score_probability !== null && score?.score_probability !== undefined;
+function PolySignalScorePanel({ analysis }: { analysis: MarketAnalysis }) {
+  const score = analysis.polysignal_score;
+  const estimateQuality = getEstimateQuality(analysis);
+  const realEstimate = getRealPolySignalProbabilities(analysis);
+  const readiness = getEstimateReadiness(analysis);
 
   return (
     <section className={`analysis-section polysignal-detail-section ${score?.color_hint || "warning"}`}>
       <div className="analysis-section-heading">
         <div>
-          <span className="section-kicker">Estimación informativa</span>
-          <h2>Lectura PolySignal</h2>
+          <span className="section-kicker">Estimacion informativa</span>
+          <h2>Estimacion PolySignal</h2>
           <p className="section-note">
-            Esta lectura organiza la información disponible para revisión manual. No es recomendación de apuesta.
+            Solo mostramos una estimacion propia cuando hay senales independientes. No es recomendacion de apuesta.
           </p>
         </div>
         <span className="timestamp-pill">
-          {score?.source === "latest_prediction" ? "Lectura guardada" : "Lectura inicial"}
+          {getEstimateQualityLabel(estimateQuality)}
         </span>
       </div>
 
-      {!score || !hasScore ? (
+      {!score || !realEstimate ? (
         <div className="empty-state">
-          <strong>Lectura SÍ: pendiente</strong>
-          <p>Faltan datos suficientes para estimar.</p>
+          <strong>Estimacion propia no disponible</strong>
+          <p>
+            Faltan datos para calcular una lectura independiente de PolySignal. El precio del mercado
+            puede verse como referencia, pero no cuenta como prediccion propia.
+          </p>
+          <div className="data-health-notes">
+            {readiness.map((entry) => (
+              <span className={`badge ${entry.available ? "external-hint" : "muted"}`} key={entry.label}>
+                {entry.label}: {entry.available ? "disponible" : entry.status === "pending" ? "pendiente" : "no disponible"}
+              </span>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="polysignal-detail-grid">
           <div className={`polysignal-score-card hero ${score.color_hint || "neutral"}`}>
             <div className="polysignal-score-heading">
-              <span>Lectura SÍ</span>
-              <strong>{formatProbability(score.score_probability)}</strong>
+              <span>Estimacion SI</span>
+              <strong>{formatProbability(realEstimate.yes)}</strong>
             </div>
             <p>{score.label}</p>
           </div>
 
           <div className="analysis-stat-grid">
-            <div><span>Mercado SÍ</span><strong>{formatProbability(score.market_yes_price)}</strong></div>
+            <div><span>Mercado SI</span><strong>{formatProbability(score.market_yes_price)}</strong></div>
+            <div><span>Estimacion NO</span><strong>{formatProbability(realEstimate.no)}</strong></div>
             <div><span>Diferencia</span><strong>{formatPercentPoints(score.edge_percent_points)}</strong></div>
             <div><span>Confianza</span><strong>{score.confidence_label}</strong></div>
-            <div><span>Estado</span><strong>{score.source === "latest_prediction" ? "Lectura guardada" : "Lectura inicial"}</strong></div>
+            <div><span>Estado</span><strong>Estimacion propia</strong></div>
           </div>
 
           <div className="polysignal-components">
@@ -1952,18 +1988,19 @@ function scorePendingMessage(dataQuality?: MarketDataQuality | null): string {
 
 function DataQualityPanel({
   dataQuality,
+  hasRealEstimate,
   score,
 }: {
   dataQuality?: MarketDataQuality | null;
+  hasRealEstimate: boolean;
   score?: PolySignalScore | null;
 }) {
   if (!dataQuality) {
     return null;
   }
 
-  const hasScore = score?.score_probability !== null && score?.score_probability !== undefined;
   const shouldShow =
-    !hasScore ||
+    !hasRealEstimate ||
     (score?.warnings?.length ?? 0) > 0 ||
     dataQuality.quality_label !== "Completo";
   if (!shouldShow) {
@@ -1985,9 +2022,9 @@ function DataQualityPanel({
         </span>
       </div>
 
-      {!hasScore ? (
+      {!hasRealEstimate ? (
         <div className="empty-state compact">
-          <strong>Lectura SÍ pendiente</strong>
+          <strong>Estimacion propia pendiente</strong>
           <p>{scorePendingMessage(dataQuality)}</p>
         </div>
       ) : null}
@@ -1997,9 +2034,9 @@ function DataQualityPanel({
         <div><span>Precio NO</span><strong>{formatQualityBoolean(dataQuality.has_no_price)}</strong></div>
         <div><span>Actualización</span><strong>{formatQualityBoolean(dataQuality.has_snapshot)}</strong></div>
         <div><span>SeÃ±al externa</span><strong>{formatQualityBoolean(dataQuality.has_external_signal)}</strong></div>
-        <div><span>Lectura guardada</span><strong>{formatQualityBoolean(dataQuality.has_prediction)}</strong></div>
+        <div><span>Estimacion guardada</span><strong>{formatQualityBoolean(dataQuality.has_prediction)}</strong></div>
         <div><span>Contexto disponible</span><strong>{formatQualityBoolean(dataQuality.has_research)}</strong></div>
-        <div><span>Lectura disponible</span><strong>{formatQualityBoolean(dataQuality.has_polysignal_score)}</strong></div>
+        <div><span>Estimacion propia</span><strong>{formatQualityBoolean(hasRealEstimate)}</strong></div>
         <div><span>Calidad</span><strong>{dataQuality.quality_score}/100</strong></div>
       </div>
 
@@ -2069,13 +2106,14 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
   const prediction = analysis.latest_prediction;
   const snapshot = analysis.latest_snapshot;
   const score = analysis.polysignal_score;
+  const realEstimate = getRealPolySignalProbabilities(analysis);
   const status = getAnalysisStatus(analysis);
   const reviewReason = getAnalysisReviewReason(analysis);
   const activity = getAnalysisActivity(analysis);
   const confidenceValue = prediction?.confidence_score ?? score?.confidence ?? null;
   const confidenceBand = getConfidenceBand(confidenceValue);
-  const yesModelProbability = prediction?.yes_probability ?? score?.score_probability ?? null;
-  const edgeValue = prediction?.edge_signed ?? score?.edge_signed ?? null;
+  const yesModelProbability = realEstimate?.yes ?? null;
+  const edgeValue = realEstimate ? (prediction?.edge_signed ?? score?.edge_signed ?? null) : null;
 
   return (
     <section className="analysis-section">
@@ -2100,18 +2138,18 @@ function QuickReadPanel({ analysis }: { analysis: MarketAnalysis }) {
       <div className="empty-state compact">
         <strong>{status.detail}</strong>
         <p>
-          {prediction
-            ? `La confianza de la lectura es ${confidenceBand}. PolySignal organiza precio, actividad y confianza para priorizar revisión manual; no es una recomendación de apuesta.`
-            : "Todavía no hay información suficiente para destacar este mercado. Esto no es una recomendación de apuesta."}
+          {realEstimate
+            ? `La confianza de la estimacion es ${confidenceBand}. PolySignal organiza precio, actividad y confianza para priorizar revision manual; no es una recomendacion de apuesta.`
+            : "Todavia no hay estimacion propia suficiente para este mercado. Esto no es una recomendacion de apuesta."}
         </p>
       </div>
 
       <div className="analysis-stat-grid">
-        <div><span>Precio SÍ</span><strong>{formatProbability(snapshot?.yes_price)}</strong></div>
+        <div><span>Precio SI</span><strong>{formatProbability(snapshot?.yes_price)}</strong></div>
         <div><span>Precio NO</span><strong>{formatProbability(snapshot?.no_price)}</strong></div>
-        <div><span>Lectura SÍ</span><strong>{formatProbability(yesModelProbability)}</strong></div>
-        <div><span>Prioridad</span><strong>{score?.score_percent !== undefined && score?.score_percent !== null ? `${score.score_percent}%` : formatProbability(score?.score_probability)}</strong></div>
-        <div><span>Confianza</span><strong>{formatProbability(confidenceValue)}</strong></div>
+        <div><span>Estimacion SI</span><strong>{formatProbability(yesModelProbability)}</strong></div>
+        <div><span>Prioridad</span><strong>{realEstimate && score?.score_percent !== undefined && score?.score_percent !== null ? `${score.score_percent}%` : realEstimate ? formatProbability(score?.score_probability) : "sin estimacion"}</strong></div>
+        <div><span>Confianza</span><strong>{realEstimate ? formatProbability(confidenceValue) : "sin estimacion"}</strong></div>
         <div><span>Diferencia visible</span><strong>{formatSignedProbabilityPoints(edgeValue)}</strong></div>
         <div><span>Última actualización</span><strong>{formatDateTime(getLatestAnalysisUpdate(analysis))}</strong></div>
       </div>
@@ -4631,9 +4669,10 @@ export default function MarketAnalysisPage() {
             <div className="analysis-main">
               <QuickReadPanel analysis={analysis} />
               <PricePanel snapshot={analysis.latest_snapshot} />
-              <PolySignalScorePanel score={analysis.polysignal_score} />
+              <PolySignalScorePanel analysis={analysis} />
               <DataQualityPanel
                 dataQuality={analysis.data_quality}
+                hasRealEstimate={hasRealPolySignalEstimate(analysis)}
                 score={analysis.polysignal_score}
               />
               <FreshnessPanel freshness={analysis.freshness ?? analysis.data_quality?.freshness} />
@@ -4666,10 +4705,10 @@ export default function MarketAnalysisPage() {
                   Guarda este analisis para compararlo con el resultado final cuando
                   el mercado cierre.
                 </p>
-                {!analysis.latest_prediction && !analysis.polysignal_score ? (
+                {!hasRealPolySignalEstimate(analysis) ? (
                   <p className="section-note">
-                    Este mercado se guardara sin porcentaje estimado porque aun no hay
-                    suficiente informacion.
+                    Este mercado se guardara con la probabilidad del mercado, pero sin
+                    estimacion PolySignal propia suficiente.
                   </p>
                 ) : null}
                 {historyState.error ? (

@@ -13,10 +13,15 @@ import {
 import {
   formatProbability as formatPublicProbability,
   getMarketImpliedProbabilities,
-  getPolySignalProbabilities,
   getProbabilityDisplayState,
   normalizeProbability,
 } from "../lib/marketProbabilities";
+import {
+  getEstimateQuality,
+  getEstimateQualityLabel,
+  getEstimateReadiness,
+  getRealPolySignalProbabilities,
+} from "../lib/marketEstimateQuality";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { saveAnalysisHistoryItem } from "../lib/analysisHistory";
@@ -226,11 +231,12 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
     marketNoPrice: item.latest_snapshot?.no_price,
     marketYesPrice: item.latest_snapshot?.yes_price,
   });
-  const polySignalProbabilities = getPolySignalProbabilities({
-    polySignalNoProbability: item.latest_prediction?.no_probability,
-    polySignalYesProbability: item.latest_prediction?.yes_probability,
-  });
-  const confidenceScore = normalizeProbability(item.latest_prediction?.confidence_score);
+  const estimateQuality = getEstimateQuality(item);
+  const polySignalProbabilities = getRealPolySignalProbabilities(item);
+  const confidenceScore =
+    estimateQuality === "real_polysignal_estimate"
+      ? normalizeProbability(item.latest_prediction?.confidence_score)
+      : null;
   const reviewReason = getMarketReviewReason(insightInput(item));
   const activity = getMarketActivityLabel(insightInput(item));
   const decision = getPolySignalDecision({
@@ -238,9 +244,13 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
     polySignalYesProbability: polySignalProbabilities?.yes,
   });
   const predictionReason =
-    decision.predictedSide === "UNKNOWN"
-      ? decision.evaluationReason
-      : "Prediccion clara guardada solo cuando la estimacion PolySignal supera 55%.";
+    estimateQuality === "market_price_only"
+      ? "Solo habia probabilidad del mercado; no se guardo prediccion PolySignal."
+      : estimateQuality !== "real_polysignal_estimate"
+        ? "Sin estimacion PolySignal suficiente."
+        : decision.predictedSide === "UNKNOWN"
+          ? decision.evaluationReason
+          : "Prediccion clara guardada solo cuando la estimacion PolySignal supera 55%.";
   return {
     analyzedAt: new Date().toISOString(),
     confidence:
@@ -255,7 +265,13 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
     decision: decision.decision,
     decisionThreshold: decision.decisionThreshold,
     eventSlug: item.market?.event_slug || undefined,
-    evaluationReason: decision.evaluationReason,
+    estimateQuality,
+    evaluationReason:
+      estimateQuality === "market_price_only"
+        ? "Solo habia probabilidad del mercado."
+        : estimateQuality === "real_polysignal_estimate"
+          ? decision.evaluationReason
+          : "Sin estimacion PolySignal suficiente.",
     evaluationStatus: decision.evaluationStatus,
     id: `link-${item.market?.id ?? Date.now()}`,
     marketId: item.market?.id ? String(item.market.id) : undefined,
@@ -288,6 +304,7 @@ function pendingHistoryPayload(normalizedUrl: string) {
     decision: "none" as const,
     decisionThreshold: 55,
     eventSlug: prefix === "event" ? slug || undefined : undefined,
+    estimateQuality: "insufficient_data" as const,
     evaluationReason: "Sin estimacion PolySignal.",
     evaluationStatus: "not_countable" as const,
     id: `link-pending-${Date.now()}`,
@@ -301,6 +318,19 @@ function pendingHistoryPayload(normalizedUrl: string) {
     title: slug ? `Enlace Polymarket: ${slug.replaceAll("-", " ")}` : "Enlace Polymarket pendiente",
     url: normalizedUrl,
   };
+}
+
+function EstimateReadinessBlock({ item }: { item: MarketOverviewItem }) {
+  const readiness = getEstimateReadiness(item);
+  return (
+    <div className="data-health-notes" aria-label="Datos necesarios para estimacion propia">
+      {readiness.map((entry) => (
+        <span className={`badge ${entry.available ? "external-hint" : "muted"}`} key={entry.label}>
+          {entry.label}: {entry.available ? "disponible" : entry.status === "pending" ? "pendiente" : "no disponible"}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function MatchCard({
@@ -322,11 +352,13 @@ function MatchCard({
   const status = getPublicMarketStatus(input);
   const reason = getMarketReviewReason(input);
   const activity = getMarketActivityLabel(input);
+  const estimateQuality = getEstimateQuality(item);
+  const realPolySignalProbabilities = getRealPolySignalProbabilities(item);
   const probabilityState = getProbabilityDisplayState({
     marketNoPrice: item.latest_snapshot?.no_price,
     marketYesPrice: item.latest_snapshot?.yes_price,
-    polySignalNoProbability: item.latest_prediction?.no_probability,
-    polySignalYesProbability: item.latest_prediction?.yes_probability,
+    polySignalNoProbability: realPolySignalProbabilities?.no,
+    polySignalYesProbability: realPolySignalProbabilities?.yes,
   });
   const decision = getPolySignalDecision({
     polySignalNoProbability: probabilityState.polySignal?.no,
@@ -371,9 +403,13 @@ function MatchCard({
                 <strong>NO {formatPublicProbability(probabilityState.polySignal.no)}</strong>
               </div>
             ) : (
-              <p>{probabilityState.polySignalDetail}</p>
+              <p>Aun no hay estimacion PolySignal suficiente para este mercado.</p>
             )}
-            <small>{probabilityState.polySignal ? probabilityState.polySignalDetail : probabilityState.disclaimer}</small>
+            <small>
+              {probabilityState.polySignal
+                ? probabilityState.polySignalDetail
+                : "Por ahora solo mostramos la probabilidad del mercado. Este analisis no contara para precision hasta que exista una estimacion propia clara."}
+            </small>
           </div>
         </div>
         {probabilityState.gap ? (
@@ -390,6 +426,15 @@ function MatchCard({
           </small>
         </div>
         <p className="section-note">{probabilityState.disclaimer}</p>
+        <div className="empty-state compact">
+          <strong>Datos necesarios para una estimacion propia</strong>
+          <p>
+            PolySignal necesita senales independientes para mostrar una estimacion propia. Si solo
+            tenemos el precio del mercado, lo mostramos como referencia, pero no lo contamos como prediccion.
+          </p>
+          <EstimateReadinessBlock item={item} />
+          <p className="section-note">Estado actual: {getEstimateQualityLabel(estimateQuality)}.</p>
+        </div>
       </div>
       <div className="history-card-metrics">
         <span>Precio Si {formatPublicProbability(item.latest_snapshot?.yes_price)}</span>
@@ -397,7 +442,7 @@ function MatchCard({
         <span>Volumen {formatMetric(item.latest_snapshot?.volume)}</span>
         <span>Liquidez {formatMetric(item.latest_snapshot?.liquidity)}</span>
         <span>
-          PolySignal YES {probabilityState.polySignal ? formatPublicProbability(probabilityState.polySignal.yes) : "sin dato"}
+          PolySignal YES {probabilityState.polySignal ? formatPublicProbability(probabilityState.polySignal.yes) : "sin estimacion"}
         </span>
       </div>
       <div className="watchlist-actions">

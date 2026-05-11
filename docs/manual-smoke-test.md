@@ -236,28 +236,31 @@ If this test fails, stop feature work and treat it as a production regression.
 7. Confirm `Estimacion PolySignal` appears only when an estimate already exists
    in the loaded data. If it is missing, confirm the page says it does not have
    enough estimation yet.
-8. Confirm `Decision de PolySignal` follows the 55% threshold:
+8. Confirm a market-price-only match does not show the same value as a
+   PolySignal estimate and does not show a `0.0 pts` difference as useful
+   analysis.
+9. Confirm `Decision de PolySignal` follows the 55% threshold:
    YES `>=55%` is clear YES, NO `>=55%` is clear NO, and 45/55 is `Sin decision fuerte`.
-9. Confirm market price alone never creates a PolySignal predicted side.
-10. Confirm it shows only real visible data: title, event, status, price if
+10. Confirm market price alone never creates a PolySignal predicted side.
+11. Confirm it shows only real visible data: title, event, status, price if
    available, volume/liquidity if available, and last update.
-11. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
+12. Confirm it offers `Guardar analisis`, `Seguir mercado`, `Ver detalle`, and
    `Ver futbol` when a market is matched.
-12. Save the analysis, open `/history`, and confirm the item appears as
+13. Save the analysis, open `/history`, and confirm the item appears as
    `Desde enlace`.
-13. Confirm the saved history item shows market YES/NO probability if it was
+14. Confirm the saved history item shows market YES/NO probability if it was
     available, and PolySignal YES/NO only if it existed.
-14. Confirm `/history` shows whether the item counts for precision or does not
+15. Confirm `/history` shows whether the item counts for precision or does not
     count yet.
-15. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
+16. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
     inventing data when there are not enough comparable records.
-16. Confirm a no-match link can only be saved as pending and does not invent a
+17. Confirm a no-match link can only be saved as pending and does not invent a
    probability.
-17. Confirm the page does not promise profit, certainty, or betting advice.
-18. Confirm the saved record only gets a PolySignal predicted side when a real
+18. Confirm the page does not promise profit, certainty, or betting advice.
+19. Confirm the saved record only gets a PolySignal predicted side when a real
     PolySignal estimate crossed the 55% threshold. Market price alone must not
     create a predicted side.
-19. Confirm saved matched records preserve Polymarket identifiers when available
+20. Confirm saved matched records preserve Polymarket identifiers when available
     so Historial can later verify outcomes automatically.
 
 ## Alertas

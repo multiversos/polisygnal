@@ -15,6 +15,9 @@ Implemented as a frontend-only flow.
   market probability from those prices.
 - If a PolySignal estimate already exists in the loaded data, the page shows it
   separately from the market probability.
+- A value is treated as a PolySignal estimate only when it has independent
+  evidence or a meaningful model edge. A market-price mirror is labelled as
+  market probability only.
 - If the PolySignal estimate is missing, the page says that instead of
   defaulting to 50/50 or inventing a number.
 - The page shows whether PolySignal has a clear decision. The current threshold
@@ -22,6 +25,8 @@ Implemented as a frontend-only flow.
   45/55 zone is treated as no strong decision.
 - Market price probability is reference context only. It does not create
   `predicted_side`.
+- Market price probability must never be copied into
+  `polysignal_probability_yes` or presented as `Estimacion PolySignal`.
 - Saved link analyses can later be checked from `/history` with `Actualizar
   resultados`. This is automatic and does not ask the user to choose the final
   outcome manually.
@@ -87,6 +92,7 @@ periodically, persist results per user, and record `resolved_at`,
 
 - No fake results.
 - No fake percentages.
+- No market-price fallback for PolySignal estimates.
 - No promise of profit.
 - No "safe bet" language.
 - Pending records do not count as misses.
