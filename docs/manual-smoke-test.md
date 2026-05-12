@@ -529,6 +529,22 @@ Use these quick checks when reviewing public pages:
 8. Confirm the Radar Analytics loader marks unintegrated layers as pending
    rather than completed evidence.
 
+## Samantha Research Manual Workflow
+
+1. Open `/analyze` and analyze a Polymarket link.
+2. Confirm the selected report shows `Investigacion con Samantha`.
+3. Confirm `Copiar brief para Samantha` and `Descargar brief` are present.
+4. Confirm the copy says this is manual/local and does not execute Samantha.
+5. Paste an invalid report and confirm a friendly validation error appears.
+6. Paste a valid structured report in a safe test environment and confirm
+   evidence appears as source-backed context.
+7. Confirm Reddit/social evidence is never accepted as high reliability.
+8. Confirm Kalshi evidence is accepted only when equivalent.
+9. Confirm no full wallet addresses, secrets, raw payloads or copy-trading
+   language appear.
+10. Confirm no prediction is created unless the suggested estimate passes the
+    strict validation gate.
+
 ## Cache Troubleshooting
 
 If a normal browser shows old data but backend/proxy checks pass:

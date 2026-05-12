@@ -614,6 +614,7 @@ function validateAnalyzeLoadingPanelSource() {
     "Cripto",
     "Billeteras",
     "Perfiles",
+    "Samantha",
     "Research",
     "Odds",
     "Kalshi",
@@ -672,6 +673,10 @@ function validateAnalyzerReportSource() {
     "Analisis profundo",
     "Capas del motor",
     "Pendiente de integracion",
+    "Investigacion con Samantha",
+    "Copiar brief para Samantha",
+    "Descargar brief",
+    "Cargar reporte",
     "Que puedes hacer ahora",
     "Analizar otro enlace",
     "Capas revisadas",
@@ -683,9 +688,14 @@ function validateAnalyzerReportSource() {
   assert(analyzePage.includes("AnalyzerReport"), "expected /analyze to render AnalyzerReport");
   assert(source.includes("buildAnalyzerResult"), "expected AnalyzerReport to use unified analyzer result model");
   assert(source.includes("buildDeepAnalysisFromPolymarketMarket"), "expected AnalyzerReport to build deep analyzer readiness");
+  assert(source.includes("buildSamanthaResearchBrief"), "expected AnalyzerReport to build Samantha research briefs");
+  assert(source.includes("parseSamanthaResearchReport"), "expected AnalyzerReport to validate Samantha reports locally");
+  assert(source.includes("mergeSamanthaResearchLayer"), "expected AnalyzerReport to merge Samantha research into deep readiness");
   assert(source.includes("mergeWalletIntelligenceLayer"), "expected AnalyzerReport to merge wallet layer into deep readiness");
   assert(source.includes("getWalletIntelligenceSummary"), "expected AnalyzerReport to summarize wallet intelligence");
   assert(source.includes("getProbabilityDisplayState"), "expected AnalyzerReport to keep market probability separated");
+  assert(!source.includes("fetch("), "AnalyzerReport must not call external services for Samantha");
+  assert(!source.includes("OpenClaw"), "AnalyzerReport must not try to execute OpenClaw");
   for (const copy of requiredCopy) {
     assert(source.includes(copy), `AnalyzerReport missing required copy: ${copy}`);
   }
@@ -698,11 +708,246 @@ function validateAnalyzerReportSource() {
   return { sections: requiredCopy.length, wallet_privacy_source_guard: true };
 }
 
+function validateSamanthaResearchRules() {
+  const {
+    buildSamanthaResearchBrief,
+    serializeResearchBrief,
+    validateResearchBrief,
+  } = loadTsModule("app/lib/samanthaResearchBrief.ts");
+  const {
+    convertSamanthaReportToEvidence,
+    convertSamanthaReportToSignals,
+    parseSamanthaResearchReport,
+    shouldAcceptSuggestedEstimate,
+  } = loadTsModule("app/lib/samanthaResearchReport.ts");
+  const reportTypes = readFileSync(resolve(appRoot, "app/lib/samanthaResearchTypes.ts"), "utf8");
+  const reportSource = readFileSync(resolve(appRoot, "app/lib/samanthaResearchReport.ts"), "utf8");
+
+  const brief = buildSamanthaResearchBrief({
+    item: {
+      latest_snapshot: {
+        liquidity: 800,
+        volume: 1200,
+        yes_price: 0.58,
+        no_price: 0.42,
+      },
+      market: {
+        event_slug: "nba-okc-lal-2026-05-11",
+        market_slug: "nba-okc-lal-2026-05-11-lal",
+        outcomes: [
+          { label: "YES", price: 0.58, side: "YES" },
+          { label: "NO", price: 0.42, side: "NO" },
+        ],
+        question: "Will the Lakers win?",
+        sport_type: "nba",
+      },
+    },
+    normalizedUrl: "https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11",
+    walletSummary: {
+      analyzedCapitalUsd: 350,
+      available: true,
+      confidence: "low",
+      reason: "Fixture summary only.",
+      relevantWalletsCount: 1,
+      signalDirection: "YES",
+      thresholdUsd: 100,
+      warnings: ["Fixture wallet warning."],
+    },
+  });
+  const serializedBrief = serializeResearchBrief(brief);
+  const briefValidation = validateResearchBrief(brief);
+  assert(briefValidation.valid, `Samantha brief should be valid: ${briefValidation.errors.join(", ")}`);
+  assert(!serializedBrief.includes("walletAddress"), "Samantha brief must not include raw wallet fields");
+  assert(!/0x[a-fA-F0-9]{40}/.test(serializedBrief), "Samantha brief must not include full wallet addresses");
+  assert(!serializedBrief.toLowerCase().includes("database_url="), "Samantha brief must not include secrets");
+  assert(serializedBrief.includes("Do not invent sources"), "Samantha brief must include anti-invention rule");
+  assert(serializedBrief.includes("Do not touch Neon"), "Samantha brief must include no-Neon rule");
+
+  const validReport = parseSamanthaResearchReport({
+    completedAt: "2026-05-12T12:00:00.000Z",
+    evidence: [
+      {
+        checkedAt: "2026-05-12T12:00:00.000Z",
+        direction: "YES",
+        id: "official-1",
+        reliability: "high",
+        sourceName: "Official source",
+        sourceType: "official",
+        sourceUrl: "https://example.com/official",
+        summary: "Official context supports YES in this fixture.",
+        title: "Official context",
+      },
+      {
+        checkedAt: "2026-05-12T12:05:00.000Z",
+        direction: "YES",
+        id: "news-1",
+        reliability: "medium",
+        sourceName: "News source",
+        sourceType: "news",
+        sourceUrl: "https://example.com/news",
+        summary: "Reported context supports YES in this fixture.",
+        title: "News context",
+      },
+    ],
+    marketUrl: "https://polymarket.com/event/test",
+    status: "completed",
+    suggestedEstimate: {
+      available: true,
+      confidence: "medium",
+      decision: "YES",
+      noProbability: 39,
+      reason: "Two independent fixture sources support YES.",
+      yesProbability: 61,
+    },
+    version: "1.0",
+    warnings: [],
+  });
+  assert(validReport.valid, `valid Samantha report rejected: ${validReport.errors.join(", ")}`);
+  assert(validReport.report, "valid Samantha report should return sanitized report");
+  assert(convertSamanthaReportToEvidence(validReport.report).length === 2, "Samantha report should convert to evidence");
+  assert(convertSamanthaReportToSignals(validReport.report).length >= 2, "Samantha report should convert to signals");
+  assert(shouldAcceptSuggestedEstimate(validReport.report), "Samantha suggested estimate should pass strict fixture gate");
+
+  const dangerousUrl = parseSamanthaResearchReport({
+    completedAt: "2026-05-12T12:00:00.000Z",
+    evidence: [
+      {
+        checkedAt: "2026-05-12T12:00:00.000Z",
+        direction: "YES",
+        id: "bad-url",
+        reliability: "medium",
+        sourceName: "Bad",
+        sourceType: "news",
+        sourceUrl: "file:///etc/passwd",
+        summary: "Bad source URL.",
+        title: "Bad URL",
+      },
+    ],
+    marketUrl: "https://polymarket.com/event/test",
+    status: "completed",
+    version: "1.0",
+    warnings: [],
+  });
+  assert(!dangerousUrl.valid, "Samantha validator must reject dangerous URLs");
+
+  const badEstimate = parseSamanthaResearchReport({
+    completedAt: "2026-05-12T12:00:00.000Z",
+    evidence: [],
+    marketUrl: "https://polymarket.com/event/test",
+    status: "failed",
+    suggestedEstimate: {
+      available: true,
+      confidence: "medium",
+      decision: "YES",
+      noProbability: -1,
+      reason: "Bad estimate.",
+      yesProbability: 101,
+    },
+    version: "1.0",
+    warnings: [],
+  });
+  assert(!badEstimate.valid, "Samantha validator must reject estimates outside 0-100");
+
+  const redditHigh = parseSamanthaResearchReport({
+    completedAt: "2026-05-12T12:00:00.000Z",
+    evidence: [
+      {
+        checkedAt: "2026-05-12T12:00:00.000Z",
+        direction: "YES",
+        id: "reddit-high",
+        reliability: "high",
+        sourceName: "Reddit",
+        sourceType: "reddit",
+        summary: "Reddit should not be high reliability.",
+        title: "Reddit thread",
+      },
+    ],
+    marketUrl: "https://polymarket.com/event/test",
+    status: "completed",
+    version: "1.0",
+    warnings: [],
+  });
+  assert(!redditHigh.valid, "Samantha validator must reject Reddit high reliability");
+
+  const kalshiNotEquivalent = parseSamanthaResearchReport({
+    completedAt: "2026-05-12T12:00:00.000Z",
+    evidence: [],
+    kalshiComparison: {
+      direction: "YES",
+      equivalent: false,
+      found: true,
+      reliability: "high",
+      summary: "Not equivalent.",
+    },
+    marketUrl: "https://polymarket.com/event/test",
+    status: "failed",
+    version: "1.0",
+    warnings: [],
+  });
+  assert(!kalshiNotEquivalent.valid, "Samantha validator must reject non-equivalent Kalshi as strong signal");
+
+  const fullWallet = `0x${"a".repeat(40)}`;
+  const fullWalletReport = parseSamanthaResearchReport({
+    completedAt: "2026-05-12T12:00:00.000Z",
+    evidence: [
+      {
+        checkedAt: "2026-05-12T12:00:00.000Z",
+        direction: "UNKNOWN",
+        id: "wallet",
+        reliability: "low",
+        sourceName: fullWallet,
+        sourceType: "other",
+        summary: "Full wallet should be rejected.",
+        title: "Wallet identity",
+      },
+    ],
+    marketUrl: "https://polymarket.com/event/test",
+    status: "completed",
+    version: "1.0",
+    warnings: [],
+  });
+  assert(!fullWalletReport.valid, "Samantha validator must reject full wallet addresses");
+
+  const longSummary = "Long ".repeat(400);
+  const longReport = parseSamanthaResearchReport({
+    completedAt: "2026-05-12T12:00:00.000Z",
+    evidence: [
+      {
+        checkedAt: "2026-05-12T12:00:00.000Z",
+        direction: "NEUTRAL",
+        id: "long",
+        reliability: "low",
+        sourceName: "Long source",
+        sourceType: "other",
+        summary: longSummary,
+        title: "Long text",
+      },
+    ],
+    marketUrl: "https://polymarket.com/event/test",
+    status: "completed",
+    version: "1.0",
+    warnings: [],
+  });
+  assert(longReport.valid, "long but safe Samantha report should remain valid after sanitization");
+  assert(longReport.report.evidence[0].summary.length <= 900, "Samantha validator should limit long summaries");
+
+  assert(reportTypes.includes("SamanthaResearchBrief"), "Samantha research types should include brief contract");
+  assert(reportTypes.includes("SamanthaResearchReport"), "Samantha research types should include report contract");
+  assert(reportSource.includes("isSafeSourceUrl"), "Samantha report validator should validate source URLs");
+
+  return {
+    brief_safe: true,
+    parser_cases: 7,
+    valid_signals: convertSamanthaReportToSignals(validReport.report).length,
+  };
+}
+
 function validateDeepAnalyzerReadinessRules() {
   const {
     buildDeepAnalysisFromPolymarketMarket,
     canGenerateDecision,
     createInitialDeepAnalysis,
+    mergeSamanthaResearchLayer,
     mergeWalletIntelligenceLayer,
     summarizeDeepAnalysis,
   } = loadTsModule("app/lib/deepAnalyzerEngine.ts");
@@ -770,6 +1015,51 @@ function validateDeepAnalyzerReadinessRules() {
     summarizeDeepAnalysis(withWallet).includes("Sin decision PolySignal suficiente"),
     "deep analyzer summary should remain conservative",
   );
+
+  const withSamantha = mergeSamanthaResearchLayer(withWallet, {
+    completedAt: "2026-05-12T12:00:00.000Z",
+    evidence: [
+      {
+        checkedAt: "2026-05-12T12:00:00.000Z",
+        direction: "YES",
+        id: "official-1",
+        reliability: "high",
+        sourceName: "Official source",
+        sourceType: "official",
+        summary: "Official fixture evidence supports YES.",
+        title: "Official fixture",
+      },
+      {
+        checkedAt: "2026-05-12T12:05:00.000Z",
+        direction: "YES",
+        id: "news-1",
+        reliability: "medium",
+        sourceName: "News source",
+        sourceType: "news",
+        summary: "News fixture evidence supports YES.",
+        title: "News fixture",
+      },
+    ],
+    marketUrl: "https://polymarket.com/event/test",
+    status: "completed",
+    suggestedEstimate: {
+      available: true,
+      confidence: "medium",
+      decision: "YES",
+      noProbability: 39,
+      reason: "Validated imported research fixture.",
+      yesProbability: 61,
+    },
+    version: "1.0",
+    warnings: [],
+  });
+  assert(
+    withSamantha.layers.some((layer) => layer.id === "external_research" && layer.status === "available"),
+    "validated Samantha report should populate external research layer",
+  );
+  assert(withSamantha.decision.available, "validated Samantha report should be able to pass v0 decision gate");
+  assert(withSamantha.decision.side === "YES", "accepted Samantha estimate should preserve suggested side");
+  assert(withSamantha.decision.yesProbability === 61, "accepted Samantha estimate should preserve suggested probability");
 
   const progressPlan = getDeepAnalysisProgressPlan();
   assert(
@@ -1569,6 +1859,7 @@ const researchReadinessChecks = validateResearchReadinessRules();
 const walletIntelligenceChecks = await validateWalletIntelligenceRules();
 const analyzeLoadingPanelChecks = validateAnalyzeLoadingPanelSource();
 const analyzerReportChecks = validateAnalyzerReportSource();
+const samanthaResearchChecks = validateSamanthaResearchRules();
 const deepAnalyzerReadinessChecks = validateDeepAnalyzerReadinessRules();
 const analyzerResultChecks = validateAnalyzerResultRules();
 const analyzerMatchRankingChecks = validateAnalyzerMatchRankingRules();
@@ -1590,6 +1881,7 @@ console.log(
       wallet_intelligence: walletIntelligenceChecks,
       analyze_loading_panel: analyzeLoadingPanelChecks,
       analyzer_report: analyzerReportChecks,
+      samantha_research: samanthaResearchChecks,
       deep_analyzer_readiness: deepAnalyzerReadinessChecks,
       analyzer_result: analyzerResultChecks,
       analyzer_match_ranking: analyzerMatchRankingChecks,

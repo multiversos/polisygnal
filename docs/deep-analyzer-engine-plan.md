@@ -343,6 +343,13 @@ Falta:
   - Modelo de progreso real/futuro.
   - Marca que perfiles, research externo, odds y Kalshi requieren backend o
     fuente externa antes de correr.
+- `apps/web/app/lib/samanthaResearchTypes.ts`
+  - Contrato de `SamanthaResearchBrief` y `SamanthaResearchReport`.
+- `apps/web/app/lib/samanthaResearchBrief.ts`
+  - Builder local del brief, sin fetch ni DB.
+- `apps/web/app/lib/samanthaResearchReport.ts`
+  - Parser, sanitizador y validador de reportes.
+  - Convierte evidencia validada en señales del Deep Analyzer.
 
 ## Estado v0 del motor
 
@@ -358,6 +365,18 @@ Con solo datos de Polymarket:
 - `category_context`: partial si hay slug/categoria.
 - `evidence_scoring`: blocked.
 - `decision`: pending / none.
+
+Con reporte valido de Samantha:
+
+- `external_research`: available si hay evidencia estructurada.
+- `odds_comparison`: available solo si el reporte trae odds comparables.
+- `kalshi_comparison`: available solo si `equivalent=true`.
+- `evidence_scoring`: partial o available segun la compuerta v0.
+- `decision`: solo available si el `suggestedEstimate` pasa validacion estricta.
+
+Samantha no decide sola. Investiga y devuelve evidencia estructurada; PolySignal
+valida, convierte a señales y conserva la separacion entre evidencia, decision e
+historial.
 
 Decision v0:
 
@@ -386,6 +405,7 @@ Decision v0:
 - No scraping.
 - No odds reales nuevas.
 - No Kalshi live.
+- No ejecucion automatica de Samantha.
 - No profiles/win rate/ROI real.
 - No DB writes.
 - No predicciones nuevas.

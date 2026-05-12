@@ -4,6 +4,8 @@ export type DeepAnalysisProgressState =
   | "analyzing_market_movement"
   | "analyzing_wallets"
   | "profiling_wallets"
+  | "preparing_samantha_brief"
+  | "waiting_samantha_report"
   | "researching_external_sources"
   | "comparing_odds"
   | "comparing_kalshi"
@@ -67,6 +69,24 @@ export const DEEP_ANALYSIS_PROGRESS_STEPS: DeepAnalysisProgressStep[] = [
     requiresBackendJob: true,
     requiresExternalSource: true,
     state: "profiling_wallets",
+  },
+  {
+    canRunNow: true,
+    isLongRunning: false,
+    label: "Brief para Samantha",
+    publicCopy: "Preparando brief estructurado para investigacion externa manual.",
+    requiresBackendJob: false,
+    requiresExternalSource: false,
+    state: "preparing_samantha_brief",
+  },
+  {
+    canRunNow: false,
+    isLongRunning: true,
+    label: "Reporte de Samantha",
+    publicCopy: "Esperando que el usuario pegue un reporte estructurado validable.",
+    requiresBackendJob: false,
+    requiresExternalSource: false,
+    state: "waiting_samantha_report",
   },
   {
     canRunNow: false,

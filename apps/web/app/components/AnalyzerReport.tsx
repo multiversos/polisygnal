@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import {
   buildAnalyzerResult,
@@ -11,6 +11,7 @@ import {
 } from "../lib/analyzerResult";
 import {
   buildDeepAnalysisFromPolymarketMarket,
+  mergeSamanthaResearchLayer,
   mergeWalletIntelligenceLayer,
   summarizeDeepAnalysis,
 } from "../lib/deepAnalyzerEngine";
@@ -39,6 +40,18 @@ import {
 } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { getResearchCoverage } from "../lib/researchReadiness";
+import {
+  buildSamanthaResearchBrief,
+  serializeResearchBrief,
+  validateResearchBrief,
+} from "../lib/samanthaResearchBrief";
+import {
+  convertSamanthaReportToEvidence,
+  convertSamanthaReportToSignals,
+  parseSamanthaResearchReport,
+  shouldAcceptSuggestedEstimate,
+} from "../lib/samanthaResearchReport";
+import type { SamanthaResearchParseResult } from "../lib/samanthaResearchTypes";
 import {
   extractSoccerMatchContext,
   formatSoccerMatchContext,
@@ -260,6 +273,16 @@ function sourceLabel(summary: WalletIntelligenceSummary): string {
   return "datos publicos cargados";
 }
 
+function shortDirectionLabel(value: string): string {
+  if (value === "YES" || value === "NO") {
+    return value;
+  }
+  if (value === "NEUTRAL") {
+    return "Neutral";
+  }
+  return "Desconocido";
+}
+
 function compactWarnings(warnings: string[], limit = 3): string[] {
   return [...new Set(warnings.filter(Boolean))].slice(0, limit);
 }
@@ -296,6 +319,10 @@ export function AnalyzerReport({
   saved,
   watchlisted,
 }: AnalyzerReportProps) {
+  const [samanthaReportInput, setSamanthaReportInput] = useState("");
+  const [samanthaReportResult, setSamanthaReportResult] =
+    useState<SamanthaResearchParseResult | null>(null);
+  const [samanthaActionMessage, setSamanthaActionMessage] = useState("");
   const status = getPublicMarketStatus(insightInput(item));
   const reason = getMarketReviewReason(insightInput(item));
   const activity = getMarketActivityLabel(insightInput(item));
@@ -328,13 +355,32 @@ export function AnalyzerReport({
   const walletSummary = getWalletIntelligenceSummary(item);
   const walletReading = getWalletSignalSummary(walletSummary);
   const walletReadiness = getWalletIntelligenceReadiness(item);
-  const deepAnalysis = mergeWalletIntelligenceLayer(
-    buildDeepAnalysisFromPolymarketMarket({
-      item,
-      normalizedUrl,
-      url: normalizedUrl,
-    }),
-    walletSummary,
+  const samanthaBrief = useMemo(
+    () =>
+      buildSamanthaResearchBrief({
+        item,
+        normalizedUrl,
+        url: normalizedUrl,
+        walletSummary,
+      }),
+    [item, normalizedUrl, walletSummary],
+  );
+  const samanthaBriefText = useMemo(() => serializeResearchBrief(samanthaBrief), [samanthaBrief]);
+  const samanthaBriefValidation = useMemo(() => validateResearchBrief(samanthaBrief), [samanthaBrief]);
+  const samanthaReport = samanthaReportResult?.valid ? samanthaReportResult.report : undefined;
+  const samanthaEvidence = samanthaReport ? convertSamanthaReportToEvidence(samanthaReport) : [];
+  const samanthaSignals = samanthaReport ? convertSamanthaReportToSignals(samanthaReport) : [];
+  const samanthaEstimateAccepted = samanthaReport ? shouldAcceptSuggestedEstimate(samanthaReport) : false;
+  const deepAnalysis = mergeSamanthaResearchLayer(
+    mergeWalletIntelligenceLayer(
+      buildDeepAnalysisFromPolymarketMarket({
+        item,
+        normalizedUrl,
+        url: normalizedUrl,
+      }),
+      walletSummary,
+    ),
+    samanthaReport,
   );
   const deepAnalysisSummary = summarizeDeepAnalysis(deepAnalysis);
   const deepLayers = deepAnalysis.layers.filter((layer) =>
@@ -371,7 +417,44 @@ export function AnalyzerReport({
     ? "Ya esta guardado en Historial. Puedes revisar su estado o guardar una lectura nueva si quieres comparar cambios."
     : analyzerResult.polySignalEstimateAvailable
       ? "Guarda esta lectura para medirla cuando el mercado tenga resultado confiable."
-      : "No hay estimacion propia suficiente; puedes guardarlo como seguimiento sin convertirlo en prediccion.";
+    : "No hay estimacion propia suficiente; puedes guardarlo como seguimiento sin convertirlo en prediccion.";
+
+  function handleLoadSamanthaReport() {
+    const result = parseSamanthaResearchReport(samanthaReportInput);
+    setSamanthaReportResult(result);
+    setSamanthaActionMessage(
+      result.valid
+        ? "Reporte de Samantha cargado y validado localmente."
+        : "El reporte de Samantha no paso la validacion.",
+    );
+  }
+
+  async function handleCopySamanthaBrief() {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("clipboard_unavailable");
+      }
+      await navigator.clipboard.writeText(samanthaBriefText);
+      setSamanthaActionMessage("Brief copiado para Samantha.");
+    } catch {
+      setSamanthaActionMessage("No pudimos copiar el brief; puedes descargarlo.");
+    }
+  }
+
+  function handleDownloadSamanthaBrief() {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const blob = new Blob([samanthaBriefText], { type: "application/json" });
+    const href = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = "samantha-research-brief.json";
+    anchor.rel = "noopener";
+    anchor.click();
+    window.URL.revokeObjectURL(href);
+    setSamanthaActionMessage("Brief descargado para flujo manual.");
+  }
 
   return (
     <article className="analyzer-report-card">
@@ -501,6 +584,151 @@ export function AnalyzerReport({
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="samantha-research-panel" aria-label="Investigacion con Samantha">
+        <div className="probability-display-heading">
+          <div>
+            <p className="eyebrow">Investigacion externa manual</p>
+            <h4>Investigacion con Samantha</h4>
+          </div>
+          <span>
+            {samanthaReportResult?.valid
+              ? "Evidencia cargada"
+              : samanthaReportResult
+                ? "Reporte invalido"
+                : "Brief listo"}
+          </span>
+        </div>
+        <p className="analyzer-report-note">
+          PolySignal prepara un brief local para Samantha. No ejecuta agentes, no envia datos a terceros y no
+          convierte el reporte en prediccion sin validacion.
+        </p>
+        <div className="samantha-action-row">
+          <button
+            className="watchlist-button"
+            disabled={!samanthaBriefValidation.valid}
+            onClick={handleCopySamanthaBrief}
+            type="button"
+          >
+            Copiar brief para Samantha
+          </button>
+          <button
+            className="watchlist-button"
+            disabled={!samanthaBriefValidation.valid}
+            onClick={handleDownloadSamanthaBrief}
+            type="button"
+          >
+            Descargar brief
+          </button>
+          <span>{samanthaBriefValidation.valid ? "Brief validado" : "Brief no disponible"}</span>
+        </div>
+        {samanthaBriefValidation.errors.length > 0 ? (
+          <div className="wallet-warning-list">
+            {samanthaBriefValidation.errors.map((error) => (
+              <span className="warning-chip" key={error}>{error}</span>
+            ))}
+          </div>
+        ) : null}
+        <label className="samantha-report-input">
+          <span>Pegar reporte estructurado de Samantha</span>
+          <textarea
+            onChange={(event) => setSamanthaReportInput(event.target.value)}
+            placeholder='{"version":"1.0","status":"partial","marketUrl":"https://polymarket.com/...","evidence":[],"warnings":[]}'
+            value={samanthaReportInput}
+          />
+        </label>
+        <div className="samantha-action-row">
+          <button
+            className="watchlist-button active"
+            disabled={!samanthaReportInput.trim()}
+            onClick={handleLoadSamanthaReport}
+            type="button"
+          >
+            Cargar reporte
+          </button>
+          <button
+            className="watchlist-button"
+            disabled={!samanthaReportInput && !samanthaReportResult}
+            onClick={() => {
+              setSamanthaReportInput("");
+              setSamanthaReportResult(null);
+              setSamanthaActionMessage("Reporte de Samantha limpiado.");
+            }}
+            type="button"
+          >
+            Limpiar reporte
+          </button>
+          {samanthaActionMessage ? <span>{samanthaActionMessage}</span> : null}
+        </div>
+        {samanthaReportResult && !samanthaReportResult.valid ? (
+          <div className="wallet-warning-list">
+            {samanthaReportResult.errors.slice(0, 5).map((error) => (
+              <span className="warning-chip" key={error}>{error}</span>
+            ))}
+          </div>
+        ) : null}
+        {samanthaReport ? (
+          <div className="samantha-evidence-summary">
+            <div className="wallet-report-summary">
+              <div>
+                <span>Fuentes revisadas</span>
+                <strong>{samanthaEvidence.length}</strong>
+              </div>
+              <div>
+                <span>Senales estructuradas</span>
+                <strong>{samanthaSignals.length}</strong>
+              </div>
+              <div>
+                <span>Odds externas</span>
+                <strong>{samanthaReport.oddsComparison?.found ? "comparadas" : "sin match"}</strong>
+              </div>
+              <div>
+                <span>Kalshi</span>
+                <strong>
+                  {samanthaReport.kalshiComparison?.found && samanthaReport.kalshiComparison.equivalent
+                    ? "equivalente"
+                    : "no aceptado"}
+                </strong>
+              </div>
+              <div>
+                <span>Estimacion sugerida</span>
+                <strong>{samanthaEstimateAccepted ? "validada" : "no aceptada"}</strong>
+              </div>
+            </div>
+            {samanthaEstimateAccepted && samanthaReport.suggestedEstimate ? (
+              <div className="samantha-estimate-card">
+                <strong>Estimacion sugerida por investigacion</strong>
+                <span>
+                  {samanthaReport.suggestedEstimate.decision} · YES {samanthaReport.suggestedEstimate.yesProbability}% · NO{" "}
+                  {samanthaReport.suggestedEstimate.noProbability}%
+                </span>
+                <p>{samanthaReport.suggestedEstimate.reason}</p>
+              </div>
+            ) : (
+              <p className="section-note">
+                La investigacion aporta contexto, pero no alcanza para una prediccion clara.
+              </p>
+            )}
+            <div className="samantha-evidence-list">
+              {samanthaEvidence.slice(0, 6).map((evidence) => (
+                <article className="samantha-evidence-card" key={evidence.id}>
+                  <span>{shortDirectionLabel(evidence.direction)} · {evidence.reliability}</span>
+                  <strong>{evidence.title}</strong>
+                  <p>{evidence.summary}</p>
+                  <small>{evidence.sourceName}</small>
+                </article>
+              ))}
+            </div>
+            {samanthaReport.warnings.length > 0 ? (
+              <div className="wallet-warning-list">
+                {compactWarnings(samanthaReport.warnings, 4).map((warning) => (
+                  <span className="warning-chip" key={warning}>{warning}</span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section className="analyzer-report-layers" aria-label="Capas revisadas">

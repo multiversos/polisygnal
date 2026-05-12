@@ -210,6 +210,36 @@ Before enabling any external Deep Analyzer layer:
 - add smoke/security checks proving disabled layers cannot be mistaken for real
   evidence.
 
+## Samantha Research Safety
+
+Samantha is treated as an external manual research agent. PolySignal prepares a
+brief and validates a pasted report, but does not execute Samantha.
+
+Current controls:
+
+- no automatic agent execution;
+- no outbound calls from PolySignal to Samantha or OpenClaw;
+- no backend run, DB write, migration, scoring, trading, or command with
+  `--apply`;
+- brief generation is local to `/analyze`;
+- brief includes normalized market fields and summarized wallet state only;
+- brief does not include raw payloads, full wallet addresses, secrets, or
+  personal identity claims;
+- report import is manual paste;
+- report validator rejects unsafe URLs, secret-like text, full wallet addresses,
+  invalid probabilities, Reddit/social high reliability, and non-equivalent
+  Kalshi strong signals;
+- suggested estimates are accepted only after a strict evidence gate and remain
+  traceable to the imported report.
+
+Before automating Samantha:
+
+- run the agent behind an explicit backend job boundary;
+- isolate credentials and tools from PolySignal runtime secrets;
+- use allowlisted destinations and rate limits;
+- write redacted audit logs only;
+- require human-visible validation before any saved estimate.
+
 ## Backend Proxy Security
 
 The frontend proxy at `/api/backend/[...path]` is read-only and only accepts

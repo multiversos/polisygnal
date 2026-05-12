@@ -100,3 +100,27 @@ puede decidir sola y no puede decir que busco en internet si el job no corrio.
 Reddit/social queda como senal debil por defecto. Odds externas y Kalshi se
 modelan como capas separadas para evitar mezclar evidencia periodistica,
 mercados externos y comparacion de exchanges.
+
+## Samantha Research Manual
+
+Samantha queda preparada como agente externo manual para investigacion profunda.
+PolySignal no la ejecuta automaticamente.
+
+Flujo v0:
+
+1. `/analyze` genera un `SamanthaResearchBrief` desde datos reales de
+   Polymarket y Wallet Intelligence resumida.
+2. El usuario copia o descarga el brief y lo entrega a Samantha fuera de
+   PolySignal.
+3. Samantha devuelve un `SamanthaResearchReport` version `1.0`.
+4. El usuario pega el reporte en `/analyze`.
+5. PolySignal valida, sanitiza y muestra evidencia aceptada.
+
+Reglas:
+
+- Reddit/social es senal debil.
+- Kalshi solo cuenta si `equivalent=true`.
+- Odds solo cuentan si el reporte declara comparabilidad.
+- Suggested estimates solo se aceptan si pasan la compuerta estricta de
+  evidencia.
+- El reporte no se guarda automaticamente y no toca DB.

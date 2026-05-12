@@ -8832,6 +8832,119 @@ html:not([data-theme="dark"]) .app-sidebar {
   line-height: 1.35;
 }
 
+.samantha-research-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 36%),
+    var(--surface-muted);
+}
+
+.samantha-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.samantha-action-row > span {
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.samantha-report-input {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.samantha-report-input textarea {
+  width: 100%;
+  min-height: 122px;
+  resize: vertical;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.samantha-evidence-summary {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.samantha-estimate-card {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.samantha-estimate-card strong {
+  color: var(--foreground);
+}
+
+.samantha-estimate-card span,
+.samantha-estimate-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.samantha-evidence-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.samantha-evidence-card {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.samantha-evidence-card span,
+.samantha-evidence-card small {
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.samantha-evidence-card strong {
+  color: var(--foreground);
+  font-size: 0.88rem;
+  line-height: 1.25;
+}
+
+.samantha-evidence-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .analyzer-source-strip span {
   min-height: 28px;
   padding: 6px 9px;
@@ -9052,6 +9165,10 @@ html:not([data-theme="dark"]) .app-sidebar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .samantha-evidence-list {
+    grid-template-columns: 1fr;
+  }
+
   .analyzer-report-actions {
     justify-content: flex-start;
     max-width: none;
@@ -9141,7 +9258,8 @@ html:not([data-theme="dark"]) .app-sidebar {
   .analyzer-report-actions .watchlist-button,
   .analyzer-report-actions .saved-pill,
   .analyzer-next-actions .analysis-link,
-  .analyzer-next-actions .watchlist-button {
+  .analyzer-next-actions .watchlist-button,
+  .samantha-action-row .watchlist-button {
     width: 100%;
     justify-content: center;
   }

@@ -70,6 +70,7 @@ const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
 ];
 
 const DEEP_LAYER_PREVIEW = [
+  "Samantha Research: brief listo",
   "Perfiles de billeteras: pendiente",
   "Investigacion externa: pendiente",
   "Odds externas: pendiente",
@@ -183,6 +184,14 @@ function CategoryIcon({ id }: { id: string }) {
       </svg>
     );
   }
+  if (id === "samantha") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M6 5h8l4 4v10H6V5Z" />
+        <path d="M14 5v4h4M8 13h8M8 16h5M9 9h2" />
+      </svg>
+    );
+  }
   if (id === "odds") {
     return (
       <svg viewBox="0 0 24 24">
@@ -209,7 +218,7 @@ function CategoryIcon({ id }: { id: string }) {
 
 const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
   {
-    angle: 320,
+    angle: 310,
     icon: <CategoryIcon id="sports" />,
     id: "sports",
     label: "Deportes",
@@ -217,7 +226,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "scanning",
   },
   {
-    angle: 20,
+    angle: 338,
     icon: <CategoryIcon id="news" />,
     id: "news",
     label: "Noticias",
@@ -225,7 +234,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "scanning",
   },
   {
-    angle: 65,
+    angle: 6,
     icon: <CategoryIcon id="politics" />,
     id: "politics",
     label: "Politica",
@@ -233,7 +242,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "pending",
   },
   {
-    angle: 110,
+    angle: 34,
     icon: <CategoryIcon id="markets" />,
     id: "markets",
     label: "Mercados",
@@ -241,7 +250,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "detected",
   },
   {
-    angle: 155,
+    angle: 62,
     icon: <CategoryIcon id="crypto" />,
     id: "crypto",
     label: "Cripto",
@@ -249,7 +258,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "pending",
   },
   {
-    angle: 205,
+    angle: 90,
     icon: <CategoryIcon id="wallets" />,
     id: "wallets",
     label: "Billeteras",
@@ -257,7 +266,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "scanning",
   },
   {
-    angle: 250,
+    angle: 118,
     icon: <CategoryIcon id="history" />,
     id: "history",
     label: "Historial",
@@ -265,7 +274,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "scanning",
   },
   {
-    angle: 245,
+    angle: 146,
     icon: <CategoryIcon id="profiles" />,
     id: "profiles",
     label: "Perfiles",
@@ -273,7 +282,15 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "pending",
   },
   {
-    angle: 280,
+    angle: 174,
+    icon: <CategoryIcon id="samantha" />,
+    id: "samantha",
+    label: "Samantha",
+    shortLabel: "brief",
+    status: "pending",
+  },
+  {
+    angle: 202,
     icon: <CategoryIcon id="research" />,
     id: "research",
     label: "Research",
@@ -281,7 +298,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "pending",
   },
   {
-    angle: 315,
+    angle: 230,
     icon: <CategoryIcon id="odds" />,
     id: "odds",
     label: "Odds",
@@ -289,7 +306,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "pending",
   },
   {
-    angle: 350,
+    angle: 258,
     icon: <CategoryIcon id="kalshi" />,
     id: "kalshi",
     label: "Kalshi",
@@ -297,7 +314,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "pending",
   },
   {
-    angle: 285,
+    angle: 286,
     icon: <CategoryIcon id="resolution" />,
     id: "resolution",
     label: "Resolucion",

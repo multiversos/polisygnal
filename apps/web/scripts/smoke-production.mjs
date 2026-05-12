@@ -550,6 +550,7 @@ function validateAnalyzeLoadingPanelSource() {
     "Cripto",
     "Billeteras",
     "Perfiles",
+    "Samantha",
     "Research",
     "Odds",
     "Kalshi",
@@ -604,6 +605,11 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Analisis profundo"), "AnalyzerReport missing deep analysis section");
   assert(reportSource.includes("Capas del motor"), "AnalyzerReport missing deep analyzer layers");
   assert(reportSource.includes("Pendiente de integracion"), "AnalyzerReport should label future layers as pending");
+  assert(reportSource.includes("Investigacion con Samantha"), "AnalyzerReport missing Samantha research workflow");
+  assert(reportSource.includes("Copiar brief para Samantha"), "AnalyzerReport missing Samantha brief copy action");
+  assert(reportSource.includes("Cargar reporte"), "AnalyzerReport missing Samantha report load action");
+  assert(reportSource.includes("parseSamanthaResearchReport"), "AnalyzerReport missing Samantha report validation");
+  assert(!reportSource.includes("fetch("), "AnalyzerReport must not call external services for Samantha");
   assert(reportSource.includes("Fuentes del analisis"), "AnalyzerReport missing source block");
   assert(reportSource.includes("Que puedes hacer ahora"), "AnalyzerReport missing next actions");
   assert(reportSource.includes("Analizar otro enlace"), "AnalyzerReport missing analyze another link action");

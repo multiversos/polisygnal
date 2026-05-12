@@ -113,6 +113,10 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
   market/event data from Polymarket/Gamma read-only, wallet data from public
   Polymarket/Gamma read-only sources when available, external research as pending
   or verified, and history from this browser.
+- The report includes a manual `Investigacion con Samantha` workflow. It
+  prepares a structured brief, lets the user paste a structured Samantha report,
+  validates it locally, and shows accepted evidence without executing Samantha
+  automatically.
 - The report closes with `Que puedes hacer ahora`: save the analysis, save as
   follow-up when there is no PolySignal estimate, view history, follow the
   market, open market detail, or analyze another link.
@@ -185,8 +189,12 @@ Prepared as frontend contracts only.
 - `deepAnalyzerEngine.ts` builds conservative v0 layers from already available
   Polymarket market data and sanitized Wallet Intelligence.
 - `deepAnalysisProgress.ts` models future job phases:
-  reading Polymarket, analyzing movement, wallets, wallet profiles, external
-  research, odds, Kalshi, evidence scoring and decision.
+  reading Polymarket, analyzing movement, wallets, wallet profiles, preparing a
+  Samantha brief, waiting for a manual Samantha report, external research, odds,
+  Kalshi, evidence scoring and decision.
+- `samanthaResearchBrief.ts` and `samanthaResearchReport.ts` define the manual
+  bridge to Samantha: export brief, paste report, validate evidence, then feed
+  accepted signals into the Deep Analyzer.
 - The v0 engine never creates a PolySignal probability from market price.
 - With only Polymarket data, the decision remains unavailable and does not
   count for accuracy.

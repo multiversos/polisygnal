@@ -1,5 +1,10 @@
 import type { MarketOverviewItem } from "./marketOverview";
 import {
+  convertSamanthaReportToSignals,
+  shouldAcceptSuggestedEstimate,
+} from "./samanthaResearchReport";
+import type { SamanthaResearchReport } from "./samanthaResearchTypes";
+import {
   getWalletSignalSummary,
   shouldUseWalletAsAuxiliarySignal,
 } from "./walletIntelligence";
@@ -60,10 +65,10 @@ const LAYER_DEFINITIONS: LayerDefinition[] = [
   },
   {
     id: "external_research",
-    label: "Investigacion externa",
+    label: "Samantha Research",
     missing: ["Noticias", "Fuentes oficiales", "Reddit/social como senal debil"],
     status: "blocked",
-    summary: "Pendiente de integracion segura; no hay busqueda externa activa.",
+    summary: "Brief listo para investigacion externa manual; no hay busqueda externa activa.",
   },
   {
     id: "odds_comparison",
@@ -394,6 +399,118 @@ export function mergeWalletIntelligenceLayer(
       : "No hay suficiente actividad publica de billeteras para este mercado.",
     warnings: walletReading.warnings,
   });
+  return {
+    ...next,
+    decision: buildDeepDecision(next),
+  };
+}
+
+export function mergeSamanthaResearchLayer(
+  result: DeepAnalyzerResult,
+  report?: SamanthaResearchReport | null,
+): DeepAnalyzerResult {
+  if (!report) {
+    return result;
+  }
+
+  const signals = convertSamanthaReportToSignals(report);
+  const evidenceSignals = signals.filter(
+    (signal) =>
+      !signal.source.includes("odds") &&
+      !signal.source.includes("kalshi"),
+  );
+  const oddsSignals = signals.filter((signal) => signal.source.includes("odds"));
+  const kalshiSignals = signals.filter((signal) => signal.source.includes("kalshi"));
+  let next = replaceLayer(result, {
+    checkedAt: report.completedAt,
+    id: "external_research",
+    label: "Samantha Research",
+    missing: evidenceSignals.length > 0 ? [] : ["Evidencia externa estructurada"],
+    signals: evidenceSignals,
+    status: report.status === "failed" ? "error" : evidenceSignals.length > 0 ? "available" : "partial",
+    summary:
+      evidenceSignals.length > 0
+        ? `${evidenceSignals.length} hallazgos estructurados importados desde Samantha.`
+        : "Reporte de Samantha cargado sin evidencia externa direccional suficiente.",
+    warnings: report.warnings,
+  });
+
+  next = replaceLayer(next, {
+    checkedAt: report.completedAt,
+    id: "odds_comparison",
+    label: "Odds externas",
+    missing: oddsSignals.length > 0 ? [] : ["Odds comparables"],
+    signals: oddsSignals,
+    status: report.oddsComparison?.found ? "available" : "unavailable",
+    summary: report.oddsComparison?.found
+      ? report.oddsComparison.summary
+      : "Samantha no reporto odds externas comparables.",
+    warnings: report.oddsComparison?.found ? [] : ["No se inventan odds si el reporte no las trae."],
+  });
+
+  next = replaceLayer(next, {
+    checkedAt: report.completedAt,
+    id: "kalshi_comparison",
+    label: "Kalshi",
+    missing: kalshiSignals.length > 0 ? [] : ["Contrato equivalente"],
+    signals: kalshiSignals,
+    status: report.kalshiComparison?.found && report.kalshiComparison.equivalent ? "available" : "unavailable",
+    summary:
+      report.kalshiComparison?.found && report.kalshiComparison.equivalent
+        ? report.kalshiComparison.summary
+        : "Sin contrato Kalshi equivalente aceptado.",
+    warnings:
+      report.kalshiComparison?.found && !report.kalshiComparison.equivalent
+        ? ["Kalshi se descarto como senal porque no era equivalente."]
+        : [],
+  });
+
+  const acceptedEstimate = shouldAcceptSuggestedEstimate(report);
+  next = replaceLayer(next, {
+    checkedAt: report.completedAt,
+    id: "evidence_scoring",
+    label: "Scoring de evidencia",
+    missing: acceptedEstimate ? [] : ["Evidencia independiente suficiente para estimacion"],
+    signals,
+    status: acceptedEstimate ? "available" : signals.length > 0 ? "partial" : "blocked",
+    summary: acceptedEstimate
+      ? "Reporte de Samantha supera la compuerta v0 para estimacion importada."
+      : "La evidencia importada aporta contexto, pero no alcanza para una prediccion clara.",
+    warnings: acceptedEstimate
+      ? ["La estimacion proviene de un reporte importado y debe quedar trazada."]
+      : ["No se crea prediccion PolySignal sin evidencia suficiente."],
+  });
+
+  if (acceptedEstimate && report.suggestedEstimate) {
+    const decision: DeepAnalyzerDecision = {
+      available: true,
+      confidence: report.suggestedEstimate.confidence === "none" ? "low" : report.suggestedEstimate.confidence,
+      countsForAccuracy: report.suggestedEstimate.decision === "YES" || report.suggestedEstimate.decision === "NO",
+      noProbability: report.suggestedEstimate.noProbability,
+      reason: `Estimacion sugerida por investigacion importada: ${report.suggestedEstimate.reason}`,
+      side: report.suggestedEstimate.decision,
+      threshold: DEEP_ANALYZER_DECISION_THRESHOLD,
+      yesProbability: report.suggestedEstimate.yesProbability,
+    };
+    next = replaceLayer(
+      {
+        ...next,
+        decision,
+      },
+      {
+        checkedAt: report.completedAt,
+        id: "decision",
+        label: "Decision PolySignal",
+        missing: [],
+        signals,
+        status: "available",
+        summary: "Decision disponible desde reporte importado validado.",
+        warnings: ["No proviene del precio de mercado; proviene de evidencia importada."],
+      },
+    );
+    return next;
+  }
+
   return {
     ...next,
     decision: buildDeepDecision(next),

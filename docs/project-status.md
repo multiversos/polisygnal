@@ -118,6 +118,11 @@ Estado visible verificado:
   `deepAnalyzerTypes.ts`, `deepAnalyzerEngine.ts` y `deepAnalysisProgress.ts`.
   No hacen fetch, no escriben DB, no activan research externo, no consultan
   odds/Kalshi y no generan probabilidades PolySignal nuevas.
+- Existe contrato manual para Samantha Research:
+  `samanthaResearchTypes.ts`, `samanthaResearchBrief.ts` y
+  `samanthaResearchReport.ts`. `/analyze` puede preparar un brief local,
+  validar un reporte pegado por el usuario y mostrar evidencia estructurada sin
+  ejecutar Samantha automaticamente.
 - La estimacion PolySignal pasa por una compuerta de calidad: si el valor solo
   replica el precio visible del mercado, se muestra como probabilidad del
   mercado y no como estimacion propia.
@@ -293,6 +298,10 @@ Documentacion preparada:
   modelo futuro, umbral, privacidad y reglas anti copy-trading.
 - `docs/deep-analyzer-engine-plan.md`: auditoria de modulos existentes,
   arquitectura objetivo del motor profundo y contratos v0 conservadores.
+- `docs/samantha-research-integration.md`: contrato manual de brief/reporte
+  para Samantha y reglas de seguridad.
+- `docs/runbooks/samantha-research-manual.md`: runbook operativo para el flujo
+  manual con Samantha.
 
 Estado actual:
 
