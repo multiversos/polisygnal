@@ -601,9 +601,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(homeSource.includes("Pega un enlace"), "home analyzer steps are missing");
   assert(historySource.includes("Analizar nuevo enlace"), "history page does not link back to analyzer");
   assert(analyzePage.includes("analyzer-selection-card"), "analyze page does not render compact selector cards");
-  assert(analyzePage.includes("Ver mercados deportivos"), "analyze no-match state does not offer a safe sports-market CTA");
-  assert(rankingSource.includes("exactMarketMatches"), "analyzer ranking does not isolate exact market slug/id matches");
-  assert(rankingSource.includes("slug del mercado"), "analyzer ranking does not protect exact market slugs");
+  assert(!analyzePage.includes("Ver mercados deportivos"), "analyze no-match state must not offer internal market fallback");
+  assert(analyzePage.includes("Polymarket devolvio"), "analyze selector should describe resolved Polymarket markets");
+  assert(analyzePage.includes("No pudimos obtener este mercado desde Polymarket"), "analyze no-match copy should be Polymarket-first");
   assert(linkSource.includes("getLeaguePrefixFromSlug"), "polymarket link parser does not strip league prefixes from weak terms");
   assert(linkSource.includes("rawParts.length !== parts.length"), "polymarket link parser may infer team codes from generic slugs");
   assert(analyzePage.includes('advancePhase("matching")'), "analyze page does not drive matching phase");
