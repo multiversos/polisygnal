@@ -8230,6 +8230,51 @@ html:not([data-theme="dark"]) .app-sidebar {
   font-size: 0.8rem;
 }
 
+.analyzer-selection-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.analyzer-selection-list {
+  display: grid;
+  gap: 10px;
+}
+
+.analyzer-selection-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+}
+
+.analyzer-selection-card > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.analyzer-selection-card h3,
+.analyzer-selection-card p {
+  margin: 0;
+}
+
+.analyzer-selection-card h3 {
+  color: var(--foreground);
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+
+.analyzer-selection-card p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
 .probability-display-panel {
   display: grid;
   gap: 10px;

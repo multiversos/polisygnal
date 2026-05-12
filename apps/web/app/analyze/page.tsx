@@ -11,9 +11,12 @@ import { fetchApiJson } from "../lib/api";
 import { getPolySignalDecision } from "../lib/analysisDecision";
 import {
   getPolymarketUrlValidationMessage,
-  extractPossibleMarketTerms,
   extractPolymarketSlug,
 } from "../lib/polymarketLink";
+import {
+  rankAnalyzerMatches,
+  type AnalyzerMatchCandidate,
+} from "../lib/analyzerMatchRanking";
 import {
   formatProbability as formatPublicProbability,
   getMarketImpliedProbabilities,
@@ -79,34 +82,28 @@ type AnalyzeMarketItem = MarketOverviewItem & {
   } | null;
 };
 
-type MatchResult = {
-  item: AnalyzeMarketItem;
-  reasons: string[];
-  score: number;
-};
+type MatchResult = AnalyzerMatchCandidate<AnalyzeMarketItem>;
 
 type SearchState =
   | { status: "idle" }
   | { message: string; status: "invalid" }
-  | { message: string; normalizedUrl: string; status: "searching" }
+  | { message: string; normalizedUrl: string; status: "detecting" }
+  | { message: string; normalizedUrl: string; selected: MatchResult; status: "analyzing_selected" }
   | {
       matches: MatchResult[];
       message: string;
       normalizedUrl: string;
-      status: "matched" | "possible" | "not_found";
+      status: "needs_selection" | "no_exact_match";
+    }
+  | {
+      match: MatchResult;
+      message: string;
+      normalizedUrl: string;
+      status: "result";
     };
 
 const MARKET_PAGE_SIZE = 50;
 const MAX_MARKETS_TO_COMPARE = 100;
-
-function normalizeText(value?: string | null): string {
-  return (value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
 
 function toNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -209,50 +206,6 @@ function watchlistDraftFromMatch(item: MarketOverviewItem): WatchlistMarketDraft
   };
 }
 
-function scoreMarketMatch(item: MarketOverviewItem, normalizedUrl: string, terms: string[]): MatchResult {
-  const market = item.market;
-  const haystack = normalizeText(
-    [
-      market?.question,
-      market?.event_title,
-      market?.event_slug,
-      market?.market_slug,
-      market?.remote_id,
-      market?.id,
-    ].join(" "),
-  );
-  const normalizedUrlText = normalizeText(normalizedUrl);
-  const urlNumbers = Array.from(normalizedUrl.matchAll(/\d{4,}/g)).map((match) => match[0]);
-  let score = 0;
-  const reasons: string[] = [];
-
-  if (market?.remote_id && normalizedUrl.includes(String(market.remote_id))) {
-    score += 100;
-    reasons.push("El identificador del mercado coincide.");
-  }
-  if (market?.id && urlNumbers.includes(String(market.id))) {
-    score += 70;
-    reasons.push("El enlace incluye el mercado local.");
-  }
-  if (market?.market_slug && normalizedUrlText.includes(normalizeText(market.market_slug))) {
-    score += 85;
-    reasons.push("El slug del mercado coincide.");
-  }
-  if (market?.event_slug && normalizedUrlText.includes(normalizeText(market.event_slug))) {
-    score += 70;
-    reasons.push("El evento coincide con el enlace.");
-  }
-
-  const matchedTerms = terms.filter((term) => haystack.includes(term));
-  if (terms.length > 0 && matchedTerms.length > 0) {
-    const ratio = matchedTerms.length / terms.length;
-    score += Math.round(ratio * 70);
-    reasons.push(`${matchedTerms.length} terminos coinciden con mercado o evento.`);
-  }
-
-  return { item, reasons, score };
-}
-
 async function fetchComparableMarkets(): Promise<AnalyzeMarketItem[]> {
   const allItems: AnalyzeMarketItem[] = [];
   let total = 0;
@@ -275,39 +228,26 @@ async function fetchComparableMarkets(): Promise<AnalyzeMarketItem[]> {
   return allItems;
 }
 
-function findMatches(items: AnalyzeMarketItem[], normalizedUrl: string): MatchResult[] {
-  const terms = extractPossibleMarketTerms(normalizedUrl);
-  return items
-    .map((item) => scoreMarketMatch(item, normalizedUrl, terms))
-    .filter((match) => match.score >= 35)
-    .sort((left, right) => right.score - left.score)
-    .slice(0, 5);
-}
-
-async function enrichMatchesWithWalletIntelligence(matches: MatchResult[]): Promise<MatchResult[]> {
-  return Promise.all(
-    matches.map(async (match, index) => {
-      if (index >= 3 || !match.item.market?.id) {
-        return match;
-      }
-      const summary = await getWalletIntelligenceForMarket({
-        eventSlug: match.item.market.event_slug ?? undefined,
-        marketId: String(match.item.market.id),
-        marketSlug: match.item.market.market_slug ?? undefined,
-        remoteId: match.item.market.remote_id ?? undefined,
-      });
-      return {
-        ...match,
-        item: {
-          ...match.item,
-          walletIntelligence: {
-            positions: summary.topWallets ?? [],
-            summary,
-          },
-        },
-      };
-    }),
-  );
+async function enrichMatchWithWalletIntelligence(match: MatchResult): Promise<MatchResult> {
+  if (!match.item.market?.id) {
+    return match;
+  }
+  const summary = await getWalletIntelligenceForMarket({
+    eventSlug: match.item.market.event_slug ?? undefined,
+    marketId: String(match.item.market.id),
+    marketSlug: match.item.market.market_slug ?? undefined,
+    remoteId: match.item.market.remote_id ?? undefined,
+  });
+  return {
+    ...match,
+    item: {
+      ...match.item,
+      walletIntelligence: {
+        positions: summary.topWallets ?? [],
+        summary,
+      },
+    },
+  };
 }
 
 function safeWalletSummaryForHistory(item: MarketOverviewItem) {
@@ -789,6 +729,128 @@ function RelatedHistoryBlock({ items }: { items: AnalysisHistoryItem[] }) {
   );
 }
 
+function matchStrengthLabel(strength: MatchResult["strength"]): string {
+  if (strength === "exact") {
+    return "Exacta";
+  }
+  if (strength === "strong") {
+    return "Fuerte";
+  }
+  if (strength === "possible") {
+    return "Posible";
+  }
+  if (strength === "weak") {
+    return "Debil";
+  }
+  return "Descartada";
+}
+
+function MarketSelectionPanel({
+  busy,
+  matches,
+  message,
+  normalizedUrl,
+  onAnalyze,
+  onSavePending,
+  status,
+}: {
+  busy: boolean;
+  matches: MatchResult[];
+  message: string;
+  normalizedUrl: string;
+  onAnalyze: (match: MatchResult) => void;
+  onSavePending: () => void;
+  status: "needs_selection" | "no_exact_match";
+}) {
+  const title =
+    status === "needs_selection"
+      ? "Mercado detectado"
+      : "No encontramos una coincidencia exacta";
+  const copy =
+    status === "needs_selection"
+      ? "Selecciona que mercado quieres analizar. PolySignal preparara una sola lectura profunda despues de tu confirmacion."
+      : "Puedes elegir una posible coincidencia o revisar el enlace. No vamos a abrir analisis profundos de mercados dudosos.";
+  return (
+    <section className="dashboard-panel analyzer-selection-panel">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Detectar -&gt; Confirmar -&gt; Analizar</p>
+          <h2>{title}</h2>
+          <p>{message}</p>
+        </div>
+        <span className="badge muted">{matches.length} opciones</span>
+      </div>
+      <div className="empty-state compact">
+        <strong>{copy}</strong>
+        <p>
+          Enlace normalizado: <span>{normalizedUrl}</span>
+        </p>
+      </div>
+      {matches.length > 0 ? (
+        <div className="analyzer-selection-list">
+          {matches.slice(0, 5).map((match) => {
+            const statusInfo = getPublicMarketStatus(insightInput(match.item));
+            return (
+              <article className="analyzer-selection-card" key={`${match.marketId}-${match.score}`}>
+                <div>
+                  <span className={`market-status-badge ${statusInfo.tone}`}>{statusInfo.label}</span>
+                  <span className="badge muted">{matchStrengthLabel(match.strength)} · score {match.score}</span>
+                </div>
+                <h3>{match.title}</h3>
+                <p>{match.eventTitle || eventTitle(match.item)}</p>
+                <div className="history-card-metrics">
+                  <span>Precio Si {formatPublicProbability(match.item.latest_snapshot?.yes_price)}</span>
+                  <span>Precio No {formatPublicProbability(match.item.latest_snapshot?.no_price)}</span>
+                  <span>Volumen {formatMetric(match.item.latest_snapshot?.volume)}</span>
+                  <span>Liquidez {formatMetric(match.item.latest_snapshot?.liquidity)}</span>
+                </div>
+                <div className="data-health-notes">
+                  {match.reasons.slice(0, 3).map((reason) => (
+                    <span className="badge" key={reason}>{reason}</span>
+                  ))}
+                  {match.warnings.slice(0, 2).map((warning) => (
+                    <span className="badge muted" key={warning}>{warning}</span>
+                  ))}
+                </div>
+                <div className="watchlist-actions">
+                  <button
+                    className="watchlist-button active"
+                    disabled={busy}
+                    onClick={() => onAnalyze(match)}
+                    type="button"
+                  >
+                    Analizar este mercado
+                  </button>
+                  {match.item.market?.id ? (
+                    <a className="analysis-link secondary" href={`/markets/${match.item.market.id}`}>
+                      Ver detalle
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="empty-state compact">
+          <strong>No hay mercados cargados que coincidan con suficiente confianza.</strong>
+          <p>
+            Puedes guardar el enlace como pendiente sin inventar mercado, fecha ni precio.
+          </p>
+          <button
+            className="watchlist-button"
+            disabled={busy}
+            onClick={onSavePending}
+            type="button"
+          >
+            Guardar como pendiente
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function MatchCard({
   busy,
   item,
@@ -1047,9 +1109,9 @@ export default function AnalyzePage() {
     }
     setLoading(true);
     setState({
-      message: "Buscando coincidencias en los mercados cargados.",
+      message: "Detectando mercado o evento en los datos cargados.",
       normalizedUrl: validation.normalizedUrl,
-      status: "searching",
+      status: "detecting",
     });
     try {
       if (!(await advancePhase("matching"))) {
@@ -1059,60 +1121,33 @@ export default function AnalyzePage() {
       if (!isCurrentRun()) {
         return;
       }
-      const matches = findMatches(markets, validation.normalizedUrl);
-      let enrichedMatches = matches;
-      const previewMarket = matches[0]?.item;
-
-      if (previewMarket) {
-        if (!(await advancePhase("context"))) {
-          return;
-        }
-        extractSoccerMatchContext(previewMarket);
-
-        if (!(await advancePhase("readiness"))) {
-          return;
-        }
-        getEstimateQuality(previewMarket);
-        getSignalEstimateReadiness(previewMarket);
-        getEstimateReadinessScore(previewMarket);
-        getPolySignalEstimate(previewMarket);
-
-        if (!(await advancePhase("research"))) {
-          return;
-        }
-        getResearchCoverage(previewMarket, []);
-        enrichedMatches = await enrichMatchesWithWalletIntelligence(matches);
-        if (!isCurrentRun()) {
-          return;
-        }
-        getWalletIntelligenceSummary(enrichedMatches[0]?.item);
-      }
-
-      if (!(await advancePhase("preparing"))) {
-        return;
-      }
-
-      if (enrichedMatches[0]?.score >= 65) {
+      const ranking = rankAnalyzerMatches(markets, validation.normalizedUrl);
+      const matches = ranking.candidates;
+      const hasExactOrStrong = matches.some((match) => match.strength === "exact" || match.strength === "strong");
+      if (hasExactOrStrong) {
         setState({
-          matches: enrichedMatches,
-          message: "Encontramos una coincidencia fuerte con los mercados cargados.",
+          matches,
+          message:
+            matches.length > 1
+              ? "Este enlace parece corresponder a un evento con varios mercados. Selecciona uno para analizar."
+              : "Detectamos un mercado probable. Confirma que quieres analizarlo antes de preparar la lectura.",
           normalizedUrl: validation.normalizedUrl,
-          status: "matched",
+          status: "needs_selection",
         });
-      } else if (enrichedMatches.length > 0) {
+      } else if (matches.length > 0) {
         setState({
-          matches: enrichedMatches,
-          message: "Encontramos posibles coincidencias. Revisa cual corresponde al enlace.",
+          matches,
+          message: "No encontramos una coincidencia exacta. Revisa estas opciones compactas antes de analizar una.",
           normalizedUrl: validation.normalizedUrl,
-          status: "possible",
+          status: "no_exact_match",
         });
       } else {
         setState({
           matches: [],
           message:
-            "Todavia no encontramos este mercado dentro de los datos cargados.",
+            "No encontramos una coincidencia exacta ni una posible coincidencia confiable en los mercados cargados.",
           normalizedUrl: validation.normalizedUrl,
-          status: "not_found",
+          status: "no_exact_match",
         });
       }
     } catch {
@@ -1131,8 +1166,78 @@ export default function AnalyzePage() {
     }
   }, [input]);
 
+  const analyzeSelectedMarket = useCallback(async (match: MatchResult, normalizedUrl: string) => {
+    const runId = analysisRunRef.current + 1;
+    analysisRunRef.current = runId;
+    const isCurrentRun = () => analysisRunRef.current === runId;
+    const advancePhase = async (phase: AnalyzeLoadingPhase) => {
+      if (!isCurrentRun()) {
+        return false;
+      }
+      setLoadingPhase(phase);
+      await Promise.resolve();
+      return isCurrentRun();
+    };
+
+    setActionMessage(null);
+    setLoading(true);
+    setLoadingPhase("context");
+    setState({
+      message: "Analizando solo el mercado seleccionado.",
+      normalizedUrl,
+      selected: match,
+      status: "analyzing_selected",
+    });
+    try {
+      if (!(await advancePhase("context"))) {
+        return;
+      }
+      extractSoccerMatchContext(match.item);
+
+      if (!(await advancePhase("readiness"))) {
+        return;
+      }
+      getEstimateQuality(match.item);
+      getSignalEstimateReadiness(match.item);
+      getEstimateReadinessScore(match.item);
+      getPolySignalEstimate(match.item);
+
+      if (!(await advancePhase("research"))) {
+        return;
+      }
+      getResearchCoverage(match.item, []);
+      const enrichedMatch = await enrichMatchWithWalletIntelligence(match);
+      if (!isCurrentRun()) {
+        return;
+      }
+      getWalletIntelligenceSummary(enrichedMatch.item);
+
+      if (!(await advancePhase("preparing"))) {
+        return;
+      }
+      setState({
+        match: enrichedMatch,
+        message: "Lectura preparada para el mercado seleccionado.",
+        normalizedUrl,
+        status: "result",
+      });
+    } catch {
+      if (!isCurrentRun()) {
+        return;
+      }
+      setState({
+        message: "No pudimos preparar la lectura de este mercado ahora. Intenta de nuevo en unos segundos.",
+        status: "invalid",
+      });
+    } finally {
+      if (isCurrentRun()) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
   const handleSaveHistory = useCallback(async (item: MarketOverviewItem) => {
-    if (state.status !== "matched" && state.status !== "possible") {
+    if (state.status !== "result") {
       return;
     }
     setActionBusy(true);
@@ -1146,10 +1251,9 @@ export default function AnalyzePage() {
         normalizedUrl: state.normalizedUrl,
         remoteId: item.market?.remote_id,
       });
-      const currentMatch = state.matches.find((match) => match.item.market?.id === item.market?.id);
       const analyzerResult = buildAnalyzerResult({
         item,
-        matchScore: currentMatch?.score,
+        matchScore: state.match.score,
         normalizedUrl: state.normalizedUrl,
         relatedHistory,
         url: state.normalizedUrl,
@@ -1167,7 +1271,7 @@ export default function AnalyzePage() {
   }, [analysisHistoryItems, state]);
 
   const handleSavePending = useCallback(async () => {
-    if (state.status !== "not_found") {
+    if (state.status !== "no_exact_match") {
       return;
     }
     setActionBusy(true);
@@ -1213,9 +1317,11 @@ export default function AnalyzePage() {
     setActionMessage(null);
   }, []);
 
-  const matches = state.status === "matched" || state.status === "possible" ? state.matches : [];
+  const matches = state.status === "needs_selection" || state.status === "no_exact_match" ? state.matches : [];
   const analyzedNormalizedUrl =
-    state.status === "matched" || state.status === "possible" ? state.normalizedUrl : "";
+    state.status === "needs_selection" || state.status === "no_exact_match" || state.status === "result"
+      ? state.normalizedUrl
+      : "";
 
   return (
     <main className="dashboard-shell analyze-page">
@@ -1225,8 +1331,9 @@ export default function AnalyzePage() {
           <p className="eyebrow">Analizar enlace</p>
           <h1>Analizar enlace</h1>
           <p className="subtitle">
-            Pega un enlace de Polymarket para revisar si PolySignal ya tiene
-            informacion sobre ese mercado.
+            Pega un enlace de Polymarket. PolySignal detectara el mercado o
+            evento y te pedira confirmar que quieres analizar antes de preparar
+            la lectura.
           </p>
         </div>
         <div className="topbar-actions">
@@ -1237,11 +1344,11 @@ export default function AnalyzePage() {
       </header>
 
       <section className="safety-strip">
-        <strong>Primera version:</strong>
+        <strong>Flujo responsable:</strong>
         <span>
-          Comparamos el enlace con mercados que PolySignal ya tiene cargados. No
-          buscamos fuentes externas todavia. Si guardas el analisis, queda en el
-          historial local de este navegador.
+          Detectar -&gt; Confirmar -&gt; Analizar. No usamos capturas, OCR ni imagenes;
+          tampoco abrimos analisis profundos de mercados secundarios sin que
+          elijas uno.
         </span>
       </section>
 
@@ -1283,8 +1390,8 @@ export default function AnalyzePage() {
         <section className="empty-state compact">
           <strong>Listo para comparar un enlace.</strong>
           <p>
-            Esta primera version compara el enlace con mercados que PolySignal ya
-            tiene cargados. Si no hay coincidencia, te lo diremos claramente.
+            Primero detectamos el evento o mercado exacto. Si hay varias opciones
+            del mismo evento, te pediremos seleccionar una antes del analisis profundo.
           </p>
         </section>
       ) : null}
@@ -1296,59 +1403,37 @@ export default function AnalyzePage() {
         </section>
       ) : null}
 
-      {state.status === "searching" ? (
+      {state.status === "detecting" || state.status === "analyzing_selected" ? (
         <AnalyzeLoadingPanel isVisible={loading} phase={loadingPhase} />
       ) : null}
 
-      {state.status === "not_found" ? (
-        <section className="dashboard-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Sin coincidencia</p>
-              <h2>Mercado no encontrado</h2>
-              <p>{state.message}</p>
-            </div>
-          </div>
-          <div className="empty-state compact">
-            <strong>No vamos a inventar una lectura.</strong>
-            <p>
-              Puedes revisar los mercados deportivos disponibles o volver a
-              intentarlo mas tarde cuando haya mas datos cargados.
-            </p>
-            <div className="empty-state-actions">
-              <a className="analysis-link" href="/sports/soccer">
-                Ver futbol
-              </a>
-              <button
-                className="watchlist-button"
-                disabled={actionBusy}
-                onClick={() => void handleSavePending()}
-                type="button"
-              >
-                Guardar como pendiente
-              </button>
-            </div>
-          </div>
-        </section>
+      {state.status === "needs_selection" || state.status === "no_exact_match" ? (
+        <MarketSelectionPanel
+          busy={actionBusy || loading}
+          matches={matches}
+          message={state.message}
+          normalizedUrl={state.normalizedUrl}
+          onAnalyze={(match) => void analyzeSelectedMarket(match, state.normalizedUrl)}
+          onSavePending={() => void handleSavePending()}
+          status={state.status}
+        />
       ) : null}
 
-      {matches.length > 0 ? (
+      {state.status === "result" ? (
         <section className="dashboard-panel">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">
-                {state.status === "matched" ? "Coincidencia encontrada" : "Posibles coincidencias"}
-              </p>
-              <h2>{"message" in state ? state.message : "Coincidencias"}</h2>
+              <p className="eyebrow">Analisis seleccionado</p>
+              <h2>{state.message}</h2>
               <p>
-                Revisa la tarjeta antes de guardar el analisis. Solo usamos datos
-                ya visibles en PolySignal.
+                Esta es una sola ficha profunda para el mercado que confirmaste.
               </p>
             </div>
-            <span className="badge muted">{matches.length} resultados</span>
+            <span className="badge muted">1 mercado</span>
           </div>
           <div className="analyze-results-list">
-            {matches.map((match) => {
+            {(() => {
+              const match = state.match;
               const relatedHistory = getRelatedAnalyzerHistory({
                 eventSlug: match.item.market?.event_slug,
                 historyItems: analysisHistoryItems,
@@ -1363,6 +1448,7 @@ export default function AnalyzePage() {
                 <div className="analyze-match-shell" key={`${match.item.market?.id}-${match.score}`}>
                   <div className="data-health-notes">
                     <span className="badge muted">Coincidencia {match.score}</span>
+                    <span className="badge">Seleccionado por usuario</span>
                     {match.reasons.slice(0, 2).map((reason) => (
                       <span className="badge" key={reason}>{reason}</span>
                     ))}
@@ -1380,7 +1466,7 @@ export default function AnalyzePage() {
                   />
                 </div>
               );
-            })}
+            })()}
           </div>
         </section>
       ) : null}

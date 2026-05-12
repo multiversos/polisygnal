@@ -33,48 +33,48 @@ type RadarMarketCategory = {
 const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
   {
     detail: "Validacion segura del enlace",
-    label: "Revisando enlace",
+    label: "Detectando enlace",
     phase: "validating",
     shortLabel: "Enlace",
   },
   {
-    detail: "Coincidencias cargadas",
-    label: "Detectando mercado",
+    detail: "Buscando slug exacto y evento",
+    label: "Resolviendo mercado/evento",
     phase: "matching",
     shortLabel: "Mercado",
   },
   {
-    detail: "Evento, estado y categoria",
-    label: "Contexto del evento",
+    detail: "Solo despues de confirmar",
+    label: "Analizando mercado seleccionado",
     phase: "context",
-    shortLabel: "Contexto",
+    shortLabel: "Seleccion",
   },
   {
     detail: "Cobertura y datos pendientes",
-    label: "Investigacion disponible",
+    label: "Revisando senales disponibles",
     phase: "readiness",
-    shortLabel: "Cobertura",
+    shortLabel: "Senales",
   },
   {
     detail: "Revisando datos disponibles de billeteras",
-    label: "Billeteras publicas",
+    label: "Revisando billeteras",
     phase: "research",
     shortLabel: "Wallets",
   },
   {
     detail: "Lectura responsable",
-    label: "Preparando decision",
+    label: "Preparando lectura",
     phase: "preparing",
-    shortLabel: "Decision",
+    shortLabel: "Lectura",
   },
 ];
 
 const RESULT_SKELETONS = [
   "Mercado detectado",
+  "Selector de mercados",
   "Probabilidad del mercado",
   "Estimacion PolySignal",
   "Wallet Intelligence",
-  "Historial relacionado",
   "Resultado/verificacion",
 ] as const;
 
@@ -375,7 +375,7 @@ export function AnalyzeLoadingPanel({
         ))}
       </div>
       <p className="analyze-loading-footnote">
-        Revisando mercado, wallets publicas, historial local y datos disponibles. Esto puede
+        Detectando primero y analizando solo el mercado confirmado. Esto puede
         tardar unos segundos segun el mercado.
       </p>
     </section>

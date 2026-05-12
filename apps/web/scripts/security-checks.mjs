@@ -80,9 +80,12 @@ function loadTsModule(relativePath) {
 
 function validatePolymarketLinks() {
   const {
+    extractPolymarketSlug,
+    extractPossibleMarketTerms,
     getPolymarketUrlValidationMessage,
     isPolymarketUrl,
     normalizePolymarketUrl,
+    parsePolymarketLink,
   } = loadTsModule("app/lib/polymarketLink.ts");
 
   const accepted = [
@@ -128,7 +131,21 @@ function validatePolymarketLinks() {
     assert(normalizePolymarketUrl(input) === null, `expected normalizePolymarketUrl to reject: ${input}`);
   }
 
-  return { accepted: accepted.length, rejected: rejected.length };
+  const localizedSportsLink = "https://polymarket.com/es/sports/laliga/lal-cel-lev-2026-05-12";
+  const parsedSports = parsePolymarketLink(localizedSportsLink);
+  assert(parsedSports?.locale === "es", "expected localized Polymarket URL locale to be extracted");
+  assert(parsedSports?.category === "sports", "expected sports category to be extracted");
+  assert(parsedSports?.sportOrLeague === "laliga", "expected sports league segment to be extracted");
+  assert(parsedSports?.eventSlug === "lal-cel-lev-2026-05-12", "expected complete event slug from sports URL");
+  assert(parsedSports?.dateFromSlug === "2026-05-12", "expected date extracted from slug");
+  assert(
+    JSON.stringify(parsedSports?.possibleTeamCodes) === JSON.stringify(["cel", "lev"]),
+    `expected team codes cel/lev, got ${JSON.stringify(parsedSports?.possibleTeamCodes)}`,
+  );
+  assert(extractPolymarketSlug(localizedSportsLink) === "lal-cel-lev-2026-05-12", "expected raw slug without league prefix");
+  assert(!extractPossibleMarketTerms(localizedSportsLink).includes("laliga"), "expected league not to become a strong term");
+
+  return { accepted: accepted.length, parsed_links: 8, rejected: rejected.length };
 }
 
 function validateAnalysisDecisionRules() {
@@ -565,19 +582,19 @@ function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(resolve(appRoot, "app/components/AnalyzeLoadingPanel.tsx"), "utf8");
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
   const expectedSteps = [
-    "Revisando enlace",
-    "Detectando mercado",
-    "Contexto del evento",
-    "Investigacion disponible",
-    "Billeteras publicas",
-    "Preparando decision",
+    "Detectando enlace",
+    "Resolviendo mercado/evento",
+    "Analizando mercado seleccionado",
+    "Revisando senales disponibles",
+    "Revisando billeteras",
+    "Preparando lectura",
   ];
   const expectedSkeletons = [
     "Mercado detectado",
+    "Selector de mercados",
     "Probabilidad del mercado",
     "Estimacion PolySignal",
     "Wallet Intelligence",
-    "Historial relacionado",
     "Resultado/verificacion",
   ];
   const expectedCategories = [
@@ -610,6 +627,12 @@ function validateAnalyzeLoadingPanelSource() {
   assert(!source.includes("setInterval"), "loading panel should not use interval-based fake progress");
   assert(!source.includes("100%"), "loading panel should not expose invented percent progress");
   assert(analyzePage.includes("AnalyzeLoadingPanel"), "expected /analyze to render the loading panel");
+  assert(analyzePage.includes("MarketSelectionPanel"), "expected /analyze to render the confirmation selector");
+  assert(analyzePage.includes("analyzeSelectedMarket"), "expected /analyze to analyze only a selected market");
+  assert(analyzePage.includes('status: "needs_selection"'), "expected exact matches to require confirmation");
+  assert(analyzePage.includes('status: "analyzing_selected"'), "expected selected-market loading state");
+  assert(analyzePage.includes('status: "result"'), "expected single selected result state");
+  assert(!analyzePage.includes("enrichMatchesWithWalletIntelligence(matches)"), "expected wallet lookup not to run for all matches");
   assert(analyzePage.includes('advancePhase("matching")'), "expected /analyze loader to enter matching phase");
   assert(analyzePage.includes('advancePhase("context")'), "expected /analyze loader to enter context phase");
   assert(analyzePage.includes('advancePhase("readiness")'), "expected /analyze loader to enter readiness phase");
@@ -748,6 +771,92 @@ function validateAnalyzerResultRules() {
   assert(related.length === 1, "expected analyzer related history lookup to match market id");
 
   return { cases: 14, layers: priceOnlyResult.layers.length };
+}
+
+function validateAnalyzerMatchRankingRules() {
+  const { rankAnalyzerMatches } = loadTsModule("app/lib/analyzerMatchRanking.ts");
+  const link = "https://polymarket.com/es/sports/laliga/lal-cel-lev-2026-05-12";
+  const items = [
+    {
+      market: {
+        active: true,
+        event_slug: "lal-cel-lev-2026-05-12",
+        event_title: "Celta de Vigo vs Levante UD",
+        id: 1,
+        market_slug: "lal-cel-lev-2026-05-12-celta-win",
+        question: "Celta de Vigo to win",
+        sport_type: "soccer",
+      },
+    },
+    {
+      market: {
+        active: true,
+        event_slug: "lal-sev-esp-2026-05-12",
+        event_title: "Sevilla vs Espanyol",
+        id: 2,
+        market_slug: "lal-sev-esp-2026-05-12-sevilla-win",
+        question: "Sevilla to win",
+        sport_type: "soccer",
+      },
+    },
+    {
+      market: {
+        active: true,
+        event_slug: "lal-atm-cel-2026-05-12",
+        event_title: "Atletico Madrid vs Celta de Vigo",
+        id: 3,
+        market_slug: "lal-atm-cel-2026-05-12-atletico-win",
+        question: "Atletico Madrid to win",
+        sport_type: "soccer",
+      },
+    },
+    {
+      market: {
+        active: true,
+        event_slug: "lal-cel-lev-2026-05-12",
+        event_title: "Celta de Vigo vs Levante UD",
+        id: 4,
+        market_slug: "lal-cel-lev-2026-05-12-draw",
+        question: "Draw",
+        sport_type: "soccer",
+      },
+    },
+  ];
+  const ranking = rankAnalyzerMatches(items, link);
+  assert(ranking.linkInfo?.eventSlug === "lal-cel-lev-2026-05-12", "expected ranking to use complete event slug");
+  assert(ranking.candidates.length === 2, `expected same-event options only, got ${ranking.candidates.length}`);
+  assert(
+    ranking.candidates.every((candidate) => candidate.eventSlug === "lal-cel-lev-2026-05-12"),
+    "expected candidates to stay within the exact event",
+  );
+  assert(
+    ranking.candidates.every((candidate) => candidate.strength === "exact" || candidate.strength === "strong"),
+    "expected exact event candidates to be exact or strong",
+  );
+  assert(
+    !ranking.candidates.some((candidate) => candidate.title.includes("Sevilla") || candidate.title.includes("Atletico")),
+    "expected league/date or one-team matches to be hidden",
+  );
+
+  const possible = rankAnalyzerMatches(
+    [
+      {
+        market: {
+          active: true,
+          event_slug: "celta-vigo-levante",
+          event_title: "Celta Vigo vs Levante",
+          id: 5,
+          market_slug: "celta-vigo-levante-winner",
+          question: "Celta Vigo wins",
+          sport_type: "soccer",
+        },
+      },
+    ],
+    link,
+  );
+  assert(possible.candidates[0]?.strength === "possible", "expected team-only match to stay possible, not exact");
+
+  return { cases: 6 };
 }
 
 async function validatePolymarketResolutionAdapter() {
@@ -982,6 +1091,7 @@ const researchReadinessChecks = validateResearchReadinessRules();
 const walletIntelligenceChecks = await validateWalletIntelligenceRules();
 const analyzeLoadingPanelChecks = validateAnalyzeLoadingPanelSource();
 const analyzerResultChecks = validateAnalyzerResultRules();
+const analyzerMatchRankingChecks = validateAnalyzerMatchRankingRules();
 const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
 const resolutionRouteChecks = await validateResolvePolymarketRoute();
 const proxyChecks = await validateBackendProxy();
@@ -997,6 +1107,7 @@ console.log(
       wallet_intelligence: walletIntelligenceChecks,
       analyze_loading_panel: analyzeLoadingPanelChecks,
       analyzer_result: analyzerResultChecks,
+      analyzer_match_ranking: analyzerMatchRankingChecks,
       polymarket_resolution_adapter: resolutionAdapterChecks,
       resolve_polymarket_route: resolutionRouteChecks,
       proxy: proxyChecks,

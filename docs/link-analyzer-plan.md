@@ -7,10 +7,20 @@ Implemented as a frontend-only flow.
 - User opens `/analyze`.
 - User pastes a Polymarket link.
 - PolySignal validates that the link belongs to `polymarket.com`.
-- PolySignal compares the link against markets already loaded in the app, then
-  presents the match as the main product analysis center.
-- If there is a match, the page shows existing market data only.
-- If there is no match, the page says so honestly.
+- PolySignal parses the link into locale, category, league/sport, raw slug,
+  event slug, market slug, date, team-code hints, and secondary search terms.
+- PolySignal compares the exact slug and date/team context against markets
+  already loaded in the app.
+- The user flow is `Detectar -> Confirmar -> Analizar -> Guardar -> Verificar
+  resultado`.
+- If there is a match, `/analyze` first shows a compact selector. It does not
+  open deep analysis for every candidate.
+- If the link is an event with several markets, only markets from that same
+  event are shown for selection.
+- If there is no exact match, the page shows at most compact possible matches
+  and says that no exact match was found.
+- If there is no match, the page says so honestly and can save the link as
+  pending without inventing market data.
 - User can save the result to local Historial.
 - The result is organized through `analyzerResult.ts`, a unified frontend model
   that records the link, normalized URL, match confidence, market id, decision
@@ -56,6 +66,8 @@ Implemented as a frontend-only flow.
 - Related local history is shown inside `/analyze` when the same market, URL,
   slug, or remote id was analyzed before. This helps users avoid accidental
   duplicate reads while still allowing a new dated analysis.
+- Wallet Intelligence is fetched only after the user selects a market for deep
+  analysis. It is not loaded for secondary candidates in the selector.
 - The final copy should read like a responsible review:
   "PolySignal reviso las capas disponibles" and, when needed, "No hay evidencia
   suficiente para emitir una estimacion propia responsable."
@@ -126,9 +138,14 @@ periodically, persist results per user, and record `resolved_at`,
 
 ## Product Rules
 
+- No screenshot flow.
+- No OCR.
+- No image upload.
 - No fake results.
 - No fake percentages.
+- No fake markets, teams, dates, or prices.
 - No market-price fallback for PolySignal estimates.
+- No opening ten full analysis cards from one link.
 - No promise of profit.
 - No "safe bet" language.
 - Pending records do not count as misses.

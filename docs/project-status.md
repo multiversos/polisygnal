@@ -52,6 +52,20 @@ Estado visible verificado:
   `analyzerResult.ts`: mercado detectado, probabilidad de mercado, estimacion
   PolySignal si existe, contexto, investigacion, Wallet Intelligence, historial
   relacionado y resolucion/verificacion.
+- `/analyze` usa flujo `Detectar -> Confirmar -> Analizar -> Guardar ->
+  Verificar resultado`: un enlace primero se parsea y rankea de forma estricta,
+  luego el usuario confirma un mercado antes de ejecutar el analisis profundo.
+  Esto evita abrir multiples fichas completas para mercados relacionados pero
+  incorrectos.
+- El parser de enlaces ahora extrae locale, categoria, liga/deporte, slug
+  completo, fecha y codigos de equipos desde URLs como
+  `/es/sports/laliga/lal-cel-lev-2026-05-12`. Liga, fecha sola, año o un solo
+  equipo no bastan para match fuerte.
+- El ranking vive en `analyzerMatchRanking.ts`: slug de evento/mercado exacto
+  y market id remoto/local exacto pesan mas que terminos secundarios. Si hay
+  match exacto/fuerte, se ocultan coincidencias debiles.
+- Wallet Intelligence se consulta solo para el mercado seleccionado, no para
+  todas las coincidencias secundarias del enlace.
 - `/analyze` muestra probabilidad del mercado basada en precio visible cuando
   existe y solo muestra estimacion PolySignal si el dato real esta disponible.
 - La estimacion PolySignal pasa por una compuerta de calidad: si el valor solo
@@ -78,6 +92,8 @@ Estado visible verificado:
   contexto, investigacion, billeteras y decision. No usa una barra de progreso
   inventada, timers falsos, imagenes externas, logos ni rostros reales para
   simular avance.
+- No hay flujo de captura de pantalla, OCR ni subida de imagenes en el
+  analizador de enlaces.
 - Existe una primera capa de Wallet Intelligence:
   `walletIntelligenceTypes.ts`, `walletIntelligence.ts` y
   `walletIntelligenceAdapter.ts`. El adapter consulta de forma read-only el

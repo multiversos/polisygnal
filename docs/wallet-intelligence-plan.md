@@ -202,6 +202,10 @@ When the analysis is saved to local Historial, only the sanitized aggregate
 summary is stored. Top wallet rows are not saved in history metadata; public UI
 uses shortened addresses only when showing current endpoint results.
 
+Wallet Intelligence is scoped to the selected analyzer market. It is not fetched
+for every possible match in the confirmation selector, which keeps the link
+flow quiet and avoids implying that secondary candidates were fully analyzed.
+
 It must not:
 
 - create a PolySignal probability by itself;

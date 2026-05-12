@@ -30,6 +30,12 @@ metadata is aggregate-only: relevant wallet count, observed capital, YES/NO
 capital when available, threshold, confidence, reason, source, and warnings. It
 does not store raw wallet payloads or complete wallet addresses.
 
+The link analyzer now requires confirmation before deep analysis. A pasted
+Polymarket link is first detected and ranked; if it maps to an event with
+multiple markets, the user selects one market. Only that selected market can be
+saved as a full analysis record. Compact secondary candidates do not create
+history records unless the user explicitly selects them.
+
 When a matched market has visible YES/NO prices, `/analyze` stores the implied
 market probability from those prices. If a PolySignal estimate already exists
 in the loaded data, it is stored separately as the PolySignal estimate. If that

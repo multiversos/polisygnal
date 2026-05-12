@@ -521,19 +521,19 @@ function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(new URL("../app/components/AnalyzeLoadingPanel.tsx", import.meta.url), "utf8");
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
   const expectedSteps = [
-    "Revisando enlace",
-    "Detectando mercado",
-    "Contexto del evento",
-    "Investigacion disponible",
-    "Billeteras publicas",
-    "Preparando decision",
+    "Detectando enlace",
+    "Resolviendo mercado/evento",
+    "Analizando mercado seleccionado",
+    "Revisando senales disponibles",
+    "Revisando billeteras",
+    "Preparando lectura",
   ];
   const expectedSkeletons = [
     "Mercado detectado",
+    "Selector de mercados",
     "Probabilidad del mercado",
     "Estimacion PolySignal",
     "Wallet Intelligence",
-    "Historial relacionado",
     "Resultado/verificacion",
   ];
   const expectedCategories = [
@@ -565,6 +565,10 @@ function validateAnalyzeLoadingPanelSource() {
   assert(!source.includes("setInterval"), "analyze loading panel should not use fake progress intervals");
   assert(!source.includes("100%"), "analyze loading panel should not display invented 100% progress");
   assert(analyzePage.includes("AnalyzeLoadingPanel"), "analyze page does not render AnalyzeLoadingPanel");
+  assert(analyzePage.includes("MarketSelectionPanel"), "analyze page does not render market selector");
+  assert(analyzePage.includes("rankAnalyzerMatches"), "analyze page does not use strict match ranking");
+  assert(analyzePage.includes("analyzeSelectedMarket"), "analyze page does not gate deep analysis behind selection");
+  assert(!analyzePage.includes("enrichMatchesWithWalletIntelligence(matches)"), "wallet intelligence should not load for all matches");
   assert(analyzePage.includes("buildAnalyzerResult"), "analyze page does not use unified analyzer result");
   assert(analyzePage.includes("Centro de analisis"), "analyze page does not include product center summary");
   assert(analyzePage.includes("Capas revisadas"), "analyze page does not include reviewed layers");
@@ -909,18 +913,23 @@ async function main() {
   assertNoFullWalletAddress(validAnalyzeText, "analyze valid wallet privacy");
   assertTextIncludesOneOf(
     validAnalyzeText,
-    ["Coincidencia encontrada", "Posibles coincidencias"],
+    ["Mercado detectado", "No encontramos una coincidencia exacta", "Coincidencia encontrada", "Posibles coincidencias"],
     "analyze valid match state",
   );
-  assertTextIncludes(validAnalyzeText, "Lectura del mercado", "analyze market reading");
-  assertTextIncludesOneOf(validAnalyzeText, ["Centro de analisis", "Lectura del mercado"], "analyze product center summary");
-  assertTextIncludesOneOf(validAnalyzeText, ["Que encontro PolySignal", "Preparacion de estimacion PolySignal"], "analyze found summary");
-  assertTextIncludesOneOf(validAnalyzeText, ["Capas revisadas", "Lectura por capas", "Preparacion de datos"], "analyze reviewed layers");
-  assertTextIncludesOneOf(validAnalyzeText, ["Historial relacionado", "Guardar analisis"], "analyze related history layer");
-  assertTextIncludes(validAnalyzeText, "Probabilidad del mercado", "analyze market probability");
+  assertTextIncludesOneOf(validAnalyzeText, ["Analizar este mercado", "Lectura del mercado"], "analyze confirm-before-deep-analysis");
+  assertTextIncludesOneOf(validAnalyzeText, ["Lectura del mercado", "Precio Si", "Precio Sí"], "analyze market reading");
+  assertTextIncludesOneOf(validAnalyzeText, ["Centro de analisis", "Selecciona que mercado", "Lectura del mercado"], "analyze product center summary");
+  assertTextIncludesOneOf(validAnalyzeText, ["Que encontro PolySignal", "Preparacion de estimacion PolySignal", "Selecciona que mercado"], "analyze found summary");
   assertTextIncludesOneOf(
     validAnalyzeText,
-    ["Estimacion PolySignal", "Estimación PolySignal"],
+    ["Capas revisadas", "Lectura por capas", "Selecciona que mercado", "Preparacion de datos", "Preparación de datos"],
+    "analyze reviewed layers",
+  );
+  assertTextIncludesOneOf(validAnalyzeText, ["Historial relacionado", "Guardar analisis", "Analizar este mercado"], "analyze related history layer");
+  assertTextIncludesOneOf(validAnalyzeText, ["Probabilidad del mercado", "Precio Si", "Precio Sí"], "analyze market probability");
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    ["Estimacion PolySignal", "Estimación PolySignal", "Analizar este mercado"],
     "analyze polysignal probability",
   );
   assertTextIncludesOneOf(
@@ -929,17 +938,18 @@ async function main() {
       "no una prediccion propia de PolySignal",
       "no una predicción propia de PolySignal",
       "Por ahora solo mostramos la probabilidad del mercado",
+      "PolySignal preparara una sola lectura profunda",
     ],
     "analyze market price is not polysignal estimate",
   );
   assertTextIncludesOneOf(
     validAnalyzeText,
-    ["Preparacion de estimacion PolySignal", "Preparación de estimación PolySignal", "Senales independientes"],
+    ["Preparacion de estimacion PolySignal", "Preparación de estimación PolySignal", "Senales independientes", "Analizar este mercado"],
     "analyze estimate readiness",
   );
-  assertTextIncludes(validAnalyzeText, "Contexto del partido", "analyze soccer context");
-  assertTextIncludes(validAnalyzeText, "Investigacion externa", "analyze external research readiness");
-  assertTextIncludes(validAnalyzeText, "Inteligencia de billeteras", "analyze wallet intelligence readiness");
+  assertTextIncludesOneOf(validAnalyzeText, ["Contexto del partido", "Analizar este mercado"], "analyze soccer context");
+  assertTextIncludesOneOf(validAnalyzeText, ["Investigacion externa", "Analizar este mercado"], "analyze external research readiness");
+  assertTextIncludesOneOf(validAnalyzeText, ["Inteligencia de billeteras", "Analizar este mercado"], "analyze wallet intelligence readiness");
   assertTextIncludesOneOf(
     validAnalyzeText,
     [
@@ -949,31 +959,32 @@ async function main() {
       "movimientos relevantes de $100",
       "movimientos relevantes de 100",
       "Billeteras publicas relevantes detectadas",
+      "Analizar este mercado",
     ],
     "analyze wallet privacy copy",
   );
   assertTextIncludesOneOf(
     validAnalyzeText,
-    ["Fuentes verificadas: 0", "Fuentes verificadas"],
+    ["Fuentes verificadas: 0", "Fuentes verificadas", "Analizar este mercado"],
     "analyze no fake external sources",
   );
-  assertTextIncludes(validAnalyzeText, "Preparacion de datos", "analyze non predictive readiness");
+  assertTextIncludesOneOf(validAnalyzeText, ["Preparacion de datos", "Analizar este mercado"], "analyze non predictive readiness");
   assertTextIncludesOneOf(
     validAnalyzeText,
-    ["no genera una prediccion PolySignal", "no genera una predicción PolySignal"],
+    ["no genera una prediccion PolySignal", "no genera una predicción PolySignal", "Analizar este mercado"],
     "analyze soccer context is not prediction",
   );
   assertTextExcludes(validAnalyzeText, ["Fake finding", "Demo finding", "fixture de prueba"], "analyze invented evidence");
   assertTextExcludes(validAnalyzeText, ["0x1234567890abcdef", ...PUBLIC_WALLET_FORBIDDEN_TEXT], "analyze fake wallet data");
-  assertTextIncludes(validAnalyzeText, "Decision de PolySignal", "analyze clear decision panel");
+  assertTextIncludesOneOf(validAnalyzeText, ["Decision de PolySignal", "Analizar este mercado"], "analyze clear decision panel");
   assertTextIncludesOneOf(
     validAnalyzeText,
-    ["umbral de decision del 55%", "umbral de decisión del 55%"],
+    ["umbral de decision del 55%", "umbral de decisión del 55%", "Analizar este mercado"],
     "analyze clear decision threshold copy",
   );
   assertTextIncludesOneOf(
     validAnalyzeText,
-    ["Guardar analisis", "Guardar análisis", "Guardado en historial"],
+    ["Guardar analisis", "Guardar análisis", "Guardado en historial", "Analizar este mercado"],
     "analyze save history action",
   );
   assertTextExcludes(validAnalyzeText, PUBLIC_TECHNICAL_TEXT, "analyze valid public copy");
