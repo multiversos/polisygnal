@@ -29,14 +29,15 @@ const publicNavigationItems: Array<{
   label: string;
   href: string;
   icon: NavIconName;
+  primary?: boolean;
 }> = [
   { label: "Inicio", href: "/", icon: "dashboard" },
+  { label: "Analizar enlace", href: "/analyze", icon: "analyze", primary: true },
+  { label: "Historial", href: "/history", icon: "history" },
   { label: "Mercados deportivos", href: "/sports", icon: "sports" },
   { label: "Resumen diario", href: "/briefing", icon: "briefing" },
   { label: "Mi lista", href: "/watchlist", icon: "watchlist" },
   { label: "Alertas", href: "/alerts", icon: "alerts" },
-  { label: "Historial", href: "/history", icon: "history" },
-  { label: "Analizar enlace", href: "/analyze", icon: "analyze" },
 ];
 
 function applyThemePreference(theme: ThemePreference) {
@@ -109,6 +110,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <NavIcon name={item.icon} />
               <span>{item.label}</span>
+              {item.primary ? <em>Principal</em> : null}
             </Link>
           ))}
         </nav>
@@ -129,7 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <img src="/brand/polysignal-icon-option5.svg" alt="" aria-hidden="true" />
             <div>
               <span>PolySignal</span>
-              <strong>Mercados y alertas deportivas</strong>
+              <strong>Analizador de mercados Polymarket</strong>
             </div>
           </div>
         </header>

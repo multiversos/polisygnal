@@ -205,6 +205,17 @@ function polySignalProbabilityForItem(item: AnalysisHistoryItem) {
   });
 }
 
+function analyzerHrefForItem(item: AnalysisHistoryItem): string | null {
+  if (!item.url) {
+    return null;
+  }
+  const params = new URLSearchParams({
+    auto: "1",
+    url: item.url,
+  });
+  return `/analyze?${params.toString()}`;
+}
+
 function averageProbability(values: number[]): number | null {
   if (values.length === 0) {
     return null;
@@ -477,6 +488,9 @@ export default function HistoryPage() {
           </p>
         </div>
         <div className="topbar-actions">
+          <a className="analysis-link" href="/analyze">
+            Analizar nuevo enlace
+          </a>
           <span className="timestamp-pill">{formatLastUpdated(updatedAt)}</span>
           <button className="theme-toggle" onClick={() => void loadHistory()} type="button">
             {loading ? "Actualizando" : "Actualizar"}
@@ -513,6 +527,7 @@ export default function HistoryPage() {
         <span>
           Solo contamos aciertos y fallos cuando PolySignal hizo una prediccion clara
           y el mercado ya fue resuelto por Polymarket o una fuente confiable.
+          La probabilidad del mercado no es una estimacion PolySignal.
         </span>
       </section>
 
@@ -729,18 +744,18 @@ export default function HistoryPage() {
               un mercado, aparecera aqui.
             </p>
             <div className="empty-state-actions">
-              <a className="analysis-link" href="/sports/soccer">
-                Explorar futbol
+              <a className="analysis-link" href="/analyze">
+                Analizar enlace
               </a>
               <a className="analysis-link secondary" href="/sports">
-                Ver mercados deportivos
+                Explorar mercados
               </a>
             </div>
           </div>
         ) : visibleItems.length === 0 ? (
           <div className="empty-state compact">
             <strong>No hay analisis para este filtro.</strong>
-            <p>Prueba con otra vista o guarda un analisis desde un mercado.</p>
+            <p>Prueba con otra vista o guarda un analisis desde /analyze.</p>
             <button className="watchlist-button" onClick={() => setFilter("all")} type="button">
               Ver todos
             </button>
@@ -751,6 +766,7 @@ export default function HistoryPage() {
               const marketProbability = marketProbabilityForItem(item);
               const polySignalProbability = polySignalProbabilityForItem(item);
               const probabilityGap = getProbabilityGap(marketProbability, polySignalProbability);
+              const reanalyzeHref = analyzerHrefForItem(item);
               return (
                 <article className="history-card" key={item.id}>
                   <div className="history-card-header">
@@ -814,6 +830,11 @@ export default function HistoryPage() {
                     <p className="section-note">Guardado para comparar cuando exista resultado final.</p>
                   )}
                   <div className="watchlist-actions">
+                    {reanalyzeHref ? (
+                      <a className="analysis-link" href={reanalyzeHref}>
+                        Reanalizar enlace
+                      </a>
+                    ) : null}
                     {item.marketId ? (
                       <a className="analysis-link" href={`/markets/${item.marketId}`}>
                         Ver detalle

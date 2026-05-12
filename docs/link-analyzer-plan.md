@@ -4,8 +4,13 @@
 
 Implemented as a frontend-only flow.
 
+- The public home page positions `/analyze` as the main product entry: paste a
+  Polymarket link, confirm the market, save the reading, and measure it later
+  from local history.
 - User opens `/analyze`.
 - User pastes a Polymarket link.
+- The initial `/analyze` state explains `Detectar -> Confirmar -> Analizar` in
+  plain language before any analysis runs.
 - PolySignal validates that the link belongs to `polymarket.com`.
 - PolySignal parses the link into locale, category, league/sport, raw slug,
   event slug, market slug, date, team-code hints, and secondary search terms.
@@ -21,6 +26,9 @@ Implemented as a frontend-only flow.
   resultado`.
 - If there is a match, `/analyze` first shows a compact selector. It does not
   open deep analysis for every candidate.
+- The selector is a confirmation step, not the final report. It labels exact,
+  strong, and possible matches, shows a short reason, and asks the user to run
+  `Analizar este mercado` before any deep layers load.
 - If the link is an event with several markets, only markets from that same
   event are shown for selection.
 - If there is no exact match, the page shows at most compact possible matches
@@ -92,6 +100,12 @@ Implemented as a frontend-only flow.
   market/event data from Polymarket plus PolySignal, wallet data from public
   Polymarket/Gamma read-only sources when available, external research as pending or
   verified, and history from this browser.
+- The report closes with `Que puedes hacer ahora`: save the analysis, save as
+  follow-up when there is no PolySignal estimate, view history, follow the
+  market, open market detail, or analyze another link.
+- `/history` points users back to `/analyze` through its header, empty state,
+  and `Reanalizar enlace` actions for saved records that include the original
+  URL.
 - QA cases currently protected:
   - `https://polymarket.com/es/sports/epl/epl-bri-wol-2026-05-09` shows a
     compact selector with markets from that same event.

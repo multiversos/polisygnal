@@ -34,14 +34,16 @@ Use these checks after a production deploy. Correct domains:
 1. Open `https://polisygnal-web.vercel.app/`.
 2. Confirm the sidebar only shows:
    - Inicio
+   - Analizar enlace
+   - Historial
    - Mercados deportivos
    - Resumen diario
    - Mi lista
    - Alertas
-   - Historial
-   - Analizar enlace
    - Modo oscuro
-3. Confirm the sidebar does not show internal sections such as Investigación,
+3. Confirm `Analizar enlace` is visually prominent as the principal product
+   entry, without exposing internal routes.
+4. Confirm the sidebar does not show internal sections such as Investigación,
    Evidencia, Workflow, Salud de datos, Trial E2E, or Backtesting.
 
 ## Security Baseline
@@ -113,11 +115,15 @@ Use these checks after a production deploy. Correct domains:
 
 ## Public Home
 
-1. Confirm Inicio shows `Qué revisar ahora`, `Mercados destacados`, and
+1. Confirm Inicio shows a main hero for `Analizar enlace`.
+2. Confirm the hero says the flow is to paste a link, confirm the market, and
+   save/measure the result over time.
+3. Confirm the primary CTA goes to `/analyze` and secondary CTAs go to
+   Historial and market exploration.
+4. Confirm Inicio still shows `Qué revisar ahora`, `Mercados destacados`, and
    `Próximos partidos`.
-2. Confirm it shows `Última actualización` and an `Actualizar` button.
-3. Confirm CTAs link to Mercados deportivos, Resumen diario, and Alertas.
-4. Confirm no visible copy mentions API, backend, JSON, proxy, snapshot,
+5. Confirm it shows `Última actualización` and an `Actualizar` button.
+6. Confirm no visible copy mentions API, backend, JSON, proxy, snapshot,
    fallback, debug, pipeline, or market_type.
 
 ## Sports
@@ -195,30 +201,32 @@ If this test fails, stop feature work and treat it as a production regression.
 
 1. Open `https://polisygnal-web.vercel.app/history` from the sidebar.
 2. Confirm the page says `Historial de analisis`.
-3. If no analyses are saved, confirm the empty state is clear and links back to
-   soccer or sports markets.
-4. Open a market detail page from `/sports/soccer`.
-5. Click `Guardar en historial`.
-6. Return to `/history` and confirm the saved analysis appears.
-7. Confirm the metric cards update from local browser data.
-8. Confirm charts never invent an accuracy rate when there are no finalized
+3. Confirm the header has `Analizar nuevo enlace`.
+4. If no analyses are saved, confirm the empty state is clear and links back to
+   `/analyze`.
+5. Open a market detail page from `/sports/soccer`.
+6. Click `Guardar en historial`.
+7. Return to `/history` and confirm the saved analysis appears.
+8. If the saved record has a URL, confirm it offers `Reanalizar enlace`.
+9. Confirm the metric cards update from local browser data.
+10. Confirm charts never invent an accuracy rate when there are no finalized
    results.
-9. Confirm the page does not promise profit, certainty, or betting advice.
-10. Confirm public copy does not show API, backend, JSON, proxy, snapshot,
+11. Confirm the page does not promise profit, certainty, or betting advice.
+12. Confirm public copy does not show API, backend, JSON, proxy, snapshot,
     fallback, debug, pipeline, market_type, model_version, or raw data.
-11. Confirm `Borrar historial local` is visible and requires browser
+13. Confirm `Borrar historial local` is visible and requires browser
     confirmation before clearing local data.
-12. Confirm `Actualizar resultados` is visible.
-13. Click `Actualizar resultados` and confirm the page says it is verifying
+14. Confirm `Actualizar resultados` is visible.
+15. Click `Actualizar resultados` and confirm the page says it is verifying
     automatically. It must not ask the user to choose `Gano YES` or `Gano NO`.
-14. Confirm the page explains `Como se mide PolySignal`: only clear PolySignal
+16. Confirm the page explains `Como se mide PolySignal`: only clear PolySignal
     predictions with verified final outcomes count as hit/miss.
-15. Confirm pending, cancelled, unknown, weak-decision, and no-estimate records
+17. Confirm pending, cancelled, unknown, weak-decision, and no-estimate records
     are not counted as failures.
-16. Confirm result source copy is understandable:
+18. Confirm result source copy is understandable:
     `Verificado con Polymarket`, `Verificado con datos PolySignal`, or
     `No verificado todavia`.
-17. Confirm a dangerous `/api/resolve-polymarket` request such as
+19. Confirm a dangerous `/api/resolve-polymarket` request such as
     `polymarket.com.evil.com` is rejected and does not return raw payloads.
 
 ## Analizar Enlace
@@ -226,40 +234,45 @@ If this test fails, stop feature work and treat it as a production regression.
 1. Open `https://polisygnal-web.vercel.app/analyze` from the sidebar.
 2. Confirm the page shows an input for a Polymarket link and an `Analizar`
    button.
-3. Paste an invalid link and confirm the page shows a friendly message.
-4. Paste a Polymarket link and confirm the page either finds a matching market
+3. Confirm the initial state explains:
+   - Detectamos el mercado del enlace.
+   - Confirmas si hay varias opciones.
+   - Analizamos solo el mercado elegido.
+   - Guardas la lectura para medirla con el tiempo.
+4. Paste an invalid link and confirm the page shows a friendly message.
+5. Paste a Polymarket link and confirm the page either finds a matching market
    selector, a single selected result, or clearly says it is not in the loaded
    markets yet.
-5. While the valid link is being analyzed, confirm the guided loading panel
+6. While the valid link is being analyzed, confirm the guided loading panel
    appears with `Analizando mercado` and a central multi-market Radar
    Analytics visual.
-6. Confirm the radar is prominent, sober, and analytical: concentric rings,
+7. Confirm the radar is prominent, sober, and analytical: concentric rings,
    subtle signal points, a central PolySignal mark, and category chips around
    the scan.
-7. Confirm the loading panel shows the real analysis steps:
+8. Confirm the loading panel shows the real analysis steps:
    - Detectando enlace.
    - Resolviendo mercado/evento.
    - Analizando mercado seleccionado.
    - Revisando senales disponibles.
    - Revisando billeteras.
    - Preparando lectura.
-8. Confirm the radar represents multiple prediction-market categories such as
+9. Confirm the radar represents multiple prediction-market categories such as
    Deportes, Noticias, Politica, Mercados, Cripto, Billeteras, Historial, and
    Resolucion. It
    should not feel like a soccer-only loader.
-9. Confirm the category visuals use local SVG/CSS only: no external images, no
+10. Confirm the category visuals use local SVG/CSS only: no external images, no
    real faces, no party logos, and no copyright logos.
-10. Confirm the loading panel shows skeleton placeholders for detected market,
+11. Confirm the loading panel shows skeleton placeholders for detected market,
     market selection, market probability, PolySignal estimate, Wallet
     Intelligence, and final verification.
-11. Confirm the steps have visible text states and do not depend only on color.
-12. Confirm the loading panel does not show a fake 0%-100% progress bar and does
+12. Confirm the steps have visible text states and do not depend only on color.
+13. Confirm the loading panel does not show a fake 0%-100% progress bar and does
    not stay stuck after the analysis finishes.
-13. Confirm `Limpiar` removes the loader, result, and errors.
-14. Confirm mobile stacks as title, radar, steps, and skeletons without
+14. Confirm `Limpiar` removes the loader, result, and errors.
+15. Confirm mobile stacks as title, radar, steps, and skeletons without
     horizontal overflow.
-15. Confirm `/analyze` does not ask for screenshots, image upload, or OCR.
-16. Confirm a valid link first shows a compact selector or one confirmed result,
+16. Confirm `/analyze` does not ask for screenshots, image upload, or OCR.
+17. Confirm a valid link first shows a compact selector or one confirmed result,
    not ten full analysis cards.
 17. For an event link, confirm only markets from the same event are shown. Other
    matches that only share league/date/one team should not appear as primary
@@ -328,8 +341,9 @@ If this test fails, stop feature work and treat it as a production regression.
 42. Confirm market price alone never creates a PolySignal predicted side.
 43. Confirm it shows only real visible data: title, event, status, price if
    available, volume/liquidity if available, and last update.
-44. Confirm it offers `Guardar analisis`, `Ver historial`, `Ver detalle`, and
-   `Seguir mercado` when a market is matched.
+44. Confirm it offers `Que puedes hacer ahora` with `Guardar analisis` or
+   `Guardar como seguimiento`, `Ver historial`, `Ver detalle`, `Seguir mercado`,
+   and `Analizar otro enlace` when a market is matched.
 45. Save the analysis, open `/history`, and confirm the item appears as
    `Desde enlace`.
 46. Confirm the saved history item shows market YES/NO probability if it was

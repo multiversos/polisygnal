@@ -752,6 +752,7 @@ function MarketSelectionPanel({
   message,
   normalizedUrl,
   onAnalyze,
+  onReviewLink,
   onSavePending,
   status,
 }: {
@@ -760,16 +761,22 @@ function MarketSelectionPanel({
   message: string;
   normalizedUrl: string;
   onAnalyze: (match: MatchResult) => void;
+  onReviewLink: () => void;
   onSavePending: () => void;
   status: "needs_selection" | "no_exact_match";
 }) {
+  const recommended =
+    matches.length === 1 &&
+    (matches[0].strength === "exact" || matches[0].strength === "strong");
   const title =
     status === "needs_selection"
-      ? "Mercado detectado"
+      ? "Confirma que mercado quieres analizar"
       : "No encontramos una coincidencia exacta";
   const copy =
     status === "needs_selection"
-      ? "Selecciona que mercado quieres analizar. PolySignal preparara una sola lectura profunda despues de tu confirmacion."
+      ? recommended
+        ? "Encontramos una opcion recomendada relacionada con tu enlace. Confirma antes de preparar la lectura profunda."
+        : "Encontramos estas opciones relacionadas con tu enlace. Elige una para preparar una sola lectura profunda."
       : "Puedes elegir una posible coincidencia o revisar el enlace. No vamos a abrir analisis profundos de mercados dudosos.";
   return (
     <section className="dashboard-panel analyzer-selection-panel">
@@ -779,7 +786,9 @@ function MarketSelectionPanel({
           <h2>{title}</h2>
           <p>{message}</p>
         </div>
-        <span className="badge muted">{matches.length} opciones</span>
+        <span className="badge muted">
+          {recommended ? "Seleccion recomendada" : `${matches.length} opciones`}
+        </span>
       </div>
       <div className="empty-state compact">
         <strong>{copy}</strong>
@@ -796,6 +805,7 @@ function MarketSelectionPanel({
                 <div>
                   <span className={`market-status-badge ${statusInfo.tone}`}>{statusInfo.label}</span>
                   <span className="badge muted">{matchStrengthLabel(match.strength)} - score {match.score}</span>
+                  {recommended ? <span className="badge external-hint">Recomendado</span> : null}
                 </div>
                 <h3>{match.title}</h3>
                 <p>{match.eventTitle || eventTitle(match.item)}</p>
@@ -846,6 +856,14 @@ function MarketSelectionPanel({
             type="button"
           >
             Guardar como pendiente
+          </button>
+          <button
+            className="watchlist-button"
+            disabled={busy}
+            onClick={onReviewLink}
+            type="button"
+          >
+            Revisar enlace
           </button>
           <a className="analysis-link secondary" href="/sports/soccer">
             Ver mercados deportivos
@@ -1392,11 +1410,42 @@ export default function AnalyzePage() {
       </section>
 
       {state.status === "idle" ? (
-        <section className="empty-state compact">
-          <strong>Listo para comparar un enlace.</strong>
-          <p>
-            Primero detectamos el evento o mercado exacto. Si hay varias opciones
-            del mismo evento, te pediremos seleccionar una antes del analisis profundo.
+        <section className="dashboard-panel analyzer-start-panel" aria-label="Como funciona el analizador">
+          <div className="panel-heading compact">
+            <div>
+              <p className="eyebrow">Como funciona</p>
+              <h2>Detectar, confirmar y analizar</h2>
+              <p>
+                Pega un enlace de evento o mercado de Polymarket. Si el enlace
+                contiene varios mercados, te mostraremos un selector antes de analizar.
+              </p>
+            </div>
+          </div>
+          <div className="analyzer-start-steps">
+            <article>
+              <span>1</span>
+              <strong>Detectamos el mercado del enlace</strong>
+              <p>El slug completo, la fecha y el evento pesan mas que terminos sueltos.</p>
+            </article>
+            <article>
+              <span>2</span>
+              <strong>Te pedimos confirmar si hay varias opciones</strong>
+              <p>PolySignal no abre analisis profundos de coincidencias secundarias.</p>
+            </article>
+            <article>
+              <span>3</span>
+              <strong>Analizamos solo el mercado elegido</strong>
+              <p>El reporte separa precio de mercado, estimacion propia y senales auxiliares.</p>
+            </article>
+            <article>
+              <span>4</span>
+              <strong>Guardas la lectura para medirla con el tiempo</strong>
+              <p>El historial mide predicciones claras cuando el mercado se resuelve.</p>
+            </article>
+          </div>
+          <p className="analyzer-report-note">
+            La probabilidad del mercado viene de Polymarket. La estimacion PolySignal
+            solo aparece si hay senales suficientes; Wallet Intelligence es auxiliar.
           </p>
         </section>
       ) : null}
@@ -1419,6 +1468,7 @@ export default function AnalyzePage() {
           message={state.message}
           normalizedUrl={state.normalizedUrl}
           onAnalyze={(match) => void analyzeSelectedMarket(match, state.normalizedUrl)}
+          onReviewLink={handleClear}
           onSavePending={() => void handleSavePending()}
           status={state.status}
         />

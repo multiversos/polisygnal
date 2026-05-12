@@ -657,6 +657,8 @@ function validateAnalyzerReportSource() {
   const requiredCopy = [
     "Resumen del analisis",
     "Fuentes del analisis",
+    "Que puedes hacer ahora",
+    "Analizar otro enlace",
     "Capas revisadas",
     "Ver todas las billeteras analizadas",
     "No hay suficiente actividad publica de billeteras",

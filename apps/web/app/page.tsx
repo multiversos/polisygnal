@@ -358,19 +358,24 @@ const limitOptions = [5, 10, 20];
 
 const quickLinks = [
   { label: "Inicio", href: "/" },
+  { label: "Analizar enlace", href: "/analyze" },
+  { label: "Historial", href: "/history" },
   { label: "Mercados deportivos", href: "/sports" },
   { label: "Resumen diario", href: "/briefing" },
   { label: "Mi lista", href: "/watchlist" },
   { label: "Alertas", href: "/alerts" },
-  { label: "Historial", href: "/history" },
-  { label: "Analizar enlace", href: "/analyze" },
 ];
 
 const commandCenterLinks = [
   {
-    label: "Inicio",
-    description: "Vista general de mercados y señales",
-    href: "/",
+    label: "Analizar enlace",
+    description: "Detecta, confirma y analiza un mercado de Polymarket",
+    href: "/analyze",
+  },
+  {
+    label: "Historial",
+    description: "Lecturas guardadas y medicion con resultados reales",
+    href: "/history",
   },
   {
     label: "Mercados deportivos",
@@ -391,16 +396,6 @@ const commandCenterLinks = [
     label: "Alertas",
     description: "Recordatorios para revisar primero",
     href: "/alerts",
-  },
-  {
-    label: "Historial",
-    description: "Aciertos y fallos cuando existan resultados",
-    href: "/history",
-  },
-  {
-    label: "Analizar enlace",
-    description: "Comparar un enlace con mercados cargados",
-    href: "/analyze",
   },
 ];
 
@@ -2882,6 +2877,80 @@ function UpcomingPreviewCard({ market }: { market: UpcomingSportsMarket }) {
   );
 }
 
+function AnalyzerEntryPanel() {
+  const steps = [
+    {
+      label: "Pega un enlace",
+      text: "Usa un enlace de evento o mercado de Polymarket.",
+    },
+    {
+      label: "Confirma el mercado",
+      text: "Si el enlace contiene varias opciones, eliges una antes de analizar.",
+    },
+    {
+      label: "Guarda y mide",
+      text: "El historial conserva la lectura y la compara cuando haya resultado confiable.",
+    },
+  ];
+  const layers = [
+    "Mercado detectado",
+    "Probabilidad de Polymarket",
+    "Wallet Intelligence",
+    "Contexto del evento",
+    "Historial local",
+  ];
+
+  return (
+    <section className="home-analyzer-hero" aria-label="Analizador de enlaces">
+      <div className="home-analyzer-copy">
+        <p className="eyebrow">Flujo principal</p>
+        <h2>Analiza enlaces de Polymarket con mas contexto</h2>
+        <p>
+          Pega un enlace, confirma el mercado correcto y PolySignal organizara
+          las capas disponibles antes de guardar una lectura medible.
+        </p>
+        <div className="home-analyzer-actions">
+          <a className="watchlist-button active" href="/analyze">
+            Analizar enlace
+          </a>
+          <a className="analysis-link secondary" href="/history">
+            Ver historial
+          </a>
+          <a className="analysis-link secondary" href="/sports">
+            Explorar mercados
+          </a>
+        </div>
+        <p className="section-note">
+          PolySignal organiza senales disponibles; no garantiza resultados ni
+          ejecuta operaciones.
+        </p>
+      </div>
+      <div className="home-analyzer-preview" aria-label="Capas del analizador">
+        <div className="home-analyzer-preview-header">
+          <span className="badge external-hint">Detectar - Confirmar - Analizar</span>
+          <strong>Reporte compacto</strong>
+        </div>
+        <div className="home-analyzer-steps">
+          {steps.map((step, index) => (
+            <article key={step.label}>
+              <span>{index + 1}</span>
+              <div>
+                <strong>{step.label}</strong>
+                <p>{step.text}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="home-analyzer-layers">
+          {layers.map((layer) => (
+            <span key={layer}>{layer}</span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function HomeGuidancePanel({
   highlights,
   loading,
@@ -3339,8 +3408,8 @@ export default function DashboardPage() {
           <p className="eyebrow">PolySignal</p>
           <h1>Inicio</h1>
           <p className="subtitle">
-            Revisa mercados deportivos, tu lista y alertas en un solo lugar.
-            PolySignal es una herramienta de lectura y revisión manual.
+            El punto de entrada es el Analizador de enlaces: pega un enlace de
+            Polymarket, confirma el mercado y guarda la lectura para medirla con el tiempo.
           </p>
         </div>
         <div className="topbar-actions">
@@ -3356,22 +3425,28 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      <AnalyzerEntryPanel />
+
       <section className="safety-strip">
         <strong>Solo lectura:</strong>
         <span>
-          PolySignal organiza mercados para revisión manual. No es una recomendación
-          de apuesta y no ejecuta apuestas automáticas.
+          PolySignal organiza senales disponibles para revision manual. No es una
+          recomendacion de apuesta y no ejecuta apuestas automaticas.
         </span>
       </section>
 
       <nav className="command-center-link-grid" aria-label="Acciones principales">
-        <a className="command-center-link-card" href="/sports">
-          <strong>Ver mercados deportivos</strong>
-          <span>Partidos y precios activos por deporte.</span>
+        <a className="command-center-link-card primary" href="/analyze">
+          <strong>Analizar enlace</strong>
+          <span>Detecta el mercado, confirma una opcion y prepara una lectura compacta.</span>
         </a>
-        <a className="command-center-link-card" href="/briefing">
-          <strong>Ver resumen diario</strong>
-          <span>Lo más importante para revisar hoy.</span>
+        <a className="command-center-link-card" href="/history">
+          <strong>Ver historial</strong>
+          <span>Guarda lecturas y mide predicciones claras cuando haya resultado.</span>
+        </a>
+        <a className="command-center-link-card" href="/sports">
+          <strong>Explorar mercados</strong>
+          <span>Revisa mercados cargados si todavia no tienes un enlace.</span>
         </a>
         <a className="command-center-link-card" href="/alerts">
           <strong>Revisar alertas</strong>

@@ -294,6 +294,16 @@ export function AnalyzerReport({
   const walletLayer = findLayer(analyzerResult, "wallet_intelligence");
   const historyLayer = findLayer(analyzerResult, "history");
   const resolutionLayer = findLayer(analyzerResult, "resolution");
+  const saveActionLabel = saved
+    ? "Guardar nuevo analisis"
+    : analyzerResult.polySignalEstimateAvailable
+      ? "Guardar analisis"
+      : "Guardar como seguimiento";
+  const nextActionCopy = saved
+    ? "Ya esta guardado en Historial. Puedes revisar su estado, seguir el mercado o guardar una lectura nueva si quieres comparar cambios."
+    : analyzerResult.polySignalEstimateAvailable
+      ? "Guarda esta lectura para medirla cuando el mercado tenga resultado confiable."
+      : "No hay estimacion propia suficiente; puedes guardarlo como seguimiento sin convertirlo en prediccion.";
 
   return (
     <article className="analyzer-report-card">
@@ -310,7 +320,7 @@ export function AnalyzerReport({
           <h3>{marketTitle(item)}</h3>
           <p>{eventTitle(item)}</p>
           <small>
-            Fuente del enlace confirmada · {formatDate(latestUpdate(item))} · Coincidencia {matchScore}
+            Fuente del enlace confirmada - {formatDate(latestUpdate(item))} - Coincidencia {matchScore}
           </small>
         </div>
         <div className="analyzer-report-actions">
@@ -323,7 +333,7 @@ export function AnalyzerReport({
             onClick={() => onSaveHistory(item)}
             type="button"
           >
-            {saved ? "Guardar nueva lectura" : "Guardar analisis"}
+            {saveActionLabel}
           </button>
           <a className="analysis-link secondary" href="/history">
             Ver historial
@@ -356,7 +366,7 @@ export function AnalyzerReport({
             <span>Probabilidad del mercado</span>
             {probabilityState.market ? (
               <strong>
-                YES {formatProbability(probabilityState.market.yes)} · NO {formatProbability(probabilityState.market.no)}
+                YES {formatProbability(probabilityState.market.yes)} - NO {formatProbability(probabilityState.market.no)}
               </strong>
             ) : (
               <strong>Sin precio visible suficiente</strong>
@@ -367,7 +377,7 @@ export function AnalyzerReport({
             <span>Estimacion PolySignal</span>
             {probabilityState.polySignal ? (
               <strong>
-                YES {formatProbability(probabilityState.polySignal.yes)} · NO {formatProbability(probabilityState.polySignal.no)}
+                YES {formatProbability(probabilityState.polySignal.yes)} - NO {formatProbability(probabilityState.polySignal.no)}
               </strong>
             ) : (
               <strong>Sin estimacion propia suficiente</strong>
@@ -594,6 +604,43 @@ export function AnalyzerReport({
             </div>
           ) : null}
         </AnalyzerLayerDetails>
+      </section>
+
+      <section className="analyzer-next-actions" aria-label="Que puedes hacer ahora">
+        <div>
+          <p className="eyebrow">Siguiente paso</p>
+          <h4>Que puedes hacer ahora</h4>
+          <p>{nextActionCopy}</p>
+        </div>
+        <div className="watchlist-actions">
+          <button
+            className={`watchlist-button ${saved ? "" : "active"}`}
+            disabled={busy}
+            onClick={() => onSaveHistory(item)}
+            type="button"
+          >
+            {saveActionLabel}
+          </button>
+          <a className="analysis-link secondary" href="/history">
+            Ver historial
+          </a>
+          {item.market?.id ? (
+            <a className="analysis-link secondary" href={`/markets/${item.market.id}`}>
+              Ver detalle del mercado
+            </a>
+          ) : null}
+          <button
+            className={`watchlist-button ${watchlisted ? "active" : ""}`}
+            disabled={busy}
+            onClick={() => onToggleWatchlist(item)}
+            type="button"
+          >
+            {watchlisted ? "Siguiendo" : "Seguir mercado"}
+          </button>
+          <a className="analysis-link secondary" href="/analyze">
+            Analizar otro enlace
+          </a>
+        </div>
       </section>
     </article>
   );

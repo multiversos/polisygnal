@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con lectura profunda read-only y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `a7458dc`
+- ultimo deploy production verificado antes de este sprint: `98900e8`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -40,6 +40,10 @@ Endpoints backend sanos:
 
 Estado visible verificado:
 
+- `/` ahora posiciona el Analizador de enlaces como entrada principal del
+  producto: hero con CTA `Analizar enlace`, CTA a Historial, tres pasos
+  `Pega un enlace -> Confirma el mercado -> Guarda y mide` y resumen de capas
+  revisadas sin prometer resultados.
 - frontend publico con tema sobrio, deportes con iconos propios y navegacion publica limpia.
 - `/sports/soccer` muestra busqueda, filtros, ordenamiento, cards de partidos, mercados dentro de cada card y auto-refresh.
 - `/watchlist` esta disponible como Mi lista local del navegador.
@@ -48,6 +52,9 @@ Estado visible verificado:
   sin inventar resultados.
 - `/analyze` esta disponible para validar enlaces de Polymarket, compararlos con
   mercados ya cargados y guardar resultados locales en Historial.
+- El estado inicial de `/analyze` explica el flujo antes de pegar un enlace:
+  detectar mercado, confirmar si hay varias opciones, analizar solo el mercado
+  elegido y guardar la lectura para medirla con el tiempo.
 - `/analyze` ahora organiza el resultado como centro de analisis mediante
   `analyzerResult.ts`: mercado detectado, probabilidad de mercado, estimacion
   PolySignal si existe, contexto, investigacion, Wallet Intelligence, historial
@@ -61,6 +68,9 @@ Estado visible verificado:
   luego el usuario confirma un mercado antes de ejecutar el analisis profundo.
   Esto evita abrir multiples fichas completas para mercados relacionados pero
   incorrectos.
+- El selector posterior a la deteccion usa copy de confirmacion, marca una
+  opcion recomendada cuando hay un unico match exacto/fuerte y mantiene las
+  coincidencias secundarias en tarjetas compactas.
 - QA reciente endurecio el flujo exacto: los prefijos de liga como `lal` no se
   usan como terminos secundarios fuertes, los slugs genericos no inventan
   codigos de equipo y un `market_slug` exacto queda aislado antes del analisis
@@ -118,6 +128,12 @@ Estado visible verificado:
 - El guardado desde `/analyze` usa el resultado unificado para conservar en
   Historial un resumen local de capas y wallet summary agregado. No guarda
   payloads crudos ni direcciones completas.
+- `AnalyzerReport` cierra con `Que puedes hacer ahora`: guardar analisis o
+  seguimiento, ver historial, seguir mercado, ver detalle y analizar otro
+  enlace.
+- `/history` esta conectado de vuelta al analizador con CTA `Analizar nuevo
+  enlace`, empty state hacia `/analyze` y acciones `Reanalizar enlace` cuando
+  el registro local conserva URL.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion

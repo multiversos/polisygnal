@@ -520,6 +520,8 @@ function validateMarketDetailPage(dom, label) {
 function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(new URL("../app/components/AnalyzeLoadingPanel.tsx", import.meta.url), "utf8");
   const reportSource = readFileSync(new URL("../app/components/AnalyzerReport.tsx", import.meta.url), "utf8");
+  const homeSource = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const historySource = readFileSync(new URL("../app/history/page.tsx", import.meta.url), "utf8");
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
   const rankingSource = readFileSync(new URL("../app/lib/analyzerMatchRanking.ts", import.meta.url), "utf8");
   const linkSource = readFileSync(new URL("../app/lib/polymarketLink.ts", import.meta.url), "utf8");
@@ -588,8 +590,13 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("AnalyzerReport"), "analyze page does not render AnalyzerReport");
   assert(reportSource.includes("Resumen del analisis"), "AnalyzerReport missing executive summary");
   assert(reportSource.includes("Fuentes del analisis"), "AnalyzerReport missing source block");
+  assert(reportSource.includes("Que puedes hacer ahora"), "AnalyzerReport missing next actions");
+  assert(reportSource.includes("Analizar otro enlace"), "AnalyzerReport missing analyze another link action");
   assert(reportSource.includes("Ver todas las billeteras analizadas"), "AnalyzerReport missing wallet drilldown");
   assert(!reportSource.includes("wallet.walletAddress"), "AnalyzerReport should not render full wallet addresses");
+  assert(homeSource.includes("Analiza enlaces de Polymarket con mas contexto"), "home does not position analyzer as primary entry");
+  assert(homeSource.includes("Pega un enlace"), "home analyzer steps are missing");
+  assert(historySource.includes("Analizar nuevo enlace"), "history page does not link back to analyzer");
   assert(analyzePage.includes("analyzer-selection-card"), "analyze page does not render compact selector cards");
   assert(analyzePage.includes("Ver mercados deportivos"), "analyze no-match state does not offer a safe sports-market CTA");
   assert(rankingSource.includes("exactMarketMatches"), "analyzer ranking does not isolate exact market slug/id matches");
@@ -743,11 +750,19 @@ async function main() {
   const homeDom = await dumpDom(urlFor(HOME_PATH));
   const homeRender = validatePublicProductPage(homeDom, "home", [
     "Inicio",
-    "Ver mercados deportivos",
-    "Ver resumen diario",
+    "Analizar enlace",
+    "Mercados deportivos",
     "Revisar alertas",
   ]);
   const homeText = visibleText(homeDom);
+  assertTextIncludesOneOf(
+    homeText,
+    ["Analiza enlaces de Polymarket", "QuÃ© revisar ahora", "Qué revisar ahora"],
+    "home analyzer hero or current guidance",
+  );
+  assertTextIncludesOneOf(homeText, ["Pega un enlace", "Mercados destacados"], "home analyzer step");
+  assertTextIncludesOneOf(homeText, ["Confirma el mercado", "Movimientos recientes"], "home confirmation step");
+  assertTextIncludesOneOf(homeText, ["Guarda y mide", "PrÃ³ximos partidos", "Próximos partidos"], "home history measurement step");
   assertTextIncludesOneOf(homeText, REVIEW_NOW_TEXT, "home review block");
   assertTextIncludes(homeText, "Mercados destacados", "home live content");
   assertTextIncludes(homeText, "Movimientos recientes", "home recent activity");
@@ -847,7 +862,7 @@ async function main() {
   );
   assertTextIncludesOneOf(
     historyText,
-    ["Ver mercados deportivos", "Explorar futbol", "Explorar fÃºtbol"],
+    ["Analizar nuevo enlace", "Analizar enlace", "Explorar mercados", "Ver mercados deportivos"],
     "history market CTA",
   );
   assertTextIncludesOneOf(
@@ -896,6 +911,16 @@ async function main() {
     analyzeText,
     ["Pega un enlace", "Enlace de Polymarket"],
     "analyze input copy",
+  );
+  assertTextIncludesOneOf(
+    analyzeText,
+    ["Detectar, confirmar y analizar", "Detectar - Confirmar - Analizar", "Listo para comparar un enlace"],
+    "analyze flow explanation",
+  );
+  assertTextIncludesOneOf(
+    analyzeText,
+    ["Guardas la lectura", "historial local de este navegador", "Primero detectamos el evento"],
+    "analyze history connection copy",
   );
   assertTextIncludesOneOf(
     analyzeText,
@@ -953,13 +978,19 @@ async function main() {
   );
   assertTextIncludesOneOf(
     validAnalyzeText,
-    ["Mercado detectado", "No encontramos una coincidencia exacta", "Coincidencia encontrada", "Posibles coincidencias"],
+    [
+      "Confirma que mercado quieres analizar",
+      "Mercado detectado",
+      "No encontramos una coincidencia exacta",
+      "Coincidencia encontrada",
+      "Posibles coincidencias",
+    ],
     "analyze valid match state",
   );
   if (validAnalyzeNoMatch) {
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Guardar como pendiente", "Ver mercados deportivos"],
+      ["Guardar como pendiente", "Revisar enlace", "Ver mercados deportivos"],
       "analyze no-match compact actions",
     );
   } else {
@@ -1033,7 +1064,7 @@ async function main() {
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Guardar analisis", "Guardar análisis", "Guardado en historial", "Analizar este mercado"],
+      ["Guardar analisis", "Guardar análisis", "Guardar como seguimiento", "Guardado en historial", "Analizar este mercado"],
       "analyze save history action",
     );
   }
