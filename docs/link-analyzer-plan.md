@@ -9,8 +9,14 @@ Implemented as a frontend-only flow.
 - PolySignal validates that the link belongs to `polymarket.com`.
 - PolySignal parses the link into locale, category, league/sport, raw slug,
   event slug, market slug, date, team-code hints, and secondary search terms.
+- League prefixes from sports slugs, standalone years, standalone dates, and
+  one-team matches are treated as weak context only. They must not create a
+  primary match.
 - PolySignal compares the exact slug and date/team context against markets
   already loaded in the app.
+- Exact market slugs or exact local/remote ids isolate that single market in
+  the selector. Exact event slugs can show sibling markets from the same event,
+  but not unrelated matches from the same league or date.
 - The user flow is `Detectar -> Confirmar -> Analizar -> Guardar -> Verificar
   resultado`.
 - If there is a match, `/analyze` first shows a compact selector. It does not
@@ -83,9 +89,17 @@ Implemented as a frontend-only flow.
   confidence, threshold `$100+`, and shortened wallet addresses behind a
   drilldown labelled `Ver todas las billeteras analizadas`.
 - The report includes a compact data-sources row: market price from Polymarket,
-  market/event data from PolySignal plus Polymarket, wallet data from
-  Polymarket/Gamma read-only when available, external research as pending or
+  market/event data from Polymarket plus PolySignal, wallet data from public
+  Polymarket/Gamma read-only sources when available, external research as pending or
   verified, and history from this browser.
+- QA cases currently protected:
+  - `https://polymarket.com/es/sports/epl/epl-bri-wol-2026-05-09` shows a
+    compact selector with markets from that same event.
+  - `https://polymarket.com/market/epl-bri-wol-2026-05-09-bri` isolates the
+    exact market slug before deep analysis.
+  - `https://polymarket.com/es/sports/laliga/lal-cel-lev-2026-05-12` does not
+    surface Sevilla/Espanyol, Atletico/Celta, or other one-team/league/date
+    noise when that exact event is not loaded.
 - The final copy should read like a responsible review:
   "PolySignal reviso las capas disponibles" and, when needed, "No hay evidencia
   suficiente para emitir una estimacion propia responsable."

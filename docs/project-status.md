@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con lectura profunda read-only y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `918c0d0`
+- ultimo deploy production verificado antes de este sprint: `a7458dc`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -61,6 +61,10 @@ Estado visible verificado:
   luego el usuario confirma un mercado antes de ejecutar el analisis profundo.
   Esto evita abrir multiples fichas completas para mercados relacionados pero
   incorrectos.
+- QA reciente endurecio el flujo exacto: los prefijos de liga como `lal` no se
+  usan como terminos secundarios fuertes, los slugs genericos no inventan
+  codigos de equipo y un `market_slug` exacto queda aislado antes del analisis
+  profundo.
 - El parser de enlaces ahora extrae locale, categoria, liga/deporte, slug
   completo, fecha y codigos de equipos desde URLs como
   `/es/sports/laliga/lal-cel-lev-2026-05-12`. Liga, fecha sola, año o un solo

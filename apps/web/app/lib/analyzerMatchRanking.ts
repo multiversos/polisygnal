@@ -217,6 +217,20 @@ function scoreCandidate<TItem extends MarketOverviewItem>(
 function compactPrincipalCandidates<TItem extends MarketOverviewItem>(
   candidates: AnalyzerMatchCandidate<TItem>[],
 ): AnalyzerMatchCandidate<TItem>[] {
+  const exactMarketMatches = candidates.filter(
+    (candidate) =>
+      candidate.strength === "exact" &&
+      candidate.reasons.some(
+        (reason) =>
+          reason.includes("identificador remoto") ||
+          reason.includes("identificador local") ||
+          reason.includes("slug del mercado"),
+      ),
+  );
+  if (exactMarketMatches.length > 0) {
+    return exactMarketMatches.slice(0, 3);
+  }
+
   const exactOrStrong = candidates.filter((candidate) => candidate.strength === "exact" || candidate.strength === "strong");
   if (exactOrStrong.length > 0) {
     const exactEvent = exactOrStrong.find((candidate) => candidate.eventSlug)?.eventSlug;

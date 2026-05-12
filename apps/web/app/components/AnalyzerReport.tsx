@@ -212,7 +212,7 @@ function sourceLabel(summary: WalletIntelligenceSummary): string {
     return "pendiente";
   }
   if (summary.source === "backend") {
-    return "Polymarket/Gamma solo lectura";
+    return "datos publicos Polymarket/Gamma de solo lectura";
   }
   return "datos publicos cargados";
 }
@@ -394,9 +394,9 @@ export function AnalyzerReport({
       <section className="analyzer-source-strip" aria-label="Fuentes del analisis">
         <strong>Fuentes del analisis</strong>
         <span>Precio: Polymarket</span>
-        <span>Mercado/evento: PolySignal + Polymarket</span>
+        <span>Mercado/evento: Polymarket / PolySignal</span>
         <span>Billeteras: {sourceLabel(walletSummary)}</span>
-        <span>Resolucion: Polymarket/Gamma si esta disponible</span>
+        <span>Resolucion: Polymarket/Gamma si aplica</span>
         <span>Investigacion externa: {research.verifiedVisibleCount > 0 ? "fuentes verificadas" : "pendiente"}</span>
         <span>Historial: este navegador</span>
       </section>

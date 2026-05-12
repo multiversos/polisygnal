@@ -144,27 +144,53 @@ function extractDateFromSlug(slug?: string): string | undefined {
 function extractTeamCodesFromSlug(slug?: string, sportOrLeague?: string): string[] {
   const date = extractDateFromSlug(slug);
   const prefix = date && slug ? slug.slice(0, slug.indexOf(date)).replace(/-+$/g, "") : slug;
-  const parts = (prefix || "")
+  const rawParts = (prefix || "")
     .split("-")
     .map((part) => part.trim().toLowerCase())
-    .filter((part) => /^[a-z]{2,5}$/.test(part) && !STOP_WORDS.has(part));
+    .filter(Boolean);
+  const parts = rawParts.filter((part) => /^[a-z]{2,5}$/.test(part) && !STOP_WORDS.has(part));
+  if (!date || rawParts.length !== parts.length) {
+    return [];
+  }
   if (parts.length >= 3 && sportOrLeague) {
     const league = sportOrLeague.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (league.startsWith(parts[0]) || parts[0].startsWith(league.slice(0, 3))) {
       return Array.from(new Set(parts.slice(1, 3)));
     }
   }
-  if (parts.length >= 2) {
-    return Array.from(new Set(parts.slice(-2)));
+  if (parts.length === 3 && parts[0].length <= 4) {
+    return Array.from(new Set(parts.slice(1, 3)));
+  }
+  if (parts.length === 2) {
+    return Array.from(new Set(parts));
   }
   return [];
 }
 
+function getLeaguePrefixFromSlug(rawSlug?: string, sportOrLeague?: string): string | undefined {
+  const date = extractDateFromSlug(rawSlug);
+  if (!date || !rawSlug) {
+    return undefined;
+  }
+  const prefix = rawSlug.slice(0, rawSlug.indexOf(date)).replace(/-+$/g, "");
+  const parts = prefix.split("-").map((part) => part.trim().toLowerCase()).filter(Boolean);
+  const league = sportOrLeague?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (parts.length >= 3 && league && (league.startsWith(parts[0]) || parts[0].startsWith(league.slice(0, 3)))) {
+    return parts[0];
+  }
+  if (parts.length === 3 && /^[a-z]{2,4}$/.test(parts[0])) {
+    return parts[0];
+  }
+  return undefined;
+}
+
 function searchTermsFromLink(info: Pick<PolymarketLinkInfo, "dateFromSlug" | "rawSlug" | "sportOrLeague">): string[] {
   const year = info.dateFromSlug?.slice(0, 4);
+  const leaguePrefix = getLeaguePrefixFromSlug(info.rawSlug, info.sportOrLeague);
   const ignored = new Set(
     [
       info.sportOrLeague,
+      leaguePrefix,
       year,
       ...(info.dateFromSlug ? info.dateFromSlug.split("-") : []),
     ]

@@ -795,11 +795,12 @@ function MarketSelectionPanel({
               <article className="analyzer-selection-card" key={`${match.marketId}-${match.score}`}>
                 <div>
                   <span className={`market-status-badge ${statusInfo.tone}`}>{statusInfo.label}</span>
-                  <span className="badge muted">{matchStrengthLabel(match.strength)} · score {match.score}</span>
+                  <span className="badge muted">{matchStrengthLabel(match.strength)} - score {match.score}</span>
                 </div>
                 <h3>{match.title}</h3>
                 <p>{match.eventTitle || eventTitle(match.item)}</p>
                 <div className="history-card-metrics">
+                  <span>Fecha {formatDate(latestUpdate(match.item))}</span>
                   <span>Precio Si {formatPublicProbability(match.item.latest_snapshot?.yes_price)}</span>
                   <span>Precio No {formatPublicProbability(match.item.latest_snapshot?.no_price)}</span>
                   <span>Volumen {formatMetric(match.item.latest_snapshot?.volume)}</span>
@@ -846,6 +847,9 @@ function MarketSelectionPanel({
           >
             Guardar como pendiente
           </button>
+          <a className="analysis-link secondary" href="/sports/soccer">
+            Ver mercados deportivos
+          </a>
         </div>
       )}
     </section>

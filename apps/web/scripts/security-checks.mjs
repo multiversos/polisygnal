@@ -142,10 +142,19 @@ function validatePolymarketLinks() {
     JSON.stringify(parsedSports?.possibleTeamCodes) === JSON.stringify(["cel", "lev"]),
     `expected team codes cel/lev, got ${JSON.stringify(parsedSports?.possibleTeamCodes)}`,
   );
+  assert(
+    !parsedSports?.searchTerms.includes("lal"),
+    `expected league prefix not to become a secondary match term, got ${JSON.stringify(parsedSports?.searchTerms)}`,
+  );
   assert(extractPolymarketSlug(localizedSportsLink) === "lal-cel-lev-2026-05-12", "expected raw slug without league prefix");
   assert(!extractPossibleMarketTerms(localizedSportsLink).includes("laliga"), "expected league not to become a strong term");
+  const genericEvent = parsePolymarketLink("https://polymarket.com/event/nonexistent-market-for-polysignal-qa-2099-01-01");
+  assert(
+    genericEvent?.possibleTeamCodes.length === 0,
+    `expected generic event slug not to invent team codes, got ${JSON.stringify(genericEvent?.possibleTeamCodes)}`,
+  );
 
-  return { accepted: accepted.length, parsed_links: 8, rejected: rejected.length };
+  return { accepted: accepted.length, parsed_links: 9, rejected: rejected.length };
 }
 
 function validateAnalysisDecisionRules() {
@@ -866,6 +875,14 @@ function validateAnalyzerMatchRankingRules() {
     "expected league/date or one-team matches to be hidden",
   );
 
+  const exactMarketLink = "https://polymarket.com/market/lal-cel-lev-2026-05-12-celta-win";
+  const exactMarket = rankAnalyzerMatches(items, exactMarketLink);
+  assert(exactMarket.candidates.length === 1, `expected exact market link to show one candidate, got ${exactMarket.candidates.length}`);
+  assert(
+    exactMarket.candidates[0]?.marketSlug === "lal-cel-lev-2026-05-12-celta-win",
+    "expected exact market link to keep only the matching market",
+  );
+
   const possible = rankAnalyzerMatches(
     [
       {
@@ -884,7 +901,36 @@ function validateAnalyzerMatchRankingRules() {
   );
   assert(possible.candidates[0]?.strength === "possible", "expected team-only match to stay possible, not exact");
 
-  return { cases: 6 };
+  const oneTeamNoise = rankAnalyzerMatches(
+    [
+      {
+        market: {
+          active: true,
+          event_slug: "lal-atm-cel-2026-05-12",
+          event_title: "Atletico Madrid vs Celta de Vigo",
+          id: 6,
+          market_slug: "lal-atm-cel-2026-05-12-atletico-win",
+          question: "Atletico Madrid to win",
+          sport_type: "soccer",
+        },
+      },
+      {
+        market: {
+          active: true,
+          event_slug: "lal-sev-esp-2026-05-12",
+          event_title: "Sevilla vs Espanyol",
+          id: 7,
+          market_slug: "lal-sev-esp-2026-05-12-sevilla-win",
+          question: "Sevilla to win",
+          sport_type: "soccer",
+        },
+      },
+    ],
+    link,
+  );
+  assert(oneTeamNoise.candidates.length === 0, "expected league/date/one-team noise not to become visible candidates");
+
+  return { cases: 8 };
 }
 
 async function validatePolymarketResolutionAdapter() {

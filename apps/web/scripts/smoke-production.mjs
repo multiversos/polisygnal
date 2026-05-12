@@ -521,6 +521,8 @@ function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(new URL("../app/components/AnalyzeLoadingPanel.tsx", import.meta.url), "utf8");
   const reportSource = readFileSync(new URL("../app/components/AnalyzerReport.tsx", import.meta.url), "utf8");
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
+  const rankingSource = readFileSync(new URL("../app/lib/analyzerMatchRanking.ts", import.meta.url), "utf8");
+  const linkSource = readFileSync(new URL("../app/lib/polymarketLink.ts", import.meta.url), "utf8");
   const expectedSteps = [
     "Detectando enlace",
     "Resolviendo mercado/evento",
@@ -588,10 +590,21 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Fuentes del analisis"), "AnalyzerReport missing source block");
   assert(reportSource.includes("Ver todas las billeteras analizadas"), "AnalyzerReport missing wallet drilldown");
   assert(!reportSource.includes("wallet.walletAddress"), "AnalyzerReport should not render full wallet addresses");
+  assert(analyzePage.includes("analyzer-selection-card"), "analyze page does not render compact selector cards");
+  assert(analyzePage.includes("Ver mercados deportivos"), "analyze no-match state does not offer a safe sports-market CTA");
+  assert(rankingSource.includes("exactMarketMatches"), "analyzer ranking does not isolate exact market slug/id matches");
+  assert(rankingSource.includes("slug del mercado"), "analyzer ranking does not protect exact market slugs");
+  assert(linkSource.includes("getLeaguePrefixFromSlug"), "polymarket link parser does not strip league prefixes from weak terms");
+  assert(linkSource.includes("rawParts.length !== parts.length"), "polymarket link parser may infer team codes from generic slugs");
   assert(analyzePage.includes('advancePhase("matching")'), "analyze page does not drive matching phase");
   assert(analyzePage.includes('advancePhase("preparing")'), "analyze page does not drive preparing phase");
 
-  return { guided_loading_panel_found: true, phases: expectedSteps.length, skeletons: expectedSkeletons.length };
+  return {
+    exact_flow_source_checks: true,
+    guided_loading_panel_found: true,
+    phases: expectedSteps.length,
+    skeletons: expectedSkeletons.length,
+  };
 }
 
 function validateBuildInfo(buildInfo) {
