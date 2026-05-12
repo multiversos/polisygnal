@@ -523,7 +523,6 @@ function validateAnalyzeLoadingPanelSource() {
   const homeSource = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   const historySource = readFileSync(new URL("../app/history/page.tsx", import.meta.url), "utf8");
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
-  const rankingSource = readFileSync(new URL("../app/lib/analyzerMatchRanking.ts", import.meta.url), "utf8");
   const linkSource = readFileSync(new URL("../app/lib/polymarketLink.ts", import.meta.url), "utf8");
   const expectedSteps = [
     "Detectando enlace",
@@ -571,7 +570,11 @@ function validateAnalyzeLoadingPanelSource() {
   assert(!source.includes("100%"), "analyze loading panel should not display invented 100% progress");
   assert(analyzePage.includes("AnalyzeLoadingPanel"), "analyze page does not render AnalyzeLoadingPanel");
   assert(analyzePage.includes("MarketSelectionPanel"), "analyze page does not render market selector");
-  assert(analyzePage.includes("rankAnalyzerMatches"), "analyze page does not use strict match ranking");
+  assert(analyzePage.includes("/api/analyze-polymarket-link"), "analyze page does not use the safe Polymarket resolver route");
+  assert(analyzePage.includes("resolvePolymarketLinkForAnalyze"), "analyze page does not resolve links from Polymarket first");
+  assert(!analyzePage.includes("/markets/overview"), "analyze page must not use internal overview as primary matching source");
+  assert(!analyzePage.includes("rankAnalyzerMatches"), "analyze page must not use internal ranking as primary matching source");
+  assert(!analyzePage.includes("fetchComparableMarkets"), "analyze page must not fetch internal comparable markets");
   assert(analyzePage.includes("analyzeSelectedMarket"), "analyze page does not gate deep analysis behind selection");
   assert(!analyzePage.includes("enrichMatchesWithWalletIntelligence(matches)"), "wallet intelligence should not load for all matches");
   assert(analyzePage.includes("buildAnalyzerResult"), "analyze page does not use unified analyzer result");
