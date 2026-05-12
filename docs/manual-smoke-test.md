@@ -286,84 +286,89 @@ If this test fails, stop feature work and treat it as a production regression.
     Confirm it resolves to Celta/Levante from Polymarket or shows an honest
     unavailable state. It must not show other LaLiga matches that only share
     league/date/one team.
-21. For an exact market link, confirm the selector isolates that market when
-    Gamma returns it through the structured market lookup.
+21. Test exact market link
+    `https://polymarket.com/market/lal-cel-lev-2026-05-12-cel`.
+    Confirm it isolates that single market when Gamma returns it directly or
+    through the parent event response. It must not show sibling draw/Levante
+    markets unless the pasted link is the event link.
 22. Confirm the selector cards are compact: title, event, match reason, date,
     real outcomes/prices when available, and an `Analizar este mercado` action.
-23. Click `Analizar este mercado` and confirm the deep analysis appears for one
+23. If an event returns many markets, confirm the selector has a local filter and
+   `Ver mas mercados` instead of opening many reports.
+24. Click `Analizar este mercado` and confirm the deep analysis appears for one
    selected market only.
-24. Confirm Wallet Intelligence appears only after selecting/analyzing a market,
+25. Confirm Wallet Intelligence appears only after selecting/analyzing a market,
    not for every secondary candidate.
-25. If a market is found, confirm it shows `Probabilidad del mercado` with YES
+26. If a market is found, confirm it shows `Probabilidad del mercado` with YES
    and NO values only when visible prices exist.
-26. If a market has non-YES/NO outcomes such as Thunder/Lakers or Over/Under,
+27. If a market has non-YES/NO outcomes such as Thunder/Lakers or Over/Under,
    confirm those real outcome labels are shown instead of inventing YES/NO
    labels.
-27. Confirm the selected result is organized as an `AnalyzerReport` style
+28. Confirm the selected result is organized as an `AnalyzerReport` style
    report with `Centro de analisis`, `Resumen del analisis`, `Que encontro
    PolySignal`, `Capas revisadas`, and `Fuentes del analisis`.
-28. Confirm `Probabilidad del mercado` is described as based on the visible
+29. Confirm `Probabilidad del mercado` is described as based on the visible
    market price, not as a PolySignal estimate.
-29. Confirm `Estimacion PolySignal` appears only when an estimate already exists
+30. Confirm `Estimacion PolySignal` appears only when an estimate already exists
    in the loaded data. If it is missing, confirm the page says it does not have
    enough estimation yet.
-30. Confirm a market-price-only match does not show the same value as a
+31. Confirm a market-price-only match does not show the same value as a
    PolySignal estimate and does not show a `0.0 pts` difference as useful
    analysis.
-31. Confirm `Preparacion de estimacion PolySignal` or equivalent readiness copy
+32. Confirm `Preparacion de estimacion PolySignal` or equivalent readiness copy
    appears inside a compact/collapsible layer and lists whether independent
    signals are available.
-32. Confirm `Contexto del partido` appears for matched soccer markets inside a
+33. Confirm `Contexto del partido` appears for matched soccer markets inside a
    compact/collapsible layer and shows only available data: teams from title,
    date if present, sport, and missing league/home-away/form/injury/odds fields.
-33. Confirm `Preparacion de datos` is presented as data availability, not as a
+34. Confirm `Preparacion de datos` is presented as data availability, not as a
    probability of winning.
-34. Confirm no league, local/visitor role, recent form, injuries, suspensions,
+35. Confirm no league, local/visitor role, recent form, injuries, suspensions,
    or external odds are invented.
-35. Confirm `Investigacion externa` is visible and shows missing categories
+36. Confirm `Investigacion externa` is visible and shows missing categories
    rather than fake sources.
-36. Confirm it says there are no verified external sources if no real findings
+37. Confirm it says there are no verified external sources if no real findings
    are loaded.
-37. Confirm `Inteligencia de billeteras` is visible as a compact auxiliary
+38. Confirm `Inteligencia de billeteras` is visible as a compact auxiliary
    layer.
-38. If wallet data exists, confirm it shows only shortened wallet addresses,
+39. If wallet data exists, confirm it shows only shortened wallet addresses,
    threshold `$100+`, capital observed, YES/NO/Neutral bias, confidence, and
    auxiliary-signal copy.
-39. If no wallet data exists, confirm it says pending or unavailable without
+40. If no wallet data exists, confirm it says pending or unavailable without
    breaking the analysis result.
-40. Confirm it does not show fake wallets, full wallet addresses, ROI, win rate,
+41. Confirm it does not show fake wallets, full wallet addresses, ROI, win rate,
    or copied-trader advice.
-41. Confirm it says public wallet activity is not mapped to real people and that
+42. Confirm it says public wallet activity is not mapped to real people and that
    the signal is auxiliary, not a prediction or recommendation.
-42. Open `Ver todas las billeteras analizadas` when wallet data exists and
+43. Open `Ver todas las billeteras analizadas` when wallet data exists and
    confirm the drilldown stays compact, uses shortened addresses only, and does
    not show fake ROI or win-rate values.
-43. Confirm `Historial relacionado` is visible. If the market was analyzed
+44. Confirm `Historial relacionado` is visible. If the market was analyzed
    before, it should show the latest local record; otherwise it should say the
    market is not in local history yet.
-44. Confirm `Decision de PolySignal` follows the 55% threshold:
+45. Confirm `Decision de PolySignal` follows the 55% threshold:
    YES `>=55%` is clear YES, NO `>=55%` is clear NO, and 45/55 is `Sin decision fuerte`.
-45. Confirm market price alone never creates a PolySignal predicted side.
-46. Confirm it shows only real visible data: title, event, status, price if
+46. Confirm market price alone never creates a PolySignal predicted side.
+47. Confirm it shows only real visible data: title, event, status, price if
    available, volume/liquidity if available, and last update.
-47. Confirm it offers `Que puedes hacer ahora` with `Guardar analisis` or
+48. Confirm it offers `Que puedes hacer ahora` with `Guardar analisis` or
    `Guardar como seguimiento`, `Ver historial`, `Ver detalle`, `Seguir mercado`,
    and `Analizar otro enlace` when a market is matched.
-48. Save the analysis, open `/history`, and confirm the item appears as
+49. Save the analysis, open `/history`, and confirm the item appears as
    `Desde enlace`.
-49. Confirm the saved history item shows market YES/NO probability if it was
+50. Confirm the saved history item shows market YES/NO probability if it was
     available, and PolySignal YES/NO only if it existed.
-50. Confirm `/history` shows whether the item counts for precision or does not
+51. Confirm `/history` shows whether the item counts for precision or does not
     count yet.
-51. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
+52. Confirm `/history` shows `Comparacion mercado vs PolySignal` without
     inventing data when there are not enough comparable records.
-52. Confirm a no-match link can only be saved as pending and does not invent a
+53. Confirm a no-match link can only be saved as pending and does not invent a
    probability.
-53. Confirm the page does not promise profit, certainty, or betting advice.
-54. Confirm the saved record only gets a PolySignal predicted side when a real
+54. Confirm the page does not promise profit, certainty, or betting advice.
+55. Confirm the saved record only gets a PolySignal predicted side when a real
     PolySignal estimate crossed the 55% threshold. Market price alone must not
     create a predicted side.
-55. Confirm saved matched records preserve Polymarket identifiers when available
+56. Confirm saved matched records preserve Polymarket identifiers when available
     so Historial can later verify outcomes automatically.
 
 ## Alertas

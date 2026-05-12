@@ -1014,6 +1014,56 @@ async function validatePolymarketLinkResolverRules() {
   assert(overview.market.outcomes.length === 2, "expected outcome prices to be preserved");
   assert(calls.length === 1, `expected one Gamma call, got ${calls.length}`);
 
+  const marketCalls = [];
+  const exactMarket = await resolvePolymarketLink(
+    { url: "https://polymarket.com/market/lal-cel-lev-2026-05-12-cel" },
+    async (url, init) => {
+      marketCalls.push({ init, url: String(url) });
+      assert(String(url).startsWith("https://gamma-api.polymarket.com/"), `unexpected exact market resolver URL ${url}`);
+      assert(init.credentials === "omit", "expected exact market resolver fetch to omit credentials");
+      assert(init.redirect === "error", "expected exact market resolver fetch to reject redirects");
+      if (String(url).startsWith("https://gamma-api.polymarket.com/markets?slug=")) {
+        return new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" }, status: 200 });
+      }
+      return new Response(
+        JSON.stringify([
+          {
+            slug: "lal-cel-lev-2026-05-12",
+            startTime: "2026-05-12T17:00:00Z",
+            tags: [{ label: "Sports", slug: "sports" }, { label: "La Liga", slug: "soccer" }],
+            title: "RC Celta de Vigo vs. Levante UD",
+            markets: [
+              {
+                active: true,
+                closed: true,
+                id: "2113258",
+                outcomePrices: "[\"0\", \"1\"]",
+                outcomes: "[\"Yes\", \"No\"]",
+                question: "Will RC Celta de Vigo win on 2026-05-12?",
+                slug: "lal-cel-lev-2026-05-12-cel",
+              },
+              {
+                active: true,
+                closed: true,
+                id: "2113259",
+                outcomePrices: "[\"0\", \"1\"]",
+                outcomes: "[\"Yes\", \"No\"]",
+                question: "Will RC Celta de Vigo vs. Levante UD end in a draw?",
+                slug: "lal-cel-lev-2026-05-12-draw",
+              },
+            ],
+          },
+        ]),
+        { headers: { "Content-Type": "application/json" }, status: 200 },
+      );
+    },
+  );
+  assert(exactMarket.status === "ok", `expected exact market fallback to resolve, got ${exactMarket.status}`);
+  assert(exactMarket.marketSlug === "lal-cel-lev-2026-05-12-cel", "expected exact market slug to be preserved");
+  assert(exactMarket.markets.length === 1, `expected exact market fallback to return one market, got ${exactMarket.markets.length}`);
+  assert(exactMarket.markets[0]?.slug === "lal-cel-lev-2026-05-12-cel", "expected exact market fallback to keep only the requested market");
+  assert(marketCalls.length === 2, `expected market lookup then event fallback, got ${marketCalls.length} calls`);
+
   const notFound = await resolvePolymarketLink(
     { url: "https://polymarket.com/es/sports/laliga/lal-cel-lev-2099-01-01" },
     async () => new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" }, status: 200 }),
@@ -1021,7 +1071,7 @@ async function validatePolymarketLinkResolverRules() {
   assert(notFound.status === "not_found", `expected not_found without internal fallback, got ${notFound.status}`);
   assert(notFound.markets.length === 0, "not_found resolver result must not invent markets");
 
-  return { live_source: "gamma", no_cross_sport_fallback: true, resolver_cases: 3 };
+  return { live_source: "gamma", no_cross_sport_fallback: true, resolver_cases: 4 };
 }
 
 async function validatePolymarketResolutionAdapter() {
@@ -1173,6 +1223,43 @@ async function validateAnalyzePolymarketLinkRoute() {
     const calls = [];
     globalThis.fetch = async (url, init) => {
       calls.push({ init, url: String(url) });
+      if (String(url).startsWith("https://gamma-api.polymarket.com/markets?slug=")) {
+        return new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" }, status: 200 });
+      }
+      if (String(url).includes("slug=lal-cel-lev-2026-05-12")) {
+        return new Response(
+          JSON.stringify([
+            {
+              slug: "lal-cel-lev-2026-05-12",
+              startTime: "2026-05-12T17:00:00Z",
+              tags: [{ label: "Sports", slug: "sports" }, { label: "La Liga", slug: "soccer" }],
+              title: "RC Celta de Vigo vs. Levante UD",
+              markets: [
+                {
+                  active: true,
+                  closed: true,
+                  id: "2113258",
+                  outcomePrices: "[\"0\", \"1\"]",
+                  outcomes: "[\"Yes\", \"No\"]",
+                  question: "Will RC Celta de Vigo win on 2026-05-12?",
+                  rawPayloadShouldNotLeak: "SECRET",
+                  slug: "lal-cel-lev-2026-05-12-cel",
+                },
+                {
+                  active: true,
+                  closed: true,
+                  id: "2113260",
+                  outcomePrices: "[\"1\", \"0\"]",
+                  outcomes: "[\"Yes\", \"No\"]",
+                  question: "Will Levante UD win on 2026-05-12?",
+                  slug: "lal-cel-lev-2026-05-12-lev",
+                },
+              ],
+            },
+          ]),
+          { headers: { "Content-Type": "application/json" }, status: 200 },
+        );
+      }
       return new Response(
         JSON.stringify([
           {
@@ -1223,12 +1310,26 @@ async function validateAnalyzePolymarketLinkRoute() {
     assert(!JSON.stringify(body).includes("SECRET"), "analyze route leaked raw payload");
     assert(!JSON.stringify(body).includes("Sevilla"), "analyze route included unrelated soccer market");
     assert(String(calls[0]?.url).startsWith("https://gamma-api.polymarket.com/events?slug="), "route did not call allowlisted Gamma events endpoint");
+
+    const marketResolved = await route.POST(
+      new Request("https://example.test/api/analyze-polymarket-link", {
+        body: JSON.stringify({ url: "https://polymarket.com/market/lal-cel-lev-2026-05-12-cel" }),
+        method: "POST",
+      }),
+    );
+    assert(marketResolved.status === 200, `expected analyze route exact market to return 200, got ${marketResolved.status}`);
+    const marketBody = await marketResolved.json();
+    assert(marketBody.status === "ok", `expected exact market route ok status, got ${marketBody.status}`);
+    assert(marketBody.marketSlug === "lal-cel-lev-2026-05-12-cel", `unexpected exact market slug ${marketBody.marketSlug}`);
+    assert(marketBody.markets?.length === 1, `expected exact market route to return one market, got ${marketBody.markets?.length}`);
+    assert(marketBody.markets?.[0]?.slug === "lal-cel-lev-2026-05-12-cel", "exact market route returned a sibling market");
+    assert(!JSON.stringify(marketBody).includes("SECRET"), "exact market route leaked raw payload");
     assert(route.GET().status === 405, "expected analyze route GET to be rejected");
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  return { route_checks: 5 };
+  return { route_checks: 6 };
 }
 
 async function validateBackendProxy() {

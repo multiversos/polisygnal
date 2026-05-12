@@ -98,6 +98,9 @@ Controls:
 - extracts the Polymarket slug and builds the Gamma request internally;
 - calls only `https://gamma-api.polymarket.com/events?slug=...` or
   `https://gamma-api.polymarket.com/markets?slug=...`;
+- for exact `/market/...` links, may derive the parent event slug from the same
+  dated market slug and then keep only the exact requested market from the Gamma
+  event response;
 - uses short timeout, `no-store`, no cookies, no credentials, and redirects
   disabled;
 - limits response size before parsing;

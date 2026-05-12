@@ -12,6 +12,7 @@ import { getPolySignalDecision } from "../lib/analysisDecision";
 import {
   getPolymarketUrlValidationMessage,
   extractPolymarketSlug,
+  parsePolymarketLink,
 } from "../lib/polymarketLink";
 import {
   resolvedMarketToOverviewItem,
@@ -280,14 +281,16 @@ function buildMatchesFromPolymarketResult(result: PolymarketLinkResolveResult): 
 }
 
 async function enrichMatchWithWalletIntelligence(match: MatchResult): Promise<MatchResult> {
-  if (!match.item.market?.id) {
+  const market = match.item.market;
+  const marketId = market?.id ? String(market.id) : market?.remote_id ?? undefined;
+  if (!marketId || !/^\d+$/.test(marketId)) {
     return match;
   }
   const summary = await getWalletIntelligenceForMarket({
-    eventSlug: match.item.market.event_slug ?? undefined,
-    marketId: String(match.item.market.id),
-    marketSlug: match.item.market.market_slug ?? undefined,
-    remoteId: match.item.market.remote_id ?? undefined,
+    eventSlug: market?.event_slug ?? undefined,
+    marketId,
+    marketSlug: market?.market_slug ?? undefined,
+    remoteId: market?.remote_id ?? undefined,
   });
   return {
     ...match,
@@ -809,6 +812,34 @@ function matchStrengthLabel(strength: MatchResult["strength"]): string {
   return "Descartada";
 }
 
+function marketGroupLabel(match: MatchResult): string {
+  const text = `${match.title} ${match.marketSlug ?? ""}`.toLowerCase();
+  if (/\b(o\/u|over|under|total)\b/.test(text)) {
+    return "Total";
+  }
+  if (/\b(spread|handicap)\b|\([+-]?\d/.test(text)) {
+    return "Spread";
+  }
+  if (/\b(draw|empate|win|winner|moneyline)\b|\bvs\.?\b/.test(text)) {
+    return "Ganador";
+  }
+  return "Otros";
+}
+
+function searchableMarketText(match: MatchResult): string {
+  return [
+    match.title,
+    match.eventTitle,
+    match.marketSlug,
+    match.eventSlug,
+    marketGroupLabel(match),
+    outcomeSummary(match.item),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 function MarketSelectionPanel({
   busy,
   matches,
@@ -816,6 +847,7 @@ function MarketSelectionPanel({
   normalizedUrl,
   onAnalyze,
   onReviewLink,
+  onRetry,
   onSavePending,
   status,
 }: {
@@ -825,12 +857,25 @@ function MarketSelectionPanel({
   normalizedUrl: string;
   onAnalyze: (match: MatchResult) => void;
   onReviewLink: () => void;
+  onRetry: () => void;
   onSavePending: () => void;
   status: "needs_selection" | "no_exact_match";
 }) {
+  const [query, setQuery] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const linkInfo = useMemo(() => parsePolymarketLink(normalizedUrl), [normalizedUrl]);
   const recommended =
     matches.length === 1 &&
     (matches[0].strength === "exact" || matches[0].strength === "strong");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredMatches = useMemo(() => {
+    if (!normalizedQuery) {
+      return matches;
+    }
+    return matches.filter((match) => searchableMarketText(match).includes(normalizedQuery));
+  }, [matches, normalizedQuery]);
+  const selectionLimit = matches.length > 8 ? 8 : 5;
+  const visibleMatches = showAll ? filteredMatches : filteredMatches.slice(0, selectionLimit);
   const title =
     status === "needs_selection"
       ? "Confirma que mercado quieres analizar"
@@ -858,53 +903,92 @@ function MarketSelectionPanel({
         <p>
           Enlace normalizado: <span>{normalizedUrl}</span>
         </p>
+        {linkInfo ? (
+          <div className="data-health-notes">
+            {linkInfo.category ? <span className="badge muted">Categoria {linkInfo.category}</span> : null}
+            {linkInfo.sportOrLeague ? <span className="badge muted">Deporte/liga {linkInfo.sportOrLeague}</span> : null}
+            {linkInfo.rawSlug ? <span className="badge muted">Slug {linkInfo.rawSlug}</span> : null}
+          </div>
+        ) : null}
       </div>
       {matches.length > 0 ? (
-        <div className="analyzer-selection-list">
-          {matches.slice(0, 5).map((match) => {
-            const statusInfo = getPublicMarketStatus(insightInput(match.item));
-            return (
-              <article className="analyzer-selection-card" key={`${match.marketId}-${match.score}`}>
-                <div>
-                  <span className={`market-status-badge ${statusInfo.tone}`}>{statusInfo.label}</span>
-                  <span className="badge muted">{matchStrengthLabel(match.strength)} - score {match.score}</span>
-                  {recommended ? <span className="badge external-hint">Recomendado</span> : null}
-                </div>
-                <h3>{match.title}</h3>
-                <p>{match.eventTitle || eventTitle(match.item)}</p>
-                <div className="history-card-metrics">
-                  <span>Fecha {formatDate(latestUpdate(match.item))}</span>
-                  <span>{outcomeSummary(match.item)}</span>
-                  <span>Volumen {formatMetric(match.item.latest_snapshot?.volume)}</span>
-                  <span>Liquidez {formatMetric(match.item.latest_snapshot?.liquidity)}</span>
-                </div>
-                <div className="data-health-notes">
-                  {match.reasons.slice(0, 3).map((reason) => (
-                    <span className="badge" key={reason}>{reason}</span>
-                  ))}
-                  {match.warnings.slice(0, 2).map((warning) => (
-                    <span className="badge muted" key={warning}>{warning}</span>
-                  ))}
-                </div>
-                <div className="watchlist-actions">
-                  <button
-                    className="watchlist-button active"
-                    disabled={busy}
-                    onClick={() => onAnalyze(match)}
-                    type="button"
-                  >
-                    Analizar este mercado
-                  </button>
-                  {match.item.market?.id ? (
-                    <a className="analysis-link secondary" href={`/markets/${match.item.market.id}`}>
-                      Ver detalle
-                    </a>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
-        </div>
+        <>
+          {matches.length > 8 ? (
+            <label className="analyzer-selection-search">
+              Buscar dentro del evento
+              <input
+                aria-label="Buscar mercado dentro del evento"
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setShowAll(false);
+                }}
+                placeholder="Ganador, spread, total, equipo..."
+                value={query}
+              />
+            </label>
+          ) : null}
+          <div className="analyzer-selection-list">
+            {visibleMatches.map((match) => {
+              const statusInfo = getPublicMarketStatus(insightInput(match.item));
+              return (
+                <article className="analyzer-selection-card" key={`${match.marketId}-${match.score}`}>
+                  <div>
+                    <span className={`market-status-badge ${statusInfo.tone}`}>{statusInfo.label}</span>
+                    <span className="badge muted">{matchStrengthLabel(match.strength)} - score {match.score}</span>
+                    <span className="badge muted">{marketGroupLabel(match)}</span>
+                    {recommended ? <span className="badge external-hint">Recomendado</span> : null}
+                  </div>
+                  <h3>{match.title}</h3>
+                  <p>{match.eventTitle || eventTitle(match.item)}</p>
+                  <div className="history-card-metrics">
+                    <span>Fecha {formatDate(latestUpdate(match.item))}</span>
+                    <span>{outcomeSummary(match.item)}</span>
+                    <span>Volumen {formatMetric(match.item.latest_snapshot?.volume)}</span>
+                    <span>Liquidez {formatMetric(match.item.latest_snapshot?.liquidity)}</span>
+                  </div>
+                  <div className="data-health-notes">
+                    {match.reasons.slice(0, 3).map((reason) => (
+                      <span className="badge" key={reason}>{reason}</span>
+                    ))}
+                    {match.warnings.slice(0, 2).map((warning) => (
+                      <span className="badge muted" key={warning}>{warning}</span>
+                    ))}
+                  </div>
+                  <div className="watchlist-actions">
+                    <button
+                      className="watchlist-button active"
+                      disabled={busy}
+                      onClick={() => onAnalyze(match)}
+                      type="button"
+                    >
+                      Analizar este mercado
+                    </button>
+                    {match.item.market?.id ? (
+                      <a className="analysis-link secondary" href={`/markets/${match.item.market.id}`}>
+                        Ver detalle
+                      </a>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          {filteredMatches.length === 0 ? (
+            <div className="empty-state compact">
+              <strong>No hay mercados que coincidan con ese filtro.</strong>
+              <p>La busqueda solo filtra las opciones que Polymarket devolvio para este evento.</p>
+            </div>
+          ) : null}
+          {filteredMatches.length > selectionLimit ? (
+            <button
+              className="watchlist-button"
+              onClick={() => setShowAll((current) => !current)}
+              type="button"
+            >
+              {showAll ? "Mostrar menos" : `Ver mas mercados (${filteredMatches.length - selectionLimit})`}
+            </button>
+          ) : null}
+        </>
       ) : (
         <div className="empty-state compact">
           <strong>No pudimos obtener este mercado desde Polymarket.</strong>
@@ -912,22 +996,35 @@ function MarketSelectionPanel({
             No vamos a buscar un mercado parecido en los datos internos ni a mezclar deportes.
             Puedes guardar el enlace como pendiente sin inventar mercado, fecha ni precio.
           </p>
-          <button
-            className="watchlist-button"
-            disabled={busy}
-            onClick={onSavePending}
-            type="button"
-          >
-            Guardar como pendiente
-          </button>
-          <button
-            className="watchlist-button"
-            disabled={busy}
-            onClick={onReviewLink}
-            type="button"
-          >
-            Revisar enlace
-          </button>
+          <div className="watchlist-actions">
+            <button
+              className="watchlist-button"
+              disabled={busy}
+              onClick={onRetry}
+              type="button"
+            >
+              Intentar de nuevo
+            </button>
+            <button
+              className="watchlist-button"
+              disabled={busy}
+              onClick={onSavePending}
+              type="button"
+            >
+              Guardar como pendiente
+            </button>
+            <button
+              className="watchlist-button"
+              disabled={busy}
+              onClick={onReviewLink}
+              type="button"
+            >
+              Revisar enlace
+            </button>
+            <a className="analysis-link secondary" href={normalizedUrl} rel="noreferrer" target="_blank">
+              Abrir Polymarket
+            </a>
+          </div>
         </div>
       )}
     </section>
@@ -1530,6 +1627,7 @@ export default function AnalyzePage() {
           normalizedUrl={state.normalizedUrl}
           onAnalyze={(match) => void analyzeSelectedMarket(match, state.normalizedUrl)}
           onReviewLink={handleClear}
+          onRetry={() => void runAnalysis(state.normalizedUrl)}
           onSavePending={() => void handleSavePending()}
           status={state.status}
         />

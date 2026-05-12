@@ -20,9 +20,12 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
   an allowlisted Gamma request internally, and returns normalized event/market
   data only. It is not an open proxy.
 - Exact event links resolve through Gamma `/events?slug=...`; exact market links
-  resolve through Gamma `/markets?slug=...` when supported.
+  first try Gamma `/markets?slug=...`. If that structured market lookup returns
+  empty but the dated market slug contains an event slug, the resolver queries
+  that Gamma event and keeps only the exact requested market slug.
 - If Gamma returns an event with several markets, the selector shows only those
-  markets from that real event.
+  markets from that real event. Large event selectors stay compact with a
+  local filter and a `Ver mas mercados` control.
 - If Gamma cannot return the event or market, `/analyze` shows a no-match state:
   "No pudimos obtener este mercado desde Polymarket." It does not search
   internally for similar markets.
@@ -118,6 +121,9 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
     from Gamma to the Celta/Levante event or shows an honest unavailable state;
     it must not surface Sevilla/Espanyol, Atletico/Celta, or other unrelated
     matches.
+  - `https://polymarket.com/market/lal-cel-lev-2026-05-12-cel` resolves as one
+    exact Celta market when Gamma exposes it through the event response; sibling
+    draw/Levante markets remain in the event selector only for event links.
   - Malicious URLs such as `polymarket.com.evil.com`, credentials, private IPs,
     custom ports, and dangerous schemes are rejected before any outbound request.
 - The final copy should read like a responsible review:

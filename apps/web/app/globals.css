@@ -8427,6 +8427,29 @@ html:not([data-theme="dark"]) .app-sidebar {
   gap: 10px;
 }
 
+.analyzer-selection-search {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.analyzer-selection-search input {
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+}
+
 .analyzer-selection-card {
   display: grid;
   gap: 10px;

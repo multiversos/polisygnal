@@ -270,6 +270,12 @@ function normalizeEvents(payload: unknown): GammaEventPayload[] {
     return payload.filter((item): item is GammaEventPayload => Boolean(item) && typeof item === "object");
   }
   if (payload && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    for (const key of ["events", "data", "items", "results"]) {
+      if (Array.isArray(record[key])) {
+        return record[key].filter((item): item is GammaEventPayload => Boolean(item) && typeof item === "object");
+      }
+    }
     return [payload as GammaEventPayload];
   }
   return [];
@@ -280,6 +286,12 @@ function normalizeMarkets(payload: unknown): GammaMarketPayload[] {
     return payload.filter((item): item is GammaMarketPayload => Boolean(item) && typeof item === "object");
   }
   if (payload && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    for (const key of ["markets", "data", "items", "results"]) {
+      if (Array.isArray(record[key])) {
+        return record[key].filter((item): item is GammaMarketPayload => Boolean(item) && typeof item === "object");
+      }
+    }
     return [payload as GammaMarketPayload];
   }
   return [];
@@ -338,6 +350,15 @@ function safeGammaUrl(base: string, slug: string): string | null {
     return null;
   }
   return url.toString();
+}
+
+function eventSlugCandidatesFromMarketSlug(marketSlug: string): string[] {
+  const candidates = new Set<string>();
+  const datePrefix = marketSlug.match(/^(.*20\d{2}-\d{2}-\d{2})(?:-.+)?$/)?.[1];
+  if (datePrefix) {
+    candidates.add(datePrefix);
+  }
+  return [...candidates].filter((candidate) => candidate && candidate !== marketSlug);
 }
 
 async function fetchGammaJson(url: string, fetchImpl: typeof fetch): Promise<unknown | null> {
@@ -437,6 +458,10 @@ async function resolveMarket(
   }
   const marketPayload = normalizeMarkets(payload).find((market) => normalizeSlug(market.slug) === marketSlug);
   if (!marketPayload) {
+    const eventFallback = await resolveMarketFromEvent(inputUrl, marketSlug, fetchImpl);
+    if (eventFallback) {
+      return eventFallback;
+    }
     return notFound(inputUrl, "No pudimos obtener este mercado desde Polymarket.");
   }
   const event = marketEvent(marketPayload);
@@ -471,6 +496,59 @@ async function resolveMarket(
     status: "ok",
     warnings: [],
   };
+}
+
+async function resolveMarketFromEvent(
+  inputUrl: string,
+  marketSlug: string,
+  fetchImpl: typeof fetch,
+): Promise<PolymarketLinkResolveResult | null> {
+  for (const eventSlug of eventSlugCandidatesFromMarketSlug(marketSlug)) {
+    const requestUrl = safeGammaUrl(GAMMA_EVENTS_URL, eventSlug);
+    if (!requestUrl) {
+      continue;
+    }
+    const payload = await fetchGammaJson(requestUrl, fetchImpl);
+    if (!payload) {
+      continue;
+    }
+    const event = selectEvent(normalizeEvents(payload), eventSlug);
+    if (!event) {
+      continue;
+    }
+    const markets = normalizeMarkets(event.markets)
+      .map((market) => normalizeMarket(market, event, eventSlug))
+      .filter((market): market is PolymarketResolvedMarket => Boolean(market));
+    const exactMarket = markets.find((market) => normalizeSlug(market.slug) === marketSlug);
+    if (!exactMarket) {
+      continue;
+    }
+    const linkInfo = parsePolymarketLink(inputUrl);
+    const sport = eventSport(event, linkInfo?.sportOrLeague);
+    const league = eventLeague(event, linkInfo?.sportOrLeague);
+    return {
+      category: linkInfo?.category,
+      checkedAt: checkedAt(),
+      event: {
+        category: linkInfo?.category,
+        league,
+        slug: normalizeSlug(event.slug) ?? eventSlug,
+        sport,
+        startTime: stringValue(event.startTime ?? event.eventDate ?? event.endDate),
+        title: stringValue(event.title),
+      },
+      eventSlug,
+      league,
+      marketSlug,
+      markets: [exactMarket],
+      normalizedUrl: normalizePolymarketUrl(inputUrl) ?? inputUrl,
+      source: "gamma",
+      sport,
+      status: "ok",
+      warnings: ["Mercado resuelto desde el evento estructurado de Polymarket."],
+    };
+  }
+  return null;
 }
 
 export async function resolvePolymarketLink(

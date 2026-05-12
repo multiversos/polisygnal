@@ -998,6 +998,37 @@ async function main() {
     ["Sevilla", "Espanyol", "Atletico", "Atlético"],
     "LaLiga analyze route unrelated match guard",
   );
+  const exactMarketAnalyzeRoute = await postJsonAllowFailure("/api/analyze-polymarket-link", {
+    url: "https://polymarket.com/market/lal-cel-lev-2026-05-12-cel",
+  });
+  assert(exactMarketAnalyzeRoute.status === 200, `exact market analyze route returned status ${exactMarketAnalyzeRoute.status}`);
+  const exactMarketAnalyzeRouteText = JSON.stringify(exactMarketAnalyzeRoute.body);
+  assertTextExcludes(
+    exactMarketAnalyzeRouteText,
+    ["Sevilla", "Espanyol", "Atletico", "Atlético"],
+    "exact market analyze route unrelated match guard",
+  );
+  if (exactMarketAnalyzeRoute.body.status === "ok") {
+    assert(
+      exactMarketAnalyzeRoute.body.marketSlug === "lal-cel-lev-2026-05-12-cel",
+      `exact market analyze route returned wrong market slug ${exactMarketAnalyzeRoute.body.marketSlug}`,
+    );
+    assert(
+      exactMarketAnalyzeRoute.body.markets?.length === 1,
+      `exact market analyze route returned ${exactMarketAnalyzeRoute.body.markets?.length} markets instead of one`,
+    );
+    assert(
+      exactMarketAnalyzeRoute.body.markets?.[0]?.slug === "lal-cel-lev-2026-05-12-cel",
+      "exact market analyze route returned a sibling market",
+    );
+  } else {
+    assert(
+      exactMarketAnalyzeRoute.body.status === "not_found" ||
+        exactMarketAnalyzeRoute.body.status === "unsupported" ||
+        exactMarketAnalyzeRoute.body.status === "error",
+      `exact market analyze route returned unexpected status ${exactMarketAnalyzeRoute.body.status}`,
+    );
+  }
 
   const validAnalyzeUrl = "https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11";
   const validAnalyzeDom = await dumpDom(

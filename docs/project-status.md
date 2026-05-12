@@ -78,10 +78,16 @@ Estado visible verificado:
   (`/events?slug=...` o `/markets?slug=...`) y devuelve datos normalizados:
   evento, mercados, outcomes/precios, volumen, liquidez, estado, ids remotos y
   condition id cuando existen. No devuelve payload crudo.
+- Para enlaces exactos `/market/...`, si `/markets?slug=...` no devuelve datos
+  pero el slug contiene un evento fechado, el resolver consulta el evento
+  estructurado correspondiente y conserva solo el market slug exacto. No usa
+  mercados internos como fallback.
 - El selector posterior a la deteccion usa solo mercados devueltos por
   Polymarket para ese evento/mercado. Un enlace NBA no puede mostrar futbol y
   un enlace LaLiga no puede mostrar otros partidos que solo compartan liga,
   fecha o un equipo.
+- Cuando un evento devuelve muchos markets, el selector se mantiene compacto con
+  filtro local y `Ver mas mercados`; no abre reportes profundos para todos.
 - QA reciente protege los casos NBA Thunder/Lakers y LaLiga Celta/Levante:
   resuelven desde Gamma o muestran no-match honesto, sin cross-sport fallback.
 - El parser de enlaces ahora extrae locale, categoria, liga/deporte, slug

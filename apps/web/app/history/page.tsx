@@ -195,6 +195,17 @@ function marketProbabilityForItem(item: AnalysisHistoryItem) {
   });
 }
 
+function marketOutcomesLabel(item: AnalysisHistoryItem): string | null {
+  const outcomes = item.marketOutcomes
+    ?.filter((outcome) => outcome.label)
+    .slice(0, 4)
+    .map((outcome) => {
+      const price = typeof outcome.price === "number" ? formatProbability(outcome.price) : "sin precio";
+      return `${outcome.label}: ${price}`;
+    });
+  return outcomes && outcomes.length > 0 ? outcomes.join(" | ") : null;
+}
+
 function polySignalProbabilityForItem(item: AnalysisHistoryItem) {
   if (item.estimateQuality !== "real_polysignal_estimate") {
     return null;
@@ -764,6 +775,7 @@ export default function HistoryPage() {
           <div className="history-list">
             {visibleItems.map((item) => {
               const marketProbability = marketProbabilityForItem(item);
+              const marketOutcomes = marketOutcomesLabel(item);
               const polySignalProbability = polySignalProbabilityForItem(item);
               const probabilityGap = getProbabilityGap(marketProbability, polySignalProbability);
               const reanalyzeHref = analyzerHrefForItem(item);
@@ -788,6 +800,7 @@ export default function HistoryPage() {
                     <span>
                       Mercado NO {marketProbability ? formatProbability(marketProbability.no) : "sin dato"}
                     </span>
+                    {marketOutcomes ? <span>Outcomes guardados {marketOutcomes}</span> : null}
                     <span>
                       PolySignal YES {polySignalProbability ? formatProbability(polySignalProbability.yes) : "sin dato"}
                     </span>

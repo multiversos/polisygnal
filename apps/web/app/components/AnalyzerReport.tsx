@@ -224,7 +224,7 @@ function historyResultLabel(item: AnalysisHistoryItem): string {
 
 function sourceLabel(summary: WalletIntelligenceSummary): string {
   if (!summary.available) {
-    return "pendiente";
+    return "no disponible para este mercado";
   }
   if (summary.source === "backend") {
     return "datos publicos Polymarket/Gamma de solo lectura";
@@ -336,7 +336,7 @@ export function AnalyzerReport({
           <h3>{marketTitle(item)}</h3>
           <p>{eventTitle(item)}</p>
           <small>
-            Fuente del enlace confirmada - {formatDate(latestUpdate(item))} - Coincidencia {matchScore}
+            Fuente principal: datos leidos desde Polymarket - {formatDate(latestUpdate(item))} - Coincidencia {matchScore}
           </small>
         </div>
         <div className="analyzer-report-actions">

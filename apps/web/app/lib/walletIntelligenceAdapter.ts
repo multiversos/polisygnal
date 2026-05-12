@@ -126,7 +126,7 @@ export async function getWalletIntelligenceForMarket(
   thresholdUsd = WALLET_INTELLIGENCE_THRESHOLD_USD,
 ): Promise<WalletIntelligenceSummary> {
   if (!input.marketId || !/^\d+$/.test(input.marketId)) {
-    return unavailableSummary("Falta un marketId local valido para consultar billeteras.", thresholdUsd);
+    return unavailableSummary("Wallet Intelligence no disponible para este mercado.", thresholdUsd);
   }
 
   try {
