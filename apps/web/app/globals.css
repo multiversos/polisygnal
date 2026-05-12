@@ -8100,6 +8100,71 @@ html:not([data-theme="dark"]) .app-sidebar {
   background: var(--blue-soft);
 }
 
+.deep-job-preview {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--blue) 18%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--blue-soft));
+}
+
+.deep-job-preview strong {
+  color: var(--foreground);
+  font-size: 0.82rem;
+}
+
+.deep-job-preview ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deep-job-preview li {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.deep-job-preview li.completed {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+}
+
+.deep-job-preview li.running {
+  border-color: color-mix(in srgb, var(--blue) 34%, var(--line));
+}
+
+.deep-job-preview li.blocked {
+  border-color: color-mix(in srgb, var(--amber) 24%, var(--line));
+}
+
+.deep-job-preview li span,
+.deep-job-preview li small {
+  overflow-wrap: anywhere;
+}
+
+.deep-job-preview li span {
+  color: var(--muted-strong);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.deep-job-preview li small {
+  color: var(--foreground);
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
 .analyze-loading-skeletons {
   display: grid;
   grid-template-columns: repeat(6, minmax(118px, 1fr));
@@ -8780,6 +8845,97 @@ html:not([data-theme="dark"]) .app-sidebar {
     var(--surface-muted);
 }
 
+.analyzer-deep-job-state {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--blue) 24%, var(--line));
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 15% 0%, color-mix(in srgb, var(--blue) 8%, transparent), transparent 36%),
+    var(--surface-muted);
+}
+
+.deep-job-step-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deep-job-step-list li {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+  min-height: 76px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.deep-job-step-list li.completed {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
+}
+
+.deep-job-step-list li.running {
+  border-color: color-mix(in srgb, var(--blue) 42%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 8%, transparent);
+}
+
+.deep-job-step-list li.blocked {
+  border-color: color-mix(in srgb, var(--amber) 24%, var(--line));
+}
+
+.deep-job-step-list > li > span {
+  display: inline-grid;
+  min-height: 24px;
+  place-items: center;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--muted-strong);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.deep-job-step-list div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.deep-job-step-list strong,
+.deep-job-step-list small,
+.deep-job-step-list em {
+  overflow-wrap: anywhere;
+}
+
+.deep-job-step-list strong {
+  color: var(--foreground);
+  font-size: 0.88rem;
+  line-height: 1.25;
+}
+
+.deep-job-step-list small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.deep-job-step-list em {
+  color: var(--muted-strong);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
 .analyzer-deep-layer-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -9165,6 +9321,11 @@ html:not([data-theme="dark"]) .app-sidebar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .deep-job-step-list,
+  .deep-job-preview ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .samantha-evidence-list {
     grid-template-columns: 1fr;
   }
@@ -9247,6 +9408,8 @@ html:not([data-theme="dark"]) .app-sidebar {
   .analyzer-report-header,
   .analyzer-next-actions,
   .analyzer-executive-grid,
+  .deep-job-preview ol,
+  .deep-job-step-list,
   .analyzer-deep-layer-grid,
   .analyzer-start-steps,
   .wallet-report-summary,

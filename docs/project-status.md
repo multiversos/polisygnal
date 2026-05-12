@@ -318,6 +318,15 @@ Estado actual:
 - QA post-pivot protege que `/alerts` dependa de analisis guardados, que
   `/methodology` explique el umbral de 55% y que el detalle de mercado apunte
   de vuelta al Analizador/Historial en vez de deportes.
+- Deep Analyzer ahora tiene un job local (`DeepAnalysisJob`) con progreso real
+  en el navegador: lee Polymarket, analiza el mercado, revisa Wallet
+  Intelligence cuando puede, prepara brief de Samantha y queda esperando reporte
+  externo validable.
+- `/analyze` muestra `Estado del analisis profundo`; no marca el analisis como
+  completado si falta reporte de Samantha o evidencia suficiente.
+- `/history` puede guardar analisis pendientes de investigacion con
+  `deepAnalysisJobId`, `awaitingResearch` y `researchStatus`, y ofrece
+  `Continuar analisis`.
 - No se creo auth real.
 - No se crearon tablas reales.
 - No se ejecutaron migraciones.
@@ -329,6 +338,8 @@ Riesgos pendientes:
 - no existe backend persistente de usuarios;
 - la resolucion automatica local depende de datos disponibles y no sustituye
   un job backend persistente futuro;
+- DeepAnalysisJob vive en localStorage y no reemplaza un backend job
+  persistente, queue, locks, retries, ownership ni auditoria por cuenta;
 - el contexto de futbol todavia no incluye liga estructurada, local/visitante,
   forma reciente, lesiones, suspensiones, odds externas ni calibracion;
 - la investigacion externa real todavia no esta conectada a APIs deportivas,

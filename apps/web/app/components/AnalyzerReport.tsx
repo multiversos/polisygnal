@@ -15,6 +15,13 @@ import {
   mergeWalletIntelligenceLayer,
   summarizeDeepAnalysis,
 } from "../lib/deepAnalyzerEngine";
+import {
+  getJobProgressSummary,
+  jobStepStatusLabel,
+  markJobSamanthaReportLoaded,
+  type DeepAnalysisJob,
+} from "../lib/deepAnalysisJob";
+import { updateDeepAnalysisJob } from "../lib/deepAnalysisJobStorage";
 import type { DeepAnalysisLayerStatus } from "../lib/deepAnalyzerTypes";
 import type { AnalysisHistoryItem } from "../lib/analysisHistory";
 import {
@@ -76,9 +83,11 @@ type AnalyzeMarketItem = MarketOverviewItem & {
 
 type AnalyzerReportProps = {
   busy: boolean;
+  deepAnalysisJob?: DeepAnalysisJob | null;
   item: AnalyzeMarketItem;
   matchScore: number;
   normalizedUrl: string;
+  onDeepAnalysisJobChange?: (job: DeepAnalysisJob) => void;
   onSaveHistory: (item: MarketOverviewItem) => void;
   onToggleWatchlist: (item: MarketOverviewItem) => void;
   relatedHistory: AnalysisHistoryItem[];
@@ -310,9 +319,11 @@ function AnalyzerLayerDetails({
 
 export function AnalyzerReport({
   busy,
+  deepAnalysisJob,
   item,
   matchScore,
   normalizedUrl,
+  onDeepAnalysisJobChange,
   onSaveHistory,
   onToggleWatchlist,
   relatedHistory,
@@ -417,11 +428,20 @@ export function AnalyzerReport({
     ? "Ya esta guardado en Historial. Puedes revisar su estado o guardar una lectura nueva si quieres comparar cambios."
     : analyzerResult.polySignalEstimateAvailable
       ? "Guarda esta lectura para medirla cuando el mercado tenga resultado confiable."
-    : "No hay estimacion propia suficiente; puedes guardarlo como seguimiento sin convertirlo en prediccion.";
+      : "No hay estimacion propia suficiente; puedes guardarlo como seguimiento sin convertirlo en prediccion.";
+  const jobSummary = deepAnalysisJob ? getJobProgressSummary(deepAnalysisJob) : null;
 
   function handleLoadSamanthaReport() {
     const result = parseSamanthaResearchReport(samanthaReportInput);
     setSamanthaReportResult(result);
+    if (result.valid && result.report && deepAnalysisJob) {
+      const nextJob = markJobSamanthaReportLoaded(deepAnalysisJob, {
+        acceptedEstimate: shouldAcceptSuggestedEstimate(result.report),
+        signalCount: convertSamanthaReportToSignals(result.report).length,
+      });
+      const storedJob = updateDeepAnalysisJob(nextJob) ?? nextJob;
+      onDeepAnalysisJobChange?.(storedJob);
+    }
     setSamanthaActionMessage(
       result.valid
         ? "Reporte de Samantha cargado y validado localmente."
@@ -566,6 +586,64 @@ export function AnalyzerReport({
         <span>Historial: este navegador</span>
       </section>
 
+      {deepAnalysisJob && jobSummary ? (
+        <section className="analyzer-deep-job-state" aria-label="Estado del analisis profundo">
+          <div className="probability-display-heading">
+            <div>
+              <p className="eyebrow">Estado del analisis profundo</p>
+              <h4>{jobSummary.headline}</h4>
+            </div>
+            <span>
+              {jobSummary.completedSteps}/{jobSummary.totalSteps} pasos
+            </span>
+          </div>
+          <p className="analyzer-report-note">{jobSummary.detail}</p>
+          <ol className="deep-job-step-list">
+            {deepAnalysisJob.steps.map((step) => (
+              <li className={step.status} key={step.id}>
+                <span>{jobStepStatusLabel(step.status)}</span>
+                <div>
+                  <strong>{step.label}</strong>
+                  <small>{step.summary}</small>
+                  {step.requiresManualInput ? <em>Requiere accion manual</em> : null}
+                  {step.requiresExternalIntegration ? <em>Pendiente de integracion segura</em> : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className="section-note">
+            El analisis profundo no esta completo hasta cargar evidencia externa suficiente o
+            contar con fuentes independientes validadas.
+          </p>
+          <p className="section-note">
+            Estado manual: Esperando reporte de Samantha cuando el brief ya esta listo y la
+            investigacion externa aun no fue cargada.
+          </p>
+          <div className="watchlist-actions">
+            <button
+              className="watchlist-button"
+              disabled={!samanthaBriefValidation.valid}
+              onClick={handleCopySamanthaBrief}
+              type="button"
+            >
+              Copiar brief para Samantha
+            </button>
+            <a className="analysis-link secondary" href="#samantha-research">
+              Pegar reporte de Samantha
+            </a>
+            <button
+              className="watchlist-button"
+              disabled={busy}
+              onClick={() => onSaveHistory(item)}
+              type="button"
+            >
+              Guardar en Historial como pendiente
+            </button>
+          </div>
+          <p className="section-note">{jobSummary.nextAction}</p>
+        </section>
+      ) : null}
+
       <section className="analyzer-deep-readiness" aria-label="Analisis profundo">
         <div className="probability-display-heading">
           <div>
@@ -586,7 +664,7 @@ export function AnalyzerReport({
         </div>
       </section>
 
-      <section className="samantha-research-panel" aria-label="Investigacion con Samantha">
+      <section className="samantha-research-panel" id="samantha-research" aria-label="Investigacion con Samantha">
         <div className="probability-display-heading">
           <div>
             <p className="eyebrow">Investigacion externa manual</p>

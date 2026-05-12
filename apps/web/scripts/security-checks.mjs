@@ -627,6 +627,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("scouting-radar-core"), "expected radar center mark");
   assert(source.includes("RADAR_MARKET_CATEGORIES"), "expected multi-market radar category config");
   assert(source.includes("DEEP_LAYER_PREVIEW"), "expected deep analyzer pending-layer preview in loading panel");
+  assert(source.includes("Deep Analysis Job"), "expected loading panel to expose local deep-analysis job state");
   assert(source.includes("aria-live=\"polite\""), "expected polite live region in loading panel");
   assert(source.includes("aria-busy=\"true\""), "expected busy state in loading panel");
   for (const step of expectedSteps) {
@@ -670,10 +671,12 @@ function validateAnalyzerReportSource() {
   const requiredCopy = [
     "Resumen del analisis",
     "Fuentes del analisis",
+    "Estado del analisis profundo",
     "Analisis profundo",
     "Capas del motor",
     "Pendiente de integracion",
     "Investigacion con Samantha",
+    "Esperando reporte de Samantha",
     "Copiar brief para Samantha",
     "Descargar brief",
     "Cargar reporte",
@@ -1096,6 +1099,97 @@ function validateDeepAnalyzerReadinessRules() {
     conservative_decision_guard: true,
     layers: initial.layers.length,
     progress_states: progressPlan.length,
+  };
+}
+
+function validateDeepAnalysisJobRules() {
+  const {
+    createDeepAnalysisJob,
+    getCurrentJobStep,
+    getJobProgressSummary,
+    markJobAwaitingSamantha,
+    markJobMarketAnalyzed,
+    markJobPolymarketRead,
+    markJobSamanthaBriefReady,
+    markJobSamanthaReportLoaded,
+    markJobWalletsAnalyzed,
+  } = loadTsModule("app/lib/deepAnalysisJob.ts");
+  const storageSource = readFileSync(resolve(appRoot, "app/lib/deepAnalysisJobStorage.ts"), "utf8");
+  const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
+  const reportSource = readFileSync(resolve(appRoot, "app/components/AnalyzerReport.tsx"), "utf8");
+  const historySource = readFileSync(resolve(appRoot, "app/history/page.tsx"), "utf8");
+
+  let job = createDeepAnalysisJob("https://polymarket.com/event/test");
+  assert(job.status === "running", "new deep analysis job should start running");
+  assert(
+    getCurrentJobStep(job)?.id === "reading_polymarket",
+    "new deep analysis job should start by reading Polymarket",
+  );
+  assert(!getJobProgressSummary(job).headline.includes("completado"), "running job must not claim completion");
+
+  job = markJobPolymarketRead(job, {
+    eventSlug: "test-event",
+    marketId: "123",
+    marketSlug: "test-market",
+    marketTitle: "Will test pass?",
+    normalizedUrl: "https://polymarket.com/event/test",
+  });
+  job = markJobMarketAnalyzed(job);
+  job = markJobWalletsAnalyzed(job, { available: false, summary: "No wallet source for this fixture." });
+  job = markJobSamanthaBriefReady(job);
+  job = markJobAwaitingSamantha(job);
+
+  assert(job.status === "awaiting_samantha", "job should wait for Samantha after brief preparation");
+  assert(job.briefReady === true, "job should mark Samantha brief ready");
+  assert(
+    job.steps.find((step) => step.id === "awaiting_samantha_report")?.status === "running",
+    "awaiting_samantha_report should be the manual running step",
+  );
+  assert(
+    job.steps.find((step) => step.id === "completed")?.status !== "completed",
+    "awaiting Samantha job must not be marked completed",
+  );
+  assert(
+    getJobProgressSummary(job).nextAction.includes("Samantha"),
+    "awaiting job summary should point to Samantha report workflow",
+  );
+
+  const withEvidenceNoDecision = markJobSamanthaReportLoaded(job, {
+    acceptedEstimate: false,
+    signalCount: 2,
+  });
+  assert(
+    withEvidenceNoDecision.status === "ready_to_score",
+    "validated evidence without accepted estimate should be ready_to_score",
+  );
+  assert(
+    withEvidenceNoDecision.resultReady !== true,
+    "validated evidence without accepted estimate should not create final result",
+  );
+
+  const withAcceptedDecision = markJobSamanthaReportLoaded(job, {
+    acceptedEstimate: true,
+    signalCount: 3,
+  });
+  assert(withAcceptedDecision.status === "completed", "accepted report should complete the local job");
+  assert(withAcceptedDecision.resultReady === true, "accepted report should mark result ready");
+
+  assert(storageSource.includes("localStorage"), "deep analysis job storage should use localStorage");
+  assert(storageSource.includes("FULL_WALLET_PATTERN"), "deep analysis job storage should redact full wallets");
+  assert(!storageSource.includes("fetch("), "deep analysis job storage must not call external services");
+  assert(!storageSource.includes("raw payload"), "deep analysis job storage should not store raw payloads");
+  assert(analyzePage.includes("createDeepAnalysisJob"), "analyze page should create local deep analysis jobs");
+  assert(analyzePage.includes("markJobAwaitingSamantha"), "analyze page should mark jobs awaiting Samantha");
+  assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
+  assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport should show job state");
+  assert(reportSource.includes("Esperando reporte de Samantha"), "AnalyzerReport should show manual research wait state");
+  assert(reportSource.includes("markJobSamanthaReportLoaded"), "AnalyzerReport should merge Samantha report into the job");
+  assert(historySource.includes("Continuar analisis"), "history should let users continue pending deep research");
+
+  return {
+    awaiting_samantha_guard: true,
+    job_steps: job.steps.length,
+    ready_to_score_guard: true,
   };
 }
 
@@ -1861,6 +1955,7 @@ const analyzeLoadingPanelChecks = validateAnalyzeLoadingPanelSource();
 const analyzerReportChecks = validateAnalyzerReportSource();
 const samanthaResearchChecks = validateSamanthaResearchRules();
 const deepAnalyzerReadinessChecks = validateDeepAnalyzerReadinessRules();
+const deepAnalysisJobChecks = validateDeepAnalysisJobRules();
 const analyzerResultChecks = validateAnalyzerResultRules();
 const analyzerMatchRankingChecks = validateAnalyzerMatchRankingRules();
 const polymarketLinkResolverChecks = await validatePolymarketLinkResolverRules();
@@ -1883,6 +1978,7 @@ console.log(
       analyzer_report: analyzerReportChecks,
       samantha_research: samanthaResearchChecks,
       deep_analyzer_readiness: deepAnalyzerReadinessChecks,
+      deep_analysis_job: deepAnalysisJobChecks,
       analyzer_result: analyzerResultChecks,
       analyzer_match_ranking: analyzerMatchRankingChecks,
       polymarket_link_resolver: polymarketLinkResolverChecks,

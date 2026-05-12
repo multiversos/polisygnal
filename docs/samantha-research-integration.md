@@ -32,6 +32,30 @@ Decision de arquitectura:
 No hay envio automatico a terceros, scraping, llamadas externas nuevas, DB
 writes ni ejecucion de procesos de Samantha desde PolySignal.
 
+## Integracion con DeepAnalysisJob
+
+El flujo manual de Samantha ahora es una etapa del job local del analizador:
+
+1. `/analyze` crea un `DeepAnalysisJob`.
+2. PolySignal lee Polymarket y analiza el mercado seleccionado.
+3. Wallet Intelligence se revisa solo para el mercado seleccionado si hay id
+   compatible.
+4. PolySignal genera el brief de Samantha.
+5. El job queda en `awaiting_samantha`.
+6. El usuario copia o descarga el brief y lo usa fuera de PolySignal.
+7. El usuario pega el reporte estructurado.
+8. PolySignal valida y sanitiza el reporte.
+9. Si el reporte es valido, el paso `awaiting_samantha_report` pasa a
+   `completed`.
+10. Si hay senales, `scoring_evidence` se marca `completed`.
+11. Si la estimacion sugerida pasa las compuertas, `generating_decision` y el
+    job se marcan `completed`.
+12. Si no alcanza, el job queda `ready_to_score` o `awaiting_samantha`, sin
+    prediccion final.
+
+Este estado vive en localStorage y sirve para reabrir el analisis desde
+`/history`. No ejecuta Samantha automaticamente y no escribe en Neon.
+
 ## Rutas seguras
 
 Briefs:

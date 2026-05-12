@@ -73,6 +73,30 @@ export function getAnalysisLifecycleState(item: AnalysisHistoryItem): AnalysisLi
     };
   }
 
+  if (
+    item.awaitingResearch ||
+    item.researchStatus === "awaiting_samantha" ||
+    item.researchStatus === "ready_to_score"
+  ) {
+    return {
+      countableForAccuracy: false,
+      event: "analysis_saved",
+      label:
+        item.researchStatus === "ready_to_score"
+          ? "Evidencia cargada, decision pendiente"
+          : "Pendiente de investigacion",
+      nextCheckHint:
+        item.researchStatus === "ready_to_score"
+          ? "Reabrir el analizador para revisar evidencia y decidir si falta investigacion."
+          : "Continuar en /analyze y cargar el reporte de Samantha.",
+      status: "analyzing",
+      summary:
+        item.researchStatus === "ready_to_score"
+          ? "Hay evidencia externa validada, pero no alcanza para una prediccion responsable."
+          : "Analisis profundo iniciado; espera reporte de Samantha antes de generar decision.",
+    };
+  }
+
   if (!hasClearPrediction(item)) {
     return {
       countableForAccuracy: false,

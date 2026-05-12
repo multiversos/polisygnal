@@ -45,6 +45,22 @@ import {
   type AnalyzerResult,
 } from "../lib/analyzerResult";
 import {
+  createDeepAnalysisJob,
+  markJobAwaitingSamantha,
+  markJobFailed,
+  markJobMarketAnalyzed,
+  markJobPolymarketRead,
+  markJobSamanthaBriefReady,
+  markJobWalletsAnalyzed,
+  type DeepAnalysisJob,
+} from "../lib/deepAnalysisJob";
+import {
+  DEEP_ANALYSIS_JOB_STORAGE_EVENT,
+  getDeepAnalysisJob,
+  getLatestDeepAnalysisJobForUrl,
+  saveDeepAnalysisJob,
+} from "../lib/deepAnalysisJobStorage";
+import {
   extractSoccerMatchContext,
   formatSoccerMatchContext,
   getSoccerContextReadiness,
@@ -337,6 +353,7 @@ function historyPayloadFromMarket(
   item: MarketOverviewItem,
   normalizedUrl: string,
   analyzerResult: AnalyzerResult,
+  deepJob?: DeepAnalysisJob | null,
 ) {
   const marketProbabilities = getMarketImpliedProbabilities({
     marketNoPrice: item.latest_snapshot?.no_price,
@@ -392,6 +409,10 @@ function historyPayloadFromMarket(
           ? decision.evaluationReason
           : "Sin estimacion PolySignal suficiente.",
     evaluationStatus: decision.evaluationStatus,
+    awaitingResearch: deepJob
+      ? deepJob.status === "awaiting_samantha" || deepJob.status === "ready_to_score"
+      : undefined,
+    deepAnalysisJobId: deepJob?.id,
     id: `link-${item.market?.id ?? item.market?.remote_id ?? item.market?.market_slug ?? "market"}-${Date.now()}`,
     marketId: item.market?.id ? String(item.market.id) : undefined,
     marketSlug: item.market?.market_slug || undefined,
@@ -407,13 +428,19 @@ function historyPayloadFromMarket(
     ),
     nextCheckHint: "Revisar cuando Polymarket confirme el resultado final.",
     result: "pending" as const,
+    researchStatus: deepJob?.status,
     resolutionStatus: "pending" as const,
     remoteId: item.market?.remote_id || undefined,
     source: "link_analyzer" as const,
     sport: item.market?.sport_type || undefined,
     status: "open" as const,
     title: marketTitle(item),
-    trackingStatus: decision.predictedSide === "UNKNOWN" ? ("no_clear_decision" as const) : ("awaiting_resolution" as const),
+    trackingStatus:
+      deepJob?.status === "awaiting_samantha"
+        ? ("analyzing" as const)
+        : decision.predictedSide === "UNKNOWN"
+          ? ("no_clear_decision" as const)
+          : ("awaiting_resolution" as const),
     url: normalizedUrl,
     walletIntelligenceSummary: safeWalletSummaryForHistory(item),
   };
@@ -1227,6 +1254,7 @@ export default function AnalyzePage() {
   const [analysisHistoryItems, setAnalysisHistoryItems] = useState<AnalysisHistoryItem[]>([]);
   const [savedHistoryKeys, setSavedHistoryKeys] = useState<Set<string>>(new Set());
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
+  const [deepAnalysisJob, setDeepAnalysisJob] = useState<DeepAnalysisJob | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const analysisRunRef = useRef(0);
@@ -1259,8 +1287,29 @@ export default function AnalyzePage() {
   }, []);
 
   useEffect(() => {
+    const refreshJobs = () => {
+      if (deepAnalysisJob) {
+        setDeepAnalysisJob(getDeepAnalysisJob(deepAnalysisJob.id));
+      }
+    };
+    window.addEventListener(DEEP_ANALYSIS_JOB_STORAGE_EVENT, refreshJobs);
+    window.addEventListener("storage", refreshJobs);
+    return () => {
+      window.removeEventListener(DEEP_ANALYSIS_JOB_STORAGE_EVENT, refreshJobs);
+      window.removeEventListener("storage", refreshJobs);
+    };
+  }, [deepAnalysisJob]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const queryUrl = params.get("url");
+    const queryJobId = params.get("job");
+    if (queryJobId) {
+      const storedJob = getDeepAnalysisJob(queryJobId);
+      if (storedJob) {
+        setDeepAnalysisJob(storedJob);
+      }
+    }
     if (queryUrl) {
       setInput(queryUrl);
       if (params.get("auto") === "1") {
@@ -1271,6 +1320,12 @@ export default function AnalyzePage() {
     }
     // This effect intentionally runs once to support smoke-test URLs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const persistDeepAnalysisJob = useCallback((job: DeepAnalysisJob): DeepAnalysisJob => {
+    const stored = saveDeepAnalysisJob(job) ?? job;
+    setDeepAnalysisJob(stored);
+    return stored;
   }, []);
 
   const runAnalysis = useCallback(async (value = input) => {
@@ -1293,6 +1348,7 @@ export default function AnalyzePage() {
       setState({ message: validation.message, status: "invalid" });
       return;
     }
+    let job = persistDeepAnalysisJob(createDeepAnalysisJob(validation.normalizedUrl));
     setLoading(true);
     setState({
       message: "Resolviendo mercado o evento directamente desde Polymarket.",
@@ -1307,6 +1363,14 @@ export default function AnalyzePage() {
       if (!isCurrentRun()) {
         return;
       }
+      job = persistDeepAnalysisJob(
+        markJobPolymarketRead(job, {
+          eventSlug: resolved.eventSlug ?? resolved.event?.slug,
+          marketSlug: resolved.marketSlug,
+          marketTitle: resolved.event?.title,
+          normalizedUrl: validation.normalizedUrl,
+        }),
+      );
       if (resolved.status === "ok" && resolved.markets.length > 0) {
         const matches = buildMatchesFromPolymarketResult(resolved);
         setState({
@@ -1319,6 +1383,12 @@ export default function AnalyzePage() {
           status: "needs_selection",
         });
       } else if (resolved.status === "unsupported") {
+        persistDeepAnalysisJob(
+          markJobFailed(
+            job,
+            resolved.warnings[0] || "Este tipo de enlace todavia no esta soportado.",
+          ),
+        );
         setState({
           matches: [],
           message:
@@ -1328,6 +1398,12 @@ export default function AnalyzePage() {
           status: "no_exact_match",
         });
       } else {
+        persistDeepAnalysisJob(
+          markJobFailed(
+            job,
+            resolved.warnings[0] || "No pudimos obtener este mercado desde Polymarket.",
+          ),
+        );
         setState({
           matches: [],
           message:
@@ -1341,6 +1417,12 @@ export default function AnalyzePage() {
       if (!isCurrentRun()) {
         return;
       }
+      persistDeepAnalysisJob(
+        markJobFailed(
+          job,
+          "No pudimos consultar Polymarket ahora. Intenta de nuevo en unos segundos.",
+        ),
+      );
       setState({
         message:
           "No pudimos consultar Polymarket ahora. Intenta de nuevo en unos segundos.",
@@ -1351,7 +1433,7 @@ export default function AnalyzePage() {
         setLoading(false);
       }
     }
-  }, [input]);
+  }, [input, persistDeepAnalysisJob]);
 
   const analyzeSelectedMarket = useCallback(async (match: MatchResult, normalizedUrl: string) => {
     const runId = analysisRunRef.current + 1;
@@ -1367,6 +1449,18 @@ export default function AnalyzePage() {
     };
 
     setActionMessage(null);
+    let job =
+      getLatestDeepAnalysisJobForUrl(normalizedUrl) ??
+      createDeepAnalysisJob(normalizedUrl);
+    job = persistDeepAnalysisJob(
+      markJobPolymarketRead(job, {
+        eventSlug: match.eventSlug ?? match.item.market?.event_slug ?? undefined,
+        marketId: match.item.market?.id ?? match.item.market?.remote_id ?? match.marketId,
+        marketSlug: match.marketSlug ?? match.item.market?.market_slug ?? undefined,
+        marketTitle: marketTitle(match.item),
+        normalizedUrl,
+      }),
+    );
     setLoading(true);
     setLoadingPhase("context");
     setState({
@@ -1388,6 +1482,7 @@ export default function AnalyzePage() {
       getSignalEstimateReadiness(match.item);
       getEstimateReadinessScore(match.item);
       getPolySignalEstimate(match.item);
+      job = persistDeepAnalysisJob(markJobMarketAnalyzed(job));
 
       if (!(await advancePhase("research"))) {
         return;
@@ -1397,14 +1492,25 @@ export default function AnalyzePage() {
       if (!isCurrentRun()) {
         return;
       }
-      getWalletIntelligenceSummary(enrichedMatch.item);
+      const walletSummary = getWalletIntelligenceSummary(enrichedMatch.item);
+      job = persistDeepAnalysisJob(
+        markJobWalletsAnalyzed(job, {
+          available: walletSummary.available,
+          summary: walletSummary.available
+            ? "Wallet Intelligence revisada en modo read-only para el mercado seleccionado."
+            : walletSummary.reason,
+          warnings: walletSummary.warnings.slice(0, 4),
+        }),
+      );
 
       if (!(await advancePhase("preparing"))) {
         return;
       }
+      job = persistDeepAnalysisJob(markJobSamanthaBriefReady(job));
+      job = persistDeepAnalysisJob(markJobAwaitingSamantha(job));
       setState({
         match: enrichedMatch,
-        message: "Lectura preparada para el mercado seleccionado.",
+        message: "Analisis profundo iniciado: Polymarket leido, Wallet Intelligence revisada y brief de Samantha listo.",
         normalizedUrl,
         status: "result",
       });
@@ -1412,6 +1518,12 @@ export default function AnalyzePage() {
       if (!isCurrentRun()) {
         return;
       }
+      persistDeepAnalysisJob(
+        markJobFailed(
+          job,
+          "No pudimos preparar el job profundo de este mercado ahora.",
+        ),
+      );
       setState({
         message: "No pudimos preparar la lectura de este mercado ahora. Intenta de nuevo en unos segundos.",
         status: "invalid",
@@ -1421,7 +1533,7 @@ export default function AnalyzePage() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [persistDeepAnalysisJob]);
 
   const handleSaveHistory = useCallback(async (item: MarketOverviewItem) => {
     if (state.status !== "result") {
@@ -1445,7 +1557,7 @@ export default function AnalyzePage() {
         relatedHistory,
         url: state.normalizedUrl,
       });
-      const payload = historyPayloadFromMarket(item, state.normalizedUrl, analyzerResult);
+      const payload = historyPayloadFromMarket(item, state.normalizedUrl, analyzerResult, deepAnalysisJob);
       const savedItem = await saveAnalysisHistoryItem(payload);
       setAnalysisHistoryItems((current) => [savedItem, ...current.filter((entry) => entry.id !== savedItem.id)]);
       setSavedHistoryKeys((current) => new Set(current).add(String(item.market?.id ?? payload.id)));
@@ -1455,7 +1567,7 @@ export default function AnalyzePage() {
     } finally {
       setActionBusy(false);
     }
-  }, [analysisHistoryItems, state]);
+  }, [analysisHistoryItems, deepAnalysisJob, state]);
 
   const handleSavePending = useCallback(async () => {
     if (state.status !== "no_exact_match") {
@@ -1502,6 +1614,7 @@ export default function AnalyzePage() {
     setLoading(false);
     setLoadingPhase("validating");
     setActionMessage(null);
+    setDeepAnalysisJob(null);
   }, []);
 
   const matches = state.status === "needs_selection" || state.status === "no_exact_match" ? state.matches : [];
@@ -1622,7 +1735,11 @@ export default function AnalyzePage() {
       ) : null}
 
       {state.status === "detecting" || state.status === "analyzing_selected" ? (
-        <AnalyzeLoadingPanel isVisible={loading} phase={loadingPhase} />
+        <AnalyzeLoadingPanel
+          isVisible={loading}
+          jobSteps={deepAnalysisJob?.steps}
+          phase={loadingPhase}
+        />
       ) : null}
 
       {state.status === "needs_selection" || state.status === "no_exact_match" ? (
@@ -1675,9 +1792,11 @@ export default function AnalyzePage() {
                   </div>
                   <AnalyzerReport
                     busy={actionBusy}
+                    deepAnalysisJob={deepAnalysisJob}
                     item={match.item}
                     matchScore={match.score}
                     normalizedUrl={analyzedNormalizedUrl}
+                    onDeepAnalysisJobChange={persistDeepAnalysisJob}
                     onSaveHistory={handleSaveHistory}
                     onToggleWatchlist={handleToggleWatchlist}
                     relatedHistory={relatedHistory}

@@ -41,6 +41,13 @@ export type AnalysisHistoryResolutionStatus =
   | "pending"
   | "resolved"
   | "unknown";
+export type AnalysisHistoryResearchStatus =
+  | "awaiting_samantha"
+  | "completed"
+  | "failed"
+  | "idle"
+  | "ready_to_score"
+  | "running";
 
 export type AnalysisHistoryAnalyzerLayer = {
   id: string;
@@ -76,10 +83,12 @@ export type AnalysisHistoryWalletSummary = {
 export type AnalysisHistoryItem = {
   analyzedAt: string;
   analyzerLayers?: AnalysisHistoryAnalyzerLayer[];
+  awaitingResearch?: boolean;
   confidence?: AnalysisHistoryConfidence;
   conditionId?: string;
   decision?: AnalysisHistoryDecision;
   decisionThreshold?: number;
+  deepAnalysisJobId?: string;
   eventSlug?: string;
   estimateQuality?: AnalysisHistoryEstimateQuality;
   evaluationReason?: string;
@@ -103,6 +112,7 @@ export type AnalysisHistoryItem = {
   resolutionStatus?: AnalysisHistoryResolutionStatus;
   resolvedAt?: string;
   result?: AnalysisHistoryResult;
+  researchStatus?: AnalysisHistoryResearchStatus;
   remoteId?: string;
   source: AnalysisHistorySource;
   sport?: string;
@@ -233,6 +243,20 @@ function normalizeResolutionStatus(value: unknown): AnalysisHistoryResolutionSta
     value === "pending" ||
     value === "resolved" ||
     value === "unknown"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeResearchStatus(value: unknown): AnalysisHistoryResearchStatus | undefined {
+  if (
+    value === "awaiting_samantha" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "idle" ||
+    value === "ready_to_score" ||
+    value === "running"
   ) {
     return value;
   }
@@ -466,10 +490,12 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
   return {
     analyzedAt: value.analyzedAt || nowIso(),
     analyzerLayers: normalizeAnalyzerLayers(value.analyzerLayers),
+    awaitingResearch: value.awaitingResearch === true,
     confidence: normalizeConfidence(value.confidence),
     conditionId: normalizeString(value.conditionId),
     decision: decision.decision,
     decisionThreshold: decision.decisionThreshold,
+    deepAnalysisJobId: normalizeString(value.deepAnalysisJobId),
     eventSlug: normalizeString(value.eventSlug),
     estimateQuality,
     evaluationReason:
@@ -501,6 +527,7 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     resolutionStatus: normalizeResolutionStatus(value.resolutionStatus),
     resolvedAt: normalizeString(value.resolvedAt),
     result,
+    researchStatus: normalizeResearchStatus(value.researchStatus),
     remoteId: normalizeString(value.remoteId),
     source: normalizeSource(value.source),
     sport: value.sport || undefined,

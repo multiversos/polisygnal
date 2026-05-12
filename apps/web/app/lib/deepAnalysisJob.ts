@@ -1,0 +1,433 @@
+export type DeepAnalysisJobStatus =
+  | "idle"
+  | "running"
+  | "awaiting_samantha"
+  | "ready_to_score"
+  | "completed"
+  | "failed";
+
+export type DeepAnalysisJobStepId =
+  | "reading_polymarket"
+  | "analyzing_market"
+  | "analyzing_wallets"
+  | "profiling_wallets"
+  | "preparing_samantha_research"
+  | "awaiting_samantha_report"
+  | "checking_odds"
+  | "checking_kalshi"
+  | "scoring_evidence"
+  | "generating_decision"
+  | "completed";
+
+export type DeepAnalysisJobStepStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "blocked"
+  | "failed";
+
+export type DeepAnalysisJobStep = {
+  id: DeepAnalysisJobStepId;
+  label: string;
+  status: DeepAnalysisJobStepStatus;
+  summary: string;
+  startedAt?: string;
+  completedAt?: string;
+  requiresManualInput?: boolean;
+  requiresExternalIntegration?: boolean;
+  warnings: string[];
+};
+
+export type DeepAnalysisJob = {
+  id: string;
+  url: string;
+  normalizedUrl?: string;
+  status: DeepAnalysisJobStatus;
+  createdAt: string;
+  updatedAt: string;
+  marketTitle?: string;
+  marketId?: string;
+  eventSlug?: string;
+  marketSlug?: string;
+  steps: DeepAnalysisJobStep[];
+  briefReady?: boolean;
+  samanthaReportLoaded?: boolean;
+  resultReady?: boolean;
+  error?: string;
+};
+
+export type DeepAnalysisJobSummary = {
+  headline: string;
+  detail: string;
+  nextAction: string;
+  completedSteps: number;
+  totalSteps: number;
+};
+
+type StepDefinition = {
+  id: DeepAnalysisJobStepId;
+  label: string;
+  summary: string;
+  requiresManualInput?: boolean;
+  requiresExternalIntegration?: boolean;
+  warnings?: string[];
+};
+
+const STEP_DEFINITIONS: StepDefinition[] = [
+  {
+    id: "reading_polymarket",
+    label: "Leyendo Polymarket",
+    summary: "Pendiente de leer mercado, outcomes, precios y estado desde Polymarket.",
+  },
+  {
+    id: "analyzing_market",
+    label: "Analizando mercado",
+    summary: "Pendiente de revisar volumen, liquidez, precios visibles y estado.",
+  },
+  {
+    id: "analyzing_wallets",
+    label: "Revisando Wallet Intelligence",
+    summary: "Pendiente de revisar wallets publicas si hay id compatible.",
+  },
+  {
+    id: "profiling_wallets",
+    label: "Perfil de wallets",
+    requiresExternalIntegration: true,
+    summary: "Pendiente de fuente confiable para historial cerrado por wallet.",
+    warnings: ["No se infiere identidad personal ni se calcula ROI sin fuente real."],
+  },
+  {
+    id: "preparing_samantha_research",
+    label: "Brief de Samantha",
+    summary: "Pendiente de preparar brief estructurado para investigacion externa manual.",
+  },
+  {
+    id: "awaiting_samantha_report",
+    label: "Esperando reporte de Samantha",
+    requiresManualInput: true,
+    summary: "Pendiente de que el usuario cargue un reporte estructurado validable.",
+  },
+  {
+    id: "checking_odds",
+    label: "Odds externas",
+    requiresExternalIntegration: true,
+    summary: "Pendiente de proveedor comparable, rate limit y cache.",
+  },
+  {
+    id: "checking_kalshi",
+    label: "Kalshi",
+    requiresExternalIntegration: true,
+    summary: "Pendiente de comparador seguro de contratos equivalentes.",
+  },
+  {
+    id: "scoring_evidence",
+    label: "Scoring de evidencia",
+    summary: "Pendiente de evidencia externa validada suficiente.",
+  },
+  {
+    id: "generating_decision",
+    label: "Decision PolySignal",
+    summary: "Pendiente de evidencia suficiente; el precio del mercado no basta.",
+  },
+  {
+    id: "completed",
+    label: "Analisis listo",
+    summary: "Pendiente de completar el job profundo.",
+  },
+];
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function randomJobId(): string {
+  return `deep-job-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function createSteps(startedAt: string): DeepAnalysisJobStep[] {
+  return STEP_DEFINITIONS.map((definition, index) => ({
+    id: definition.id,
+    label: definition.label,
+    requiresExternalIntegration: definition.requiresExternalIntegration,
+    requiresManualInput: definition.requiresManualInput,
+    startedAt: index === 0 ? startedAt : undefined,
+    status: index === 0 ? "running" : "pending",
+    summary:
+      index === 0
+        ? "Leyendo mercado, outcomes, precios y estado desde Polymarket."
+        : definition.summary,
+    warnings: definition.warnings ?? [],
+  }));
+}
+
+function patchStep(
+  step: DeepAnalysisJobStep,
+  patch: Partial<DeepAnalysisJobStep>,
+  timestamp: string,
+): DeepAnalysisJobStep {
+  const status = patch.status ?? step.status;
+  return {
+    ...step,
+    ...patch,
+    completedAt:
+      status === "completed" || status === "blocked" || status === "failed"
+        ? patch.completedAt ?? step.completedAt ?? timestamp
+        : patch.completedAt,
+    startedAt:
+      status === "running" || status === "completed"
+        ? patch.startedAt ?? step.startedAt ?? timestamp
+        : patch.startedAt ?? step.startedAt,
+    status,
+    warnings: patch.warnings ?? step.warnings,
+  };
+}
+
+export function createDeepAnalysisJob(url: string): DeepAnalysisJob {
+  const createdAt = nowIso();
+  return {
+    createdAt,
+    id: randomJobId(),
+    resultReady: false,
+    status: "running",
+    steps: createSteps(createdAt),
+    updatedAt: createdAt,
+    url,
+  };
+}
+
+export function updateDeepAnalysisJobStep(
+  job: DeepAnalysisJob,
+  stepId: DeepAnalysisJobStepId,
+  patch: Partial<DeepAnalysisJobStep>,
+): DeepAnalysisJob {
+  const updatedAt = nowIso();
+  return {
+    ...job,
+    steps: job.steps.map((step) =>
+      step.id === stepId ? patchStep(step, patch, updatedAt) : step,
+    ),
+    updatedAt,
+  };
+}
+
+export function markJobPolymarketRead(
+  job: DeepAnalysisJob,
+  input: {
+    eventSlug?: string;
+    marketId?: string | number | null;
+    marketSlug?: string;
+    marketTitle?: string;
+    normalizedUrl?: string;
+  },
+): DeepAnalysisJob {
+  const next = updateDeepAnalysisJobStep(job, "reading_polymarket", {
+    status: "completed",
+    summary: "Polymarket leido: mercado, outcomes, precios y estado disponibles cuando la fuente los trae.",
+  });
+  return {
+    ...next,
+    eventSlug: input.eventSlug ?? next.eventSlug,
+    marketId:
+      input.marketId !== null && input.marketId !== undefined
+        ? String(input.marketId)
+        : next.marketId,
+    marketSlug: input.marketSlug ?? next.marketSlug,
+    marketTitle: input.marketTitle ?? next.marketTitle,
+    normalizedUrl: input.normalizedUrl ?? next.normalizedUrl,
+  };
+}
+
+export function markJobMarketAnalyzed(job: DeepAnalysisJob): DeepAnalysisJob {
+  return updateDeepAnalysisJobStep(job, "analyzing_market", {
+    status: "completed",
+    summary: "Mercado analizado con datos visibles de Polymarket; no se genero estimacion propia.",
+    warnings: ["El precio de mercado no es una estimacion PolySignal."],
+  });
+}
+
+export function markJobWalletsAnalyzed(
+  job: DeepAnalysisJob,
+  input: { available: boolean; summary?: string; warnings?: string[] },
+): DeepAnalysisJob {
+  return updateDeepAnalysisJobStep(job, "analyzing_wallets", {
+    status: input.available ? "completed" : "blocked",
+    summary:
+      input.summary ||
+      (input.available
+        ? "Wallet Intelligence revisada en modo read-only."
+        : "Wallet Intelligence no disponible para este mercado sin id compatible o datos suficientes."),
+    warnings: input.warnings ?? [],
+  });
+}
+
+export function markJobSamanthaBriefReady(job: DeepAnalysisJob): DeepAnalysisJob {
+  const next = updateDeepAnalysisJobStep(job, "preparing_samantha_research", {
+    status: "completed",
+    summary: "Brief estructurado listo para Samantha en flujo manual.",
+  });
+  return {
+    ...next,
+    briefReady: true,
+  };
+}
+
+export function markJobAwaitingSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
+  let next = updateDeepAnalysisJobStep(job, "profiling_wallets", {
+    status: "blocked",
+    summary: "Perfil historico de wallets pendiente de fuente estructurada confiable.",
+    warnings: ["No se calcula win rate ni ROI sin historial cerrado real."],
+  });
+  next = updateDeepAnalysisJobStep(next, "awaiting_samantha_report", {
+    requiresManualInput: true,
+    status: "running",
+    summary: "Esperando reporte estructurado de Samantha para evaluar evidencia externa.",
+  });
+  next = updateDeepAnalysisJobStep(next, "checking_odds", {
+    status: "blocked",
+    summary: "Odds externas pendientes de integracion segura; Samantha puede aportar comparacion manual validable.",
+  });
+  next = updateDeepAnalysisJobStep(next, "checking_kalshi", {
+    status: "blocked",
+    summary: "Kalshi pendiente de integracion segura; solo se aceptara si el reporte marca equivalencia clara.",
+  });
+  return {
+    ...next,
+    briefReady: true,
+    resultReady: false,
+    status: "awaiting_samantha",
+  };
+}
+
+export function markJobSamanthaReportLoaded(
+  job: DeepAnalysisJob,
+  input: { acceptedEstimate: boolean; signalCount: number },
+): DeepAnalysisJob {
+  let next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
+    status: "completed",
+    summary: "Reporte de Samantha cargado y validado localmente.",
+  });
+  next = updateDeepAnalysisJobStep(next, "scoring_evidence", {
+    status: input.signalCount > 0 ? "completed" : "blocked",
+    summary:
+      input.signalCount > 0
+        ? `Evidencia validada convertida en ${input.signalCount} senales estructuradas.`
+        : "Reporte valido, pero sin senales suficientes para scoring.",
+  });
+  next = updateDeepAnalysisJobStep(next, "generating_decision", {
+    status: input.acceptedEstimate ? "completed" : "blocked",
+    summary: input.acceptedEstimate
+      ? "Estimacion sugerida aceptada por las compuertas de validacion."
+      : "Decision PolySignal bloqueada: la evidencia no alcanza una prediccion responsable.",
+  });
+  if (input.acceptedEstimate) {
+    next = markJobCompleted(next);
+  }
+  return {
+    ...next,
+    resultReady: input.acceptedEstimate,
+    samanthaReportLoaded: true,
+    status: input.acceptedEstimate
+      ? "completed"
+      : input.signalCount > 0
+        ? "ready_to_score"
+        : "awaiting_samantha",
+  };
+}
+
+export function markJobCompleted(job: DeepAnalysisJob): DeepAnalysisJob {
+  const next = updateDeepAnalysisJobStep(job, "completed", {
+    status: "completed",
+    summary: "Analisis profundo completado con evidencia validada.",
+  });
+  return {
+    ...next,
+    resultReady: true,
+    status: "completed",
+  };
+}
+
+export function markJobFailed(job: DeepAnalysisJob, error: string): DeepAnalysisJob {
+  const current = getCurrentJobStep(job);
+  const next = current
+    ? updateDeepAnalysisJobStep(job, current.id, {
+        status: "failed",
+        summary: error,
+      })
+    : job;
+  return {
+    ...next,
+    error,
+    status: "failed",
+  };
+}
+
+export function getCurrentJobStep(job: DeepAnalysisJob): DeepAnalysisJobStep | undefined {
+  return (
+    job.steps.find((step) => step.status === "running") ??
+    job.steps.find((step) => step.status === "pending")
+  );
+}
+
+export function getJobProgressSummary(job: DeepAnalysisJob): DeepAnalysisJobSummary {
+  const completedSteps = job.steps.filter((step) => step.status === "completed").length;
+  const totalSteps = job.steps.length;
+  if (job.status === "completed") {
+    return {
+      completedSteps,
+      detail: "La evidencia cargada paso las compuertas locales del Deep Analyzer.",
+      headline: "Analisis profundo completado",
+      nextAction: "Guardar en Historial y verificar resultado cuando Polymarket resuelva.",
+      totalSteps,
+    };
+  }
+  if (job.status === "ready_to_score") {
+    return {
+      completedSteps,
+      detail: "Hay evidencia estructurada cargada, pero no basta para una estimacion final responsable.",
+      headline: "Evidencia cargada, decision pendiente",
+      nextAction: "Revisar el reporte o cargar evidencia adicional antes de guardar como prediccion.",
+      totalSteps,
+    };
+  }
+  if (job.status === "awaiting_samantha") {
+    return {
+      completedSteps,
+      detail: "PolySignal leyo Polymarket, reviso capas disponibles y preparo el brief externo.",
+      headline: "Analisis profundo iniciado",
+      nextAction: "Copia el brief para Samantha y carga su reporte estructurado para continuar.",
+      totalSteps,
+    };
+  }
+  if (job.status === "failed") {
+    return {
+      completedSteps,
+      detail: job.error || "El job local no pudo avanzar.",
+      headline: "Analisis profundo detenido",
+      nextAction: "Reintentar desde el analizador.",
+      totalSteps,
+    };
+  }
+  return {
+    completedSteps,
+    detail: "PolySignal esta resolviendo el enlace y preparando capas del analisis profundo.",
+    headline: "Analisis profundo en curso",
+    nextAction: "Espera a que Polymarket y las capas locales terminen de revisarse.",
+    totalSteps,
+  };
+}
+
+export function jobStepStatusLabel(status: DeepAnalysisJobStepStatus): string {
+  if (status === "completed") {
+    return "OK";
+  }
+  if (status === "running") {
+    return "Ahora";
+  }
+  if (status === "blocked") {
+    return "Esperando";
+  }
+  if (status === "failed") {
+    return "Error";
+  }
+  return "Pendiente";
+}

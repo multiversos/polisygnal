@@ -86,6 +86,28 @@ export default function MethodologyPage() {
         </div>
       </section>
 
+      <section className="dashboard-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Analisis profundo</p>
+            <h2>No hay modo rapido</h2>
+            <p>
+              Cada enlace inicia un job profundo local. PolySignal lee Polymarket,
+              revisa las capas disponibles, prepara el brief de Samantha y puede
+              quedar esperando investigacion externa antes de generar decision.
+            </p>
+          </div>
+        </div>
+        <div className="history-card-metrics">
+          <span>Job local: Polymarket leido</span>
+          <span>Wallet Intelligence: revisada si hay id compatible</span>
+          <span>Samantha: reporte manual validable</span>
+          <span>Odds/Kalshi: pendientes de integracion segura</span>
+          <span>No cuenta: pendiente de investigacion</span>
+          <span>No cuenta: evidencia insuficiente</span>
+        </div>
+      </section>
+
       <section className="safety-strip">
         <strong>Lectura responsable:</strong>
         <span>

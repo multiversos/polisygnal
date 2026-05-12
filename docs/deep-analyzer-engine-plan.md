@@ -7,6 +7,70 @@ PolySignal. Este sprint solo prepara contratos, helpers conservadores y UI de
 readiness. No activa llamadas externas nuevas, scraping, jobs, migraciones ni
 predicciones nuevas.
 
+## Sprint DeepAnalysisJob local
+
+El analizador ya no debe sentirse como una respuesta rapida que termina en dos
+segundos. El flujo actual prepara un `DeepAnalysisJob` local y lo conserva en
+`localStorage` para que el usuario vea que el analisis profundo queda en curso
+cuando falta investigacion externa.
+
+Archivos nuevos:
+
+- `apps/web/app/lib/deepAnalysisJob.ts`
+- `apps/web/app/lib/deepAnalysisJobStorage.ts`
+
+Estados del job:
+
+- `idle`
+- `running`
+- `awaiting_samantha`
+- `ready_to_score`
+- `completed`
+- `failed`
+
+Pasos del job:
+
+- `reading_polymarket`
+- `analyzing_market`
+- `analyzing_wallets`
+- `profiling_wallets`
+- `preparing_samantha_research`
+- `awaiting_samantha_report`
+- `checking_odds`
+- `checking_kalshi`
+- `scoring_evidence`
+- `generating_decision`
+- `completed`
+
+Que corre automaticamente hoy:
+
+- lectura estructurada Polymarket/Gamma/CLOB desde el endpoint seguro de
+  `/api/analyze-polymarket-link`;
+- analisis local de mercado visible, volumen/liquidez/precios/outcomes;
+- Wallet Intelligence read-only si hay id compatible;
+- generacion del brief local para Samantha.
+
+Que queda pendiente/manual:
+
+- perfil historico de wallets;
+- reporte de Samantha;
+- odds externas;
+- Kalshi;
+- scoring de evidencia;
+- decision PolySignal final.
+
+Regla importante:
+
+Cuando el brief de Samantha esta listo, el job queda en
+`awaiting_samantha`. No se marca `completed` hasta que un reporte validado
+aporte evidencia suficiente y pase las compuertas. Si el reporte valido aporta
+evidencia pero no estimacion aceptable, el job queda en `ready_to_score` y no
+cuenta para precision.
+
+El almacenamiento local solo guarda metadata y resumen del job. No guarda raw
+payloads, secretos, direcciones completas de wallets, HTML, evidencia no
+validada ni datos sensibles.
+
 ## Regla principal
 
 El Analizador de enlaces tiene un solo modo: analisis profundo.

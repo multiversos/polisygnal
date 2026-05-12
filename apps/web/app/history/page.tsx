@@ -229,6 +229,9 @@ function analyzerHrefForItem(item: AnalysisHistoryItem): string | null {
     auto: "1",
     url: item.url,
   });
+  if (item.deepAnalysisJobId) {
+    params.set("job", item.deepAnalysisJobId);
+  }
   return `/analyze?${params.toString()}`;
 }
 
@@ -827,6 +830,12 @@ export default function HistoryPage() {
                       <span className={`history-result-badge ${item.result || "unknown"}`}>
                         {statusLabel(item)}
                       </span>
+                      {item.awaitingResearch || item.researchStatus === "awaiting_samantha" ? (
+                        <span className="badge muted">Esperando reporte de Samantha</span>
+                      ) : null}
+                      {item.researchStatus === "ready_to_score" ? (
+                        <span className="badge external-hint">Evidencia cargada</span>
+                      ) : null}
                     </div>
                     <span className="timestamp-pill">{formatDate(item.analyzedAt)}</span>
                   </div>
@@ -851,6 +860,7 @@ export default function HistoryPage() {
                     <span>Resultado Polymarket {outcomeLabel(item.outcome)}</span>
                     <span>Evaluacion {evaluationLabel(item)}</span>
                     <span>Seguimiento {lifecycle.label}</span>
+                    {item.researchStatus ? <span>Investigacion {item.researchStatus}</span> : null}
                     <span>Fuente {resolutionSourceLabel(item.resolutionSource)}</span>
                     <span>Verificado {item.verifiedAt ? formatDate(item.verifiedAt) : "pendiente"}</span>
                     <span>Ultima revision {item.lastCheckedAt ? formatDate(item.lastCheckedAt) : "sin revision"}</span>
@@ -888,7 +898,9 @@ export default function HistoryPage() {
                   <div className="watchlist-actions">
                     {reanalyzeHref ? (
                       <a className="analysis-link" href={reanalyzeHref}>
-                        Reanalizar enlace
+                        {item.awaitingResearch || item.researchStatus === "awaiting_samantha"
+                          ? "Continuar analisis"
+                          : "Reanalizar enlace"}
                       </a>
                     ) : null}
                     {item.marketId ? (

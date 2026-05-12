@@ -563,6 +563,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("scouting-radar-core"), "analyze loading panel radar core is missing");
   assert(source.includes("RADAR_MARKET_CATEGORIES"), "analyze loading panel category config is missing");
   assert(source.includes("DEEP_LAYER_PREVIEW"), "analyze loading panel deep-layer preview is missing");
+  assert(source.includes("Deep Analysis Job"), "analyze loading panel should expose local deep-analysis job state");
   assert(source.includes("aria-live=\"polite\""), "analyze loading panel needs polite live status");
   for (const step of expectedSteps) {
     assert(source.includes(step), `analyze loading panel missing step: ${step}`);
@@ -602,6 +603,8 @@ function validateAnalyzeLoadingPanelSource() {
   );
   assert(analyzePage.includes("AnalyzerReport"), "analyze page does not render AnalyzerReport");
   assert(reportSource.includes("Resumen del analisis"), "AnalyzerReport missing executive summary");
+  assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport missing deep job state");
+  assert(reportSource.includes("Esperando reporte de Samantha"), "AnalyzerReport missing Samantha wait state");
   assert(reportSource.includes("Analisis profundo"), "AnalyzerReport missing deep analysis section");
   assert(reportSource.includes("Capas del motor"), "AnalyzerReport missing deep analyzer layers");
   assert(reportSource.includes("Pendiente de integracion"), "AnalyzerReport should label future layers as pending");
@@ -618,6 +621,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(homeSource.includes("Analiza enlaces de Polymarket y mide si PolySignal acierta"), "home does not position analyzer as primary entry");
   assert(homeSource.includes("Pega un enlace"), "home analyzer steps are missing");
   assert(historySource.includes("Analizar nuevo enlace"), "history page does not link back to analyzer");
+  assert(historySource.includes("Continuar analisis"), "history page should reopen pending deep research jobs");
   assert(historySource.includes("Ver rendimiento"), "history page does not link to performance");
   assert(analyzePage.includes("analyzer-selection-card"), "analyze page does not render compact selector cards");
   assert(!analyzePage.includes("Ver mercados deportivos"), "analyze no-match state must not offer internal market fallback");

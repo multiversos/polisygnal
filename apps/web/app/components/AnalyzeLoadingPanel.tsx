@@ -1,5 +1,10 @@
 import type { CSSProperties, ReactNode } from "react";
 
+import {
+  jobStepStatusLabel,
+  type DeepAnalysisJobStep,
+} from "../lib/deepAnalysisJob";
+
 export type AnalyzeLoadingPhase =
   | "validating"
   | "matching"
@@ -10,6 +15,7 @@ export type AnalyzeLoadingPhase =
 
 type AnalyzeLoadingPanelProps = {
   phase: AnalyzeLoadingPhase;
+  jobSteps?: DeepAnalysisJobStep[];
   message?: string;
   isVisible: boolean;
 };
@@ -345,6 +351,7 @@ function statusLabel(status: "completed" | "active" | "pending"): string {
 
 export function AnalyzeLoadingPanel({
   phase,
+  jobSteps,
   message,
   isVisible,
 }: AnalyzeLoadingPanelProps) {
@@ -468,6 +475,19 @@ export function AnalyzeLoadingPanel({
           <span key={item}>{item}</span>
         ))}
       </div>
+      {jobSteps && jobSteps.length > 0 ? (
+        <div className="deep-job-preview" aria-label="Estado del Deep Analysis Job">
+          <strong>Deep Analysis Job</strong>
+          <ol>
+            {jobSteps.slice(0, 6).map((step) => (
+              <li className={step.status} key={step.id}>
+                <span>{jobStepStatusLabel(step.status)}</span>
+                <small>{step.label}</small>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
       <p className="analyze-loading-footnote">
         Detectando primero y analizando solo el mercado confirmado. Las capas no
         integradas se muestran como pendientes, no como evidencia real.

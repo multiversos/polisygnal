@@ -217,6 +217,11 @@ Primary responsibilities:
 - Store analyses created from `/analyze`.
 - Keep normalized Polymarket URL, event slug, market slug, ids, prices,
   decision metadata, safe wallet summary and analyzer layer summaries.
+- Store local Deep Analyzer job metadata when an analysis is waiting for
+  Samantha or evidence scoring:
+  - `deepAnalysisJobId`
+  - `awaitingResearch`
+  - `researchStatus`
 - Track lifecycle fields locally:
   - `trackingStatus`
   - `lastCheckedAt`
@@ -224,6 +229,7 @@ Primary responsibilities:
   - `resolutionStatus`
 - Provide the input for `/performance`.
 - Let the user reanalyze the original link.
+- Let the user continue a pending deep research job from `/history`.
 - Let the user run a manual result refresh while there is no persistent backend
   job.
 
@@ -233,3 +239,12 @@ Accuracy remains strict:
 - pending, cancelled, unknown and no-clear-decision records do not count.
 - market-price-only records do not count.
 - the user does not manually decide hit/miss.
+
+Deep research status:
+
+- `awaiting_samantha` means the brief is ready and PolySignal is waiting for a
+  structured report.
+- `ready_to_score` means a report was valid and produced signals, but the
+  evidence did not pass the decision gate.
+- Neither state counts as hit, miss, accuracy, or a PolySignal prediction.
+- The CTA is `Continuar analisis`, not manual result editing.
