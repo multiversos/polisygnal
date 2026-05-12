@@ -1348,7 +1348,7 @@ export default function AnalyzePage() {
         <span>
           Detectar -&gt; Confirmar -&gt; Analizar. No usamos capturas, OCR ni imagenes;
           tampoco abrimos analisis profundos de mercados secundarios sin que
-          elijas uno.
+          elijas uno. Si guardas una lectura, queda en el historial local de este navegador.
         </span>
       </section>
 
