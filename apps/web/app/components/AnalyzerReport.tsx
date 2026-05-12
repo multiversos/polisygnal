@@ -9,6 +9,12 @@ import {
   type AnalyzerLayer,
   type AnalyzerResult,
 } from "../lib/analyzerResult";
+import {
+  buildDeepAnalysisFromPolymarketMarket,
+  mergeWalletIntelligenceLayer,
+  summarizeDeepAnalysis,
+} from "../lib/deepAnalyzerEngine";
+import type { DeepAnalysisLayerStatus } from "../lib/deepAnalyzerTypes";
 import type { AnalysisHistoryItem } from "../lib/analysisHistory";
 import {
   collectIndependentSignals,
@@ -181,6 +187,28 @@ function layerStatusLabel(status: AnalyzerLayer["status"]): string {
   return "No disponible";
 }
 
+function deepLayerStatusLabel(status: DeepAnalysisLayerStatus): string {
+  if (status === "available") {
+    return "Disponible";
+  }
+  if (status === "partial") {
+    return "Parcial";
+  }
+  if (status === "blocked") {
+    return "Pendiente de integracion";
+  }
+  if (status === "running") {
+    return "En revision";
+  }
+  if (status === "error") {
+    return "No consultado";
+  }
+  if (status === "pending") {
+    return "Pendiente";
+  }
+  return "No disponible";
+}
+
 function findLayer(result: AnalyzerResult, id: AnalyzerLayer["id"]): AnalyzerLayer {
   return (
     result.layers.find((layer) => layer.id === id) ?? {
@@ -300,6 +328,30 @@ export function AnalyzerReport({
   const walletSummary = getWalletIntelligenceSummary(item);
   const walletReading = getWalletSignalSummary(walletSummary);
   const walletReadiness = getWalletIntelligenceReadiness(item);
+  const deepAnalysis = mergeWalletIntelligenceLayer(
+    buildDeepAnalysisFromPolymarketMarket({
+      item,
+      normalizedUrl,
+      url: normalizedUrl,
+    }),
+    walletSummary,
+  );
+  const deepAnalysisSummary = summarizeDeepAnalysis(deepAnalysis);
+  const deepLayers = deepAnalysis.layers.filter((layer) =>
+    [
+      "polymarket_market",
+      "market_movement",
+      "wallet_intelligence",
+      "wallet_profiles",
+      "external_research",
+      "odds_comparison",
+      "kalshi_comparison",
+      "category_context",
+      "evidence_scoring",
+      "history_tracking",
+      "resolution",
+    ].includes(layer.id),
+  );
   const topWallets = walletSummary.topWallets ?? [];
   const latestHistory = relatedHistory[0];
   const marketLayer = findLayer(analyzerResult, "market");
@@ -429,6 +481,26 @@ export function AnalyzerReport({
         <span>Resolucion: Polymarket si aplica</span>
         <span>Investigacion externa: {research.verifiedVisibleCount > 0 ? "fuentes verificadas" : "pendiente"}</span>
         <span>Historial: este navegador</span>
+      </section>
+
+      <section className="analyzer-deep-readiness" aria-label="Analisis profundo">
+        <div className="probability-display-heading">
+          <div>
+            <p className="eyebrow">Analisis profundo</p>
+            <h4>Capas del motor</h4>
+          </div>
+          <span>{deepAnalysis.decision.available ? "Decision disponible" : "Decision pendiente"}</span>
+        </div>
+        <p className="analyzer-report-note">{deepAnalysisSummary}</p>
+        <div className="analyzer-deep-layer-grid">
+          {deepLayers.map((layer) => (
+            <article className={`analyzer-deep-layer ${layer.status}`} key={layer.id}>
+              <span>{deepLayerStatusLabel(layer.status)}</span>
+              <strong>{layer.label}</strong>
+              <p>{layer.summary}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="analyzer-report-layers" aria-label="Capas revisadas">

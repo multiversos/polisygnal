@@ -92,6 +92,12 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
 - After a market is selected, the result is rendered by `AnalyzerReport.tsx`.
   The report keeps a compact executive summary at the top, then groups deeper
   layers into collapsible sections instead of opening every block at once.
+- The selected report now also exposes a Deep Analyzer readiness strip. It is a
+  product contract, not a live job yet. It lists Polymarket market data, market
+  movement, Wallet Intelligence, wallet profiles, external research, odds,
+  Kalshi, category context, evidence scoring, history tracking and resolution
+  with honest statuses such as available, partial, pending, blocked or
+  unavailable.
 - The executive summary shows market probability, real PolySignal estimate
   availability, decision state, and whether the reading can count for accuracy
   later. It keeps the market price clearly separate from any PolySignal
@@ -169,6 +175,22 @@ Not implemented yet.
 - Treat Reddit and social discussion as weak/contextual signals only.
 - Store sources and timestamps.
 - Separate market probability from PolySignal probability.
+
+## Phase 3.5: Deep Analyzer Engine Readiness
+
+Prepared as frontend contracts only.
+
+- `deepAnalyzerTypes.ts` defines the full analysis result, layers, signals,
+  market payload and decision object.
+- `deepAnalyzerEngine.ts` builds conservative v0 layers from already available
+  Polymarket market data and sanitized Wallet Intelligence.
+- `deepAnalysisProgress.ts` models future job phases:
+  reading Polymarket, analyzing movement, wallets, wallet profiles, external
+  research, odds, Kalshi, evidence scoring and decision.
+- The v0 engine never creates a PolySignal probability from market price.
+- With only Polymarket data, the decision remains unavailable and does not
+  count for accuracy.
+- Future layers are visible as readiness/pending, not as claimed evidence.
 
 ## Phase 4: PolySignal Probability
 

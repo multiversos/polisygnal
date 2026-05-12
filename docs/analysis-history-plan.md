@@ -52,6 +52,13 @@ collects market signals and independent signals, then returns `available=false`
 unless a real PolySignal estimate already exists. This is intentional: v0 is a
 readiness layer, not a heuristic estimator.
 
+Deep Analyzer readiness is now prepared as a compact contract for future saved
+records. Until the backend engine exists, local history should store only layer
+summaries and sanitized wallet aggregates. It must not store fake research,
+fake odds, fake Kalshi comparisons, fake wallet profiles, or a decision created
+from market price. A saved Deep Analyzer v0 record remains no-clear-decision
+unless a real PolySignal estimate exists.
+
 ## Clear Prediction Rule
 
 PolySignal only creates a measurable `predicted_side` from a real PolySignal

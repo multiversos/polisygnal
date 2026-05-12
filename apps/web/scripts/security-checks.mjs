@@ -592,11 +592,11 @@ function validateAnalyzeLoadingPanelSource() {
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
   const expectedSteps = [
     "Detectando enlace",
-    "Resolviendo mercado/evento",
+    "Leyendo Polymarket",
     "Analizando mercado seleccionado",
-    "Revisando senales disponibles",
+    "Evaluando senales disponibles",
     "Revisando billeteras",
-    "Preparando lectura",
+    "Preparando decision",
   ];
   const expectedSkeletons = [
     "Mercado detectado",
@@ -613,6 +613,10 @@ function validateAnalyzeLoadingPanelSource() {
     "Mercados",
     "Cripto",
     "Billeteras",
+    "Perfiles",
+    "Research",
+    "Odds",
+    "Kalshi",
     "Historial",
     "Resolucion",
   ];
@@ -621,6 +625,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("scouting-radar-shell"), "expected prominent radar analytics visual shell");
   assert(source.includes("scouting-radar-core"), "expected radar center mark");
   assert(source.includes("RADAR_MARKET_CATEGORIES"), "expected multi-market radar category config");
+  assert(source.includes("DEEP_LAYER_PREVIEW"), "expected deep analyzer pending-layer preview in loading panel");
   assert(source.includes("aria-live=\"polite\""), "expected polite live region in loading panel");
   assert(source.includes("aria-busy=\"true\""), "expected busy state in loading panel");
   for (const step of expectedSteps) {
@@ -635,6 +640,8 @@ function validateAnalyzeLoadingPanelSource() {
   assert(!source.includes("setTimeout"), "loading panel should not use fake timers");
   assert(!source.includes("setInterval"), "loading panel should not use interval-based fake progress");
   assert(!source.includes("100%"), "loading panel should not expose invented percent progress");
+  assert(!source.includes("Buscando evidencia externa"), "loading panel must not claim external research is running");
+  assert(!source.includes("buscando internet"), "loading panel must not claim internet search is running");
   assert(analyzePage.includes("AnalyzeLoadingPanel"), "expected /analyze to render the loading panel");
   assert(analyzePage.includes("MarketSelectionPanel"), "expected /analyze to render the confirmation selector");
   assert(analyzePage.includes("analyzeSelectedMarket"), "expected /analyze to analyze only a selected market");
@@ -662,6 +669,9 @@ function validateAnalyzerReportSource() {
   const requiredCopy = [
     "Resumen del analisis",
     "Fuentes del analisis",
+    "Analisis profundo",
+    "Capas del motor",
+    "Pendiente de integracion",
     "Que puedes hacer ahora",
     "Analizar otro enlace",
     "Capas revisadas",
@@ -672,6 +682,8 @@ function validateAnalyzerReportSource() {
 
   assert(analyzePage.includes("AnalyzerReport"), "expected /analyze to render AnalyzerReport");
   assert(source.includes("buildAnalyzerResult"), "expected AnalyzerReport to use unified analyzer result model");
+  assert(source.includes("buildDeepAnalysisFromPolymarketMarket"), "expected AnalyzerReport to build deep analyzer readiness");
+  assert(source.includes("mergeWalletIntelligenceLayer"), "expected AnalyzerReport to merge wallet layer into deep readiness");
   assert(source.includes("getWalletIntelligenceSummary"), "expected AnalyzerReport to summarize wallet intelligence");
   assert(source.includes("getProbabilityDisplayState"), "expected AnalyzerReport to keep market probability separated");
   for (const copy of requiredCopy) {
@@ -684,6 +696,117 @@ function validateAnalyzerReportSource() {
   assert(!source.includes("copy this trader"), "AnalyzerReport should not recommend copy-trading");
 
   return { sections: requiredCopy.length, wallet_privacy_source_guard: true };
+}
+
+function validateDeepAnalyzerReadinessRules() {
+  const {
+    buildDeepAnalysisFromPolymarketMarket,
+    canGenerateDecision,
+    createInitialDeepAnalysis,
+    mergeWalletIntelligenceLayer,
+    summarizeDeepAnalysis,
+  } = loadTsModule("app/lib/deepAnalyzerEngine.ts");
+  const {
+    getDeepAnalysisProgressPlan,
+    getRunnableDeepAnalysisSteps,
+  } = loadTsModule("app/lib/deepAnalysisProgress.ts");
+  const typesSource = readFileSync(resolve(appRoot, "app/lib/deepAnalyzerTypes.ts"), "utf8");
+
+  const initial = createInitialDeepAnalysis("https://polymarket.com/event/test");
+  assert(!initial.decision.available, "initial deep analysis must not create a decision");
+  assert(initial.decision.side === "NONE", "initial deep analysis must not create a predicted side");
+
+  const marketOnly = buildDeepAnalysisFromPolymarketMarket({
+    item: {
+      latest_snapshot: {
+        liquidity: 450,
+        volume: 1200,
+      },
+      market: {
+        active: true,
+        closed: false,
+        event_slug: "nba-okc-lal-2026-05-11",
+        market_slug: "nba-okc-lal-2026-05-11-lal",
+        outcomes: [
+          { label: "YES", price: 0.61, side: "YES" },
+          { label: "NO", price: 0.39, side: "NO" },
+        ],
+        question: "Will the Lakers win?",
+        source: "gamma",
+      },
+    },
+    normalizedUrl: "https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11",
+  });
+
+  assert(marketOnly.market?.source === "gamma", "deep analyzer should preserve live Polymarket/Gamma source");
+  assert(!marketOnly.decision.available, "market-only deep analysis must not create a PolySignal estimate");
+  assert(marketOnly.decision.side === "NONE", "market-only deep analysis must not create predictedSide");
+  assert(marketOnly.decision.yesProbability === undefined, "market price must not become a PolySignal yesProbability");
+  assert(marketOnly.decision.noProbability === undefined, "market price must not become a PolySignal noProbability");
+  assert(
+    marketOnly.layers.some((layer) => layer.id === "polymarket_market" && layer.status === "available"),
+    "deep analyzer should mark Polymarket market data available when structured data exists",
+  );
+
+  const withWallet = mergeWalletIntelligenceLayer(marketOnly, {
+    analyzedCapitalUsd: 500,
+    available: true,
+    confidence: "low",
+    noCapitalUsd: 0,
+    reason: "Test fixture with real-shape wallet summary only.",
+    relevantWalletsCount: 1,
+    signalDirection: "YES",
+    source: "backend",
+    thresholdUsd: 100,
+    warnings: ["Senal auxiliar; no decision final."],
+    yesCapitalUsd: 500,
+  });
+  const walletLayer = withWallet.layers.find((layer) => layer.id === "wallet_intelligence");
+  assert(walletLayer?.status === "available", "real wallet summary should become an available auxiliary layer");
+  assert(walletLayer?.signals.length === 1, "wallet summary should create one auxiliary signal");
+  assert(!withWallet.decision.available, "wallet data alone must not create a PolySignal estimate");
+  assert(!canGenerateDecision(withWallet), "deep analyzer v0 must not generate a decision from wallet data alone");
+  assert(
+    summarizeDeepAnalysis(withWallet).includes("Sin decision PolySignal suficiente"),
+    "deep analyzer summary should remain conservative",
+  );
+
+  const progressPlan = getDeepAnalysisProgressPlan();
+  assert(
+    progressPlan.some(
+      (step) =>
+        step.state === "researching_external_sources" &&
+        !step.canRunNow &&
+        step.requiresBackendJob &&
+        step.requiresExternalSource,
+    ),
+    "external research progress must remain blocked until integration is authorized",
+  );
+  assert(
+    progressPlan.some((step) => step.state === "comparing_kalshi" && !step.canRunNow && step.requiresExternalSource),
+    "Kalshi comparison progress must remain blocked until integration is authorized",
+  );
+  assert(
+    getRunnableDeepAnalysisSteps().every((step) => step.canRunNow),
+    "runnable deep-analysis progress helper should return only runnable states",
+  );
+  for (const layerId of [
+    '"polymarket_market"',
+    '"wallet_profiles"',
+    '"external_research"',
+    '"odds_comparison"',
+    '"kalshi_comparison"',
+    '"decision"',
+    '"resolution"',
+  ]) {
+    assert(typesSource.includes(layerId), `deep analyzer types missing ${layerId}`);
+  }
+
+  return {
+    conservative_decision_guard: true,
+    layers: initial.layers.length,
+    progress_states: progressPlan.length,
+  };
 }
 
 function validateAnalyzerResultRules() {
@@ -1446,6 +1569,7 @@ const researchReadinessChecks = validateResearchReadinessRules();
 const walletIntelligenceChecks = await validateWalletIntelligenceRules();
 const analyzeLoadingPanelChecks = validateAnalyzeLoadingPanelSource();
 const analyzerReportChecks = validateAnalyzerReportSource();
+const deepAnalyzerReadinessChecks = validateDeepAnalyzerReadinessRules();
 const analyzerResultChecks = validateAnalyzerResultRules();
 const analyzerMatchRankingChecks = validateAnalyzerMatchRankingRules();
 const polymarketLinkResolverChecks = await validatePolymarketLinkResolverRules();
@@ -1466,6 +1590,7 @@ console.log(
       wallet_intelligence: walletIntelligenceChecks,
       analyze_loading_panel: analyzeLoadingPanelChecks,
       analyzer_report: analyzerReportChecks,
+      deep_analyzer_readiness: deepAnalyzerReadinessChecks,
       analyzer_result: analyzerResultChecks,
       analyzer_match_ranking: analyzerMatchRankingChecks,
       polymarket_link_resolver: polymarketLinkResolverChecks,

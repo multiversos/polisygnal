@@ -1,6 +1,6 @@
 # PolySignal Security Plan
 
-Last updated: 2026-05-10
+Last updated: 2026-05-12
 
 This document captures the current defensive security baseline for PolySignal.
 It is intentionally conservative: no production writes, no trading, no
@@ -174,6 +174,41 @@ Before expanding real wallet lookups:
 - avoid storing raw payloads;
 - document retention and deletion rules;
 - keep logs free of complete wallet lists.
+
+## Deep Analyzer External-Layer Safety
+
+The Deep Analyzer contracts expose future layers for external research, odds
+comparison, Kalshi comparison, wallet profiles, evidence scoring, and final
+decisioning. These layers are currently readiness states only unless a trusted
+structured source already exists.
+
+Current constraints:
+
+- `/analyze` remains Polymarket-first and uses structured Polymarket/Gamma/CLOB
+  data as its primary market source.
+- The Deep Analyzer v0 must not trigger internet search, Reddit/social lookups,
+  odds provider calls, Kalshi calls, or wallet profile lookups.
+- Future layers must be labeled as pending, blocked, or unavailable until the
+  integration is implemented and authorized.
+- The UI must not claim that external research, odds comparison, Kalshi matching,
+  or wallet profiling ran when those calls did not happen.
+- Market price can appear as market probability only. It must not become a
+  PolySignal estimate or prediction.
+- Wallet Intelligence remains an auxiliary signal. It must not create a
+  prediction without independent evidence scoring.
+- Public responses must not include raw payloads, raw HTML, stack traces,
+  provider credentials, or full wallet addresses.
+
+Before enabling any external Deep Analyzer layer:
+
+- run it server-side behind a narrow allowlist;
+- add short timeouts, response-size limits, caching, and rate limiting;
+- store only normalized, minimal fields;
+- define source-quality and citation requirements;
+- avoid aggressive HTML scraping;
+- log redacted metadata only;
+- add smoke/security checks proving disabled layers cannot be mistaken for real
+  evidence.
 
 ## Backend Proxy Security
 

@@ -501,6 +501,34 @@ Use these quick checks when reviewing public pages:
 16. Open a market detail page directly and confirm the primary CTA points back
     to `/analyze` or `/history`, not to sports browsing.
 
+## Deep Analyzer Readiness
+
+1. Open `/analyze`.
+2. Confirm the initial copy says the selected market receives an analisis
+   profundo.
+3. Run a valid Polymarket link and select one market if a selector appears.
+4. Confirm `AnalyzerReport` shows a compact `Analisis profundo` / capas del
+   motor section.
+5. Confirm these layers appear as available, partial, pending, blocked, or not
+   available:
+   - Polymarket.
+   - Movimiento del mercado.
+   - Wallet Intelligence.
+   - Perfiles de billeteras.
+   - Investigacion externa.
+   - Odds externas.
+   - Kalshi.
+   - Contexto por categoria.
+   - Scoring de evidencia.
+   - Historial.
+   - Resolucion.
+6. Confirm pending/future layers do not claim that internet, odds, Kalshi or
+   wallet profiles were actually queried.
+7. Confirm there are no fake news, fake odds, fake Kalshi matches, fake wallet
+   ROI/win rate, fake outcomes, or fake PolySignal probabilities.
+8. Confirm the Radar Analytics loader marks unintegrated layers as pending
+   rather than completed evidence.
+
 ## Cache Troubleshooting
 
 If a normal browser shows old data but backend/proxy checks pass:

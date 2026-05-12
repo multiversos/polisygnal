@@ -38,20 +38,20 @@ const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
     shortLabel: "Enlace",
   },
   {
-    detail: "Buscando slug exacto y evento",
-    label: "Resolviendo mercado/evento",
+    detail: "Mercado, outcomes y estado",
+    label: "Leyendo Polymarket",
     phase: "matching",
+    shortLabel: "Polymarket",
+  },
+  {
+    detail: "Volumen, liquidez y precios visibles",
+    label: "Analizando mercado seleccionado",
+    phase: "context",
     shortLabel: "Mercado",
   },
   {
-    detail: "Solo despues de confirmar",
-    label: "Analizando mercado seleccionado",
-    phase: "context",
-    shortLabel: "Seleccion",
-  },
-  {
-    detail: "Cobertura y datos pendientes",
-    label: "Revisando senales disponibles",
+    detail: "Capas disponibles y pendientes",
+    label: "Evaluando senales disponibles",
     phase: "readiness",
     shortLabel: "Senales",
   },
@@ -62,12 +62,19 @@ const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
     shortLabel: "Wallets",
   },
   {
-    detail: "Lectura responsable",
-    label: "Preparando lectura",
+    detail: "Sin prediccion si faltan evidencias",
+    label: "Preparando decision",
     phase: "preparing",
-    shortLabel: "Lectura",
+    shortLabel: "Decision",
   },
 ];
+
+const DEEP_LAYER_PREVIEW = [
+  "Perfiles de billeteras: pendiente",
+  "Investigacion externa: pendiente",
+  "Odds externas: pendiente",
+  "Kalshi: pendiente",
+] as const;
 
 const RESULT_SKELETONS = [
   "Mercado detectado",
@@ -159,6 +166,39 @@ function CategoryIcon({ id }: { id: string }) {
       </svg>
     );
   }
+  if (id === "profiles") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <circle cx="8" cy="8" r="3" />
+        <circle cx="16" cy="8" r="3" />
+        <path d="M4 19c.8-3 2.4-5 4-5s3.2 2 4 5M12 19c.8-3 2.4-5 4-5s3.2 2 4 5" />
+      </svg>
+    );
+  }
+  if (id === "research") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="6" />
+        <path d="m16 16 4 4M8 9h6M8 12h4" />
+      </svg>
+    );
+  }
+  if (id === "odds") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M5 17V7h14v10H5Z" />
+        <path d="M8 14h2M12 14h4M8 10h8M6 20h12" />
+      </svg>
+    );
+  }
+  if (id === "kalshi") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M5 18 12 5l7 13H5Z" />
+        <path d="M10 15h4M11 12l2-2" />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="8" />
@@ -223,6 +263,38 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     label: "Historial",
     shortLabel: "local",
     status: "scanning",
+  },
+  {
+    angle: 245,
+    icon: <CategoryIcon id="profiles" />,
+    id: "profiles",
+    label: "Perfiles",
+    shortLabel: "pendiente",
+    status: "pending",
+  },
+  {
+    angle: 280,
+    icon: <CategoryIcon id="research" />,
+    id: "research",
+    label: "Research",
+    shortLabel: "pendiente",
+    status: "pending",
+  },
+  {
+    angle: 315,
+    icon: <CategoryIcon id="odds" />,
+    id: "odds",
+    label: "Odds",
+    shortLabel: "futura",
+    status: "pending",
+  },
+  {
+    angle: 350,
+    icon: <CategoryIcon id="kalshi" />,
+    id: "kalshi",
+    label: "Kalshi",
+    shortLabel: "futura",
+    status: "pending",
   },
   {
     angle: 285,
@@ -374,9 +446,14 @@ export function AnalyzeLoadingPanel({
           </article>
         ))}
       </div>
+      <div className="scouting-legend deep-layer-preview" aria-label="Capas futuras preparadas">
+        {DEEP_LAYER_PREVIEW.map((item) => (
+          <span key={item}>{item}</span>
+        ))}
+      </div>
       <p className="analyze-loading-footnote">
-        Detectando primero y analizando solo el mercado confirmado. Esto puede
-        tardar unos segundos segun el mercado.
+        Detectando primero y analizando solo el mercado confirmado. Las capas no
+        integradas se muestran como pendientes, no como evidencia real.
       </p>
     </section>
   );

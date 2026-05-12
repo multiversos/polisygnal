@@ -77,7 +77,6 @@ const PUBLIC_TECHNICAL_TEXT = [
   "model_version",
   "raw data",
   "raw_data",
-  "Kalshi",
 ];
 const PUBLIC_SECURITY_TEXT = [
   "DATABASE_URL",
@@ -529,11 +528,11 @@ function validateAnalyzeLoadingPanelSource() {
   const linkSource = readFileSync(new URL("../app/lib/polymarketLink.ts", import.meta.url), "utf8");
   const expectedSteps = [
     "Detectando enlace",
-    "Resolviendo mercado/evento",
+    "Leyendo Polymarket",
     "Analizando mercado seleccionado",
-    "Revisando senales disponibles",
+    "Evaluando senales disponibles",
     "Revisando billeteras",
-    "Preparando lectura",
+    "Preparando decision",
   ];
   const expectedSkeletons = [
     "Mercado detectado",
@@ -550,6 +549,10 @@ function validateAnalyzeLoadingPanelSource() {
     "Mercados",
     "Cripto",
     "Billeteras",
+    "Perfiles",
+    "Research",
+    "Odds",
+    "Kalshi",
     "Historial",
     "Resolucion",
   ];
@@ -558,6 +561,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("scouting-radar-shell"), "analyze loading panel radar shell is missing");
   assert(source.includes("scouting-radar-core"), "analyze loading panel radar core is missing");
   assert(source.includes("RADAR_MARKET_CATEGORIES"), "analyze loading panel category config is missing");
+  assert(source.includes("DEEP_LAYER_PREVIEW"), "analyze loading panel deep-layer preview is missing");
   assert(source.includes("aria-live=\"polite\""), "analyze loading panel needs polite live status");
   for (const step of expectedSteps) {
     assert(source.includes(step), `analyze loading panel missing step: ${step}`);
@@ -571,6 +575,8 @@ function validateAnalyzeLoadingPanelSource() {
   assert(!source.includes("setTimeout"), "analyze loading panel should not use fake timers");
   assert(!source.includes("setInterval"), "analyze loading panel should not use fake progress intervals");
   assert(!source.includes("100%"), "analyze loading panel should not display invented 100% progress");
+  assert(!source.includes("Buscando evidencia externa"), "analyze loading panel must not claim external research is running");
+  assert(!source.includes("buscando internet"), "analyze loading panel must not claim internet search is running");
   assert(analyzePage.includes("AnalyzeLoadingPanel"), "analyze page does not render AnalyzeLoadingPanel");
   assert(analyzePage.includes("MarketSelectionPanel"), "analyze page does not render market selector");
   assert(analyzePage.includes("/api/analyze-polymarket-link"), "analyze page does not use the safe Polymarket resolver route");
@@ -595,6 +601,9 @@ function validateAnalyzeLoadingPanelSource() {
   );
   assert(analyzePage.includes("AnalyzerReport"), "analyze page does not render AnalyzerReport");
   assert(reportSource.includes("Resumen del analisis"), "AnalyzerReport missing executive summary");
+  assert(reportSource.includes("Analisis profundo"), "AnalyzerReport missing deep analysis section");
+  assert(reportSource.includes("Capas del motor"), "AnalyzerReport missing deep analyzer layers");
+  assert(reportSource.includes("Pendiente de integracion"), "AnalyzerReport should label future layers as pending");
   assert(reportSource.includes("Fuentes del analisis"), "AnalyzerReport missing source block");
   assert(reportSource.includes("Que puedes hacer ahora"), "AnalyzerReport missing next actions");
   assert(reportSource.includes("Analizar otro enlace"), "AnalyzerReport missing analyze another link action");
@@ -1082,6 +1091,8 @@ async function main() {
     assertTextIncludesOneOf(validAnalyzeText, ["Analizar este mercado", "Lectura del mercado"], "analyze confirm-before-deep-analysis");
     assertTextIncludesOneOf(validAnalyzeText, ["Lectura del mercado", "Precio Si", "Precio Sí"], "analyze market reading");
     assertTextIncludesOneOf(validAnalyzeText, ["Centro de analisis", "Selecciona que mercado", "Lectura del mercado"], "analyze product center summary");
+    assertTextIncludesOneOf(validAnalyzeText, ["Analisis profundo", "Selecciona que mercado"], "analyze deep analyzer readiness");
+    assertTextIncludesOneOf(validAnalyzeText, ["Pendiente de integracion", "Selecciona que mercado"], "analyze future layers are not presented as active");
     assertTextIncludesOneOf(validAnalyzeText, ["Que encontro PolySignal", "Preparacion de estimacion PolySignal", "Selecciona que mercado"], "analyze found summary");
     assertTextIncludesOneOf(
       validAnalyzeText,

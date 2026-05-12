@@ -10,6 +10,9 @@ estimaciones PolySignal.
 
 - `/analyze` y `/markets/[id]` muestran investigacion externa como pendiente si
   no hay hallazgos reales.
+- `/analyze` ya muestra la capa `Investigacion externa` dentro del contrato
+  Deep Analyzer, pero el estado sigue siendo pendiente/bloqueado hasta que haya
+  backend job, allowlist, rate limit, cache y quality gate.
 - `ResearchFinding` modela futuras evidencias con fuente, confiabilidad,
   direccion y visibilidad.
 - `researchReadiness.ts` calcula cobertura de investigacion sin crear
@@ -83,9 +86,17 @@ estimaciones PolySignal.
 
 1. Usuario pega enlace de Polymarket.
 2. PolySignal identifica mercado y contexto del partido.
-3. Backend consulta fuentes allowlisted con limites.
+3. Un Deep Analyzer backend job consulta fuentes allowlisted con limites.
 4. Backend normaliza hallazgos en `ResearchFinding`.
 5. UI muestra evidencias y faltantes.
 6. Solo cuando haya datos suficientes, un motor futuro puede calcular una
    estimacion propia.
 7. Historial guarda estimacion, fuentes usadas y version del estimador.
+
+## Relacion con Deep Analyzer
+
+La capa `ExternalResearchAgent` sera una de varias capas del motor profundo. No
+puede decidir sola y no puede decir que busco en internet si el job no corrio.
+Reddit/social queda como senal debil por defecto. Odds externas y Kalshi se
+modelan como capas separadas para evitar mezclar evidencia periodistica,
+mercados externos y comparacion de exchanges.

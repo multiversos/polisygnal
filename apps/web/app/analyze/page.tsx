@@ -1520,7 +1520,7 @@ export default function AnalyzePage() {
           <p className="subtitle">
             Pega un enlace de Polymarket. PolySignal detectara el mercado o
             evento y te pedira confirmar que quieres analizar antes de preparar
-            la lectura.
+            el analisis profundo.
           </p>
         </div>
         <div className="topbar-actions">
@@ -1533,7 +1533,7 @@ export default function AnalyzePage() {
       <section className="safety-strip">
         <strong>Flujo responsable:</strong>
         <span>
-          Detectar -&gt; Confirmar -&gt; Analizar. Resolvemos el enlace desde
+          Detectar -&gt; Confirmar -&gt; Analisis profundo. Resolvemos el enlace desde
           Polymarket/Gamma en modo solo lectura; no usamos capturas, OCR ni
           mercados internos como alternativa. Si guardas una lectura, queda en el historial local de este navegador.
         </span>
@@ -1578,7 +1578,7 @@ export default function AnalyzePage() {
           <div className="panel-heading compact">
             <div>
               <p className="eyebrow">Como funciona</p>
-              <h2>Detectar, confirmar y analizar</h2>
+              <h2>Detectar, confirmar y analizar en profundidad</h2>
               <p>
                 Pega un enlace de evento o mercado de Polymarket. Si el enlace
                 contiene varios mercados, te mostraremos un selector antes de analizar.
@@ -1599,7 +1599,7 @@ export default function AnalyzePage() {
             <article>
               <span>3</span>
               <strong>Analizamos solo el mercado elegido</strong>
-              <p>El reporte separa precio de mercado, estimacion propia y senales auxiliares.</p>
+              <p>El reporte prepara capas profundas: mercado, movimiento, billeteras, research, odds, Kalshi y decision.</p>
             </article>
             <article>
               <span>4</span>

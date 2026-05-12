@@ -4,7 +4,7 @@
 
 - fecha de corte: `2026-05-12`
 - etapa: `visible_product_mvp`
-- foco actual: `/analyze` como centro del producto, con lectura profunda read-only y sin auth ni escrituras
+- foco actual: `/analyze` como centro del producto, con arquitectura Deep Analyzer read-only preparada y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
 - ultimo deploy production verificado antes de este sprint: `336a9ed`
@@ -108,6 +108,16 @@ Estado visible verificado:
   inventados ni copy-trading.
 - `/analyze` muestra probabilidad del mercado basada en precio visible cuando
   existe y solo muestra estimacion PolySignal si el dato real esta disponible.
+- `/analyze` ahora prepara la direccion de producto "solo analisis profundo":
+  el reporte muestra capas de Deep Analyzer como Polymarket, movimiento del
+  mercado, Wallet Intelligence, perfiles de billeteras, investigacion externa,
+  odds externas, Kalshi, contexto, scoring de evidencia, historial y resolucion.
+  Las capas futuras aparecen como pendientes de integracion o no disponibles;
+  no se presentan como evidencia real.
+- Existen contratos frontend conservadores para el futuro motor profundo:
+  `deepAnalyzerTypes.ts`, `deepAnalyzerEngine.ts` y `deepAnalysisProgress.ts`.
+  No hacen fetch, no escriben DB, no activan research externo, no consultan
+  odds/Kalshi y no generan probabilidades PolySignal nuevas.
 - La estimacion PolySignal pasa por una compuerta de calidad: si el valor solo
   replica el precio visible del mercado, se muestra como probabilidad del
   mercado y no como estimacion propia.
@@ -281,6 +291,8 @@ Documentacion preparada:
   externas con allowlist, rate limit, cache y backend server-side.
 - `docs/wallet-intelligence-plan.md`: auditoria de fuentes de wallets/trades,
   modelo futuro, umbral, privacidad y reglas anti copy-trading.
+- `docs/deep-analyzer-engine-plan.md`: auditoria de modulos existentes,
+  arquitectura objetivo del motor profundo y contratos v0 conservadores.
 
 Estado actual:
 
@@ -326,8 +338,10 @@ Prioridad recomendada:
 
 1. Consolidar el flujo `/analyze` -> `/history` -> `/performance` como producto
    principal.
-2. Preparar backend persistente para analisis guardados, sin migracion real aun.
-3. Disenar auth tecnico y ownership checks antes de cualquier tabla de usuario.
-4. Planificar jobs de seguimiento y resolucion contra Polymarket/Gamma/CLOB.
-5. Mantener deportes/markets legacy ocultos hasta decidir si se archivan o
+2. Convertir los contratos Deep Analyzer en backend job seguro, con mocks y
+   quality gate antes de activar fuentes externas.
+3. Preparar backend persistente para analisis guardados, sin migracion real aun.
+4. Disenar auth tecnico y ownership checks antes de cualquier tabla de usuario.
+5. Planificar jobs de seguimiento y resolucion contra Polymarket/Gamma/CLOB.
+6. Mantener deportes/markets legacy ocultos hasta decidir si se archivan o
    redirigen.

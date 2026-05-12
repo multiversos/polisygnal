@@ -206,6 +206,12 @@ Wallet Intelligence is scoped to the selected analyzer market. It is not fetched
 for every possible match in the confirmation selector, which keeps the link
 flow quiet and avoids implying that secondary candidates were fully analyzed.
 
+In the Deep Analyzer contract, Wallet Intelligence is an auxiliary layer. If it
+has real read-only data it can contribute a real low-confidence signal with
+direction YES/NO/Neutral, but `WalletProfileAnalyzer` remains blocked until
+closed-position history, win rate and ROI can be computed from reliable public
+data. Wallet data alone must not create a PolySignal decision.
+
 It must not:
 
 - create a PolySignal probability by itself;
