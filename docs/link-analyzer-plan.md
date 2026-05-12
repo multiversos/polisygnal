@@ -7,10 +7,23 @@ Implemented as a frontend-only flow.
 - User opens `/analyze`.
 - User pastes a Polymarket link.
 - PolySignal validates that the link belongs to `polymarket.com`.
-- PolySignal compares the link against markets already loaded in the app.
+- PolySignal compares the link against markets already loaded in the app, then
+  presents the match as the main product analysis center.
 - If there is a match, the page shows existing market data only.
 - If there is no match, the page says so honestly.
 - User can save the result to local Historial.
+- The result is organized through `analyzerResult.ts`, a unified frontend model
+  that records the link, normalized URL, match confidence, market id, decision
+  state, accuracy eligibility, and reviewed analysis layers.
+- The analyzer layers are:
+  - `market`: detected market, title, status and match confidence.
+  - `probabilities`: market YES/NO probability from visible prices.
+  - `polysignal_estimate`: real PolySignal estimate if one exists.
+  - `event_context`: event or soccer match context from loaded data.
+  - `research`: external research coverage or missing categories.
+  - `wallet_intelligence`: sanitized read-only wallet summary.
+  - `history`: related local history records.
+  - `resolution`: verified result status when a trusted source is available.
 - If a matched market has visible YES/NO prices, the page shows the implied
   market probability from those prices.
 - If a PolySignal estimate already exists in the loaded data, the page shows it
@@ -37,6 +50,15 @@ Implemented as a frontend-only flow.
   `predicted_side`.
 - Market price probability must never be copied into
   `polysignal_probability_yes` or presented as `Estimacion PolySignal`.
+- Wallet Intelligence can appear as an auxiliary layer when the read-only
+  endpoint returns real sanitized data. It can improve readiness, but cannot
+  create a PolySignal prediction by itself.
+- Related local history is shown inside `/analyze` when the same market, URL,
+  slug, or remote id was analyzed before. This helps users avoid accidental
+  duplicate reads while still allowing a new dated analysis.
+- The final copy should read like a responsible review:
+  "PolySignal reviso las capas disponibles" and, when needed, "No hay evidencia
+  suficiente para emitir una estimacion propia responsable."
 - Saved link analyses can later be checked from `/history` with `Actualizar
   resultados`. This is automatic and does not ask the user to choose the final
   outcome manually.

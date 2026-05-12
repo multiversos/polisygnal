@@ -23,9 +23,36 @@ export type AnalysisHistoryResolutionSource = "clob" | "gamma" | "polymarket" | 
 export type AnalysisHistoryResult = "cancelled" | "hit" | "miss" | "pending" | "unknown";
 export type AnalysisHistorySource = "link_analyzer" | "manual" | "market_detail" | "unknown";
 export type AnalysisHistoryStatus = "open" | "resolved" | "unknown";
+export type AnalysisHistoryAnalyzerLayerStatus = "available" | "error" | "partial" | "pending" | "unavailable";
+
+export type AnalysisHistoryAnalyzerLayer = {
+  id: string;
+  label: string;
+  status: AnalysisHistoryAnalyzerLayerStatus;
+  summary: string;
+  warnings: string[];
+};
+
+export type AnalysisHistoryWalletSignalDirection = "BOTH" | "NEUTRAL" | "NO" | "UNKNOWN" | "YES";
+
+export type AnalysisHistoryWalletSummary = {
+  analyzedCapitalUsd?: number;
+  available: boolean;
+  checkedAt?: string;
+  confidence: "high" | "low" | "medium" | "none";
+  noCapitalUsd?: number;
+  reason: string;
+  relevantWalletsCount: number;
+  signalDirection: AnalysisHistoryWalletSignalDirection;
+  source?: "backend" | "local" | "unavailable";
+  thresholdUsd: number;
+  warnings: string[];
+  yesCapitalUsd?: number;
+};
 
 export type AnalysisHistoryItem = {
   analyzedAt: string;
+  analyzerLayers?: AnalysisHistoryAnalyzerLayer[];
   confidence?: AnalysisHistoryConfidence;
   conditionId?: string;
   decision?: AnalysisHistoryDecision;
@@ -56,6 +83,7 @@ export type AnalysisHistoryItem = {
   title: string;
   url?: string;
   verifiedAt?: string;
+  walletIntelligenceSummary?: AnalysisHistoryWalletSummary;
 };
 
 export type AnalysisHistoryStats = {
@@ -205,6 +233,108 @@ function normalizeString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function normalizeStringList(value: unknown, limit = 8): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is string => typeof item === "string" && item.trim() !== "")
+    .map((item) => item.trim())
+    .slice(0, limit);
+}
+
+function normalizeAnalyzerLayerStatus(value: unknown): AnalysisHistoryAnalyzerLayerStatus {
+  if (
+    value === "available" ||
+    value === "error" ||
+    value === "partial" ||
+    value === "pending" ||
+    value === "unavailable"
+  ) {
+    return value;
+  }
+  return "unavailable";
+}
+
+function normalizeAnalyzerLayers(value: unknown): AnalysisHistoryAnalyzerLayer[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const layers = value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      const candidate = item as Partial<AnalysisHistoryAnalyzerLayer>;
+      const id = normalizeString(candidate.id);
+      const label = normalizeString(candidate.label);
+      const summary = normalizeString(candidate.summary);
+      if (!id || !label || !summary) {
+        return null;
+      }
+      return {
+        id,
+        label,
+        status: normalizeAnalyzerLayerStatus(candidate.status),
+        summary,
+        warnings: normalizeStringList(candidate.warnings, 6),
+      };
+    })
+    .filter((item): item is AnalysisHistoryAnalyzerLayer => Boolean(item))
+    .slice(0, 12);
+  return layers.length > 0 ? layers : undefined;
+}
+
+function normalizeWalletSignalDirection(value: unknown): AnalysisHistoryWalletSignalDirection {
+  if (
+    value === "BOTH" ||
+    value === "NEUTRAL" ||
+    value === "NO" ||
+    value === "UNKNOWN" ||
+    value === "YES"
+  ) {
+    return value;
+  }
+  return "UNKNOWN";
+}
+
+function normalizeWalletConfidence(value: unknown): AnalysisHistoryWalletSummary["confidence"] {
+  if (value === "high" || value === "medium" || value === "low" || value === "none") {
+    return value;
+  }
+  return "none";
+}
+
+function normalizeWalletSource(value: unknown): AnalysisHistoryWalletSummary["source"] {
+  if (value === "backend" || value === "local" || value === "unavailable") {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeWalletSummary(value: unknown): AnalysisHistoryWalletSummary | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const summary = value as Partial<AnalysisHistoryWalletSummary>;
+  return {
+    analyzedCapitalUsd: normalizeNumber(summary.analyzedCapitalUsd),
+    available: summary.available === true,
+    checkedAt: normalizeString(summary.checkedAt),
+    confidence: normalizeWalletConfidence(summary.confidence),
+    noCapitalUsd: normalizeNumber(summary.noCapitalUsd),
+    reason:
+      normalizeString(summary.reason) ||
+      "Wallet Intelligence no tenia datos suficientes al guardar el analisis.",
+    relevantWalletsCount: normalizeNumber(summary.relevantWalletsCount) ?? 0,
+    signalDirection: normalizeWalletSignalDirection(summary.signalDirection),
+    source: normalizeWalletSource(summary.source),
+    thresholdUsd: normalizeNumber(summary.thresholdUsd) ?? 100,
+    warnings: normalizeStringList(summary.warnings, 8),
+    yesCapitalUsd: normalizeNumber(summary.yesCapitalUsd),
+  };
+}
+
 function normalizeEstimateQuality(value: unknown): AnalysisHistoryEstimateQuality | undefined {
   if (
     value === "insufficient_data" ||
@@ -250,6 +380,7 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
       : rawResult;
   return {
     analyzedAt: value.analyzedAt || nowIso(),
+    analyzerLayers: normalizeAnalyzerLayers(value.analyzerLayers),
     confidence: normalizeConfidence(value.confidence),
     conditionId: normalizeString(value.conditionId),
     decision: decision.decision,
@@ -288,6 +419,7 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     title,
     url: value.url || undefined,
     verifiedAt: normalizeString(value.verifiedAt),
+    walletIntelligenceSummary: normalizeWalletSummary(value.walletIntelligenceSummary),
   };
 }
 

@@ -187,6 +187,21 @@ when real wallet data exists. It should be marked:
 - low confidence when few wallets are available;
 - neutral when reliable wallets are split.
 
+In `/analyze`, Wallet Intelligence is now one layer of the unified analyzer
+result. The page can show:
+
+- whether wallet data is available;
+- the `$100+` threshold;
+- relevant wallet count;
+- observed capital;
+- YES/NO/Neutral bias when the endpoint provides side and amount;
+- confidence, usually low until historical wallet performance exists;
+- warnings that the signal is auxiliary and does not identify people.
+
+When the analysis is saved to local Historial, only the sanitized aggregate
+summary is stored. Top wallet rows are not saved in history metadata; public UI
+uses shortened addresses only when showing current endpoint results.
+
 It must not:
 
 - create a PolySignal probability by itself;

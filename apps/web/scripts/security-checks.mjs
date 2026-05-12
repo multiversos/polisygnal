@@ -565,31 +565,30 @@ function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(resolve(appRoot, "app/components/AnalyzeLoadingPanel.tsx"), "utf8");
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
   const expectedSteps = [
-    "Verificando enlace",
-    "Extrayendo informacion",
-    "Detectando categorias",
-    "Evaluando senales disponibles",
-    "Investigacion externa",
-    "Preparando resumen",
+    "Revisando enlace",
+    "Detectando mercado",
+    "Contexto del evento",
+    "Investigacion disponible",
+    "Billeteras publicas",
+    "Preparando decision",
   ];
   const expectedSkeletons = [
     "Mercado detectado",
-    "Senales disponibles",
-    "Contexto relevante",
-    "Billeteras publicas",
-    "Evidencia pendiente",
-    "Lectura final",
+    "Probabilidad del mercado",
+    "Estimacion PolySignal",
+    "Wallet Intelligence",
+    "Historial relacionado",
+    "Resultado/verificacion",
   ];
   const expectedCategories = [
     "Deportes",
-    "Baloncesto",
-    "Beisbol",
     "Noticias",
     "Politica",
     "Mercados",
     "Cripto",
-    "Global",
     "Billeteras",
+    "Historial",
+    "Resolucion",
   ];
 
   assert(source.includes("export type AnalyzeLoadingPhase"), "expected typed analyze loading phases");
@@ -618,6 +617,137 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes('advancePhase("preparing")'), "expected /analyze loader to enter preparing phase");
 
   return { phases: expectedSteps.length, skeletons: expectedSkeletons.length };
+}
+
+function validateAnalyzerResultRules() {
+  const {
+    buildAnalyzerResult,
+    getAnalyzerDecisionCopy,
+    getAnalyzerSummary,
+    getRelatedAnalyzerHistory,
+  } = loadTsModule("app/lib/analyzerResult.ts");
+
+  const normalizedUrl = "https://polymarket.com/event/test-market";
+  const marketPriceOnly = {
+    latest_snapshot: {
+      no_price: 0.4,
+      yes_price: 0.6,
+    },
+    market: {
+      active: true,
+      event_slug: "test-market",
+      event_title: "Test Team vs Other Team",
+      id: 123,
+      market_slug: "test-market",
+      question: "Will Test Team win?",
+      sport_type: "soccer",
+    },
+  };
+  const priceOnlyResult = buildAnalyzerResult({
+    item: marketPriceOnly,
+    matchScore: 72,
+    normalizedUrl,
+    relatedHistory: [],
+    url: normalizedUrl,
+  });
+
+  assert(priceOnlyResult.decision === "NONE", "market price only must not become an analyzer decision");
+  assert(!priceOnlyResult.canCountForAccuracy, "market price only must not count for accuracy");
+  assert(!priceOnlyResult.polySignalEstimateAvailable, "market price only must not become a PolySignal estimate");
+  assert(
+    priceOnlyResult.layers.some((layer) => layer.id === "wallet_intelligence"),
+    "analyzer result should include wallet intelligence layer",
+  );
+  assert(
+    priceOnlyResult.layers.some((layer) => layer.id === "history"),
+    "analyzer result should include related history layer",
+  );
+  assert(
+    priceOnlyResult.layers.some((layer) => layer.id === "resolution"),
+    "analyzer result should include resolution layer",
+  );
+  assert(
+    getAnalyzerDecisionCopy(priceOnlyResult).label.includes("Sin estimacion"),
+    "price only analyzer copy must stay honest",
+  );
+
+  const realEstimate = {
+    ...marketPriceOnly,
+    estimateQuality: "real_polysignal_estimate",
+    latest_prediction: {
+      no_probability: 0.38,
+      yes_probability: 0.62,
+    },
+  };
+  const realResult = buildAnalyzerResult({
+    item: realEstimate,
+    matchScore: 80,
+    normalizedUrl,
+    relatedHistory: [
+      {
+        analyzedAt: "2026-05-11T00:00:00.000Z",
+        decision: "clear",
+        id: "history-1",
+        marketId: "123",
+        predictedSide: "YES",
+        result: "pending",
+        source: "link_analyzer",
+        status: "open",
+        title: "Will Test Team win?",
+        url: normalizedUrl,
+      },
+    ],
+    url: normalizedUrl,
+  });
+  assert(realResult.decision === "YES", "real PolySignal estimate should allow clear YES decision");
+  assert(realResult.canCountForAccuracy, "real clear estimate should be countable after resolution");
+  assert(getAnalyzerSummary(realResult).found.length > 0, "analyzer summary should describe found layers");
+
+  const walletOnly = {
+    ...marketPriceOnly,
+    walletIntelligence: {
+      summary: {
+        analyzedCapitalUsd: 250,
+        available: true,
+        confidence: "low",
+        reason: "Test wallet data",
+        relevantWalletsCount: 1,
+        signalDirection: "YES",
+        source: "backend",
+        thresholdUsd: 100,
+        warnings: ["Actividad publica observada"],
+        yesCapitalUsd: 250,
+      },
+    },
+  };
+  const walletOnlyResult = buildAnalyzerResult({
+    item: walletOnly,
+    matchScore: 78,
+    normalizedUrl,
+    relatedHistory: [],
+    url: normalizedUrl,
+  });
+  assert(walletOnlyResult.decision === "NONE", "wallet data alone must not create a prediction");
+  assert(!walletOnlyResult.canCountForAccuracy, "wallet data alone must not count for accuracy");
+
+  const related = getRelatedAnalyzerHistory({
+    historyItems: [
+      {
+        analyzedAt: "2026-05-11T00:00:00.000Z",
+        id: "history-2",
+        marketId: "123",
+        source: "link_analyzer",
+        status: "open",
+        title: "Will Test Team win?",
+        url: normalizedUrl,
+      },
+    ],
+    marketId: 123,
+    normalizedUrl,
+  });
+  assert(related.length === 1, "expected analyzer related history lookup to match market id");
+
+  return { cases: 14, layers: priceOnlyResult.layers.length };
 }
 
 async function validatePolymarketResolutionAdapter() {
@@ -851,6 +981,7 @@ const estimateEngineChecks = validateEstimateEngineRules();
 const researchReadinessChecks = validateResearchReadinessRules();
 const walletIntelligenceChecks = await validateWalletIntelligenceRules();
 const analyzeLoadingPanelChecks = validateAnalyzeLoadingPanelSource();
+const analyzerResultChecks = validateAnalyzerResultRules();
 const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
 const resolutionRouteChecks = await validateResolvePolymarketRoute();
 const proxyChecks = await validateBackendProxy();
@@ -865,6 +996,7 @@ console.log(
       research_readiness: researchReadinessChecks,
       wallet_intelligence: walletIntelligenceChecks,
       analyze_loading_panel: analyzeLoadingPanelChecks,
+      analyzer_result: analyzerResultChecks,
       polymarket_resolution_adapter: resolutionAdapterChecks,
       resolve_polymarket_route: resolutionRouteChecks,
       proxy: proxyChecks,

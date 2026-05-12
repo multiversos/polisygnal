@@ -2,12 +2,12 @@
 
 ## Snapshot
 
-- fecha de corte: `2026-05-10`
+- fecha de corte: `2026-05-11`
 - etapa: `visible_product_mvp`
-- foco actual: historial local con resolucion automatica conservadora, sin auth ni escrituras
+- foco actual: `/analyze` como centro del producto, con lectura profunda read-only y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este bloque: `02dcacd`
+- ultimo deploy production verificado antes de este sprint: `a61864c`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -48,6 +48,10 @@ Estado visible verificado:
   sin inventar resultados.
 - `/analyze` esta disponible para validar enlaces de Polymarket, compararlos con
   mercados ya cargados y guardar resultados locales en Historial.
+- `/analyze` ahora organiza el resultado como centro de analisis mediante
+  `analyzerResult.ts`: mercado detectado, probabilidad de mercado, estimacion
+  PolySignal si existe, contexto, investigacion, Wallet Intelligence, historial
+  relacionado y resolucion/verificacion.
 - `/analyze` muestra probabilidad del mercado basada en precio visible cuando
   existe y solo muestra estimacion PolySignal si el dato real esta disponible.
 - La estimacion PolySignal pasa por una compuerta de calidad: si el valor solo
@@ -69,11 +73,11 @@ Estado visible verificado:
   llama fuentes externas ni muestra fixtures/demo como datos reales.
 - `/analyze` muestra un panel de carga guiado tipo Radar Analytics multi-market
   mientras compara enlaces: radar central con categorias visuales de deportes,
-  noticias, politica, mercados, cripto y eventos globales, pasos laterales,
-  skeletons inferiores y fases reales de validacion, extraccion, categorias,
-  senales disponibles, investigacion externa y resumen final. No usa una barra
-  de progreso inventada, timers falsos, imagenes externas, logos ni rostros
-  reales para simular avance.
+  noticias, politica, mercados, cripto, billeteras, historial y resolucion,
+  pasos laterales, skeletons inferiores y fases reales de enlace, mercado,
+  contexto, investigacion, billeteras y decision. No usa una barra de progreso
+  inventada, timers falsos, imagenes externas, logos ni rostros reales para
+  simular avance.
 - Existe una primera capa de Wallet Intelligence:
   `walletIntelligenceTypes.ts`, `walletIntelligence.ts` y
   `walletIntelligenceAdapter.ts`. El adapter consulta de forma read-only el
@@ -82,6 +86,9 @@ Estado visible verificado:
   payloads crudos y deja claro que no identifica personas ni recomienda copiar
   operaciones. La UI resume capital observado, sesgo YES/NO/Neutral, confianza y
   advertencias como senal auxiliar, no como prediccion final.
+- El guardado desde `/analyze` usa el resultado unificado para conservar en
+  Historial un resumen local de capas y wallet summary agregado. No guarda
+  payloads crudos ni direcciones completas.
 - `/history` puede intentar `Actualizar resultados` de forma automatica usando
   datos read-only disponibles; no pide al usuario marcar YES/NO manualmente.
 - hit/miss solo se calcula cuando existe outcome confiable y una prediccion

@@ -32,50 +32,50 @@ type RadarMarketCategory = {
 
 const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
   {
-    detail: "Conexion segura establecida",
-    label: "Verificando enlace",
+    detail: "Validacion segura del enlace",
+    label: "Revisando enlace",
     phase: "validating",
-    shortLabel: "Polymarket",
+    shortLabel: "Enlace",
   },
   {
-    detail: "Datos del mercado obtenidos",
-    label: "Extrayendo informacion",
+    detail: "Coincidencias cargadas",
+    label: "Detectando mercado",
     phase: "matching",
     shortLabel: "Mercado",
   },
   {
-    detail: "Identificando mercado relevante",
-    label: "Detectando categorias",
+    detail: "Evento, estado y categoria",
+    label: "Contexto del evento",
     phase: "context",
-    shortLabel: "Multi-market",
+    shortLabel: "Contexto",
   },
   {
-    detail: "Revisando actividad, wallets publicas y contexto",
-    label: "Evaluando senales disponibles",
+    detail: "Cobertura y datos pendientes",
+    label: "Investigacion disponible",
     phase: "readiness",
-    shortLabel: "Datos visibles",
-  },
-  {
-    detail: "Cobertura pendiente o disponible",
-    label: "Investigacion externa",
-    phase: "research",
     shortLabel: "Cobertura",
   },
   {
-    detail: "Generando lectura final",
-    label: "Preparando resumen",
+    detail: "Revisando datos disponibles de billeteras",
+    label: "Billeteras publicas",
+    phase: "research",
+    shortLabel: "Wallets",
+  },
+  {
+    detail: "Lectura responsable",
+    label: "Preparando decision",
     phase: "preparing",
-    shortLabel: "Resumen",
+    shortLabel: "Decision",
   },
 ];
 
 const RESULT_SKELETONS = [
   "Mercado detectado",
-  "Senales disponibles",
-  "Contexto relevante",
-  "Billeteras publicas",
-  "Evidencia pendiente",
-  "Lectura final",
+  "Probabilidad del mercado",
+  "Estimacion PolySignal",
+  "Wallet Intelligence",
+  "Historial relacionado",
+  "Resultado/verificacion",
 ] as const;
 
 function CategoryIcon({ id }: { id: string }) {
@@ -133,6 +133,23 @@ function CategoryIcon({ id }: { id: string }) {
       </svg>
     );
   }
+  if (id === "history") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M6 5h11a2 2 0 0 1 2 2v12H8a2 2 0 0 1-2-2V5Z" />
+        <path d="M9 9h6M9 12h7M9 15h4M6 17H5a2 2 0 0 1-2-2V7" />
+      </svg>
+    );
+  }
+  if (id === "resolution") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M12 4v4M12 16v4M4 12h4M16 12h4" />
+        <circle cx="12" cy="12" r="4" />
+        <path d="m10.5 12 1.1 1.2 2.2-2.5" />
+      </svg>
+    );
+  }
   if (id === "wallets") {
     return (
       <svg viewBox="0 0 24 24">
@@ -160,23 +177,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "scanning",
   },
   {
-    angle: 0,
-    icon: <CategoryIcon id="basketball" />,
-    id: "basketball",
-    label: "Baloncesto",
-    shortLabel: "categoria",
-    status: "pending",
-  },
-  {
-    angle: 40,
-    icon: <CategoryIcon id="baseball" />,
-    id: "baseball",
-    label: "Beisbol",
-    shortLabel: "categoria",
-    status: "pending",
-  },
-  {
-    angle: 70,
+    angle: 20,
     icon: <CategoryIcon id="news" />,
     id: "news",
     label: "Noticias",
@@ -184,7 +185,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "scanning",
   },
   {
-    angle: 115,
+    angle: 65,
     icon: <CategoryIcon id="politics" />,
     id: "politics",
     label: "Politica",
@@ -192,7 +193,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "pending",
   },
   {
-    angle: 160,
+    angle: 110,
     icon: <CategoryIcon id="markets" />,
     id: "markets",
     label: "Mercados",
@@ -200,7 +201,7 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "detected",
   },
   {
-    angle: 205,
+    angle: 155,
     icon: <CategoryIcon id="crypto" />,
     id: "crypto",
     label: "Cripto",
@@ -208,20 +209,28 @@ const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
     status: "pending",
   },
   {
-    angle: 240,
-    icon: <CategoryIcon id="global" />,
-    id: "global",
-    label: "Global",
-    shortLabel: "eventos",
-    status: "scanning",
-  },
-  {
-    angle: 285,
+    angle: 205,
     icon: <CategoryIcon id="wallets" />,
     id: "wallets",
     label: "Billeteras",
     shortLabel: "publicas",
     status: "scanning",
+  },
+  {
+    angle: 250,
+    icon: <CategoryIcon id="history" />,
+    id: "history",
+    label: "Historial",
+    shortLabel: "local",
+    status: "scanning",
+  },
+  {
+    angle: 285,
+    icon: <CategoryIcon id="resolution" />,
+    id: "resolution",
+    label: "Resolucion",
+    shortLabel: "outcome",
+    status: "pending",
   },
 ];
 
@@ -366,7 +375,7 @@ export function AnalyzeLoadingPanel({
         ))}
       </div>
       <p className="analyze-loading-footnote">
-        Escaneando categorias, wallets publicas y datos disponibles. Esto puede
+        Revisando mercado, wallets publicas, historial local y datos disponibles. Esto puede
         tardar unos segundos segun el mercado.
       </p>
     </section>

@@ -521,27 +521,30 @@ function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(new URL("../app/components/AnalyzeLoadingPanel.tsx", import.meta.url), "utf8");
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
   const expectedSteps = [
-    "Verificando enlace",
-    "Extrayendo informacion",
-    "Detectando categorias",
-    "Evaluando senales disponibles",
-    "Investigacion externa",
-    "Preparando resumen",
+    "Revisando enlace",
+    "Detectando mercado",
+    "Contexto del evento",
+    "Investigacion disponible",
+    "Billeteras publicas",
+    "Preparando decision",
   ];
   const expectedSkeletons = [
     "Mercado detectado",
-    "Senales disponibles",
-    "Contexto relevante",
-    "Billeteras publicas",
-    "Evidencia pendiente",
-    "Lectura final",
+    "Probabilidad del mercado",
+    "Estimacion PolySignal",
+    "Wallet Intelligence",
+    "Historial relacionado",
+    "Resultado/verificacion",
   ];
   const expectedCategories = [
     "Deportes",
     "Noticias",
     "Politica",
     "Mercados",
+    "Cripto",
     "Billeteras",
+    "Historial",
+    "Resolucion",
   ];
 
   assert(source.includes("Analizando mercado"), "analyze loading panel heading is missing");
@@ -562,6 +565,10 @@ function validateAnalyzeLoadingPanelSource() {
   assert(!source.includes("setInterval"), "analyze loading panel should not use fake progress intervals");
   assert(!source.includes("100%"), "analyze loading panel should not display invented 100% progress");
   assert(analyzePage.includes("AnalyzeLoadingPanel"), "analyze page does not render AnalyzeLoadingPanel");
+  assert(analyzePage.includes("buildAnalyzerResult"), "analyze page does not use unified analyzer result");
+  assert(analyzePage.includes("Centro de analisis"), "analyze page does not include product center summary");
+  assert(analyzePage.includes("Capas revisadas"), "analyze page does not include reviewed layers");
+  assert(analyzePage.includes("Historial relacionado"), "analyze page does not include related history");
   assert(analyzePage.includes('advancePhase("matching")'), "analyze page does not drive matching phase");
   assert(analyzePage.includes('advancePhase("preparing")'), "analyze page does not drive preparing phase");
 
@@ -906,6 +913,10 @@ async function main() {
     "analyze valid match state",
   );
   assertTextIncludes(validAnalyzeText, "Lectura del mercado", "analyze market reading");
+  assertTextIncludesOneOf(validAnalyzeText, ["Centro de analisis", "Lectura del mercado"], "analyze product center summary");
+  assertTextIncludesOneOf(validAnalyzeText, ["Que encontro PolySignal", "Preparacion de estimacion PolySignal"], "analyze found summary");
+  assertTextIncludesOneOf(validAnalyzeText, ["Capas revisadas", "Lectura por capas", "Preparacion de datos"], "analyze reviewed layers");
+  assertTextIncludesOneOf(validAnalyzeText, ["Historial relacionado", "Guardar analisis"], "analyze related history layer");
   assertTextIncludes(validAnalyzeText, "Probabilidad del mercado", "analyze market probability");
   assertTextIncludesOneOf(
     validAnalyzeText,

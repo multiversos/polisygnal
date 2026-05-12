@@ -12,6 +12,24 @@ phase it only validates Polymarket links and compares them with markets already
 loaded in PolySignal. It does not fetch external Polymarket pages or create new
 market records.
 
+`/analyze` now builds a unified `AnalyzerResult` before rendering and before
+saving matched analyses. The saved local record can include a sanitized layer
+summary:
+
+- market detected;
+- market probability;
+- PolySignal estimate availability;
+- event context;
+- research readiness;
+- Wallet Intelligence summary;
+- related history;
+- result/resolution status.
+
+This metadata is stored only in localStorage for the current browser. Wallet
+metadata is aggregate-only: relevant wallet count, observed capital, YES/NO
+capital when available, threshold, confidence, reason, source, and warnings. It
+does not store raw wallet payloads or complete wallet addresses.
+
 When a matched market has visible YES/NO prices, `/analyze` stores the implied
 market probability from those prices. If a PolySignal estimate already exists
 in the loaded data, it is stored separately as the PolySignal estimate. If that
@@ -135,6 +153,8 @@ Resolution lifecycle planned for a future backend phase:
 - `predicted_side`
 - `evaluation_status`
 - `evaluation_reason`
+- `analyzer_layers` (local summary only)
+- `wallet_intelligence_summary` (aggregate, no full addresses)
 - `remote_id`
 - `condition_id`
 - `event_slug`

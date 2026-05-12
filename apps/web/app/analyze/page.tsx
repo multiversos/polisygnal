@@ -8,7 +8,7 @@ import {
 } from "../components/AnalyzeLoadingPanel";
 import { MainNavigation } from "../components/MainNavigation";
 import { fetchApiJson } from "../lib/api";
-import { getDecisionLabel, getPolySignalDecision } from "../lib/analysisDecision";
+import { getPolySignalDecision } from "../lib/analysisDecision";
 import {
   getPolymarketUrlValidationMessage,
   extractPossibleMarketTerms,
@@ -34,6 +34,13 @@ import {
 } from "../lib/estimationSignals";
 import { getPolySignalEstimate } from "../lib/polySignalEstimateEngine";
 import {
+  buildAnalyzerResult,
+  getAnalyzerDecisionCopy,
+  getAnalyzerSummary,
+  getRelatedAnalyzerHistory,
+  type AnalyzerResult,
+} from "../lib/analyzerResult";
+import {
   extractSoccerMatchContext,
   formatSoccerMatchContext,
   getSoccerContextReadiness,
@@ -47,7 +54,12 @@ import {
 import { getWalletIntelligenceForMarket } from "../lib/walletIntelligenceAdapter";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
-import { saveAnalysisHistoryItem } from "../lib/analysisHistory";
+import {
+  ANALYSIS_HISTORY_STORAGE_EVENT,
+  getAnalysisHistory,
+  saveAnalysisHistoryItem,
+  type AnalysisHistoryItem,
+} from "../lib/analysisHistory";
 import {
   fetchWatchlistItems,
   toggleWatchlistMarket,
@@ -298,7 +310,29 @@ async function enrichMatchesWithWalletIntelligence(matches: MatchResult[]): Prom
   );
 }
 
-function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: string) {
+function safeWalletSummaryForHistory(item: MarketOverviewItem) {
+  const summary = getWalletIntelligenceSummary(item);
+  return {
+    analyzedCapitalUsd: summary.analyzedCapitalUsd,
+    available: summary.available,
+    checkedAt: summary.checkedAt,
+    confidence: summary.confidence,
+    noCapitalUsd: summary.noCapitalUsd,
+    reason: summary.reason,
+    relevantWalletsCount: summary.relevantWalletsCount,
+    signalDirection: summary.signalDirection,
+    source: summary.source,
+    thresholdUsd: summary.thresholdUsd,
+    warnings: summary.warnings.slice(0, 6),
+    yesCapitalUsd: summary.yesCapitalUsd,
+  };
+}
+
+function historyPayloadFromMarket(
+  item: MarketOverviewItem,
+  normalizedUrl: string,
+  analyzerResult: AnalyzerResult,
+) {
   const marketProbabilities = getMarketImpliedProbabilities({
     marketNoPrice: item.latest_snapshot?.no_price,
     marketYesPrice: item.latest_snapshot?.yes_price,
@@ -323,8 +357,16 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
         : decision.predictedSide === "UNKNOWN"
           ? decision.evaluationReason
           : "Prediccion clara guardada solo cuando la estimacion PolySignal supera 55%.";
+  const analyzerSummary = getAnalyzerSummary(analyzerResult);
   return {
     analyzedAt: new Date().toISOString(),
+    analyzerLayers: analyzerResult.layers.map((layer) => ({
+      id: layer.id,
+      label: layer.label,
+      status: layer.status,
+      summary: layer.summary,
+      warnings: layer.warnings.slice(0, 4),
+    })),
     confidence:
       confidenceScore === null
         ? ("Desconocida" as const)
@@ -345,7 +387,7 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
           ? decision.evaluationReason
           : "Sin estimacion PolySignal suficiente.",
     evaluationStatus: decision.evaluationStatus,
-    id: `link-${item.market?.id ?? Date.now()}`,
+    id: `link-${item.market?.id ?? "market"}-${Date.now()}`,
     marketId: item.market?.id ? String(item.market.id) : undefined,
     marketSlug: item.market?.market_slug || undefined,
     marketNoProbability: marketProbabilities?.no,
@@ -354,7 +396,7 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
     polySignalNoProbability: polySignalProbabilities?.no,
     polySignalYesProbability: polySignalProbabilities?.yes,
     predictedSide: decision.predictedSide,
-    reasons: [reviewReason.reason, activity?.detail, predictionReason].filter(
+    reasons: [analyzerSummary.headline, reviewReason.reason, activity?.detail, predictionReason].filter(
       (reason): reason is string => Boolean(reason),
     ),
     result: "pending" as const,
@@ -364,6 +406,7 @@ function historyPayloadFromMarket(item: MarketOverviewItem, normalizedUrl: strin
     status: "open" as const,
     title: marketTitle(item),
     url: normalizedUrl,
+    walletIntelligenceSummary: safeWalletSummaryForHistory(item),
   };
 }
 
@@ -601,18 +644,169 @@ function WalletIntelligenceBlock({ item }: { item: MarketOverviewItem }) {
   );
 }
 
+function analyzerStatusLabel(status: AnalyzerResult["layers"][number]["status"]): string {
+  if (status === "available") {
+    return "Disponible";
+  }
+  if (status === "partial") {
+    return "Parcial";
+  }
+  if (status === "pending") {
+    return "Pendiente";
+  }
+  if (status === "error") {
+    return "No consultado";
+  }
+  return "No disponible";
+}
+
+function historyDecisionLabel(item: AnalysisHistoryItem): string {
+  if (item.decision === "clear" && (item.predictedSide === "YES" || item.predictedSide === "NO")) {
+    return `Prediccion clara ${item.predictedSide}`;
+  }
+  if (item.decision === "weak") {
+    return "Sin decision fuerte";
+  }
+  if (item.estimateQuality === "market_price_only") {
+    return "Solo probabilidad de mercado";
+  }
+  return "Sin estimacion PolySignal";
+}
+
+function historyResultLabel(item: AnalysisHistoryItem): string {
+  if (item.result === "hit") {
+    return "Acerto";
+  }
+  if (item.result === "miss") {
+    return "Fallo";
+  }
+  if (item.result === "cancelled") {
+    return "Cancelado";
+  }
+  if (item.result === "unknown") {
+    return "Desconocido";
+  }
+  return "Pendiente";
+}
+
+function AnalyzerSummaryBlock({ result }: { result: AnalyzerResult }) {
+  const summary = getAnalyzerSummary(result);
+  return (
+    <section className="analyzer-center-summary" aria-label="Resumen del centro de analisis">
+      <div>
+        <p className="eyebrow">Centro de analisis</p>
+        <h4>Que encontro PolySignal</h4>
+        <strong>{summary.headline}</strong>
+        <p>{summary.detail}</p>
+      </div>
+      <div className="analyzer-summary-columns">
+        <div>
+          <span>Encontrado</span>
+          <ul>
+            {summary.found.slice(0, 4).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <span>Falta o esta pendiente</span>
+          <ul>
+            {summary.missing.slice(0, 4).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <span>Que puedes hacer ahora</span>
+          <ul>
+            {summary.nextSteps.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AnalyzerLayersBlock({ result }: { result: AnalyzerResult }) {
+  return (
+    <section className="analyzer-layers-section" aria-label="Capas de analisis revisadas">
+      <div className="probability-display-heading">
+        <h4>Capas revisadas</h4>
+        <span>Lectura responsable</span>
+      </div>
+      <div className="analyzer-layer-grid">
+        {result.layers.map((layer) => (
+          <article className={`analyzer-layer-card ${layer.status}`} key={layer.id}>
+            <div>
+              <strong>{layer.label}</strong>
+              <span>{analyzerStatusLabel(layer.status)}</span>
+            </div>
+            <p>{layer.summary}</p>
+            {layer.warnings.length > 0 ? (
+              <small>{layer.warnings.slice(0, 2).join(" | ")}</small>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function RelatedHistoryBlock({ items }: { items: AnalysisHistoryItem[] }) {
+  const latest = items[0];
+  return (
+    <section className="related-history-panel" aria-label="Historial relacionado">
+      <div className="probability-display-heading">
+        <h4>Historial relacionado</h4>
+        <span>{items.length > 0 ? `${items.length} analisis` : "Sin historial"}</span>
+      </div>
+      {latest ? (
+        <div className="related-history-card">
+          <div>
+            <strong>Ya analizaste este mercado</strong>
+            <span>{formatDate(latest.analyzedAt)}</span>
+          </div>
+          <div className="data-health-notes">
+            <span className="badge">{historyDecisionLabel(latest)}</span>
+            <span className="badge muted">{historyResultLabel(latest)}</span>
+            {latest.resolutionSource && latest.resolutionSource !== "unknown" ? (
+              <span className="badge external-hint">Verificado</span>
+            ) : null}
+          </div>
+          <p className="section-note">
+            Puedes guardar una nueva lectura si quieres dejar constancia de una revision mas reciente.
+          </p>
+        </div>
+      ) : (
+        <div className="empty-state compact">
+          <strong>Este mercado aun no esta en tu historial.</strong>
+          <p>Si guardas el analisis, quedara como lectura local de este navegador.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function MatchCard({
   busy,
   item,
+  matchScore,
+  normalizedUrl,
   onSaveHistory,
   onToggleWatchlist,
+  relatedHistory,
   saved,
   watchlisted,
 }: {
   busy: boolean;
   item: MarketOverviewItem;
+  matchScore: number;
+  normalizedUrl: string;
   onSaveHistory: (item: MarketOverviewItem) => void;
   onToggleWatchlist: (item: MarketOverviewItem) => void;
+  relatedHistory: AnalysisHistoryItem[];
   saved: boolean;
   watchlisted: boolean;
 }) {
@@ -633,6 +827,14 @@ function MatchCard({
     polySignalNoProbability: probabilityState.polySignal?.no,
     polySignalYesProbability: probabilityState.polySignal?.yes,
   });
+  const analyzerResult = buildAnalyzerResult({
+    item,
+    matchScore,
+    normalizedUrl,
+    relatedHistory,
+    url: normalizedUrl,
+  });
+  const analyzerDecision = getAnalyzerDecisionCopy(analyzerResult);
   return (
     <article className="analyze-result-card">
       <div className="history-card-header">
@@ -643,12 +845,23 @@ function MatchCard({
         </div>
         <span className="timestamp-pill">{formatDate(latestUpdate(item))}</span>
       </div>
-      <h3>{marketTitle(item)}</h3>
-      <p className="section-note">{eventTitle(item)}</p>
-      <p>{reason.reason}</p>
-      <SoccerContextBlock item={item} />
-      <ExternalResearchBlock item={item} />
-      <WalletIntelligenceBlock item={item} />
+      <div className="analyzer-result-hero">
+        <div>
+          <h3>{marketTitle(item)}</h3>
+          <p className="section-note">{eventTitle(item)}</p>
+          <p>{analyzerResult.decisionReason}</p>
+        </div>
+        <div className="data-health-notes">
+          <span className="badge">Confianza match: {analyzerResult.matchConfidence}</span>
+          {analyzerResult.matchedMarketId ? (
+            <span className="badge muted">Market ID {analyzerResult.matchedMarketId}</span>
+          ) : null}
+          <span className={analyzerResult.canCountForAccuracy ? "badge external-hint" : "badge muted"}>
+            {analyzerResult.canCountForAccuracy ? "Puede contar luego" : "No cuenta todavia"}
+          </span>
+        </div>
+      </div>
+      <AnalyzerSummaryBlock result={analyzerResult} />
       <div className="probability-display-panel">
         <div className="probability-display-heading">
           <h4>Lectura del mercado</h4>
@@ -689,13 +902,9 @@ function MatchCard({
         ) : null}
         <div className={`probability-decision-card ${decision.decision}`}>
           <span>Decision de PolySignal</span>
-          <strong>{getDecisionLabel(decision.decision, decision.predictedSide)}</strong>
-          <p>{decision.detail}</p>
-          <small>
-            Para medir aciertos, PolySignal solo cuenta mercados donde su estimacion supera
-            el umbral de decision del 55%. El resultado final se verificara con Polymarket
-            cuando el mercado cierre.
-          </small>
+          <strong>{analyzerDecision.label}</strong>
+          <p>{analyzerDecision.detail}</p>
+          <small>{analyzerDecision.note}</small>
         </div>
         <p className="section-note">{probabilityState.disclaimer}</p>
         <div className="empty-state compact">
@@ -712,6 +921,17 @@ function MatchCard({
           </p>
         </div>
       </div>
+      <AnalyzerLayersBlock result={analyzerResult} />
+      <section className="analyzer-depth-section" aria-label="Capas profundas del analisis">
+        <div className="probability-display-heading">
+          <h4>Lectura por capas</h4>
+          <span>Datos reales y pendientes</span>
+        </div>
+        <SoccerContextBlock item={item} />
+        <ExternalResearchBlock item={item} />
+        <WalletIntelligenceBlock item={item} />
+        <RelatedHistoryBlock items={relatedHistory} />
+      </section>
       <div className="history-card-metrics">
         <span>Precio Si {formatPublicProbability(item.latest_snapshot?.yes_price)}</span>
         <span>Precio No {formatPublicProbability(item.latest_snapshot?.no_price)}</span>
@@ -728,7 +948,7 @@ function MatchCard({
           onClick={() => onSaveHistory(item)}
           type="button"
         >
-          {saved ? "Guardado en historial" : "Guardar analisis"}
+          {saved ? "Guardar nueva lectura" : "Guardar analisis"}
         </button>
         <button
           className={`watchlist-button ${watchlisted ? "active" : ""}`}
@@ -756,6 +976,7 @@ export default function AnalyzePage() {
   const [state, setState] = useState<SearchState>({ status: "idle" });
   const [loading, setLoading] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<AnalyzeLoadingPhase>("validating");
+  const [analysisHistoryItems, setAnalysisHistoryItems] = useState<AnalysisHistoryItem[]>([]);
   const [savedHistoryKeys, setSavedHistoryKeys] = useState<Set<string>>(new Set());
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
   const [actionBusy, setActionBusy] = useState(false);
@@ -768,6 +989,25 @@ export default function AnalyzePage() {
 
   useEffect(() => {
     void fetchWatchlistItems().then(setWatchlistItems);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const refreshHistory = () => {
+      void getAnalysisHistory().then((items) => {
+        if (mounted) {
+          setAnalysisHistoryItems(items);
+        }
+      });
+    };
+    refreshHistory();
+    window.addEventListener(ANALYSIS_HISTORY_STORAGE_EVENT, refreshHistory);
+    window.addEventListener("storage", refreshHistory);
+    return () => {
+      mounted = false;
+      window.removeEventListener(ANALYSIS_HISTORY_STORAGE_EVENT, refreshHistory);
+      window.removeEventListener("storage", refreshHistory);
+    };
   }, []);
 
   useEffect(() => {
@@ -898,8 +1138,25 @@ export default function AnalyzePage() {
     setActionBusy(true);
     setActionMessage(null);
     try {
-      const payload = historyPayloadFromMarket(item, state.normalizedUrl);
-      await saveAnalysisHistoryItem(payload);
+      const relatedHistory = getRelatedAnalyzerHistory({
+        eventSlug: item.market?.event_slug,
+        historyItems: analysisHistoryItems,
+        marketId: item.market?.id,
+        marketSlug: item.market?.market_slug,
+        normalizedUrl: state.normalizedUrl,
+        remoteId: item.market?.remote_id,
+      });
+      const currentMatch = state.matches.find((match) => match.item.market?.id === item.market?.id);
+      const analyzerResult = buildAnalyzerResult({
+        item,
+        matchScore: currentMatch?.score,
+        normalizedUrl: state.normalizedUrl,
+        relatedHistory,
+        url: state.normalizedUrl,
+      });
+      const payload = historyPayloadFromMarket(item, state.normalizedUrl, analyzerResult);
+      const savedItem = await saveAnalysisHistoryItem(payload);
+      setAnalysisHistoryItems((current) => [savedItem, ...current.filter((entry) => entry.id !== savedItem.id)]);
       setSavedHistoryKeys((current) => new Set(current).add(String(item.market?.id ?? payload.id)));
       setActionMessage("Analisis guardado en Historial.");
     } catch {
@@ -907,7 +1164,7 @@ export default function AnalyzePage() {
     } finally {
       setActionBusy(false);
     }
-  }, [state]);
+  }, [analysisHistoryItems, state]);
 
   const handleSavePending = useCallback(async () => {
     if (state.status !== "not_found") {
@@ -957,6 +1214,8 @@ export default function AnalyzePage() {
   }, []);
 
   const matches = state.status === "matched" || state.status === "possible" ? state.matches : [];
+  const analyzedNormalizedUrl =
+    state.status === "matched" || state.status === "possible" ? state.normalizedUrl : "";
 
   return (
     <main className="dashboard-shell analyze-page">
@@ -1089,24 +1348,39 @@ export default function AnalyzePage() {
             <span className="badge muted">{matches.length} resultados</span>
           </div>
           <div className="analyze-results-list">
-            {matches.map((match) => (
-              <div className="analyze-match-shell" key={`${match.item.market?.id}-${match.score}`}>
-                <div className="data-health-notes">
-                  <span className="badge muted">Coincidencia {match.score}</span>
-                  {match.reasons.slice(0, 2).map((reason) => (
-                    <span className="badge" key={reason}>{reason}</span>
-                  ))}
+            {matches.map((match) => {
+              const relatedHistory = getRelatedAnalyzerHistory({
+                eventSlug: match.item.market?.event_slug,
+                historyItems: analysisHistoryItems,
+                marketId: match.item.market?.id,
+                marketSlug: match.item.market?.market_slug,
+                normalizedUrl: analyzedNormalizedUrl,
+                remoteId: match.item.market?.remote_id,
+              });
+              const saved =
+                relatedHistory.length > 0 || savedHistoryKeys.has(String(match.item.market?.id));
+              return (
+                <div className="analyze-match-shell" key={`${match.item.market?.id}-${match.score}`}>
+                  <div className="data-health-notes">
+                    <span className="badge muted">Coincidencia {match.score}</span>
+                    {match.reasons.slice(0, 2).map((reason) => (
+                      <span className="badge" key={reason}>{reason}</span>
+                    ))}
+                  </div>
+                  <MatchCard
+                    busy={actionBusy}
+                    item={match.item}
+                    matchScore={match.score}
+                    normalizedUrl={analyzedNormalizedUrl}
+                    onSaveHistory={handleSaveHistory}
+                    onToggleWatchlist={handleToggleWatchlist}
+                    relatedHistory={relatedHistory}
+                    saved={saved}
+                    watchlisted={Boolean(match.item.market?.id && watchlistByMarketId.has(match.item.market.id))}
+                  />
                 </div>
-                <MatchCard
-                  busy={actionBusy}
-                  item={match.item}
-                  onSaveHistory={handleSaveHistory}
-                  onToggleWatchlist={handleToggleWatchlist}
-                  saved={savedHistoryKeys.has(String(match.item.market?.id))}
-                  watchlisted={Boolean(match.item.market?.id && watchlistByMarketId.has(match.item.market.id))}
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       ) : null}
