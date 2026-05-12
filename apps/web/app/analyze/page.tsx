@@ -6,6 +6,7 @@ import {
   AnalyzeLoadingPanel,
   type AnalyzeLoadingPhase,
 } from "../components/AnalyzeLoadingPanel";
+import { AnalyzerReport } from "../components/AnalyzerReport";
 import { MainNavigation } from "../components/MainNavigation";
 import { fetchApiJson } from "../lib/api";
 import { getPolySignalDecision } from "../lib/analysisDecision";
@@ -1453,7 +1454,7 @@ export default function AnalyzePage() {
                       <span className="badge" key={reason}>{reason}</span>
                     ))}
                   </div>
-                  <MatchCard
+                  <AnalyzerReport
                     busy={actionBusy}
                     item={match.item}
                     matchScore={match.score}

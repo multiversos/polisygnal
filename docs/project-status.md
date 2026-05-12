@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con lectura profunda read-only y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `a61864c`
+- ultimo deploy production verificado antes de este sprint: `918c0d0`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -52,6 +52,10 @@ Estado visible verificado:
   `analyzerResult.ts`: mercado detectado, probabilidad de mercado, estimacion
   PolySignal si existe, contexto, investigacion, Wallet Intelligence, historial
   relacionado y resolucion/verificacion.
+- El resultado seleccionado de `/analyze` se presenta con `AnalyzerReport.tsx`:
+  resumen ejecutivo compacto, fuentes visibles, capas avanzadas plegables,
+  Wallet Intelligence con drilldown seguro y acciones claras para guardar,
+  ver historial, abrir detalle o seguir mercado.
 - `/analyze` usa flujo `Detectar -> Confirmar -> Analizar -> Guardar ->
   Verificar resultado`: un enlace primero se parsea y rankea de forma estricta,
   luego el usuario confirma un mercado antes de ejecutar el analisis profundo.
@@ -66,6 +70,11 @@ Estado visible verificado:
   match exacto/fuerte, se ocultan coincidencias debiles.
 - Wallet Intelligence se consulta solo para el mercado seleccionado, no para
   todas las coincidencias secundarias del enlace.
+- Wallet Intelligence en el reporte muestra capital observado, sesgo
+  YES/NO/Neutral, confianza, umbral `100 USD+` y direcciones abreviadas solo
+  cuando existen datos reales. El detalle queda detras de `Ver todas las
+  billeteras analizadas` y no muestra direcciones completas, ROI/win rate
+  inventados ni copy-trading.
 - `/analyze` muestra probabilidad del mercado basada en precio visible cuando
   existe y solo muestra estimacion PolySignal si el dato real esta disponible.
 - La estimacion PolySignal pasa por una compuerta de calidad: si el valor solo

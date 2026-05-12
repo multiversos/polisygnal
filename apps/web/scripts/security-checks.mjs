@@ -642,6 +642,34 @@ function validateAnalyzeLoadingPanelSource() {
   return { phases: expectedSteps.length, skeletons: expectedSkeletons.length };
 }
 
+function validateAnalyzerReportSource() {
+  const source = readFileSync(resolve(appRoot, "app/components/AnalyzerReport.tsx"), "utf8");
+  const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
+  const requiredCopy = [
+    "Resumen del analisis",
+    "Fuentes del analisis",
+    "Capas revisadas",
+    "Ver todas las billeteras analizadas",
+    "No hay suficiente actividad publica de billeteras",
+    "PolySignal separa el precio del mercado de su estimacion propia",
+  ];
+
+  assert(analyzePage.includes("AnalyzerReport"), "expected /analyze to render AnalyzerReport");
+  assert(source.includes("buildAnalyzerResult"), "expected AnalyzerReport to use unified analyzer result model");
+  assert(source.includes("getWalletIntelligenceSummary"), "expected AnalyzerReport to summarize wallet intelligence");
+  assert(source.includes("getProbabilityDisplayState"), "expected AnalyzerReport to keep market probability separated");
+  for (const copy of requiredCopy) {
+    assert(source.includes(copy), `AnalyzerReport missing required copy: ${copy}`);
+  }
+  assert(!source.includes("wallet.walletAddress"), "AnalyzerReport must not render full wallet addresses");
+  assert(!/0x[a-fA-F0-9]{40}/.test(source), "AnalyzerReport source should not contain full wallet addresses");
+  assert(!source.includes("win rate 100%"), "AnalyzerReport should not invent win-rate copy");
+  assert(!source.includes("ROI 100%"), "AnalyzerReport should not invent ROI copy");
+  assert(!source.includes("copy this trader"), "AnalyzerReport should not recommend copy-trading");
+
+  return { sections: requiredCopy.length, wallet_privacy_source_guard: true };
+}
+
 function validateAnalyzerResultRules() {
   const {
     buildAnalyzerResult,
@@ -1090,6 +1118,7 @@ const estimateEngineChecks = validateEstimateEngineRules();
 const researchReadinessChecks = validateResearchReadinessRules();
 const walletIntelligenceChecks = await validateWalletIntelligenceRules();
 const analyzeLoadingPanelChecks = validateAnalyzeLoadingPanelSource();
+const analyzerReportChecks = validateAnalyzerReportSource();
 const analyzerResultChecks = validateAnalyzerResultRules();
 const analyzerMatchRankingChecks = validateAnalyzerMatchRankingRules();
 const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
@@ -1106,6 +1135,7 @@ console.log(
       research_readiness: researchReadinessChecks,
       wallet_intelligence: walletIntelligenceChecks,
       analyze_loading_panel: analyzeLoadingPanelChecks,
+      analyzer_report: analyzerReportChecks,
       analyzer_result: analyzerResultChecks,
       analyzer_match_ranking: analyzerMatchRankingChecks,
       polymarket_resolution_adapter: resolutionAdapterChecks,

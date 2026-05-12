@@ -519,6 +519,7 @@ function validateMarketDetailPage(dom, label) {
 
 function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(new URL("../app/components/AnalyzeLoadingPanel.tsx", import.meta.url), "utf8");
+  const reportSource = readFileSync(new URL("../app/components/AnalyzerReport.tsx", import.meta.url), "utf8");
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
   const expectedSteps = [
     "Detectando enlace",
@@ -570,9 +571,23 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("analyzeSelectedMarket"), "analyze page does not gate deep analysis behind selection");
   assert(!analyzePage.includes("enrichMatchesWithWalletIntelligence(matches)"), "wallet intelligence should not load for all matches");
   assert(analyzePage.includes("buildAnalyzerResult"), "analyze page does not use unified analyzer result");
-  assert(analyzePage.includes("Centro de analisis"), "analyze page does not include product center summary");
-  assert(analyzePage.includes("Capas revisadas"), "analyze page does not include reviewed layers");
-  assert(analyzePage.includes("Historial relacionado"), "analyze page does not include related history");
+  assert(
+    analyzePage.includes("Centro de analisis") || reportSource.includes("Centro de analisis"),
+    "analyze report does not include product center summary",
+  );
+  assert(
+    analyzePage.includes("Capas revisadas") || reportSource.includes("Capas revisadas"),
+    "analyze report does not include reviewed layers",
+  );
+  assert(
+    analyzePage.includes("Historial relacionado") || reportSource.includes("Historial relacionado"),
+    "analyze report does not include related history",
+  );
+  assert(analyzePage.includes("AnalyzerReport"), "analyze page does not render AnalyzerReport");
+  assert(reportSource.includes("Resumen del analisis"), "AnalyzerReport missing executive summary");
+  assert(reportSource.includes("Fuentes del analisis"), "AnalyzerReport missing source block");
+  assert(reportSource.includes("Ver todas las billeteras analizadas"), "AnalyzerReport missing wallet drilldown");
+  assert(!reportSource.includes("wallet.walletAddress"), "AnalyzerReport should not render full wallet addresses");
   assert(analyzePage.includes('advancePhase("matching")'), "analyze page does not drive matching phase");
   assert(analyzePage.includes('advancePhase("preparing")'), "analyze page does not drive preparing phase");
 

@@ -68,6 +68,24 @@ Implemented as a frontend-only flow.
   duplicate reads while still allowing a new dated analysis.
 - Wallet Intelligence is fetched only after the user selects a market for deep
   analysis. It is not loaded for secondary candidates in the selector.
+- After a market is selected, the result is rendered by `AnalyzerReport.tsx`.
+  The report keeps a compact executive summary at the top, then groups deeper
+  layers into collapsible sections instead of opening every block at once.
+- The executive summary shows market probability, real PolySignal estimate
+  availability, decision state, and whether the reading can count for accuracy
+  later. It keeps the market price clearly separate from any PolySignal
+  estimate.
+- Advanced layers are grouped as context, data preparation, external research,
+  Wallet Intelligence, related history, and result verification. Each layer has
+  a one-line summary first, with details available on demand.
+- Wallet Intelligence appears as a compact auxiliary signal. If real public
+  wallet data exists, the report shows observed capital, YES/NO/Neutral bias,
+  confidence, threshold `$100+`, and shortened wallet addresses behind a
+  drilldown labelled `Ver todas las billeteras analizadas`.
+- The report includes a compact data-sources row: market price from Polymarket,
+  market/event data from PolySignal plus Polymarket, wallet data from
+  Polymarket/Gamma read-only when available, external research as pending or
+  verified, and history from this browser.
 - The final copy should read like a responsible review:
   "PolySignal reviso las capas disponibles" and, when needed, "No hay evidencia
   suficiente para emitir una estimacion propia responsable."
