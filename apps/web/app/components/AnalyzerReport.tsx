@@ -316,7 +316,7 @@ export function AnalyzerReport({
       ? "Guardar analisis"
       : "Guardar como seguimiento";
   const nextActionCopy = saved
-    ? "Ya esta guardado en Historial. Puedes revisar su estado, seguir el mercado o guardar una lectura nueva si quieres comparar cambios."
+    ? "Ya esta guardado en Historial. Puedes revisar su estado o guardar una lectura nueva si quieres comparar cambios."
     : analyzerResult.polySignalEstimateAvailable
       ? "Guarda esta lectura para medirla cuando el mercado tenga resultado confiable."
       : "No hay estimacion propia suficiente; puedes guardarlo como seguimiento sin convertirlo en prediccion.";
@@ -365,7 +365,7 @@ export function AnalyzerReport({
                 onClick={() => onToggleWatchlist(item)}
                 type="button"
               >
-                {watchlisted ? "Siguiendo" : "Seguir mercado"}
+                {watchlisted ? "En seguimiento local" : "Seguir en local"}
               </button>
             </>
           ) : null}
@@ -662,7 +662,7 @@ export function AnalyzerReport({
               onClick={() => onToggleWatchlist(item)}
               type="button"
             >
-              {watchlisted ? "Siguiendo" : "Seguir mercado"}
+              {watchlisted ? "En seguimiento local" : "Seguir en local"}
             </button>
           ) : null}
           <a className="analysis-link secondary" href="/analyze">

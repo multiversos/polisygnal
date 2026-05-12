@@ -85,3 +85,19 @@ No cuentan como fallos:
 - No contar pendientes/cancelados/desconocidos como fallos.
 - No promover copy-trading ni intentar identificar personas reales.
 - No borrar datos ni ejecutar migraciones destructivas.
+
+## QA post-pivot
+
+Checks esperados:
+
+- El sidebar publico no contiene deportes, briefing ni Mi lista.
+- Home explica el loop analyzer-first en menos de 10 segundos.
+- `/analyze` conserva Polymarket-first y no vuelve a fallback interno.
+- `/history` muestra tracking local, filtros, reanalisis y actualizacion de
+  resultados.
+- `/performance` no muestra precision falsa cuando no hay resultados medibles.
+- `/alerts` lee analisis guardados, no watchlist deportiva.
+- `/methodology` explica umbral 55%, conteo de precision, Wallet Intelligence
+  auxiliar y no copy-trading.
+- Rutas legacy muestran CTA a `/analyze` y no se presentan como producto
+  principal.

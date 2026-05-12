@@ -483,9 +483,9 @@ function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTo
 function validateMarketDetailPage(dom, label) {
   const text = visibleText(dom);
   assertNoFullWalletAddress(text, label);
-  assertTextIncludesOneOf(text, ["Seguir mercado", "Siguiendo"], `${label} watchlist action`);
-  assertTextIncludes(text, "Volver a mercados deportivos", label);
-  assertTextIncludesOneOf(text, SOCCER_RETURN_TEXT, `${label} sport return`);
+  assertTextIncludesOneOf(text, ["Analizar con enlace", "Analizar enlace"], `${label} analyzer action`);
+  assertTextIncludes(text, "Ver historial", `${label} history action`);
+  assertTextIncludesOneOf(text, ["Seguimiento legacy", "En seguimiento local", "Seguir en local"], `${label} legacy tracking action`);
   assertTextIncludesOneOf(text, WHAT_THIS_MEANS_TEXT, label);
   assertTextIncludesOneOf(text, WHY_VISIBLE_TEXT, `${label} visible reason`);
   assertTextIncludesOneOf(text, REVIEW_REASON_TEXT, `${label} public state`);
@@ -513,7 +513,7 @@ function validateMarketDetailPage(dom, label) {
   assertTextExcludes(text, ["0x1234567890abcdef", ...PUBLIC_WALLET_FORBIDDEN_TEXT], `${label} fake wallet metrics`);
   assertTextExcludes(
     text,
-    ["Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
+    ["Volver a mercados deportivos", "Ver JSON", "API docs", "Endpoint", "model_version", "market_type", "raw data"],
     label,
   );
   assertTextExcludes(text, PUBLIC_SECURITY_TEXT, `${label} secret leakage`);
@@ -849,7 +849,7 @@ async function main() {
   );
   assertTextIncludesOneOf(
     historyText,
-    ["Analizar nuevo enlace", "Analizar enlace", "Explorar mercados", "Ver mercados deportivos"],
+    ["Analizar nuevo enlace", "Analizar enlace", "Ver rendimiento"],
     "history market CTA",
   );
   assertTextIncludesOneOf(

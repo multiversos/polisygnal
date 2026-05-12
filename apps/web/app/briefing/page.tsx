@@ -770,11 +770,11 @@ export default function DailyBriefingPage() {
             </p>
           </div>
           <div className="panel-action-links">
-            <Link className="analysis-link" href="/sports">
-              Ver mercados deportivos
+            <Link className="analysis-link" href="/analyze">
+              Analizar enlace
             </Link>
-            <Link className="analysis-link secondary" href="/sports/soccer">
-              Revisar fútbol
+            <Link className="analysis-link secondary" href="/history">
+              Ver historial
             </Link>
           </div>
         </div>
@@ -784,7 +784,7 @@ export default function DailyBriefingPage() {
         ) : !topReviewMarkets.length ? (
           <div className="empty-state compact">
             <strong>Todavía no hay suficiente actividad para generar un resumen completo.</strong>
-            <p>Puedes revisar los mercados deportivos disponibles mientras tanto.</p>
+            <p>Puedes pegar un enlace de Polymarket para crear una lectura medible.</p>
           </div>
         ) : (
           <div className="briefing-guide-grid">
@@ -813,7 +813,7 @@ export default function DailyBriefingPage() {
               <h3>Qué hacer ahora</h3>
               <div className="briefing-sport-stack">
                 <span>Revisa primero los mercados marcados como <strong>Para revisar</strong>.</span>
-                <span>Guarda en Mi lista los mercados que quieras seguir de cerca.</span>
+                <span>Guarda lecturas en Historial para medirlas cuando se resuelvan.</span>
                 <span>Deja para después los mercados con datos limitados.</span>
               </div>
             </section>

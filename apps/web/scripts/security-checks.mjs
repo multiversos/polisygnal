@@ -1413,6 +1413,31 @@ async function validateBackendProxy() {
   return { proxy_checks: 7 };
 }
 
+function validateAnalyzerFirstProductSource() {
+  const shell = readFileSync(resolve(appRoot, "app/components/AppShell.tsx"), "utf8");
+  const home = readFileSync(resolve(appRoot, "app/page.tsx"), "utf8");
+  const alerts = readFileSync(resolve(appRoot, "app/alerts/page.tsx"), "utf8");
+  const performance = readFileSync(resolve(appRoot, "app/performance/page.tsx"), "utf8");
+  const methodology = readFileSync(resolve(appRoot, "app/methodology/page.tsx"), "utf8");
+  const legacySports = readFileSync(resolve(appRoot, "app/sports/page.tsx"), "utf8");
+
+  for (const item of ["Analizar enlace", "Historial", "Rendimiento", "Alertas", "Metodologia"]) {
+    assert(shell.includes(item), `expected analyzer-first nav item: ${item}`);
+  }
+  for (const legacyItem of ["Mercados deportivos", "Resumen diario", "Mi lista"]) {
+    assert(!shell.includes(`label: "${legacyItem}"`), `legacy nav item still appears in primary navigation: ${legacyItem}`);
+  }
+  assert(home.includes("mide si PolySignal acierta"), "home should explain analyzer-first performance loop");
+  assert(home.includes("Ver rendimiento"), "home should link to performance");
+  assert(alerts.includes("Seguimiento de analisis guardados"), "alerts should focus on saved analyses");
+  assert(!alerts.includes("fetchWatchlistItems"), "alerts should not depend on sports watchlist");
+  assert(performance.includes("aciertos y fallos medibles"), "performance should document honest accuracy denominator");
+  assert(methodology.includes("umbral para decision clara es 55%"), "methodology should explain clear decision threshold");
+  assert(legacySports.includes("Vista legacy"), "sports route should be marked legacy");
+
+  return { analyzer_first_source_checks: true };
+}
+
 const linkChecks = validatePolymarketLinks();
 const decisionChecks = validateAnalysisDecisionRules();
 const estimateQualityChecks = validateEstimateQualityRules();
@@ -1428,6 +1453,7 @@ const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
 const resolutionRouteChecks = await validateResolvePolymarketRoute();
 const analyzePolymarketLinkRouteChecks = await validateAnalyzePolymarketLinkRoute();
 const proxyChecks = await validateBackendProxy();
+const analyzerFirstProductChecks = validateAnalyzerFirstProductSource();
 
 console.log(
   JSON.stringify(
@@ -1446,6 +1472,7 @@ console.log(
       polymarket_resolution_adapter: resolutionAdapterChecks,
       resolve_polymarket_route: resolutionRouteChecks,
       analyze_polymarket_link_route: analyzePolymarketLinkRouteChecks,
+      analyzer_first_product: analyzerFirstProductChecks,
       proxy: proxyChecks,
       status: "ok",
     },

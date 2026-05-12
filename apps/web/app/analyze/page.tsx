@@ -1204,7 +1204,7 @@ function MatchCard({
           onClick={() => onToggleWatchlist(item)}
           type="button"
         >
-          {watchlisted ? "Siguiendo" : "Seguir mercado"}
+          {watchlisted ? "En seguimiento local" : "Seguir en local"}
         </button>
         {item.market?.id ? (
           <a className="analysis-link" href={`/markets/${item.market.id}`}>
@@ -1487,9 +1487,9 @@ export default function AnalyzePage() {
         const withoutMarket = current.filter((entry) => entry.market_id !== item.market?.id);
         return updated ? [updated, ...withoutMarket] : withoutMarket;
       });
-      setActionMessage(updated ? "Mercado agregado a Mi lista." : "Mercado quitado de Mi lista.");
+      setActionMessage(updated ? "Mercado agregado al seguimiento local." : "Mercado quitado del seguimiento local.");
     } catch {
-      setActionMessage("No pudimos actualizar Mi lista ahora.");
+      setActionMessage("No pudimos actualizar el seguimiento local ahora.");
     } finally {
       setActionBusy(false);
     }

@@ -294,6 +294,9 @@ Estado actual:
   hay outcome confiable y alimentar la pagina `/performance`.
 - Deportes, briefing y watchlist quedan como rutas legacy ocultas de la
   navegacion principal.
+- QA post-pivot protege que `/alerts` dependa de analisis guardados, que
+  `/methodology` explique el umbral de 55% y que el detalle de mercado apunte
+  de vuelta al Analizador/Historial en vez de deportes.
 - No se creo auth real.
 - No se crearon tablas reales.
 - No se ejecutaron migraciones.

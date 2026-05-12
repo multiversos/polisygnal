@@ -492,6 +492,14 @@ Use these quick checks when reviewing public pages:
 13. Open `/sports` directly and confirm it is marked as a legacy view.
 14. Confirm pending, cancelled, unknown and no-clear-decision items are not
     counted as misses.
+15. Open `/methodology` and confirm it explains:
+    - Polymarket-first source,
+    - market probability vs PolySignal estimate,
+    - 55% threshold for clear decisions,
+    - Wallet Intelligence as auxiliary only,
+    - no copy-trading or guaranteed outcomes.
+16. Open a market detail page directly and confirm the primary CTA points back
+    to `/analyze` or `/history`, not to sports browsing.
 
 ## Cache Troubleshooting
 

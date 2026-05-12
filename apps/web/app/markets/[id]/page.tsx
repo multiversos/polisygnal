@@ -3407,13 +3407,13 @@ function WatchlistDetailPanel({
       <div className="analysis-section-heading">
         <div>
           <span className="section-kicker">Organización</span>
-          <h2>Mi lista</h2>
+          <h2>Seguimiento legacy</h2>
         </div>
         {state.item ? <span className="badge external-hint">Siguiendo</span> : null}
       </div>
       <p className="section-note">
-        Esta lista se guarda en este navegador para que puedas volver al mercado
-        con menos pasos. No representa una recomendación de apuesta.
+        Esta vista local queda como apoyo legacy. El seguimiento medible vive en
+        Historial cuando guardas una lectura desde el Analizador de enlaces.
       </p>
 
       {state.loading ? <div className="empty-state compact">Cargando seguimiento...</div> : null}
@@ -3435,8 +3435,8 @@ function WatchlistDetailPanel({
             {state.saving
               ? "Guardando..."
               : state.item
-                ? "Siguiendo"
-                : "Seguir mercado"}
+                ? "En seguimiento local"
+                : "Seguir en local"}
           </button>
 
           {state.item ? (
@@ -3480,13 +3480,13 @@ function WatchlistDetailPanel({
                   onClick={onRemove}
                   type="button"
                 >
-                  Quitar de Mi lista
+                  Quitar del seguimiento local
                 </button>
               </div>
             </div>
           ) : (
             <span className="quiet-text">
-              Sigue este mercado para verlo luego en Mi lista.
+              Si necesitas medir resultado, guarda una lectura desde el Analizador.
             </span>
           )}
         </>
@@ -4993,14 +4993,6 @@ export default function MarketAnalysisPage() {
   const ingestDryRunCommand = "python -m app.commands.ingest_codex_research --run-id <RUN_ID> --dry-run";
   const pausedFutureMarket = analysis ? isPausedFutureMarket(analysis) : false;
   const upcomingMatchMarket = analysis ? isUpcomingMatchMarket(analysis) : false;
-  const sportDetailHref = analysis?.market.sport_type
-    ? `/sports/${analysis.market.sport_type}`
-    : "/sports";
-  const sportReturnLabel =
-    analysis?.market.sport_type === "soccer"
-      ? "Volver a fútbol"
-      : `Volver a ${formatSportLabel(analysis?.market.sport_type) || "deporte"}`;
-
   const marketBadges = useMemo(() => {
     if (!analysis) {
       return [];
@@ -5026,11 +5018,11 @@ export default function MarketAnalysisPage() {
           Volver a Inicio
         </Link>
         <div className="topbar-actions">
-          <Link className="text-link" href="/sports">
-            Volver a mercados deportivos
+          <Link className="text-link" href="/analyze">
+            Analizar enlace
           </Link>
-          <Link className="text-link" href={sportDetailHref}>
-            {sportReturnLabel}
+          <Link className="text-link" href="/history">
+            Ver historial
           </Link>
         </div>
       </header>
@@ -5099,14 +5091,17 @@ export default function MarketAnalysisPage() {
             <span>
               Esta página organiza información para revisión manual y no ejecuta apuestas automáticas.
             </span>
+            <Link className="analysis-link secondary" href="/analyze">
+              Analizar con enlace
+            </Link>
           </section>
 
           <section className="focus-notice active">
             <strong>Qué significa esto</strong>
             <span>
               Este mercado está siendo monitoreado con la información disponible.
-              Si lo sigues, aparecerá en Mi lista; cuando haya cambios importantes,
-              los podrás revisar desde Alertas.
+              Para crear un seguimiento medible, analiza el enlace y guarda la
+              lectura en Historial.
             </span>
           </section>
 

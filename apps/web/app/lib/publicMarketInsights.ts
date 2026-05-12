@@ -202,7 +202,7 @@ export function getMarketReviewReason(
 
   if (status.label === "Analizado" && recent) {
     return {
-      action: "Revisa el detalle o guárdalo en Mi lista para seguirlo.",
+    action: "Revisa el detalle o guarda una lectura desde el Analizador para seguirlo.",
       label: "Para revisar",
       reason: "Tiene análisis disponible y datos recientes.",
       status,

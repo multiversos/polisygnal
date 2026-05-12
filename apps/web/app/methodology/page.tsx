@@ -64,6 +64,28 @@ export default function MethodologyPage() {
         </div>
       </section>
 
+      <section className="dashboard-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Separacion de senales</p>
+            <h2>Precio de mercado no es prediccion PolySignal</h2>
+            <p>
+              La probabilidad visible viene de Polymarket. La estimacion
+              PolySignal solo aparece cuando hay evidencia independiente
+              suficiente; el umbral para decision clara es 55%.
+            </p>
+          </div>
+        </div>
+        <div className="history-card-metrics">
+          <span>Fuente primaria: Polymarket read-only</span>
+          <span>Precio del mercado: referencia</span>
+          <span>Estimacion PolySignal: solo con evidencia suficiente</span>
+          <span>Decision clara: YES/NO sobre 55%</span>
+          <span>Wallet Intelligence: senal auxiliar</span>
+          <span>Resultado final: Polymarket/Gamma cuando sea verificable</span>
+        </div>
+      </section>
+
       <section className="safety-strip">
         <strong>Lectura responsable:</strong>
         <span>

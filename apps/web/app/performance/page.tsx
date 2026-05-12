@@ -128,8 +128,13 @@ export default function PerformancePage() {
         </article>
         <article className="metric-card">
           <span>Sin decision fuerte</span>
-          <strong>{loading ? "..." : stats.weakDecisions + stats.noPolySignalEstimate}</strong>
+          <strong>{loading ? "..." : stats.weakDecisions}</strong>
           <p>Seguimiento, no precision</p>
+        </article>
+        <article className="metric-card">
+          <span>Sin estimacion propia</span>
+          <strong>{loading ? "..." : stats.noPolySignalEstimate}</strong>
+          <p>No se convierte en prediccion</p>
         </article>
       </section>
 
