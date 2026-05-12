@@ -33,6 +33,12 @@ export type AnalysisHistoryAnalyzerLayer = {
   warnings: string[];
 };
 
+export type AnalysisHistoryMarketOutcome = {
+  label: string;
+  price?: number;
+  side?: string;
+};
+
 export type AnalysisHistoryWalletSignalDirection = "BOTH" | "NEUTRAL" | "NO" | "UNKNOWN" | "YES";
 
 export type AnalysisHistoryWalletSummary = {
@@ -65,6 +71,7 @@ export type AnalysisHistoryItem = {
   marketId?: string;
   marketSlug?: string;
   marketNoProbability?: number;
+  marketOutcomes?: AnalysisHistoryMarketOutcome[];
   marketYesProbability?: number;
   outcome?: AnalysisHistoryOutcome;
   polySignalNoProbability?: number;
@@ -243,6 +250,32 @@ function normalizeStringList(value: unknown, limit = 8): string[] {
     .slice(0, limit);
 }
 
+function normalizeMarketOutcomes(value: unknown): AnalysisHistoryMarketOutcome[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const outcomes: AnalysisHistoryMarketOutcome[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const record = item as Partial<AnalysisHistoryMarketOutcome>;
+    const label = normalizeString(record.label);
+    if (!label) {
+      continue;
+    }
+    outcomes.push({
+      label,
+      price: normalizeNumber(record.price),
+      side: normalizeString(record.side),
+    });
+    if (outcomes.length >= 12) {
+      break;
+    }
+  }
+  return outcomes.length > 0 ? outcomes : undefined;
+}
+
 function normalizeAnalyzerLayerStatus(value: unknown): AnalysisHistoryAnalyzerLayerStatus {
   if (
     value === "available" ||
@@ -399,6 +432,7 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     marketId: value.marketId ? String(value.marketId) : undefined,
     marketSlug: normalizeString(value.marketSlug),
     marketNoProbability,
+    marketOutcomes: normalizeMarketOutcomes(value.marketOutcomes),
     marketYesProbability,
     outcome: normalizeOutcome(value.outcome),
     polySignalNoProbability,

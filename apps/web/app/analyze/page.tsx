@@ -319,6 +319,17 @@ function safeWalletSummaryForHistory(item: MarketOverviewItem) {
   };
 }
 
+function safeOutcomesForHistory(item: MarketOverviewItem) {
+  return (item.market?.outcomes ?? [])
+    .filter((outcome) => outcome.label)
+    .slice(0, 12)
+    .map((outcome) => ({
+      label: String(outcome.label),
+      price: toNumber(outcome.price) ?? undefined,
+      side: outcome.side ? String(outcome.side) : undefined,
+    }));
+}
+
 function historyPayloadFromMarket(
   item: MarketOverviewItem,
   normalizedUrl: string,
@@ -382,6 +393,7 @@ function historyPayloadFromMarket(
     marketId: item.market?.id ? String(item.market.id) : undefined,
     marketSlug: item.market?.market_slug || undefined,
     marketNoProbability: marketProbabilities?.no,
+    marketOutcomes: safeOutcomesForHistory(item),
     marketYesProbability: marketProbabilities?.yes,
     outcome: "UNKNOWN" as const,
     polySignalNoProbability: polySignalProbabilities?.no,
