@@ -32,19 +32,20 @@ Use these checks after a production deploy. Correct domains:
 ## Public Navigation
 
 1. Open `https://polisygnal-web.vercel.app/`.
-2. Confirm the sidebar only shows:
+2. Confirm the primary public navigation prioritizes:
    - Inicio
    - Analizar enlace
    - Historial
-   - Mercados deportivos
-   - Resumen diario
-   - Mi lista
+   - Rendimiento
    - Alertas
-   - Modo oscuro
+   - Metodologia
 3. Confirm `Analizar enlace` is visually prominent as the principal product
    entry, without exposing internal routes.
-4. Confirm the sidebar does not show internal sections such as Investigación,
-   Evidencia, Workflow, Salud de datos, Trial E2E, or Backtesting.
+4. Confirm sports, briefing and watchlist are not promoted as primary product
+   routes.
+5. Confirm the sidebar does not show internal sections such as Investigacion,
+   Evidencia, Workflow, Salud de datos, Trial E2E, Backtesting, or
+   `/internal/data-status`.
 
 ## Security Baseline
 
@@ -543,31 +544,45 @@ Use these quick checks when reviewing public pages:
    - Odds/Kalshi/profile steps blocked or pending integration.
 5. Confirm the report does not say the deep analysis is completed while waiting
    for Samantha.
-6. Use `Copiar brief para Samantha` or `Descargar brief`.
+6. Use `Copiar tarea para Samantha`, `Descargar tarea JSON`,
+   `Descargar instrucciones TXT`, or `Copiar schema de respuesta`.
 7. Save the analysis as pending and open `/history`.
-8. Confirm the saved item shows pending research and a `Continuar analisis`
-   action.
+8. Confirm the saved item shows `Esperando Samantha`, the brief date when
+   available, and a `Continuar analisis` action.
 9. Paste an invalid Samantha report and confirm it fails without changing the
    job to completed.
 10. In a safe local test, paste a valid structured report and confirm the job
     updates evidence/scoring state without inventing market data.
 11. Confirm `/performance` does not count awaiting research or ready-to-score
     records as hit/miss.
+12. Confirm `/performance` separates `Pendientes de investigacion` from
+    `Pendientes de resolucion`.
 
 ## Samantha Research Manual Workflow
 
 1. Open `/analyze` and analyze a Polymarket link.
 2. Confirm the selected report shows `Investigacion con Samantha`.
-3. Confirm `Copiar brief para Samantha` and `Descargar brief` are present.
+3. Confirm these actions are present:
+   - `Copiar tarea para Samantha`.
+   - `Descargar tarea JSON`.
+   - `Descargar instrucciones TXT`.
+   - `Copiar schema de respuesta`.
+   - `Descargar brief JSON`.
 4. Confirm the copy says this is manual/local and does not execute Samantha.
-5. Paste an invalid report and confirm a friendly validation error appears.
-6. Paste a valid structured report in a safe test environment and confirm
-   evidence appears as source-backed context.
-7. Confirm Reddit/social evidence is never accepted as high reliability.
-8. Confirm Kalshi evidence is accepted only when equivalent.
-9. Confirm no full wallet addresses, secrets, raw payloads or copy-trading
+5. Paste invalid JSON and confirm `Validar reporte` shows a friendly validation
+   error without applying the report.
+6. Paste a report with a dangerous URL, a secret-like value, an estimate outside
+   `0..100`, Reddit high reliability, or Kalshi non-equivalent strong signal
+   and confirm it is rejected.
+7. Paste a valid structured report in a safe test environment, click
+   `Validar reporte`, confirm the preview summarizes evidence counts, then
+   click `Cargar reporte al analisis`.
+8. Confirm evidence appears as source-backed context.
+9. Confirm Reddit/social evidence is never accepted as high reliability.
+10. Confirm Kalshi evidence is accepted only when equivalent.
+11. Confirm no full wallet addresses, secrets, raw payloads or copy-trading
    language appear.
-10. Confirm no prediction is created unless the suggested estimate passes the
+12. Confirm no prediction is created unless the suggested estimate passes the
     strict validation gate.
 
 ## Cache Troubleshooting

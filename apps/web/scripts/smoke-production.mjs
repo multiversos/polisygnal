@@ -609,9 +609,13 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Capas del motor"), "AnalyzerReport missing deep analyzer layers");
   assert(reportSource.includes("Pendiente de integracion"), "AnalyzerReport should label future layers as pending");
   assert(reportSource.includes("Investigacion con Samantha"), "AnalyzerReport missing Samantha research workflow");
-  assert(reportSource.includes("Copiar brief para Samantha"), "AnalyzerReport missing Samantha brief copy action");
-  assert(reportSource.includes("Cargar reporte"), "AnalyzerReport missing Samantha report load action");
+  assert(reportSource.includes("Copiar tarea para Samantha"), "AnalyzerReport missing Samantha task copy action");
+  assert(reportSource.includes("Descargar tarea JSON"), "AnalyzerReport missing Samantha task JSON action");
+  assert(reportSource.includes("Copiar schema de respuesta"), "AnalyzerReport missing Samantha response schema action");
+  assert(reportSource.includes("Validar reporte"), "AnalyzerReport missing Samantha report validation action");
+  assert(reportSource.includes("Cargar reporte al analisis"), "AnalyzerReport missing Samantha report apply action");
   assert(reportSource.includes("parseSamanthaResearchReport"), "AnalyzerReport missing Samantha report validation");
+  assert(reportSource.includes("buildSamanthaTaskPacket"), "AnalyzerReport missing Samantha task packet builder");
   assert(!reportSource.includes("fetch("), "AnalyzerReport must not call external services for Samantha");
   assert(reportSource.includes("Fuentes del analisis"), "AnalyzerReport missing source block");
   assert(reportSource.includes("Que puedes hacer ahora"), "AnalyzerReport missing next actions");
@@ -622,6 +626,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(homeSource.includes("Pega un enlace"), "home analyzer steps are missing");
   assert(historySource.includes("Analizar nuevo enlace"), "history page does not link back to analyzer");
   assert(historySource.includes("Continuar analisis"), "history page should reopen pending deep research jobs");
+  assert(historySource.includes("Esperando Samantha"), "history page should label pending Samantha research");
   assert(historySource.includes("Ver rendimiento"), "history page does not link to performance");
   assert(analyzePage.includes("analyzer-selection-card"), "analyze page does not render compact selector cards");
   assert(!analyzePage.includes("Ver mercados deportivos"), "analyze no-match state must not offer internal market fallback");
@@ -918,6 +923,11 @@ async function main() {
   const performanceText = visibleText(performanceDom);
   assertTextIncludes(performanceText, "Rendimiento de PolySignal", "performance heading");
   assertTextIncludes(performanceText, "Precision general", "performance accuracy");
+  assertTextIncludesOneOf(
+    performanceText,
+    ["Pendientes de investigacion", "Pendientes"],
+    "performance research pending bucket",
+  );
   assertTextIncludesOneOf(
     performanceText,
     ["Pendientes", "Sin decision fuerte", "no cuentan"],

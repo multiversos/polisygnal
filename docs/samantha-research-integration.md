@@ -56,6 +56,40 @@ El flujo manual de Samantha ahora es una etapa del job local del analizador:
 Este estado vive en localStorage y sirve para reabrir el analisis desde
 `/history`. No ejecuta Samantha automaticamente y no escribe en Neon.
 
+## Samantha Task Packet
+
+El brief tecnico se envuelve en un `SamanthaTaskPacket` para que el usuario
+pueda entregar una tarea completa a Samantha sin explicar manualmente el
+contrato.
+
+Archivo:
+
+- `apps/web/app/lib/samanthaTaskPacket.ts`
+
+El paquete contiene:
+
+- `researchBriefJson`: brief estructurado del mercado.
+- `samanthaInstructionsText`: instrucciones legibles para Samantha.
+- `expectedReportSchema`: schema esperado del reporte JSON.
+- `safetyRules`: reglas operativas y de privacidad.
+- `returnInstructions`: instrucciones de devolucion.
+- `taskPacketJson`: paquete completo serializado.
+
+Acciones disponibles en `/analyze`:
+
+- `Copiar tarea para Samantha`
+- `Descargar tarea JSON`
+- `Descargar instrucciones TXT`
+- `Copiar schema de respuesta`
+- `Descargar brief JSON`
+
+El texto del paquete indica que Samantha debe investigar con fuentes reales,
+clasificar evidencia como YES/NO/NEUTRAL/UNKNOWN, tratar Reddit/social como
+senal debil, usar Kalshi solo si el equivalente es claro, usar odds solo si son
+comparables y devolver solo JSON valido. Tambien prohibe trading, bases de
+datos, secretos, doxxing, identificacion de personas reales detras de wallets y
+fuentes inventadas.
+
 ## Rutas seguras
 
 Briefs:
@@ -138,6 +172,7 @@ Cada evidencia debe incluir:
 
 PolySignal rechaza:
 
+- JSON invalido o texto demasiado largo para ser un reporte estructurado
 - reportes sin version `1.0`
 - evidencia sin `sourceName`, `title` o `summary`
 - URLs peligrosas o no publicas
@@ -154,6 +189,26 @@ PolySignal sanitiza:
 - quotes largas
 - control chars
 - listas de evidencia demasiado grandes
+
+La UI separa validacion y aplicacion:
+
+1. `Validar reporte` revisa el JSON y muestra errores especificos.
+2. Si es valido, PolySignal muestra un resumen antes de aplicar:
+   evidencias totales, senales YES, NO, NEUTRAL y UNKNOWN.
+3. `Cargar reporte al analisis` actualiza el `DeepAnalysisJob` local.
+
+Errores comunes:
+
+- JSON invalido.
+- Falta `version`.
+- Falta evidencia estructurada.
+- Estimate fuera de rango.
+- Reddit/social marcado con confiabilidad alta.
+- Kalshi no equivalente usado como senal fuerte.
+- URL peligrosa.
+- Texto demasiado largo.
+- Posible secreto detectado.
+- Direccion completa de wallet.
 
 ## Reglas para Samantha
 
@@ -188,6 +243,18 @@ Si no pasa la compuerta:
 - la evidencia se muestra como contexto;
 - no se crea decision PolySignal;
 - no cuenta para precision.
+
+## Historial y rendimiento
+
+Los analisis guardados que esperan investigacion externa se muestran como
+pendientes, no como fallos:
+
+- `/history` muestra `Esperando Samantha`, fecha de brief si existe y accion
+  `Continuar analisis`.
+- `/performance` separa `Pendientes de investigacion` de `Pendientes de
+  resolucion`.
+- `awaiting_samantha` y `ready_to_score` no cuentan para precision hasta que
+  exista decision clara y resultado final verificable.
 
 ## Futuro
 

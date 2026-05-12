@@ -58,6 +58,7 @@ import {
   parseSamanthaResearchReport,
   shouldAcceptSuggestedEstimate,
 } from "../lib/samanthaResearchReport";
+import { buildSamanthaTaskPacket } from "../lib/samanthaTaskPacket";
 import type { SamanthaResearchParseResult } from "../lib/samanthaResearchTypes";
 import {
   extractSoccerMatchContext,
@@ -331,6 +332,8 @@ export function AnalyzerReport({
   watchlisted,
 }: AnalyzerReportProps) {
   const [samanthaReportInput, setSamanthaReportInput] = useState("");
+  const [samanthaReportDraftResult, setSamanthaReportDraftResult] =
+    useState<SamanthaResearchParseResult | null>(null);
   const [samanthaReportResult, setSamanthaReportResult] =
     useState<SamanthaResearchParseResult | null>(null);
   const [samanthaActionMessage, setSamanthaActionMessage] = useState("");
@@ -377,11 +380,22 @@ export function AnalyzerReport({
     [item, normalizedUrl, walletSummary],
   );
   const samanthaBriefText = useMemo(() => serializeResearchBrief(samanthaBrief), [samanthaBrief]);
+  const samanthaTaskPacket = useMemo(() => buildSamanthaTaskPacket(samanthaBrief), [samanthaBrief]);
   const samanthaBriefValidation = useMemo(() => validateResearchBrief(samanthaBrief), [samanthaBrief]);
+  const samanthaDraftReport = samanthaReportDraftResult?.valid ? samanthaReportDraftResult.report : undefined;
   const samanthaReport = samanthaReportResult?.valid ? samanthaReportResult.report : undefined;
+  const samanthaDraftEvidence = samanthaDraftReport ? convertSamanthaReportToEvidence(samanthaDraftReport) : [];
+  const samanthaDraftSignals = samanthaDraftReport ? convertSamanthaReportToSignals(samanthaDraftReport) : [];
   const samanthaEvidence = samanthaReport ? convertSamanthaReportToEvidence(samanthaReport) : [];
   const samanthaSignals = samanthaReport ? convertSamanthaReportToSignals(samanthaReport) : [];
   const samanthaEstimateAccepted = samanthaReport ? shouldAcceptSuggestedEstimate(samanthaReport) : false;
+  const samanthaDraftDirectionCounts = samanthaDraftEvidence.reduce(
+    (counts, evidence) => ({
+      ...counts,
+      [evidence.direction]: (counts[evidence.direction] ?? 0) + 1,
+    }),
+    { NEUTRAL: 0, NO: 0, UNKNOWN: 0, YES: 0 } as Record<string, number>,
+  );
   const deepAnalysis = mergeSamanthaResearchLayer(
     mergeWalletIntelligenceLayer(
       buildDeepAnalysisFromPolymarketMarket({
@@ -431,49 +445,94 @@ export function AnalyzerReport({
       : "No hay estimacion propia suficiente; puedes guardarlo como seguimiento sin convertirlo en prediccion.";
   const jobSummary = deepAnalysisJob ? getJobProgressSummary(deepAnalysisJob) : null;
 
-  function handleLoadSamanthaReport() {
+  function handleValidateSamanthaReport() {
     const result = parseSamanthaResearchReport(samanthaReportInput);
+    setSamanthaReportDraftResult(result);
+    setSamanthaActionMessage(
+      result.valid
+        ? "Reporte de Samantha valido. Revisa el resumen y aplicalo al analisis."
+        : "El reporte de Samantha no paso la validacion.",
+    );
+  }
+
+  function handleApplySamanthaReport() {
+    const result =
+      samanthaReportDraftResult?.valid
+        ? samanthaReportDraftResult
+        : parseSamanthaResearchReport(samanthaReportInput);
+    setSamanthaReportDraftResult(result);
+    if (!result.valid || !result.report) {
+      setSamanthaActionMessage("Primero corrige el reporte de Samantha.");
+      return;
+    }
     setSamanthaReportResult(result);
-    if (result.valid && result.report && deepAnalysisJob) {
+    if (deepAnalysisJob) {
       const nextJob = markJobSamanthaReportLoaded(deepAnalysisJob, {
         acceptedEstimate: shouldAcceptSuggestedEstimate(result.report),
+        kalshiEquivalent: result.report.kalshiComparison?.found === true && result.report.kalshiComparison.equivalent === true,
+        oddsFound: result.report.oddsComparison?.found === true,
+        reportStatus: result.report.status,
         signalCount: convertSamanthaReportToSignals(result.report).length,
       });
       const storedJob = updateDeepAnalysisJob(nextJob) ?? nextJob;
       onDeepAnalysisJobChange?.(storedJob);
     }
-    setSamanthaActionMessage(
-      result.valid
-        ? "Reporte de Samantha cargado y validado localmente."
-        : "El reporte de Samantha no paso la validacion.",
-    );
+    setSamanthaActionMessage("Reporte aplicado al analisis profundo.");
   }
 
-  async function handleCopySamanthaBrief() {
+  async function copyTextToClipboard(text: string, successMessage: string) {
     try {
       if (!navigator.clipboard) {
         throw new Error("clipboard_unavailable");
       }
-      await navigator.clipboard.writeText(samanthaBriefText);
-      setSamanthaActionMessage("Brief copiado para Samantha.");
+      await navigator.clipboard.writeText(text);
+      setSamanthaActionMessage(successMessage);
     } catch {
-      setSamanthaActionMessage("No pudimos copiar el brief; puedes descargarlo.");
+      setSamanthaActionMessage("No pudimos copiarlo; puedes descargar el archivo.");
     }
   }
 
-  function handleDownloadSamanthaBrief() {
+  function downloadTextFile(filename: string, text: string, type: string) {
     if (typeof window === "undefined") {
       return;
     }
-    const blob = new Blob([samanthaBriefText], { type: "application/json" });
+    const blob = new Blob([text], { type });
     const href = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = href;
-    anchor.download = "samantha-research-brief.json";
+    anchor.download = filename;
     anchor.rel = "noopener";
     anchor.click();
     window.URL.revokeObjectURL(href);
-    setSamanthaActionMessage("Brief descargado para flujo manual.");
+  }
+
+  async function handleCopySamanthaTask() {
+    await copyTextToClipboard(
+      samanthaTaskPacket.samanthaInstructionsText,
+      "Tarea completa copiada para Samantha.",
+    );
+  }
+
+  function handleDownloadSamanthaTaskJson() {
+    downloadTextFile("samantha-task-packet.json", samanthaTaskPacket.taskPacketJson, "application/json");
+    setSamanthaActionMessage("Tarea JSON descargada para Samantha.");
+  }
+
+  function handleDownloadSamanthaInstructions() {
+    downloadTextFile("samantha-instructions.txt", samanthaTaskPacket.samanthaInstructionsText, "text/plain");
+    setSamanthaActionMessage("Instrucciones TXT descargadas para Samantha.");
+  }
+
+  async function handleCopySamanthaSchema() {
+    await copyTextToClipboard(
+      samanthaTaskPacket.expectedReportSchema,
+      "Schema de respuesta copiado.",
+    );
+  }
+
+  function handleDownloadSamanthaBrief() {
+    downloadTextFile("samantha-research-brief.json", samanthaBriefText, "application/json");
+    setSamanthaActionMessage("Brief JSON descargado para flujo manual.");
   }
 
   return (
@@ -623,10 +682,10 @@ export function AnalyzerReport({
             <button
               className="watchlist-button"
               disabled={!samanthaBriefValidation.valid}
-              onClick={handleCopySamanthaBrief}
+              onClick={handleCopySamanthaTask}
               type="button"
             >
-              Copiar brief para Samantha
+              Copiar tarea para Samantha
             </button>
             <a className="analysis-link secondary" href="#samantha-research">
               Pegar reporte de Samantha
@@ -679,17 +738,42 @@ export function AnalyzerReport({
           </span>
         </div>
         <p className="analyzer-report-note">
-          PolySignal prepara un brief local para Samantha. No ejecuta agentes, no envia datos a terceros y no
-          convierte el reporte en prediccion sin validacion.
+          Copia esta tarea y enviala a Samantha. Cuando Samantha devuelva el JSON,
+          pegalo aqui para continuar el analisis. PolySignal no ejecuta agentes,
+          no envia datos a terceros y no convierte el reporte en prediccion sin validacion.
         </p>
         <div className="samantha-action-row">
           <button
-            className="watchlist-button"
+            className="watchlist-button active"
             disabled={!samanthaBriefValidation.valid}
-            onClick={handleCopySamanthaBrief}
+            onClick={handleCopySamanthaTask}
             type="button"
           >
-            Copiar brief para Samantha
+            Copiar tarea para Samantha
+          </button>
+          <button
+            className="watchlist-button"
+            disabled={!samanthaBriefValidation.valid}
+            onClick={handleDownloadSamanthaTaskJson}
+            type="button"
+          >
+            Descargar tarea JSON
+          </button>
+          <button
+            className="watchlist-button"
+            disabled={!samanthaBriefValidation.valid}
+            onClick={handleDownloadSamanthaInstructions}
+            type="button"
+          >
+            Descargar instrucciones TXT
+          </button>
+          <button
+            className="watchlist-button"
+            disabled={!samanthaBriefValidation.valid}
+            onClick={handleCopySamanthaSchema}
+            type="button"
+          >
+            Copiar schema de respuesta
           </button>
           <button
             className="watchlist-button"
@@ -697,7 +781,7 @@ export function AnalyzerReport({
             onClick={handleDownloadSamanthaBrief}
             type="button"
           >
-            Descargar brief
+            Descargar brief JSON
           </button>
           <span>{samanthaBriefValidation.valid ? "Brief validado" : "Brief no disponible"}</span>
         </div>
@@ -711,25 +795,37 @@ export function AnalyzerReport({
         <label className="samantha-report-input">
           <span>Pegar reporte estructurado de Samantha</span>
           <textarea
-            onChange={(event) => setSamanthaReportInput(event.target.value)}
-            placeholder='{"version":"1.0","status":"partial","marketUrl":"https://polymarket.com/...","evidence":[],"warnings":[]}'
+            onChange={(event) => {
+              setSamanthaReportInput(event.target.value);
+              setSamanthaReportDraftResult(null);
+            }}
+            placeholder='{"version":"1.0","status":"partial","marketUrl":"https://polymarket.com/...","evidence":[{"id":"source-1","title":"Fuente revisada","sourceName":"Nombre de fuente","sourceType":"news","checkedAt":"2026-05-12T12:00:00.000Z","direction":"NEUTRAL","reliability":"medium","summary":"Resumen respaldado por fuente."}],"warnings":[]}'
             value={samanthaReportInput}
           />
         </label>
         <div className="samantha-action-row">
           <button
-            className="watchlist-button active"
+            className="watchlist-button"
             disabled={!samanthaReportInput.trim()}
-            onClick={handleLoadSamanthaReport}
+            onClick={handleValidateSamanthaReport}
             type="button"
           >
-            Cargar reporte
+            Validar reporte
+          </button>
+          <button
+            className="watchlist-button active"
+            disabled={!samanthaReportDraftResult?.valid}
+            onClick={handleApplySamanthaReport}
+            type="button"
+          >
+            Cargar reporte al analisis
           </button>
           <button
             className="watchlist-button"
-            disabled={!samanthaReportInput && !samanthaReportResult}
+            disabled={!samanthaReportInput && !samanthaReportDraftResult && !samanthaReportResult}
             onClick={() => {
               setSamanthaReportInput("");
+              setSamanthaReportDraftResult(null);
               setSamanthaReportResult(null);
               setSamanthaActionMessage("Reporte de Samantha limpiado.");
             }}
@@ -739,11 +835,28 @@ export function AnalyzerReport({
           </button>
           {samanthaActionMessage ? <span>{samanthaActionMessage}</span> : null}
         </div>
-        {samanthaReportResult && !samanthaReportResult.valid ? (
+        {samanthaReportDraftResult && !samanthaReportDraftResult.valid ? (
           <div className="wallet-warning-list">
-            {samanthaReportResult.errors.slice(0, 5).map((error) => (
+            {samanthaReportDraftResult.errors.slice(0, 8).map((error) => (
               <span className="warning-chip" key={error}>{error}</span>
             ))}
+          </div>
+        ) : null}
+        {samanthaDraftReport ? (
+          <div className="samantha-validation-preview">
+            <strong>Reporte valido antes de aplicar</strong>
+            <p>
+              Encontramos {samanthaDraftEvidence.length} evidencias:
+              {" "}YES {samanthaDraftDirectionCounts.YES ?? 0},
+              {" "}NO {samanthaDraftDirectionCounts.NO ?? 0},
+              {" "}NEUTRAL {samanthaDraftDirectionCounts.NEUTRAL ?? 0},
+              {" "}UNKNOWN {samanthaDraftDirectionCounts.UNKNOWN ?? 0}.
+              {" "}Senales estructuradas: {samanthaDraftSignals.length}.
+            </p>
+            <p className="section-note">
+              Al aplicar, PolySignal actualiza el job profundo. Si la evidencia no pasa
+              compuertas, quedara como contexto y no como prediccion.
+            </p>
           </div>
         ) : null}
         {samanthaReport ? (

@@ -112,6 +112,7 @@ export type AnalysisHistoryItem = {
   resolutionStatus?: AnalysisHistoryResolutionStatus;
   resolvedAt?: string;
   result?: AnalysisHistoryResult;
+  researchBriefReadyAt?: string;
   researchStatus?: AnalysisHistoryResearchStatus;
   remoteId?: string;
   source: AnalysisHistorySource;
@@ -143,6 +144,7 @@ export type AnalysisHistoryStats = {
   noAccuracy: number | null;
   noPredictions: number;
   pending: number;
+  researchPending: number;
   realPolySignalEstimates: number;
   resolved: number;
   total: number;
@@ -527,6 +529,7 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     resolutionStatus: normalizeResolutionStatus(value.resolutionStatus),
     resolvedAt: normalizeString(value.resolvedAt),
     result,
+    researchBriefReadyAt: normalizeString(value.researchBriefReadyAt),
     researchStatus: normalizeResearchStatus(value.researchStatus),
     remoteId: normalizeString(value.remoteId),
     source: normalizeSource(value.source),
@@ -651,6 +654,12 @@ export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): Ana
     (item) => item.estimateQuality !== "real_polysignal_estimate" || item.decision === "none",
   ).length;
   const pending = items.filter((item) => item.result === "pending" || item.status === "open").length;
+  const researchPending = items.filter(
+    (item) =>
+      item.awaitingResearch ||
+      item.researchStatus === "awaiting_samantha" ||
+      item.researchStatus === "ready_to_score",
+  ).length;
   const resolved = hits + misses;
   const countableResolved = resolved;
   const finalized = resolved + cancelled;
@@ -697,6 +706,7 @@ export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): Ana
     noAccuracy: accuracyFor(items.filter((item) => item.predictedSide === "NO")),
     noPredictions: items.filter((item) => item.predictedSide === "NO").length,
     pending,
+    researchPending,
     realPolySignalEstimates,
     resolved,
     total: items.length,

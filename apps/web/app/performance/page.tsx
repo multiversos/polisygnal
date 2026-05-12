@@ -62,6 +62,7 @@ export default function PerformancePage() {
   }, []);
 
   const stats = useMemo(() => calculateAnalysisHistoryStats(items), [items]);
+  const resolutionPending = Math.max(0, stats.pending - stats.researchPending);
   const categoryRows = useMemo(() => {
     const groups = new Map<string, AnalysisHistoryItem[]>();
     for (const item of items) {
@@ -122,9 +123,14 @@ export default function PerformancePage() {
           <p>Predicciones claras no confirmadas</p>
         </article>
         <article className="metric-card">
-          <span>Pendientes</span>
-          <strong>{loading ? "..." : stats.pending}</strong>
-          <p>No cuentan como fallo</p>
+          <span>Pendientes de investigacion</span>
+          <strong>{loading ? "..." : stats.researchPending}</strong>
+          <p>Esperan Samantha o revision de senales</p>
+        </article>
+        <article className="metric-card">
+          <span>Pendientes de resolucion</span>
+          <strong>{loading ? "..." : resolutionPending}</strong>
+          <p>Esperan resultado final</p>
         </article>
         <article className="metric-card">
           <span>Sin decision fuerte</span>

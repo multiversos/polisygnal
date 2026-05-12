@@ -9037,6 +9037,28 @@ html:not([data-theme="dark"]) .app-sidebar {
   line-height: 1.45;
 }
 
+.samantha-validation-preview {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.samantha-validation-preview strong {
+  color: var(--foreground);
+  font-size: 0.9rem;
+}
+
+.samantha-validation-preview p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .samantha-evidence-summary {
   display: grid;
   gap: 10px;

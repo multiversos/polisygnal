@@ -26,6 +26,7 @@ const SECRET_PATTERNS = [
   /secret\s*[:=]/i,
   /token\s*[:=]/i,
 ] as const;
+const MAX_REPORT_INPUT_LENGTH = 60000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -312,11 +313,25 @@ export function validateSamanthaResearchReport(report: SamanthaResearchReport): 
 export function parseSamanthaResearchReport(input: string | unknown): SamanthaResearchParseResult {
   let raw: unknown = input;
   if (typeof input === "string") {
+    if (input.length > MAX_REPORT_INPUT_LENGTH) {
+      return {
+        errors: ["Texto demasiado largo: el reporte debe ser JSON estructurado y resumido."],
+        valid: false,
+        warnings: [],
+      };
+    }
+    if (containsSensitiveText(input)) {
+      return {
+        errors: ["Posible secreto o direccion completa detectada en el reporte."],
+        valid: false,
+        warnings: [],
+      };
+    }
     try {
       raw = JSON.parse(input);
     } catch {
       return {
-        errors: ["No pudimos leer el reporte estructurado."],
+        errors: ["JSON invalido: no pudimos leer el reporte estructurado."],
         valid: false,
         warnings: [],
       };

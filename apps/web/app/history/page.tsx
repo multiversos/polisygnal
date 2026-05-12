@@ -831,7 +831,7 @@ export default function HistoryPage() {
                         {statusLabel(item)}
                       </span>
                       {item.awaitingResearch || item.researchStatus === "awaiting_samantha" ? (
-                        <span className="badge muted">Esperando reporte de Samantha</span>
+                        <span className="badge muted">Esperando Samantha</span>
                       ) : null}
                       {item.researchStatus === "ready_to_score" ? (
                         <span className="badge external-hint">Evidencia cargada</span>
@@ -861,6 +861,7 @@ export default function HistoryPage() {
                     <span>Evaluacion {evaluationLabel(item)}</span>
                     <span>Seguimiento {lifecycle.label}</span>
                     {item.researchStatus ? <span>Investigacion {item.researchStatus}</span> : null}
+                    {item.researchBriefReadyAt ? <span>Brief listo {formatDate(item.researchBriefReadyAt)}</span> : null}
                     <span>Fuente {resolutionSourceLabel(item.resolutionSource)}</span>
                     <span>Verificado {item.verifiedAt ? formatDate(item.verifiedAt) : "pendiente"}</span>
                     <span>Ultima revision {item.lastCheckedAt ? formatDate(item.lastCheckedAt) : "sin revision"}</span>

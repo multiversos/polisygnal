@@ -76,7 +76,7 @@ const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
 ];
 
 const DEEP_LAYER_PREVIEW = [
-  "Samantha Research: brief listo",
+  "Samantha Research: brief listo / esperando reporte / reporte cargado",
   "Perfiles de billeteras: pendiente",
   "Investigacion externa: pendiente",
   "Odds externas: pendiente",

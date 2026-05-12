@@ -428,6 +428,7 @@ function historyPayloadFromMarket(
     ),
     nextCheckHint: "Revisar cuando Polymarket confirme el resultado final.",
     result: "pending" as const,
+    researchBriefReadyAt: deepJob?.steps.find((step) => step.id === "preparing_samantha_research")?.completedAt,
     researchStatus: deepJob?.status,
     resolutionStatus: "pending" as const,
     remoteId: item.market?.remote_id || undefined,

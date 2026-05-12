@@ -221,16 +221,31 @@ Current controls:
 - no outbound calls from PolySignal to Samantha or OpenClaw;
 - no backend run, DB write, migration, scoring, trading, or command with
   `--apply`;
-- brief generation is local to `/analyze`;
-- brief includes normalized market fields and summarized wallet state only;
-- brief does not include raw payloads, full wallet addresses, secrets, or
+- task packet generation is local to `/analyze`;
+- the packet includes a research brief, plain-text Samantha instructions,
+  expected JSON schema, return instructions, and safety rules;
+- the packet includes normalized market fields and summarized wallet state only;
+- the packet does not include raw payloads, full wallet addresses, secrets, or
   personal identity claims;
+- the packet instructs Samantha to return only JSON, use real sources, avoid
+  invented evidence, treat Reddit/social as weak, use Kalshi only for clear
+  equivalents, use odds only when comparable, and avoid trading, DB access,
+  secrets, doxxing, and identity mapping;
 - report import is manual paste;
 - report validator rejects unsafe URLs, secret-like text, full wallet addresses,
-  invalid probabilities, Reddit/social high reliability, and non-equivalent
-  Kalshi strong signals;
+  invalid JSON, oversized text, invalid probabilities, Reddit/social high
+  reliability, and non-equivalent Kalshi strong signals;
+- the UI validates reports before applying them to the local job;
 - suggested estimates are accepted only after a strict evidence gate and remain
   traceable to the imported report.
+
+History and performance safety:
+
+- `awaiting_samantha` and `ready_to_score` records are pending research states,
+  not misses;
+- `/performance` separates pending research from pending resolution;
+- no pending Samantha state counts for accuracy until a clear PolySignal
+  decision and a verified final Polymarket outcome exist.
 
 Before automating Samantha:
 

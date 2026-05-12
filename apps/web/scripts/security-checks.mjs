@@ -677,9 +677,12 @@ function validateAnalyzerReportSource() {
     "Pendiente de integracion",
     "Investigacion con Samantha",
     "Esperando reporte de Samantha",
-    "Copiar brief para Samantha",
-    "Descargar brief",
-    "Cargar reporte",
+    "Copiar tarea para Samantha",
+    "Descargar tarea JSON",
+    "Descargar instrucciones TXT",
+    "Copiar schema de respuesta",
+    "Validar reporte",
+    "Cargar reporte al analisis",
     "Que puedes hacer ahora",
     "Analizar otro enlace",
     "Capas revisadas",
@@ -692,7 +695,10 @@ function validateAnalyzerReportSource() {
   assert(source.includes("buildAnalyzerResult"), "expected AnalyzerReport to use unified analyzer result model");
   assert(source.includes("buildDeepAnalysisFromPolymarketMarket"), "expected AnalyzerReport to build deep analyzer readiness");
   assert(source.includes("buildSamanthaResearchBrief"), "expected AnalyzerReport to build Samantha research briefs");
+  assert(source.includes("buildSamanthaTaskPacket"), "expected AnalyzerReport to build Samantha task packets");
   assert(source.includes("parseSamanthaResearchReport"), "expected AnalyzerReport to validate Samantha reports locally");
+  assert(source.includes("handleValidateSamanthaReport"), "expected AnalyzerReport to validate reports before applying");
+  assert(source.includes("handleApplySamanthaReport"), "expected AnalyzerReport to apply valid reports explicitly");
   assert(source.includes("mergeSamanthaResearchLayer"), "expected AnalyzerReport to merge Samantha research into deep readiness");
   assert(source.includes("mergeWalletIntelligenceLayer"), "expected AnalyzerReport to merge wallet layer into deep readiness");
   assert(source.includes("getWalletIntelligenceSummary"), "expected AnalyzerReport to summarize wallet intelligence");
@@ -723,8 +729,13 @@ function validateSamanthaResearchRules() {
     parseSamanthaResearchReport,
     shouldAcceptSuggestedEstimate,
   } = loadTsModule("app/lib/samanthaResearchReport.ts");
+  const {
+    buildSamanthaTaskPacket,
+    getExpectedSamanthaReportSchema,
+  } = loadTsModule("app/lib/samanthaTaskPacket.ts");
   const reportTypes = readFileSync(resolve(appRoot, "app/lib/samanthaResearchTypes.ts"), "utf8");
   const reportSource = readFileSync(resolve(appRoot, "app/lib/samanthaResearchReport.ts"), "utf8");
+  const taskPacketSource = readFileSync(resolve(appRoot, "app/lib/samanthaTaskPacket.ts"), "utf8");
 
   const brief = buildSamanthaResearchBrief({
     item: {
@@ -765,6 +776,23 @@ function validateSamanthaResearchRules() {
   assert(!serializedBrief.toLowerCase().includes("database_url="), "Samantha brief must not include secrets");
   assert(serializedBrief.includes("Do not invent sources"), "Samantha brief must include anti-invention rule");
   assert(serializedBrief.includes("Do not touch Neon"), "Samantha brief must include no-Neon rule");
+  const taskPacket = buildSamanthaTaskPacket(brief);
+  const taskPacketText = [
+    taskPacket.researchBriefJson,
+    taskPacket.samanthaInstructionsText,
+    taskPacket.expectedReportSchema,
+    taskPacket.returnInstructions,
+    taskPacket.taskPacketJson,
+  ].join("\n");
+  assert(taskPacket.samanthaInstructionsText.includes("Return ONLY valid JSON"), "Samantha task packet must instruct JSON-only return");
+  assert(taskPacket.samanthaInstructionsText.includes("Do not invent sources"), "Samantha task packet must include anti-invention rules");
+  assert(taskPacket.samanthaInstructionsText.includes("Do not touch Neon"), "Samantha task packet must include no-Neon rule");
+  assert(taskPacket.samanthaInstructionsText.includes("Reddit and social content are weak signals"), "Samantha task packet must downgrade social evidence");
+  assert(taskPacket.expectedReportSchema.includes('"evidence"'), "Samantha task packet must include expected report schema");
+  assert(getExpectedSamanthaReportSchema().includes('"suggestedEstimate"'), "Samantha schema helper should include suggestedEstimate");
+  assert(!/0x[a-fA-F0-9]{40}/.test(taskPacketText), "Samantha task packet must not include full wallet addresses");
+  assert(!taskPacketText.toLowerCase().includes("database_url="), "Samantha task packet must not include secrets");
+  assert(!taskPacketSource.includes("fetch("), "Samantha task packet builder must not call external services");
 
   const validReport = parseSamanthaResearchReport({
     completedAt: "2026-05-12T12:00:00.000Z",
@@ -832,6 +860,10 @@ function validateSamanthaResearchRules() {
     warnings: [],
   });
   assert(!dangerousUrl.valid, "Samantha validator must reject dangerous URLs");
+
+  const invalidJson = parseSamanthaResearchReport("{not-json");
+  assert(!invalidJson.valid, "Samantha validator must reject invalid JSON");
+  assert(invalidJson.errors.some((error) => error.includes("JSON invalido")), "Samantha validator should explain invalid JSON");
 
   const badEstimate = parseSamanthaResearchReport({
     completedAt: "2026-05-12T12:00:00.000Z",
@@ -911,6 +943,17 @@ function validateSamanthaResearchRules() {
   });
   assert(!fullWalletReport.valid, "Samantha validator must reject full wallet addresses");
 
+  const secretReportText = JSON.stringify({
+    completedAt: "2026-05-12T12:00:00.000Z",
+    evidence: [],
+    marketUrl: "https://polymarket.com/event/test",
+    status: "failed",
+    version: "1.0",
+    warnings: ["token=abc123"],
+  });
+  const secretReport = parseSamanthaResearchReport(secretReportText);
+  assert(!secretReport.valid, "Samantha validator must reject possible secrets in raw report text");
+
   const longSummary = "Long ".repeat(400);
   const longReport = parseSamanthaResearchReport({
     completedAt: "2026-05-12T12:00:00.000Z",
@@ -933,14 +976,18 @@ function validateSamanthaResearchRules() {
   });
   assert(longReport.valid, "long but safe Samantha report should remain valid after sanitization");
   assert(longReport.report.evidence[0].summary.length <= 900, "Samantha validator should limit long summaries");
+  const tooLongReport = parseSamanthaResearchReport("x".repeat(70000));
+  assert(!tooLongReport.valid, "Samantha validator must reject excessively long report text");
 
   assert(reportTypes.includes("SamanthaResearchBrief"), "Samantha research types should include brief contract");
   assert(reportTypes.includes("SamanthaResearchReport"), "Samantha research types should include report contract");
   assert(reportSource.includes("isSafeSourceUrl"), "Samantha report validator should validate source URLs");
+  assert(reportSource.includes("MAX_REPORT_INPUT_LENGTH"), "Samantha report validator should limit raw report length");
 
   return {
     brief_safe: true,
-    parser_cases: 7,
+    parser_cases: 10,
+    task_packet_safe: true,
     valid_signals: convertSamanthaReportToSignals(validReport.report).length,
   };
 }
@@ -1939,6 +1986,8 @@ function validateAnalyzerFirstProductSource() {
   assert(alerts.includes("Seguimiento de analisis guardados"), "alerts should focus on saved analyses");
   assert(!alerts.includes("fetchWatchlistItems"), "alerts should not depend on sports watchlist");
   assert(performance.includes("aciertos y fallos medibles"), "performance should document honest accuracy denominator");
+  assert(performance.includes("Pendientes de investigacion"), "performance should separate Samantha/research-pending analyses");
+  assert(performance.includes("stats.researchPending"), "performance should not mix research pending items with misses");
   assert(methodology.includes("umbral para decision clara es 55%"), "methodology should explain clear decision threshold");
   assert(legacySports.includes("Vista legacy"), "sports route should be marked legacy");
 

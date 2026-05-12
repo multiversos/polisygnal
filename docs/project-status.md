@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con arquitectura Deep Analyzer read-only preparada y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `336a9ed`
+- ultimo deploy production verificado antes de este sprint: `61e5cfc`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -119,10 +119,22 @@ Estado visible verificado:
   No hacen fetch, no escriben DB, no activan research externo, no consultan
   odds/Kalshi y no generan probabilidades PolySignal nuevas.
 - Existe contrato manual para Samantha Research:
-  `samanthaResearchTypes.ts`, `samanthaResearchBrief.ts` y
-  `samanthaResearchReport.ts`. `/analyze` puede preparar un brief local,
-  validar un reporte pegado por el usuario y mostrar evidencia estructurada sin
-  ejecutar Samantha automaticamente.
+  `samanthaResearchTypes.ts`, `samanthaResearchBrief.ts`,
+  `samanthaTaskPacket.ts` y `samanthaResearchReport.ts`. `/analyze` puede
+  preparar una tarea completa para Samantha, copiarla o descargarla, validar un
+  reporte pegado por el usuario en dos pasos y mostrar evidencia estructurada
+  sin ejecutar Samantha automaticamente.
+- El paquete para Samantha incluye brief JSON, instrucciones TXT, schema de
+  respuesta, reglas de seguridad e instrucciones de devolucion. Prohibe fuentes
+  inventadas, trading, Neon, `.env`, doxxing, secretos, copy-trading y
+  identificacion de personas reales detras de wallets.
+- Al validar reportes de Samantha, PolySignal rechaza JSON invalido, textos
+  demasiado largos, URLs peligrosas, secretos, direcciones completas de wallet,
+  estimates fuera de rango, Reddit/social con confiabilidad alta y Kalshi no
+  equivalente usado como senal fuerte.
+- Los jobs `awaiting_samantha` quedan visibles en Historial como `Esperando
+  Samantha` con accion `Continuar analisis`. `/performance` separa pendientes
+  de investigacion de pendientes de resolucion y no los cuenta como fallos.
 - La estimacion PolySignal pasa por una compuerta de calidad: si el valor solo
   replica el precio visible del mercado, se muestra como probabilidad del
   mercado y no como estimacion propia.

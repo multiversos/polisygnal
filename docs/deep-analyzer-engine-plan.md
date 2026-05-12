@@ -442,6 +442,34 @@ Samantha no decide sola. Investiga y devuelve evidencia estructurada; PolySignal
 valida, convierte a señales y conserva la separacion entre evidencia, decision e
 historial.
 
+## Puente manual Samantha
+
+El puente operativo actual es manual/local y no ejecuta agentes:
+
+1. PolySignal crea un `DeepAnalysisJob`.
+2. El job lee Polymarket, revisa el mercado y prepara el brief.
+3. `samanthaTaskPacket.ts` genera una tarea completa para Samantha con:
+   - brief JSON;
+   - instrucciones legibles;
+   - schema esperado;
+   - reglas de seguridad;
+   - instrucciones de devolucion.
+4. El usuario copia o descarga la tarea y la entrega fuera de PolySignal.
+5. Samantha devuelve solo JSON estructurado.
+6. PolySignal valida el reporte antes de aplicarlo.
+7. Si el reporte es valido, el job avanza:
+   - `awaiting_samantha_report` -> `completed`;
+   - `checking_odds` -> `completed` solo si hay odds comparables;
+   - `checking_kalshi` -> `completed` solo si hay equivalente claro;
+   - `scoring_evidence` -> `completed` si hay senales;
+   - `generating_decision` -> `completed` solo si la estimacion sugerida pasa
+     las compuertas.
+
+Si el reporte aporta evidencia pero no decision aceptable, el job queda
+`ready_to_score`. Si es parcial o insuficiente, permanece `awaiting_samantha`.
+En ningun caso se inventa una prediccion ni se usa el precio de mercado como
+estimacion PolySignal.
+
 Decision v0:
 
 - `available=false`.

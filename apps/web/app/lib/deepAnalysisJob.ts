@@ -300,11 +300,29 @@ export function markJobAwaitingSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
 
 export function markJobSamanthaReportLoaded(
   job: DeepAnalysisJob,
-  input: { acceptedEstimate: boolean; signalCount: number },
+  input: {
+    acceptedEstimate: boolean;
+    kalshiEquivalent?: boolean;
+    oddsFound?: boolean;
+    reportStatus?: "completed" | "failed" | "partial";
+    signalCount: number;
+  },
 ): DeepAnalysisJob {
   let next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
     status: "completed",
     summary: "Reporte de Samantha cargado y validado localmente.",
+  });
+  next = updateDeepAnalysisJobStep(next, "checking_odds", {
+    status: input.oddsFound ? "completed" : "blocked",
+    summary: input.oddsFound
+      ? "Samantha reporto una comparacion de odds comparable y validable."
+      : "No hay odds comparables cargadas; pendiente de integracion segura.",
+  });
+  next = updateDeepAnalysisJobStep(next, "checking_kalshi", {
+    status: input.kalshiEquivalent ? "completed" : "blocked",
+    summary: input.kalshiEquivalent
+      ? "Samantha reporto un mercado Kalshi equivalente."
+      : "No hay equivalente Kalshi aceptado; pendiente de integracion segura.",
   });
   next = updateDeepAnalysisJobStep(next, "scoring_evidence", {
     status: input.signalCount > 0 ? "completed" : "blocked",
@@ -326,11 +344,14 @@ export function markJobSamanthaReportLoaded(
     ...next,
     resultReady: input.acceptedEstimate,
     samanthaReportLoaded: true,
-    status: input.acceptedEstimate
-      ? "completed"
-      : input.signalCount > 0
-        ? "ready_to_score"
-        : "awaiting_samantha",
+    status:
+      input.acceptedEstimate
+        ? "completed"
+        : input.signalCount > 0
+          ? "ready_to_score"
+          : input.reportStatus === "completed"
+            ? "ready_to_score"
+            : "awaiting_samantha",
   };
 }
 
