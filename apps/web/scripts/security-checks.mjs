@@ -638,6 +638,11 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("AnalyzeLoadingPanel"), "expected /analyze to render the loading panel");
   assert(analyzePage.includes("MarketSelectionPanel"), "expected /analyze to render the confirmation selector");
   assert(analyzePage.includes("analyzeSelectedMarket"), "expected /analyze to analyze only a selected market");
+  assert(analyzePage.includes("/api/analyze-polymarket-link"), "expected /analyze to resolve links through the safe Polymarket route");
+  assert(analyzePage.includes("resolvePolymarketLinkForAnalyze"), "expected /analyze to use the live Polymarket resolver");
+  assert(!analyzePage.includes("/markets/overview"), "analyzer must not use internal markets overview for primary matching");
+  assert(!analyzePage.includes("rankAnalyzerMatches"), "analyzer must not rank internal markets as the primary source");
+  assert(!analyzePage.includes("fetchComparableMarkets"), "analyzer must not fetch comparable internal markets");
   assert(analyzePage.includes('status: "needs_selection"'), "expected exact matches to require confirmation");
   assert(analyzePage.includes('status: "analyzing_selected"'), "expected selected-market loading state");
   assert(analyzePage.includes('status: "result"'), "expected single selected result state");
@@ -935,6 +940,90 @@ function validateAnalyzerMatchRankingRules() {
   return { cases: 8 };
 }
 
+async function validatePolymarketLinkResolverRules() {
+  const {
+    resolvePolymarketLink,
+    resolvedMarketToOverviewItem,
+  } = loadTsModule("app/lib/polymarketLinkResolver.ts");
+
+  const rejected = await resolvePolymarketLink(
+    { url: "https://polymarket.com.evil.com/event/test" },
+    async () => {
+      throw new Error("fetch should not be called for invalid input");
+    },
+  );
+  assert(rejected.status === "unsupported", "expected resolver to reject non-Polymarket host");
+
+  const calls = [];
+  const resolverFetch = async (url, init) => {
+    calls.push({ init, url: String(url) });
+    assert(String(url).startsWith("https://gamma-api.polymarket.com/events?slug="), `unexpected resolver URL ${url}`);
+    assert(init.credentials === "omit", "expected resolver fetch to omit credentials");
+    assert(init.redirect === "error", "expected resolver fetch to reject redirects");
+    return new Response(
+      JSON.stringify([
+        {
+          slug: "nba-okc-lal-2026-05-11",
+          startTime: "2026-05-12T02:30:00Z",
+          tags: [{ label: "Sports", slug: "sports" }, { label: "NBA", slug: "nba" }],
+          title: "Thunder vs. Lakers",
+          markets: [
+            {
+              active: true,
+              closed: false,
+              conditionId: "0xabc",
+              clobTokenIds: "[\"token-thunder\", \"token-lakers\"]",
+              id: "2161658",
+              liquidity: "1422845.15",
+              outcomePrices: "[\"0.825\", \"0.175\"]",
+              outcomes: "[\"Thunder\", \"Lakers\"]",
+              question: "Thunder vs. Lakers",
+              slug: "nba-okc-lal-2026-05-11",
+              volume: "1457369.46",
+            },
+            {
+              active: true,
+              closed: false,
+              id: "2220924",
+              outcomePrices: "[\"0.495\", \"0.505\"]",
+              outcomes: "[\"Over\", \"Under\"]",
+              question: "Thunder vs. Lakers: O/U 214.5",
+              slug: "nba-okc-lal-2026-05-11-total-214pt5",
+            },
+          ],
+        },
+      ]),
+      { headers: { "Content-Type": "application/json" }, status: 200 },
+    );
+  };
+
+  const resolved = await resolvePolymarketLink(
+    { url: "https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11" },
+    resolverFetch,
+  );
+  assert(resolved.status === "ok", `expected NBA link to resolve, got ${resolved.status}`);
+  assert(resolved.source === "gamma", `expected gamma source, got ${resolved.source}`);
+  assert(resolved.eventSlug === "nba-okc-lal-2026-05-11", "expected event slug to stay NBA");
+  assert(resolved.sport === "nba", `expected NBA sport tag, got ${resolved.sport}`);
+  assert(resolved.markets.length === 2, `expected two event markets, got ${resolved.markets.length}`);
+  assert(!JSON.stringify(resolved).includes("Sevilla"), "resolver must not include unrelated internal soccer markets");
+  assert(!JSON.stringify(resolved).includes("rawPayloadShouldNotLeak"), "resolver leaked raw payload fields");
+  const overview = resolvedMarketToOverviewItem(resolved, resolved.markets[0]);
+  assert(overview.market.remote_id === "2161658", "expected resolved market id to become remote_id");
+  assert(overview.market.condition_id === "0xabc", "expected conditionId to be preserved for future read-only lookups");
+  assert(overview.market.outcomes.length === 2, "expected outcome prices to be preserved");
+  assert(calls.length === 1, `expected one Gamma call, got ${calls.length}`);
+
+  const notFound = await resolvePolymarketLink(
+    { url: "https://polymarket.com/es/sports/laliga/lal-cel-lev-2099-01-01" },
+    async () => new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" }, status: 200 }),
+  );
+  assert(notFound.status === "not_found", `expected not_found without internal fallback, got ${notFound.status}`);
+  assert(notFound.markets.length === 0, "not_found resolver result must not invent markets");
+
+  return { live_source: "gamma", no_cross_sport_fallback: true, resolver_cases: 3 };
+}
+
 async function validatePolymarketResolutionAdapter() {
   const {
     buildExternalResolutionRequest,
@@ -1078,6 +1167,70 @@ async function validateResolvePolymarketRoute() {
   return { route_checks: 4 };
 }
 
+async function validateAnalyzePolymarketLinkRoute() {
+  const originalFetch = globalThis.fetch;
+  try {
+    const calls = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({ init, url: String(url) });
+      return new Response(
+        JSON.stringify([
+          {
+            slug: "nba-okc-lal-2026-05-11",
+            startTime: "2026-05-12T02:30:00Z",
+            tags: [{ label: "Sports", slug: "sports" }, { label: "NBA", slug: "nba" }],
+            title: "Thunder vs. Lakers",
+            markets: [
+              {
+                active: true,
+                closed: false,
+                conditionId: "0xabc",
+                id: "2161658",
+                outcomePrices: "[\"0.825\", \"0.175\"]",
+                outcomes: "[\"Thunder\", \"Lakers\"]",
+                question: "Thunder vs. Lakers",
+                rawPayloadShouldNotLeak: "SECRET",
+                slug: "nba-okc-lal-2026-05-11",
+              },
+            ],
+          },
+        ]),
+        { headers: { "Content-Type": "application/json" }, status: 200 },
+      );
+    };
+
+    const route = loadTsModule("app/api/analyze-polymarket-link/route.ts");
+    const invalid = await route.POST(
+      new Request("https://example.test/api/analyze-polymarket-link", {
+        body: JSON.stringify({ url: "https://polymarket.com.evil.com/event/test" }),
+        method: "POST",
+      }),
+    );
+    assert(invalid.status === 400, `expected invalid analyze route request to fail, got ${invalid.status}`);
+
+    const resolved = await route.POST(
+      new Request("https://example.test/api/analyze-polymarket-link", {
+        body: JSON.stringify({ url: "https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11" }),
+        method: "POST",
+      }),
+    );
+    assert(resolved.status === 200, `expected analyze route to return 200, got ${resolved.status}`);
+    const body = await resolved.json();
+    assert(body.status === "ok", `expected analyze route ok status, got ${body.status}`);
+    assert(body.source === "gamma", `expected analyze route gamma source, got ${body.source}`);
+    assert(body.eventSlug === "nba-okc-lal-2026-05-11", `unexpected event slug ${body.eventSlug}`);
+    assert(body.markets?.[0]?.question === "Thunder vs. Lakers", "expected route to normalize the returned market");
+    assert(!JSON.stringify(body).includes("SECRET"), "analyze route leaked raw payload");
+    assert(!JSON.stringify(body).includes("Sevilla"), "analyze route included unrelated soccer market");
+    assert(String(calls[0]?.url).startsWith("https://gamma-api.polymarket.com/events?slug="), "route did not call allowlisted Gamma events endpoint");
+    assert(route.GET().status === 405, "expected analyze route GET to be rejected");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  return { route_checks: 5 };
+}
+
 async function validateBackendProxy() {
   const route = loadTsModule("app/api/backend/[...path]/route.ts");
   const originalFetch = globalThis.fetch;
@@ -1169,8 +1322,10 @@ const analyzeLoadingPanelChecks = validateAnalyzeLoadingPanelSource();
 const analyzerReportChecks = validateAnalyzerReportSource();
 const analyzerResultChecks = validateAnalyzerResultRules();
 const analyzerMatchRankingChecks = validateAnalyzerMatchRankingRules();
+const polymarketLinkResolverChecks = await validatePolymarketLinkResolverRules();
 const resolutionAdapterChecks = await validatePolymarketResolutionAdapter();
 const resolutionRouteChecks = await validateResolvePolymarketRoute();
+const analyzePolymarketLinkRouteChecks = await validateAnalyzePolymarketLinkRoute();
 const proxyChecks = await validateBackendProxy();
 
 console.log(
@@ -1186,8 +1341,10 @@ console.log(
       analyzer_report: analyzerReportChecks,
       analyzer_result: analyzerResultChecks,
       analyzer_match_ranking: analyzerMatchRankingChecks,
+      polymarket_link_resolver: polymarketLinkResolverChecks,
       polymarket_resolution_adapter: resolutionAdapterChecks,
       resolve_polymarket_route: resolutionRouteChecks,
+      analyze_polymarket_link_route: analyzePolymarketLinkRouteChecks,
       proxy: proxyChecks,
       status: "ok",
     },

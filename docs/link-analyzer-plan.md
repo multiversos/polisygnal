@@ -2,7 +2,7 @@
 
 ## Phase 1: Current Local Experience
 
-Implemented as a frontend-only flow.
+Implemented as a frontend flow plus a same-origin read-only resolver route.
 
 - The public home page positions `/analyze` as the main product entry: paste a
   Polymarket link, confirm the market, save the reading, and measure it later
@@ -14,14 +14,18 @@ Implemented as a frontend-only flow.
 - PolySignal validates that the link belongs to `polymarket.com`.
 - PolySignal parses the link into locale, category, league/sport, raw slug,
   event slug, market slug, date, team-code hints, and secondary search terms.
-- League prefixes from sports slugs, standalone years, standalone dates, and
-  one-team matches are treated as weak context only. They must not create a
-  primary match.
-- PolySignal compares the exact slug and date/team context against markets
-  already loaded in the app.
-- Exact market slugs or exact local/remote ids isolate that single market in
-  the selector. Exact event slugs can show sibling markets from the same event,
-  but not unrelated matches from the same league or date.
+- The primary source for link resolution is now Polymarket/Gamma read-only, not
+  markets already loaded inside PolySignal.
+- `/api/analyze-polymarket-link` validates the submitted Polymarket URL, builds
+  an allowlisted Gamma request internally, and returns normalized event/market
+  data only. It is not an open proxy.
+- Exact event links resolve through Gamma `/events?slug=...`; exact market links
+  resolve through Gamma `/markets?slug=...` when supported.
+- If Gamma returns an event with several markets, the selector shows only those
+  markets from that real event.
+- If Gamma cannot return the event or market, `/analyze` shows a no-match state:
+  "No pudimos obtener este mercado desde Polymarket." It does not search
+  internally for similar markets.
 - The user flow is `Detectar -> Confirmar -> Analizar -> Guardar -> Verificar
   resultado`.
 - If there is a match, `/analyze` first shows a compact selector. It does not
@@ -30,9 +34,9 @@ Implemented as a frontend-only flow.
   strong, and possible matches, shows a short reason, and asks the user to run
   `Analizar este mercado` before any deep layers load.
 - If the link is an event with several markets, only markets from that same
-  event are shown for selection.
-- If there is no exact match, the page shows at most compact possible matches
-  and says that no exact match was found.
+  event returned by Polymarket are shown for selection.
+- If there is no structured match from Polymarket, the page says so honestly.
+  It does not show possible matches from another sport or league.
 - If there is no match, the page says so honestly and can save the link as
   pending without inventing market data.
 - User can save the result to local Historial.
@@ -97,9 +101,9 @@ Implemented as a frontend-only flow.
   confidence, threshold `$100+`, and shortened wallet addresses behind a
   drilldown labelled `Ver todas las billeteras analizadas`.
 - The report includes a compact data-sources row: market price from Polymarket,
-  market/event data from Polymarket plus PolySignal, wallet data from public
-  Polymarket/Gamma read-only sources when available, external research as pending or
-  verified, and history from this browser.
+  market/event data from Polymarket/Gamma read-only, wallet data from public
+  Polymarket/Gamma read-only sources when available, external research as pending
+  or verified, and history from this browser.
 - The report closes with `Que puedes hacer ahora`: save the analysis, save as
   follow-up when there is no PolySignal estimate, view history, follow the
   market, open market detail, or analyze another link.
@@ -107,13 +111,15 @@ Implemented as a frontend-only flow.
   and `Reanalizar enlace` actions for saved records that include the original
   URL.
 - QA cases currently protected:
-  - `https://polymarket.com/es/sports/epl/epl-bri-wol-2026-05-09` shows a
-    compact selector with markets from that same event.
-  - `https://polymarket.com/market/epl-bri-wol-2026-05-09-bri` isolates the
-    exact market slug before deep analysis.
-  - `https://polymarket.com/es/sports/laliga/lal-cel-lev-2026-05-12` does not
-    surface Sevilla/Espanyol, Atletico/Celta, or other one-team/league/date
-    noise when that exact event is not loaded.
+  - `https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11` resolves
+    from Gamma to the Thunder/Lakers event or shows an honest unavailable state;
+    it must never show soccer markets.
+  - `https://polymarket.com/es/sports/laliga/lal-cel-lev-2026-05-12` resolves
+    from Gamma to the Celta/Levante event or shows an honest unavailable state;
+    it must not surface Sevilla/Espanyol, Atletico/Celta, or other unrelated
+    matches.
+  - Malicious URLs such as `polymarket.com.evil.com`, credentials, private IPs,
+    custom ports, and dangerous schemes are rejected before any outbound request.
 - The final copy should read like a responsible review:
   "PolySignal reviso las capas disponibles" and, when needed, "No hay evidencia
   suficiente para emitir una estimacion propia responsable."
@@ -122,21 +128,30 @@ Implemented as a frontend-only flow.
   outcome manually.
 
 This phase does not scrape Polymarket, does not write to Neon, and does not
-invent probabilities. For result verification only, Historial can use a
-server-side read-only adapter that validates Polymarket identifiers and calls
-Gamma's structured `/events?slug=...` endpoint with an allow-list, timeout, no
-cookies, no credentials, no dangerous redirects, and no raw payload returned to
-the browser.
+invent probabilities. Link resolution and result verification both use
+server-side read-only adapters that validate Polymarket identifiers and call
+Gamma's structured endpoints with an allow-list, timeout, no cookies, no
+credentials, no dangerous redirects, and no raw payload returned to the browser.
 
-## Phase 2: Backend Market Lookup
+## Phase 2: Structured Polymarket Lookup
 
-Not implemented yet.
+Implemented for `/analyze` as a server-side read-only route.
 
 - Resolve Polymarket event/market identifiers server-side.
-- Load market title, close time, outcomes, prices, volume, and liquidity.
-- Store analysis records persistently instead of only in browser storage.
-- Preserve the price and timestamp from the moment of analysis.
+- Load market title, close time, outcomes, prices, volume, and liquidity from
+  the resolved Gamma response.
+- Preserve normalized URL, event slug, market slug, remote id, condition id,
+  outcome prices, volume, liquidity, and analysis timestamp when the user saves
+  to local history.
 - Keep market price probability and PolySignal probability as separate fields.
+- PolySignal internal markets are allowed for local history and later
+  verification, but not for primary link matching.
+
+Still not implemented:
+
+- Persistent backend storage for user analyses.
+- Auth-linked history.
+- Cached Polymarket resolution records.
 
 ## Phase 3: Evidence Search
 

@@ -1,4 +1,5 @@
 export type MarketOverviewMarket = {
+  condition_id?: string | null;
   id?: number;
   question?: string | null;
   remote_id?: string | null;
@@ -15,6 +16,15 @@ export type MarketOverviewMarket = {
   evidence_eligible?: boolean | null;
   evidence_shape?: string | null;
   evidence_skip_reason?: string | null;
+  outcomes?: MarketOverviewOutcome[] | null;
+  source?: "clob" | "gamma" | "polymarket" | "polysignal" | "unknown" | string | null;
+};
+
+export type MarketOverviewOutcome = {
+  label?: string | null;
+  price?: string | number | null;
+  side?: "DRAW" | "NO" | "UNKNOWN" | "YES" | string | null;
+  token_id?: string | null;
 };
 
 export type MarketOverviewSnapshot = {

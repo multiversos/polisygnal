@@ -137,6 +137,12 @@ function marketStatusSummary(item: MarketOverviewItem): string {
   return "Estado del mercado pendiente de confirmacion.";
 }
 
+function hasVisibleOutcomePrices(item: MarketOverviewItem): boolean {
+  return Boolean(
+    item.market?.outcomes?.some((outcome) => typeof outcome.price === "number" || typeof outcome.price === "string"),
+  );
+}
+
 function layer(
   id: AnalyzerLayerId,
   label: string,
@@ -246,9 +252,9 @@ export function buildAnalyzerResult(input: BuildAnalyzerResultInput): AnalyzerRe
     return {
       canCountForAccuracy: false,
       decision: "NONE",
-      decisionReason: "No hay mercado cargado para analizar sin inventar datos.",
+      decisionReason: "No pudimos obtener este mercado desde Polymarket sin inventar datos.",
       layers: [
-        layer("market", "Mercado detectado", "unavailable", "No encontramos coincidencia en los mercados cargados."),
+        layer("market", "Mercado detectado", "unavailable", "No pudimos obtener este mercado desde Polymarket."),
         layer("probabilities", "Probabilidad del mercado", "unavailable", "No hay precio visible disponible."),
         layer("polysignal_estimate", "Estimacion PolySignal", "unavailable", "Sin estimacion PolySignal suficiente."),
         layer("event_context", "Contexto del evento", "pending", "Contexto pendiente de mercado cargado."),
@@ -270,6 +276,7 @@ export function buildAnalyzerResult(input: BuildAnalyzerResultInput): AnalyzerRe
     marketNoPrice: item.latest_snapshot?.no_price,
     marketYesPrice: item.latest_snapshot?.yes_price,
   });
+  const marketPricesAvailable = Boolean(marketProbabilities) || hasVisibleOutcomePrices(item);
   const estimateQuality = getEstimateQuality(item);
   const polySignalProbabilities = getRealPolySignalProbabilities(item);
   const polySignalEstimateAvailable =
@@ -303,10 +310,12 @@ export function buildAnalyzerResult(input: BuildAnalyzerResultInput): AnalyzerRe
     layer(
       "probabilities",
       "Probabilidad del mercado",
-      marketProbabilities ? "available" : "unavailable",
+      marketPricesAvailable ? "available" : "unavailable",
       marketProbabilities
         ? "Precio visible YES/NO disponible como referencia de mercado."
-        : "No hay precio visible suficiente para calcular probabilidad de mercado.",
+        : marketPricesAvailable
+          ? "Precios de outcomes disponibles como referencia de mercado."
+          : "No hay precio visible suficiente para calcular probabilidad de mercado.",
       ["El precio del mercado no es una prediccion PolySignal."],
     ),
     layer(
@@ -371,9 +380,9 @@ export function buildAnalyzerResult(input: BuildAnalyzerResultInput): AnalyzerRe
       polySignalEstimateAvailable,
     }),
     layers,
-    marketProbabilityAvailable: Boolean(marketProbabilities),
+    marketProbabilityAvailable: marketPricesAvailable,
     marketTitle: marketTitle(item),
-    matchedMarketId: item.market?.id ? String(item.market.id) : undefined,
+    matchedMarketId: item.market?.id ? String(item.market.id) : item.market?.remote_id ?? undefined,
     matchConfidence,
     normalizedUrl: input.normalizedUrl,
     polySignalEstimateAvailable,

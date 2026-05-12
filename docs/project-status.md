@@ -2,12 +2,12 @@
 
 ## Snapshot
 
-- fecha de corte: `2026-05-11`
+- fecha de corte: `2026-05-12`
 - etapa: `visible_product_mvp`
 - foco actual: `/analyze` como centro del producto, con lectura profunda read-only y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `98900e8`
+- ultimo deploy production verificado antes de este sprint: `336a9ed`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -50,8 +50,9 @@ Estado visible verificado:
 - Alertas se conectan honestamente con mercados seguidos y datos visibles.
 - `/history` esta disponible como Historial local para medir analisis guardados
   sin inventar resultados.
-- `/analyze` esta disponible para validar enlaces de Polymarket, compararlos con
-  mercados ya cargados y guardar resultados locales en Historial.
+- `/analyze` esta disponible para validar enlaces de Polymarket, resolverlos
+  directamente desde Polymarket/Gamma read-only y guardar resultados locales en
+  Historial.
 - El estado inicial de `/analyze` explica el flujo antes de pegar un enlace:
   detectar mercado, confirmar si hay varias opciones, analizar solo el mercado
   elegido y guardar la lectura para medirla con el tiempo.
@@ -64,17 +65,25 @@ Estado visible verificado:
   Wallet Intelligence con drilldown seguro y acciones claras para guardar,
   ver historial, abrir detalle o seguir mercado.
 - `/analyze` usa flujo `Detectar -> Confirmar -> Analizar -> Guardar ->
-  Verificar resultado`: un enlace primero se parsea y rankea de forma estricta,
-  luego el usuario confirma un mercado antes de ejecutar el analisis profundo.
-  Esto evita abrir multiples fichas completas para mercados relacionados pero
-  incorrectos.
-- El selector posterior a la deteccion usa copy de confirmacion, marca una
-  opcion recomendada cuando hay un unico match exacto/fuerte y mantiene las
-  coincidencias secundarias en tarjetas compactas.
-- QA reciente endurecio el flujo exacto: los prefijos de liga como `lal` no se
-  usan como terminos secundarios fuertes, los slugs genericos no inventan
-  codigos de equipo y un `market_slug` exacto queda aislado antes del analisis
-  profundo.
+  Verificar resultado`: un enlace primero se valida, luego se resuelve desde
+  Polymarket/Gamma por slug de evento o mercado, y despues el usuario confirma
+  un mercado antes de ejecutar el analisis profundo. Esto evita abrir multiples
+  fichas completas para mercados relacionados pero incorrectos.
+- Regla nueva de arquitectura: los mercados internos de PolySignal no son la
+  fuente principal del Analizador de enlaces. Si Polymarket/Gamma no devuelve
+  un evento o mercado, `/analyze` muestra un no-match honesto y no busca una
+  alternativa en `/markets/overview`, `/sports/soccer` ni mercados cargados.
+- Existe un endpoint seguro `POST /api/analyze-polymarket-link` que acepta solo
+  URLs de Polymarket, construye internamente llamadas allowlisted a Gamma
+  (`/events?slug=...` o `/markets?slug=...`) y devuelve datos normalizados:
+  evento, mercados, outcomes/precios, volumen, liquidez, estado, ids remotos y
+  condition id cuando existen. No devuelve payload crudo.
+- El selector posterior a la deteccion usa solo mercados devueltos por
+  Polymarket para ese evento/mercado. Un enlace NBA no puede mostrar futbol y
+  un enlace LaLiga no puede mostrar otros partidos que solo compartan liga,
+  fecha o un equipo.
+- QA reciente protege los casos NBA Thunder/Lakers y LaLiga Celta/Levante:
+  resuelven desde Gamma o muestran no-match honesto, sin cross-sport fallback.
 - El parser de enlaces ahora extrae locale, categoria, liga/deporte, slug
   completo, fecha y codigos de equipos desde URLs como
   `/es/sports/laliga/lal-cel-lev-2026-05-12`. Liga, fecha sola, año o un solo
@@ -83,7 +92,9 @@ Estado visible verificado:
   y market id remoto/local exacto pesan mas que terminos secundarios. Si hay
   match exacto/fuerte, se ocultan coincidencias debiles.
 - Wallet Intelligence se consulta solo para el mercado seleccionado, no para
-  todas las coincidencias secundarias del enlace.
+  todas las coincidencias secundarias del enlace. En mercados resueltos desde
+  Gamma sin market id local compatible, queda no disponible de forma honesta; no
+  se busca otro mercado interno.
 - Wallet Intelligence en el reporte muestra capital observado, sesgo
   YES/NO/Neutral, confianza, umbral `100 USD+` y direcciones abreviadas solo
   cuando existen datos reales. El detalle queda detras de `Ver todas las

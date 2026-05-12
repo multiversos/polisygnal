@@ -958,16 +958,54 @@ async function main() {
     ["DATABASE_URL", "SECRET", "TOKEN", "postgres://", "https://polisygnal.onrender.com", "markets"],
     "resolve-polymarket invalid response",
   );
-  const validAnalyzeUrl = `https://polymarket.com/event/${slugForAnalyzeSmoke(expectedTitles[0])}`;
+  const invalidAnalyzeRoute = await postJsonAllowFailure("/api/analyze-polymarket-link", {
+    url: "https://polymarket.com.evil.com/event/test",
+  });
+  assert(
+    invalidAnalyzeRoute.status === 400,
+    `analyze-polymarket-link accepted dangerous URL with status ${invalidAnalyzeRoute.status}`,
+  );
+  assertTextExcludes(
+    JSON.stringify(invalidAnalyzeRoute.body),
+    ["DATABASE_URL", "SECRET", "TOKEN", "postgres://", "https://polisygnal.onrender.com", "markets"],
+    "analyze-polymarket-link invalid response",
+  );
+  const nbaAnalyzeRoute = await postJsonAllowFailure("/api/analyze-polymarket-link", {
+    url: "https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11",
+  });
+  assert(nbaAnalyzeRoute.status === 200, `NBA analyze route returned status ${nbaAnalyzeRoute.status}`);
+  const nbaAnalyzeRouteText = JSON.stringify(nbaAnalyzeRoute.body);
+  assert(
+    nbaAnalyzeRoute.body.status === "ok" ||
+      nbaAnalyzeRoute.body.status === "not_found" ||
+      nbaAnalyzeRoute.body.status === "unsupported",
+    `NBA analyze route returned unexpected status ${nbaAnalyzeRoute.body.status}`,
+  );
+  assertTextExcludes(nbaAnalyzeRouteText, ["Sevilla", "Espanyol", "Atletico", "Atlético"], "NBA analyze route cross-sport guard");
+  if (nbaAnalyzeRoute.body.status === "ok") {
+    assert(nbaAnalyzeRoute.body.eventSlug === "nba-okc-lal-2026-05-11", "NBA analyze route returned the wrong event slug");
+    assert(nbaAnalyzeRouteText.includes("Thunder") || nbaAnalyzeRouteText.includes("Lakers"), "NBA analyze route did not return NBA market text");
+  }
+  const laligaAnalyzeRoute = await postJsonAllowFailure("/api/analyze-polymarket-link", {
+    url: "https://polymarket.com/es/sports/laliga/lal-cel-lev-2026-05-12",
+  });
+  assert(laligaAnalyzeRoute.status === 200, `LaLiga analyze route returned status ${laligaAnalyzeRoute.status}`);
+  assertTextExcludes(
+    JSON.stringify(laligaAnalyzeRoute.body),
+    ["Sevilla", "Espanyol", "Atletico", "Atlético"],
+    "LaLiga analyze route unrelated match guard",
+  );
+
+  const validAnalyzeUrl = "https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11";
   const validAnalyzeDom = await dumpDom(
     urlFor(`${ANALYZE_PATH}?url=${encodeURIComponent(validAnalyzeUrl)}&auto=1`),
   );
   const validAnalyzeText = visibleText(validAnalyzeDom);
   assertNoFullWalletAddress(validAnalyzeText, "analyze valid wallet privacy");
   const validAnalyzeNoMatch =
-    validAnalyzeText.includes("No encontramos una coincidencia exacta") &&
-    (validAnalyzeText.includes("Guardar como pendiente") ||
-      validAnalyzeText.includes("Ver mercados deportivos"));
+    (validAnalyzeText.includes("No encontramos una coincidencia exacta") ||
+      validAnalyzeText.includes("No pudimos obtener este mercado desde Polymarket")) &&
+    validAnalyzeText.includes("Guardar como pendiente");
   const validAnalyzeSelection = validAnalyzeText.includes("Analizar este mercado");
   const validAnalyzeReport =
     validAnalyzeText.includes("Centro de analisis") ||
@@ -982,16 +1020,25 @@ async function main() {
       "Confirma que mercado quieres analizar",
       "Mercado detectado",
       "No encontramos una coincidencia exacta",
+      "No pudimos obtener este mercado desde Polymarket",
       "Coincidencia encontrada",
       "Posibles coincidencias",
     ],
     "analyze valid match state",
   );
+  assertTextExcludes(validAnalyzeText, ["Sevilla", "Espanyol", "Atletico", "Atlético"], "analyze NBA cross-sport guard");
   if (validAnalyzeNoMatch) {
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Guardar como pendiente", "Revisar enlace", "Ver mercados deportivos"],
+      ["Guardar como pendiente", "Revisar enlace"],
       "analyze no-match compact actions",
+    );
+  } else if (validAnalyzeSelection && !validAnalyzeReport) {
+    assertTextIncludes(validAnalyzeText, "Analizar este mercado", "analyze selector action");
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Polymarket devolvio", "Thunder", "Lakers", "O/U", "Spread"],
+      "analyze selector uses live Polymarket data",
     );
   } else {
     assertTextIncludesOneOf(validAnalyzeText, ["Analizar este mercado", "Lectura del mercado"], "analyze confirm-before-deep-analysis");

@@ -52,8 +52,10 @@ production.
 
 ## Link Analyzer Input Security
 
-The `/analyze` flow is frontend-only in the current phase. It does not fetch the
-submitted URL, does not follow redirects, and does not scrape Polymarket.
+The `/analyze` flow validates the user-submitted URL in the browser, then sends
+it to a same-origin server route for structured read-only resolution. It never
+fetches the submitted URL as a destination, never follows redirects from the
+submitted URL, and does not scrape Polymarket HTML.
 
 Accepted links:
 
@@ -78,6 +80,36 @@ Rejected inputs:
 - `ftp:`
 - URLs with usernames/passwords or custom ports
 - oversized URLs
+
+## Structured Link Resolution Security
+
+`POST /api/analyze-polymarket-link` is the only primary source used by
+`/analyze` to identify the event or market behind a pasted link. It is read-only
+and is not a general proxy.
+
+Controls:
+
+- accepts `POST` only;
+- validates the URL with the hardened Polymarket helper before any outbound
+  request;
+- accepts only a bounded `url` field;
+- rejects credentials, custom ports, non-Polymarket hosts, private IPs,
+  metadata IPs, dangerous schemes, and oversized inputs;
+- extracts the Polymarket slug and builds the Gamma request internally;
+- calls only `https://gamma-api.polymarket.com/events?slug=...` or
+  `https://gamma-api.polymarket.com/markets?slug=...`;
+- uses short timeout, `no-store`, no cookies, no credentials, and redirects
+  disabled;
+- limits response size before parsing;
+- returns only normalized event/market fields, outcomes, prices, volume,
+  liquidity, state, remote ids, condition id, warnings, and checked timestamp;
+- does not return raw Gamma payloads, stack traces, secrets, or backend URLs;
+- does not use `/markets/overview`, `/sports/soccer`, or internal loaded
+  markets as the primary link matching source.
+
+If Gamma cannot return the event or market, `/analyze` must show an honest
+unavailable state. It must not show a market from another sport or a merely
+similar internal market.
 
 ## Structured Market Resolution Security
 

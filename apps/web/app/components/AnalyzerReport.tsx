@@ -101,6 +101,21 @@ function formatUsd(value: unknown): string {
   }).format(parsed);
 }
 
+function outcomePriceSummary(item: MarketOverviewItem): string | null {
+  const outcomes = item.market?.outcomes ?? [];
+  const priced = outcomes
+    .filter((outcome) => outcome.label)
+    .slice(0, 4)
+    .map((outcome) => {
+      const price =
+        outcome.price === null || outcome.price === undefined
+          ? "precio no disponible"
+          : formatProbability(outcome.price);
+      return `${outcome.label}: ${price}`;
+    });
+  return priced.length > 0 ? priced.join(" | ") : null;
+}
+
 function formatDate(value?: string | null): string {
   if (!value) {
     return "sin fecha";
@@ -263,6 +278,7 @@ export function AnalyzerReport({
     polySignalNoProbability: realPolySignalProbabilities?.no,
     polySignalYesProbability: realPolySignalProbabilities?.yes,
   });
+  const outcomePrices = outcomePriceSummary(item);
   const analyzerResult = buildAnalyzerResult({
     item,
     matchScore,
@@ -339,18 +355,20 @@ export function AnalyzerReport({
             Ver historial
           </a>
           {item.market?.id ? (
-            <a className="analysis-link" href={`/markets/${item.market.id}`}>
-              Ver detalle
-            </a>
+            <>
+              <a className="analysis-link" href={`/markets/${item.market.id}`}>
+                Ver detalle
+              </a>
+              <button
+                className={`watchlist-button ${watchlisted ? "active" : ""}`}
+                disabled={busy}
+                onClick={() => onToggleWatchlist(item)}
+                type="button"
+              >
+                {watchlisted ? "Siguiendo" : "Seguir mercado"}
+              </button>
+            </>
           ) : null}
-          <button
-            className={`watchlist-button ${watchlisted ? "active" : ""}`}
-            disabled={busy}
-            onClick={() => onToggleWatchlist(item)}
-            type="button"
-          >
-            {watchlisted ? "Siguiendo" : "Seguir mercado"}
-          </button>
         </div>
       </header>
 
@@ -368,6 +386,8 @@ export function AnalyzerReport({
               <strong>
                 YES {formatProbability(probabilityState.market.yes)} - NO {formatProbability(probabilityState.market.no)}
               </strong>
+            ) : outcomePrices ? (
+              <strong>{outcomePrices}</strong>
             ) : (
               <strong>Sin precio visible suficiente</strong>
             )}
@@ -404,7 +424,7 @@ export function AnalyzerReport({
       <section className="analyzer-source-strip" aria-label="Fuentes del analisis">
         <strong>Fuentes del analisis</strong>
         <span>Precio: Polymarket</span>
-        <span>Mercado/evento: Polymarket / PolySignal</span>
+        <span>Mercado/evento: Polymarket/Gamma read-only</span>
         <span>Billeteras: {sourceLabel(walletSummary)}</span>
         <span>Resolucion: Polymarket/Gamma si aplica</span>
         <span>Investigacion externa: {research.verifiedVisibleCount > 0 ? "fuentes verificadas" : "pendiente"}</span>
@@ -445,8 +465,14 @@ export function AnalyzerReport({
 
         <AnalyzerLayerDetails layer={findLayer(analyzerResult, "probabilities")}>
           <div className="analyzer-layer-metrics">
-            <span>Precio Si {formatProbability(item.latest_snapshot?.yes_price)}</span>
-            <span>Precio No {formatProbability(item.latest_snapshot?.no_price)}</span>
+            {probabilityState.market ? (
+              <>
+                <span>Precio Si {formatProbability(item.latest_snapshot?.yes_price)}</span>
+                <span>Precio No {formatProbability(item.latest_snapshot?.no_price)}</span>
+              </>
+            ) : (
+              <span>{outcomePrices ?? "Precios no disponibles"}</span>
+            )}
             <span>Volumen {formatMetric(item.latest_snapshot?.volume)}</span>
             <span>Liquidez {formatMetric(item.latest_snapshot?.liquidity)}</span>
           </div>
@@ -629,14 +655,16 @@ export function AnalyzerReport({
               Ver detalle del mercado
             </a>
           ) : null}
-          <button
-            className={`watchlist-button ${watchlisted ? "active" : ""}`}
-            disabled={busy}
-            onClick={() => onToggleWatchlist(item)}
-            type="button"
-          >
-            {watchlisted ? "Siguiendo" : "Seguir mercado"}
-          </button>
+          {item.market?.id ? (
+            <button
+              className={`watchlist-button ${watchlisted ? "active" : ""}`}
+              disabled={busy}
+              onClick={() => onToggleWatchlist(item)}
+              type="button"
+            >
+              {watchlisted ? "Siguiendo" : "Seguir mercado"}
+            </button>
+          ) : null}
           <a className="analysis-link secondary" href="/analyze">
             Analizar otro enlace
           </a>

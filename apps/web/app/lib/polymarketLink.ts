@@ -306,7 +306,7 @@ export function getPolymarketUrlValidationMessage(input: string): PolymarketLink
     };
   }
   return {
-    message: "Enlace listo para comparar con los mercados cargados.",
+    message: "Enlace listo para resolver desde Polymarket.",
     normalizedUrl: normalized,
     ok: true,
   };
