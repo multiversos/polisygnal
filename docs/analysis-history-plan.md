@@ -200,3 +200,29 @@ tables and production writes.
 - Preserve the market price and analysis time when they are available.
 - Do not promise profit, certainty, or betting advice.
 - Do not activate automatic trading or scheduled refresh from this flow.
+
+## Analyzer-First History Role
+
+History is now the measurement system for the product, not just a saved list.
+
+Primary responsibilities:
+
+- Store analyses created from `/analyze`.
+- Keep normalized Polymarket URL, event slug, market slug, ids, prices,
+  decision metadata, safe wallet summary and analyzer layer summaries.
+- Track lifecycle fields locally:
+  - `trackingStatus`
+  - `lastCheckedAt`
+  - `nextCheckHint`
+  - `resolutionStatus`
+- Provide the input for `/performance`.
+- Let the user reanalyze the original link.
+- Let the user run a manual result refresh while there is no persistent backend
+  job.
+
+Accuracy remains strict:
+
+- `accuracy = hits / (hits + misses)`
+- pending, cancelled, unknown and no-clear-decision records do not count.
+- market-price-only records do not count.
+- the user does not manually decide hit/miss.

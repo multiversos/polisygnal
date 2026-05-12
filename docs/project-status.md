@@ -286,10 +286,14 @@ Estado actual:
 
 - Historial sigue en localStorage.
 - Mi lista sigue en localStorage.
-- Alertas leen Mi lista local.
-- Analizar enlace puede guardar analisis en historial local.
-- Historial puede verificar resultados de forma automatica cuando hay outcome
-  disponible en datos PolySignal/read-only.
+- Alertas ahora se enfocan en analisis guardados y no en una lista generica de
+  mercados.
+- Analizar enlace es el flujo principal del producto y resuelve enlaces desde
+  Polymarket/Gamma/CLOB en modo read-only.
+- Historial puede guardar lecturas del analizador, verificar resultados cuando
+  hay outcome confiable y alimentar la pagina `/performance`.
+- Deportes, briefing y watchlist quedan como rutas legacy ocultas de la
+  navegacion principal.
 - No se creo auth real.
 - No se crearon tablas reales.
 - No se ejecutaron migraciones.
@@ -317,9 +321,10 @@ Riesgos pendientes:
 
 Prioridad recomendada:
 
-1. Disenar auth tecnico y proveedor de sesiones, sin implementarlo todavia.
-2. Preparar un schema draft de customer data, sin migracion real.
-3. Definir RLS o backend ownership checks antes de cualquier tabla de usuario.
-4. Repetir diagnostics de frescura solo en entorno con Neon confirmado.
-5. Ejecutar import/refresh real solo con dry-run limpio, supervision explicita y
-   limites conservadores.
+1. Consolidar el flujo `/analyze` -> `/history` -> `/performance` como producto
+   principal.
+2. Preparar backend persistente para analisis guardados, sin migracion real aun.
+3. Disenar auth tecnico y ownership checks antes de cualquier tabla de usuario.
+4. Planificar jobs de seguimiento y resolucion contra Polymarket/Gamma/CLOB.
+5. Mantener deportes/markets legacy ocultos hasta decidir si se archivan o
+   redirigen.

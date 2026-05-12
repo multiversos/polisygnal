@@ -24,6 +24,23 @@ export type AnalysisHistoryResult = "cancelled" | "hit" | "miss" | "pending" | "
 export type AnalysisHistorySource = "link_analyzer" | "manual" | "market_detail" | "unknown";
 export type AnalysisHistoryStatus = "open" | "resolved" | "unknown";
 export type AnalysisHistoryAnalyzerLayerStatus = "available" | "error" | "partial" | "pending" | "unavailable";
+export type AnalysisHistoryTrackingStatus =
+  | "analyzing"
+  | "awaiting_resolution"
+  | "cancelled"
+  | "created"
+  | "no_clear_decision"
+  | "resolved_hit"
+  | "resolved_miss"
+  | "saved"
+  | "tracking"
+  | "unknown";
+export type AnalysisHistoryResolutionStatus =
+  | "cancelled"
+  | "not_countable"
+  | "pending"
+  | "resolved"
+  | "unknown";
 
 export type AnalysisHistoryAnalyzerLayer = {
   id: string;
@@ -68,9 +85,11 @@ export type AnalysisHistoryItem = {
   evaluationReason?: string;
   evaluationStatus?: AnalysisHistoryEvaluationStatus;
   id: string;
+  lastCheckedAt?: string;
   marketId?: string;
   marketSlug?: string;
   marketNoProbability?: number;
+  nextCheckHint?: string;
   marketOutcomes?: AnalysisHistoryMarketOutcome[];
   marketYesProbability?: number;
   outcome?: AnalysisHistoryOutcome;
@@ -81,6 +100,7 @@ export type AnalysisHistoryItem = {
   resolutionConfidence?: AnalysisHistoryResolutionConfidence;
   resolutionReason?: string;
   resolutionSource?: AnalysisHistoryResolutionSource;
+  resolutionStatus?: AnalysisHistoryResolutionStatus;
   resolvedAt?: string;
   result?: AnalysisHistoryResult;
   remoteId?: string;
@@ -88,6 +108,7 @@ export type AnalysisHistoryItem = {
   sport?: string;
   status: AnalysisHistoryStatus;
   title: string;
+  trackingStatus?: AnalysisHistoryTrackingStatus;
   url?: string;
   verifiedAt?: string;
   walletIntelligenceSummary?: AnalysisHistoryWalletSummary;
@@ -185,6 +206,37 @@ function normalizeStatus(value: unknown): AnalysisHistoryStatus {
     return value;
   }
   return "unknown";
+}
+
+function normalizeTrackingStatus(value: unknown): AnalysisHistoryTrackingStatus | undefined {
+  if (
+    value === "analyzing" ||
+    value === "awaiting_resolution" ||
+    value === "cancelled" ||
+    value === "created" ||
+    value === "no_clear_decision" ||
+    value === "resolved_hit" ||
+    value === "resolved_miss" ||
+    value === "saved" ||
+    value === "tracking" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeResolutionStatus(value: unknown): AnalysisHistoryResolutionStatus | undefined {
+  if (
+    value === "cancelled" ||
+    value === "not_countable" ||
+    value === "pending" ||
+    value === "resolved" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  return undefined;
 }
 
 function normalizeResult(value: unknown, status: AnalysisHistoryStatus): AnalysisHistoryResult {
@@ -429,9 +481,11 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
           : decision.evaluationReason),
     evaluationStatus: decision.evaluationStatus,
     id: value.id || randomId(),
+    lastCheckedAt: normalizeString(value.lastCheckedAt),
     marketId: value.marketId ? String(value.marketId) : undefined,
     marketSlug: normalizeString(value.marketSlug),
     marketNoProbability,
+    nextCheckHint: normalizeString(value.nextCheckHint),
     marketOutcomes: normalizeMarketOutcomes(value.marketOutcomes),
     marketYesProbability,
     outcome: normalizeOutcome(value.outcome),
@@ -444,6 +498,7 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     resolutionConfidence: normalizeResolutionConfidence(value.resolutionConfidence),
     resolutionReason: normalizeString(value.resolutionReason),
     resolutionSource: normalizeResolutionSource(value.resolutionSource),
+    resolutionStatus: normalizeResolutionStatus(value.resolutionStatus),
     resolvedAt: normalizeString(value.resolvedAt),
     result,
     remoteId: normalizeString(value.remoteId),
@@ -451,6 +506,7 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     sport: value.sport || undefined,
     status,
     title,
+    trackingStatus: normalizeTrackingStatus(value.trackingStatus),
     url: value.url || undefined,
     verifiedAt: normalizeString(value.verifiedAt),
     walletIntelligenceSummary: normalizeWalletSummary(value.walletIntelligenceSummary),

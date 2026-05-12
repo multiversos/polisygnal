@@ -660,9 +660,8 @@ export default function DailyBriefingPage() {
           <p className="eyebrow">PolySignal</p>
           <h1>Resumen diario</h1>
           <p className="subtitle">
-            Resumen simple centrado en partidos deportivos de los próximos 7
-            días. Los campeonatos y futuros quedan fuera del flujo principal por
-            ahora; no es recomendación de apuesta.
+            Vista legacy de briefing deportivo. El flujo principal ahora es
+            analizar enlaces concretos de Polymarket y medirlos en Historial.
           </p>
         </div>
         <div className="topbar-actions">
@@ -706,11 +705,14 @@ export default function DailyBriefingPage() {
       </section>
 
       <section className="safety-strip briefing-focus-note">
-        <strong>Enfoque temporal:</strong>
+        <strong>Vista legacy:</strong>
         <span>
-          El briefing se enfoca en partidos próximos. Mercados de campeonato y
-          futuros quedan fuera del flujo principal por ahora.
+          Esta ruta queda oculta de la navegacion principal. Para crear nuevos
+          analisis usa el Analizador de enlaces.
         </span>
+        <a className="analysis-link secondary" href="/analyze">
+          Analizar enlace
+        </a>
       </section>
 
       {error ? <div className="alert-panel error">{error}</div> : null}

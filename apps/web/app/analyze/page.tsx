@@ -405,12 +405,15 @@ function historyPayloadFromMarket(
     reasons: [analyzerSummary.headline, reviewReason.reason, activity?.detail, predictionReason].filter(
       (reason): reason is string => Boolean(reason),
     ),
+    nextCheckHint: "Revisar cuando Polymarket confirme el resultado final.",
     result: "pending" as const,
+    resolutionStatus: "pending" as const,
     remoteId: item.market?.remote_id || undefined,
     source: "link_analyzer" as const,
     sport: item.market?.sport_type || undefined,
     status: "open" as const,
     title: marketTitle(item),
+    trackingStatus: decision.predictedSide === "UNKNOWN" ? ("no_clear_decision" as const) : ("awaiting_resolution" as const),
     url: normalizedUrl,
     walletIntelligenceSummary: safeWalletSummaryForHistory(item),
   };
@@ -433,11 +436,14 @@ function pendingHistoryPayload(normalizedUrl: string) {
     outcome: "UNKNOWN" as const,
     marketSlug: prefix === "market" ? slug || undefined : undefined,
     predictedSide: "UNKNOWN" as const,
+    nextCheckHint: "Reintentar desde el analizador cuando el enlace vuelva a estar disponible.",
     reasons: ["No pudimos obtener este mercado desde Polymarket sin inventar datos."],
     result: "unknown" as const,
+    resolutionStatus: "unknown" as const,
     source: "link_analyzer" as const,
     status: "unknown" as const,
     title: slug ? `Enlace Polymarket: ${slug.replaceAll("-", " ")}` : "Enlace Polymarket pendiente",
+    trackingStatus: "unknown" as const,
     url: normalizedUrl,
   };
 }

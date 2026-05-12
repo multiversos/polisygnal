@@ -14,6 +14,11 @@ import {
   type AnalysisHistoryStats,
 } from "../lib/analysisHistory";
 import { getDecisionLabel, hasClearPrediction } from "../lib/analysisDecision";
+import {
+  getAnalysisLifecycleState,
+  getNextCheckHintForHistory,
+  getTrackingStatusForHistory,
+} from "../lib/analysisLifecycle";
 import { resolveAnalysisAgainstOutcome } from "../lib/marketResolution";
 import { lookupAnalysisResolution } from "../lib/marketResolutionLookup";
 import {
@@ -448,7 +453,33 @@ export default function HistoryPage() {
         try {
           const resolution = await lookupAnalysisResolution(item);
           const patch = resolveAnalysisAgainstOutcome(item, resolution);
-          patches.set(item.id, patch);
+          const checkedAt = new Date().toISOString();
+          patches.set(item.id, {
+            ...patch,
+            lastCheckedAt: checkedAt,
+            nextCheckHint:
+              patch.result === "pending"
+                ? "Revisar cuando Polymarket confirme el resultado final."
+                : "Revision completada con la fuente disponible.",
+            resolutionStatus:
+              patch.result === "hit" || patch.result === "miss"
+                ? "resolved"
+                : patch.result === "cancelled"
+                  ? "cancelled"
+                  : patch.result === "pending"
+                    ? "pending"
+                    : "unknown",
+            trackingStatus:
+              patch.result === "hit"
+                ? "resolved_hit"
+                : patch.result === "miss"
+                  ? "resolved_miss"
+                  : patch.result === "cancelled"
+                    ? "cancelled"
+                    : patch.result === "pending"
+                      ? getTrackingStatusForHistory(item)
+                      : "unknown",
+          });
           if (patch.result === "hit" || patch.result === "miss" || patch.result === "cancelled") {
             updatedCount += 1;
           } else if (patch.result === "pending") {
@@ -457,14 +488,19 @@ export default function HistoryPage() {
             unknownCount += 1;
           }
         } catch {
+          const checkedAt = new Date().toISOString();
           patches.set(item.id, {
+            lastCheckedAt: checkedAt,
+            nextCheckHint: "Intenta actualizar resultados mas tarde.",
             outcome: "UNKNOWN",
             resolutionConfidence: "low",
             resolutionReason: "No pudimos verificar este mercado todavia.",
             resolutionSource: "unknown",
+            resolutionStatus: "unknown",
             result: "unknown",
             status: "unknown",
-            verifiedAt: new Date().toISOString(),
+            trackingStatus: "unknown",
+            verifiedAt: checkedAt,
           });
           unknownCount += 1;
         }
@@ -494,13 +530,16 @@ export default function HistoryPage() {
           <p className="eyebrow">Historial</p>
           <h1>Historial de analisis</h1>
           <p className="subtitle">
-            Revisa los mercados que PolySignal analizo y compara la lectura con el
-            resultado final cuando el mercado cierre.
+            Revisa las lecturas guardadas, los pendientes de resolucion y el
+            rendimiento real de PolySignal cuando Polymarket confirma resultados.
           </p>
         </div>
         <div className="topbar-actions">
           <a className="analysis-link" href="/analyze">
             Analizar nuevo enlace
+          </a>
+          <a className="analysis-link secondary" href="/performance">
+            Ver rendimiento
           </a>
           <span className="timestamp-pill">{formatLastUpdated(updatedAt)}</span>
           <button className="theme-toggle" onClick={() => void loadHistory()} type="button">
@@ -554,8 +593,7 @@ export default function HistoryPage() {
         <strong>Resultado verificable:</strong>
         <span>
           PolySignal intentara verificar los mercados usando datos disponibles de
-          Polymarket o datos ya cargados en PolySignal. El usuario no marca manualmente
-          el resultado final.
+          Polymarket. El usuario no marca manualmente el resultado final.
         </span>
       </section>
 
@@ -758,8 +796,8 @@ export default function HistoryPage() {
               <a className="analysis-link" href="/analyze">
                 Analizar enlace
               </a>
-              <a className="analysis-link secondary" href="/sports">
-                Explorar mercados
+              <a className="analysis-link secondary" href="/performance">
+                Ver rendimiento
               </a>
             </div>
           </div>
@@ -779,6 +817,7 @@ export default function HistoryPage() {
               const polySignalProbability = polySignalProbabilityForItem(item);
               const probabilityGap = getProbabilityGap(marketProbability, polySignalProbability);
               const reanalyzeHref = analyzerHrefForItem(item);
+              const lifecycle = getAnalysisLifecycleState(item);
               return (
                 <article className="history-card" key={item.id}>
                   <div className="history-card-header">
@@ -811,9 +850,13 @@ export default function HistoryPage() {
                     <span>Confianza {item.confidence ?? "Desconocida"}</span>
                     <span>Resultado Polymarket {outcomeLabel(item.outcome)}</span>
                     <span>Evaluacion {evaluationLabel(item)}</span>
+                    <span>Seguimiento {lifecycle.label}</span>
                     <span>Fuente {resolutionSourceLabel(item.resolutionSource)}</span>
                     <span>Verificado {item.verifiedAt ? formatDate(item.verifiedAt) : "pendiente"}</span>
+                    <span>Ultima revision {item.lastCheckedAt ? formatDate(item.lastCheckedAt) : "sin revision"}</span>
                   </div>
+                  <p className="section-note">{lifecycle.summary}</p>
+                  <p className="section-note">{item.nextCheckHint || getNextCheckHintForHistory(item)}</p>
                   <p className="section-note">
                     {item.evaluationReason ||
                       "Solo cuenta para precision si hubo prediccion clara y resultado verificable."}

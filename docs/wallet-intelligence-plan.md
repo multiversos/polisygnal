@@ -237,3 +237,15 @@ It must not:
 - No new tables or migrations.
 - No ROI/win-rate calculation without real closed-position data.
 - No prediction generation from wallet data.
+
+## Analyzer-First Scope
+
+Wallet Intelligence is now part of the selected `/analyze` report only.
+
+- It runs after a Polymarket link has been resolved and the user selected one
+  market.
+- It must use the resolved Polymarket-compatible id when available.
+- It must not use internal sports matches as fallback for another market.
+- It can be saved to History only as a sanitized aggregate summary.
+- It remains an auxiliary signal and never creates a PolySignal prediction by
+  itself.

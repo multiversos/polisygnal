@@ -21,6 +21,8 @@ const BRIEFING_PATH = "/briefing";
 const ALERTS_PATH = "/alerts";
 const WATCHLIST_PATH = "/watchlist";
 const HISTORY_PATH = "/history";
+const PERFORMANCE_PATH = "/performance";
+const METHODOLOGY_PATH = "/methodology";
 const ANALYZE_PATH = "/analyze";
 const DATA_HEALTH_PATH = "/data-health";
 const INTERNAL_DATA_STATUS_PATH = "/internal/data-status";
@@ -36,13 +38,13 @@ const RENDER_ERROR_TEXT = [
 ];
 const PUBLIC_NAV_TEXT = [
   "Inicio",
-  "Mercados deportivos",
-  "Resumen diario",
-  "Mi lista",
-  "Alertas",
-  "Historial",
   "Analizar enlace",
+  "Historial",
+  "Rendimiento",
+  "Alertas",
+  "Metodologia",
 ];
+const LEGACY_NAV_TEXT = ["Mercados deportivos", "Resumen diario", "Mi lista"];
 const INTERNAL_NAV_TEXT = [
   "InvestigaciÃ³n",
   "InvestigaciÃƒÂ³n",
@@ -391,6 +393,7 @@ function validatePublicProductPage(dom, label, requiredText = []) {
   for (const expected of requiredText) {
     assertTextIncludes(text, expected, label);
   }
+  assertTextExcludes(navText, LEGACY_NAV_TEXT, `${label} legacy public sidebar`);
   assertTextExcludes(navText, INTERNAL_NAV_TEXT, `${label} public sidebar`);
   assertTextExcludes(text, PUBLIC_TECHNICAL_TEXT, `${label} public copy`);
   assertTextExcludes(text, PUBLIC_SECURITY_TEXT, `${label} secret leakage`);
@@ -597,9 +600,10 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Analizar otro enlace"), "AnalyzerReport missing analyze another link action");
   assert(reportSource.includes("Ver todas las billeteras analizadas"), "AnalyzerReport missing wallet drilldown");
   assert(!reportSource.includes("wallet.walletAddress"), "AnalyzerReport should not render full wallet addresses");
-  assert(homeSource.includes("Analiza enlaces de Polymarket con mas contexto"), "home does not position analyzer as primary entry");
+  assert(homeSource.includes("Analiza enlaces de Polymarket y mide si PolySignal acierta"), "home does not position analyzer as primary entry");
   assert(homeSource.includes("Pega un enlace"), "home analyzer steps are missing");
   assert(historySource.includes("Analizar nuevo enlace"), "history page does not link back to analyzer");
+  assert(historySource.includes("Ver rendimiento"), "history page does not link to performance");
   assert(analyzePage.includes("analyzer-selection-card"), "analyze page does not render compact selector cards");
   assert(!analyzePage.includes("Ver mercados deportivos"), "analyze no-match state must not offer internal market fallback");
   assert(analyzePage.includes("Polymarket devolvio"), "analyze selector should describe resolved Polymarket markets");
@@ -754,43 +758,24 @@ async function main() {
   const homeRender = validatePublicProductPage(homeDom, "home", [
     "Inicio",
     "Analizar enlace",
-    "Mercados deportivos",
-    "Revisar alertas",
+    "Rendimiento",
   ]);
   const homeText = visibleText(homeDom);
   assertTextIncludesOneOf(
     homeText,
-    ["Analiza enlaces de Polymarket", "QuÃ© revisar ahora", "Qué revisar ahora"],
-    "home analyzer hero or current guidance",
+    ["Analiza enlaces de Polymarket", "mide si PolySignal acierta"],
+    "home analyzer hero",
   );
-  assertTextIncludesOneOf(homeText, ["Pega un enlace", "Mercados destacados"], "home analyzer step");
-  assertTextIncludesOneOf(homeText, ["Confirma el mercado", "Movimientos recientes"], "home confirmation step");
-  assertTextIncludesOneOf(homeText, ["Guarda y mide", "PrÃ³ximos partidos", "Próximos partidos"], "home history measurement step");
-  assertTextIncludesOneOf(homeText, REVIEW_NOW_TEXT, "home review block");
-  assertTextIncludes(homeText, "Mercados destacados", "home live content");
-  assertTextIncludes(homeText, "Movimientos recientes", "home recent activity");
-  assertTextIncludesOneOf(homeText, ACTIVITY_TEXT, "home activity label");
-  assertTextIncludes(homeText, "Actualizar", "home update button");
-  assertTextIncludesOneOf(homeText, UPDATE_TEXT, "home update timestamp");
-  assertTextIncludesOneOf(
-    homeText,
-    [
-      "TodavÃ­a no tienes mercados guardados",
-      "Todavía no tienes mercados guardados",
-      "Cuando sigas un mercado",
-      "Explorar mercados deportivos",
-      ...ANALYSIS_TEXT,
-    ],
-    "home watchlist",
-  );
-  assertTextIncludesOneOf(
-    homeText,
-    ["Esta lista se guarda en este navegador", "Siguiendo", "Seguir"],
-    "home local watchlist copy",
-  );
+  assertTextIncludes(homeText, "Pega un enlace", "home analyzer step");
+  assertTextIncludes(homeText, "Confirma el mercado", "home confirmation step");
+  assertTextIncludes(homeText, "Guarda la lectura", "home history save step");
+  assertTextIncludes(homeText, "Verifica el resultado", "home verification step");
+  assertTextIncludes(homeText, "Wallet Intelligence", "home wallet layer");
+  assertTextIncludes(homeText, "no genera una prediccion propia", "home honest estimate copy");
+  assertTextExcludes(homeText, ["Mercados destacados", "Explorar mercados deportivos"], "home legacy sports copy");
   const sportsDom = await dumpDom(urlFor(SPORTS_PATH));
   const sportsRender = validatePublicProductPage(sportsDom, "sports", [
-    "Mercados deportivos",
+    "Vista legacy",
     "Deportes principales",
   ]);
   const sportsText = visibleText(sportsDom);
@@ -814,18 +799,17 @@ async function main() {
   const alertsText = visibleText(alertsDom);
   assertTextIncludes(alertsText, "Actualizar", "alerts update button");
   assertTextIncludesOneOf(alertsText, UPDATE_TEXT, "alerts update timestamp");
-  assertTextIncludes(alertsText, "Mercados que sigues", "alerts local watchlist");
-  assertTextIncludes(alertsText, "Cómo leer estas alertas", "alerts meaning copy");
+  assertTextIncludes(alertsText, "Seguimiento de analisis guardados", "alerts analyzer history focus");
+  assertTextIncludes(alertsText, "Analisis en seguimiento", "alerts saved analyses");
   assertTextIncludesOneOf(
     alertsText,
-    ["Mi lista se lee desde este navegador", "este navegador"],
-    "alerts local privacy copy",
+    ["sin seguimiento automatico", "servicio persistente", "Historial"],
+    "alerts local tracking copy",
   );
-  assertTextIncludesOneOf(alertsText, ["Mercado actualizado", "Listo para revisar", "No tienes mercados en seguimiento"], "alerts real context");
   assertTextIncludesOneOf(
     alertsText,
-    ["No tienes mercados en seguimiento", "Mercado en seguimiento"],
-    "alerts watchlist state",
+    ["Todavia no tienes analisis guardados", "No hay analisis pendientes", "Esperando resolucion"],
+    "alerts analysis state",
   );
   const watchlistDom = await dumpDom(urlFor(WATCHLIST_PATH));
   const watchlistRender = validatePublicProductPage(watchlistDom, "watchlist", ["Mi lista"]);
@@ -841,13 +825,13 @@ async function main() {
   );
   assertTextIncludesOneOf(
     watchlistText,
-    ["Esta lista se guarda en este navegador", "Ver detalle", "Explorar mercados deportivos"],
-    "watchlist local storage copy",
+    ["Vista legacy", "Analizar enlace", "Ver detalle"],
+    "watchlist legacy analyzer copy",
   );
   assertTextIncludesOneOf(
     watchlistText,
-    ["no se sincroniza todavia", "no se sincroniza entre dispositivos"],
-    "watchlist local privacy copy",
+    ["Historial", "Analizador de enlaces", "analisis"],
+    "watchlist hidden legacy copy",
   );
   assertTextIncludes(watchlistText, "Vaciar Mi lista", "watchlist local clear control");
   const historyDom = await dumpDom(urlFor(HISTORY_PATH));
@@ -905,6 +889,26 @@ async function main() {
     ["Gano YES", "Ganó YES", "Gano NO", "Ganó NO"],
     "history manual resolution controls",
   );
+  assertTextIncludesOneOf(
+    historyText,
+    ["Seguimiento", "Ultima revision", "Ver rendimiento"],
+    "history lifecycle tracking",
+  );
+  const performanceDom = await dumpDom(urlFor(PERFORMANCE_PATH));
+  const performanceRender = validatePublicProductPage(performanceDom, "performance", ["Rendimiento"]);
+  const performanceText = visibleText(performanceDom);
+  assertTextIncludes(performanceText, "Rendimiento de PolySignal", "performance heading");
+  assertTextIncludes(performanceText, "Precision general", "performance accuracy");
+  assertTextIncludesOneOf(
+    performanceText,
+    ["Pendientes", "Sin decision fuerte", "no cuentan"],
+    "performance honest counting",
+  );
+  const methodologyDom = await dumpDom(urlFor(METHODOLOGY_PATH));
+  const methodologyRender = validatePublicProductPage(methodologyDom, "methodology", ["Metodologia"]);
+  const methodologyText = visibleText(methodologyDom);
+  assertTextIncludes(methodologyText, "Que cuenta y que no cuenta", "methodology measurement copy");
+  assertTextIncludes(methodologyText, "solo precio de mercado", "methodology market price rule");
   const analyzeDom = await dumpDom(urlFor(ANALYZE_PATH));
   const analyzeRender = validatePublicProductPage(analyzeDom, "analyze", ["Analizar enlace"]);
   const analyzeText = visibleText(analyzeDom);
@@ -1222,6 +1226,8 @@ async function main() {
           alerts: alertsRender,
           watchlist: watchlistRender,
           history: historyRender,
+          performance: performanceRender,
+          methodology: methodologyRender,
           analyze: analyzeRender,
           market_detail: marketDetailRender,
         },

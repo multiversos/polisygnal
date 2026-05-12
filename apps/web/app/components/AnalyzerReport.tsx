@@ -424,9 +424,9 @@ export function AnalyzerReport({
       <section className="analyzer-source-strip" aria-label="Fuentes del analisis">
         <strong>Fuentes del analisis</strong>
         <span>Precio: Polymarket</span>
-        <span>Mercado/evento: Polymarket/Gamma read-only</span>
+        <span>Mercado/evento: datos publicos de Polymarket</span>
         <span>Billeteras: {sourceLabel(walletSummary)}</span>
-        <span>Resolucion: Polymarket/Gamma si aplica</span>
+        <span>Resolucion: Polymarket si aplica</span>
         <span>Investigacion externa: {research.verifiedVisibleCount > 0 ? "fuentes verificadas" : "pendiente"}</span>
         <span>Historial: este navegador</span>
       </section>

@@ -461,6 +461,38 @@ Use these quick checks when reviewing public pages:
 8. Confirm public copy says this is not financial advice, does not promise
    results, and does not tell the user to buy or bet.
 
+## Analyzer-First Product Flow
+
+1. Open `/`.
+2. Confirm the primary CTA is `Analizar enlace`.
+3. Confirm the home explains:
+   - paste a Polymarket link,
+   - confirm the market,
+   - save the reading,
+   - verify final result,
+   - measure accuracy over time.
+4. Confirm the public sidebar prioritizes:
+   - Analizar enlace,
+   - Historial,
+   - Rendimiento,
+   - Alertas,
+   - Metodologia.
+5. Confirm sports, briefing and watchlist are not promoted in public
+   navigation.
+6. Open `/analyze` and test a valid Polymarket link.
+7. Confirm only markets returned by Polymarket appear in the selector.
+8. Confirm deep analysis runs only after selecting one market.
+9. Save the analysis and open `/history`.
+10. Confirm `/history` shows the saved item, tracking status, reanalysis action
+    and `Actualizar resultados`.
+11. Open `/performance` and confirm accuracy is not invented when there are no
+    resolved clear predictions.
+12. Open `/alerts` and confirm it references saved analyses, not a generic
+    sports watchlist.
+13. Open `/sports` directly and confirm it is marked as a legacy view.
+14. Confirm pending, cancelled, unknown and no-clear-decision items are not
+    counted as misses.
+
 ## Cache Troubleshooting
 
 If a normal browser shows old data but backend/proxy checks pass:

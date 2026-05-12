@@ -223,3 +223,31 @@ periodically, persist results per user, and record `resolved_at`,
 - Do not ask users to manually mark YES/NO as the main resolution path.
 - Every saved record must keep the analysis time and visible market price when
   available.
+
+## Analyzer-First Product Pivot
+
+As of 2026-05-12, `/analyze` is the primary product entry point.
+
+Rules:
+
+- The analyzer resolves Polymarket links from Polymarket/Gamma/CLOB read-only
+  sources, not from internally loaded sports markets.
+- If Polymarket cannot return the market, the analyzer shows an honest no-match
+  state instead of cross-sport suggestions.
+- Selector cards must come only from the event or market returned by
+  Polymarket.
+- Deep analysis, Wallet Intelligence and history saving run only after the
+  user confirms the selected market.
+- The result can be saved to local History and later checked against a final
+  Polymarket outcome.
+
+Navigation now points users to:
+
+- `/analyze`
+- `/history`
+- `/performance`
+- `/alerts`
+- `/methodology`
+
+Sports browsing, briefing and watchlist views remain legacy/hidden while the
+new analyzer-first flow is validated.

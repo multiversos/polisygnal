@@ -1666,8 +1666,8 @@ export default function SportDetailPage() {
           <p className="eyebrow">Deportes</p>
           <h1>Mercados de {sportOption.label}</h1>
           <p className="subtitle">
-            Mercados reales para revisar por deporte. Si un deporte principal
-            aún no tiene datos, verás un estado vacío limpio.
+            Vista legacy de exploracion deportiva. El flujo principal ahora es
+            analizar enlaces concretos de Polymarket y medirlos en Historial.
           </p>
         </div>
         <div className="topbar-actions">
@@ -1684,11 +1684,14 @@ export default function SportDetailPage() {
       </header>
 
       <section className="safety-strip">
-        <strong>No es recomendación de apuesta:</strong>
+        <strong>Vista legacy:</strong>
         <span>
-          Esta vista organiza mercados deportivos para revisión manual. No
-          ejecuta apuestas automáticas ni operaciones por ti.
+          Esta ruta queda oculta de la navegacion principal. No crea nuevos
+          analisis; para guardar y medir una lectura usa el Analizador de enlaces.
         </span>
+        <Link className="analysis-link secondary" href="/analyze">
+          Analizar enlace
+        </Link>
       </section>
 
       <SportsSelectorBar

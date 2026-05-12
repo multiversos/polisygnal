@@ -177,7 +177,8 @@ export default function WatchlistPage() {
           <p className="eyebrow">Mi lista</p>
           <h1>Mercados guardados</h1>
           <p className="subtitle">
-            Un lugar simple para volver a los mercados que quieres revisar mas rapido.
+            Vista legacy de mercados guardados. Los nuevos seguimientos deben
+            nacer desde un analisis de enlace.
           </p>
         </div>
         <div className="topbar-actions">
@@ -197,12 +198,14 @@ export default function WatchlistPage() {
       </header>
 
       <section className="safety-strip">
-        <strong>Guardado local:</strong>
+        <strong>Vista legacy:</strong>
         <span>
-          Esta lista se guarda en este navegador. Si cambias de dispositivo, no se
-          sincroniza todavia. Puedes vaciarla cuando quieras; mas adelante podra
-          guardarse en una cuenta.
+          Esta ruta queda oculta de la navegacion principal. Para crear un nuevo
+          seguimiento usa el Analizador de enlaces y guarda la lectura en Historial.
         </span>
+        <a className="analysis-link secondary" href="/analyze">
+          Analizar enlace
+        </a>
       </section>
 
       <section className="metric-grid" aria-label="Resumen de Mi lista">
@@ -245,13 +248,13 @@ export default function WatchlistPage() {
         ) : sortedItems.length === 0 ? (
           <div className="empty-state compact">
             <strong>Todavia no tienes mercados guardados.</strong>
-            <p>Cuando sigas un mercado, aparecera aqui para revisarlo mas rapido.</p>
+            <p>El seguimiento principal ahora vive en Historial de analisis.</p>
             <div className="empty-state-actions">
-              <a className="analysis-link" href="/sports">
-                Explorar mercados deportivos
+              <a className="analysis-link" href="/analyze">
+                Analizar enlace
               </a>
-              <a className="analysis-link secondary" href="/sports/soccer">
-                Ver futbol
+              <a className="analysis-link secondary" href="/history">
+                Ver historial
               </a>
             </div>
           </div>

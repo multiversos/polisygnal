@@ -38,8 +38,8 @@ export default function SportsIndexPage() {
           <p className="eyebrow">Deportes</p>
           <h1>Deportes en PolySignal</h1>
           <p className="subtitle">
-            Vista sencilla por deporte. Hoy priorizamos partidos cercanos y
-            mercados con precios activos.
+            Vista legacy de exploracion. El flujo principal de PolySignal ahora
+            es analizar enlaces de Polymarket y medir resultados en Historial.
           </p>
         </div>
         <div className="topbar-actions">
@@ -51,11 +51,14 @@ export default function SportsIndexPage() {
       </header>
 
       <section className="safety-strip">
-        <strong>Solo lectura:</strong>
+        <strong>Vista legacy:</strong>
         <span>
-          Estas páginas organizan mercados disponibles para revisión manual. No
-          crean apuestas ni ejecutan operaciones automáticas.
+          Esta pantalla queda oculta de la navegacion principal. Para crear nuevos
+          analisis usa el Analizador de enlaces.
         </span>
+        <Link className="analysis-link secondary" href="/analyze">
+          Analizar enlace
+        </Link>
       </section>
 
       <section className="sports-index-section" aria-label="Deportes principales">

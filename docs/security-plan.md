@@ -467,3 +467,18 @@ real source calls are enabled:
   evidence and calibration.
 
 See `docs/external-research-plan.md` for the implementation roadmap.
+
+### Analyzer-First Controls
+
+The link analyzer is the main product flow and must stay Polymarket-first.
+
+- Resolve submitted links through the safe `/api/analyze-polymarket-link`
+  route and allowlisted Polymarket/Gamma/CLOB sources.
+- Do not use internally loaded sports markets, `/sports/soccer`, or
+  `/markets/overview` as the primary match source.
+- If the source cannot return the market, show a no-match state instead of a
+  cross-sport fallback.
+- Store local history summaries only after the user chooses to save.
+- Do not store raw resolver payloads or full wallet addresses.
+- Do not count pending, cancelled, unknown or no-clear-decision records as
+  failures.

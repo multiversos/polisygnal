@@ -34,10 +34,9 @@ const publicNavigationItems: Array<{
   { label: "Inicio", href: "/", icon: "dashboard" },
   { label: "Analizar enlace", href: "/analyze", icon: "analyze", primary: true },
   { label: "Historial", href: "/history", icon: "history" },
-  { label: "Mercados deportivos", href: "/sports", icon: "sports" },
-  { label: "Resumen diario", href: "/briefing", icon: "briefing" },
-  { label: "Mi lista", href: "/watchlist", icon: "watchlist" },
+  { label: "Rendimiento", href: "/performance", icon: "decisions" },
   { label: "Alertas", href: "/alerts", icon: "alerts" },
+  { label: "Metodologia", href: "/methodology", icon: "evidence" },
 ];
 
 function applyThemePreference(theme: ThemePreference) {
