@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con arquitectura Deep Analyzer read-only preparada y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `ef7a626`
+- ultimo deploy production verificado antes de este sprint: `f8adf21`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -183,6 +183,11 @@ Estado visible verificado:
   Wallet Intelligence suficiente, perfil de billetera con historial cerrado,
   odds comparables o Kalshi equivalente. El precio del mercado queda como
   referencia y no se copia como estimacion propia.
+- Las compuertas de estimacion ahora tienen fixtures y scripts dedicados:
+  `test:estimate-gates` prueba casos pendientes/disponibles sin repetir la
+  logica principal, y `test:samantha-report-validation` prueba reportes
+  Samantha validos, debiles e invalidos. Los fixtures son controlados y no se
+  muestran como datos reales.
 - Existe una primera capa de contexto deportivo para futbol:
   `soccerMatchContext.ts` extrae equipos y fecha desde datos ya cargados,
   mantiene local/visitante como desconocido si no esta estructurado y no

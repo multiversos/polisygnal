@@ -915,6 +915,11 @@ function validateSamanthaResearchRules() {
     shouldAcceptSuggestedEstimate,
   } = loadTsModule("app/lib/samanthaResearchReport.ts");
   const {
+    invalidSamanthaReportCases,
+    strongValidSamanthaReport,
+    weakValidSamanthaReport,
+  } = loadTsModule("app/lib/__fixtures__/samanthaReports.ts");
+  const {
     buildSamanthaTaskPacket,
     getExpectedSamanthaReportSchema,
   } = loadTsModule("app/lib/samanthaTaskPacket.ts");
@@ -927,6 +932,7 @@ function validateSamanthaResearchRules() {
   const bridgeStatusRouteSource = readFileSync(resolve(appRoot, "app/api/samantha/research-status/route.ts"), "utf8");
   const historySource = readFileSync(resolve(appRoot, "app/history/page.tsx"), "utf8");
   const analyzePageSource = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
+  const packageSource = readFileSync(resolve(appRoot, "package.json"), "utf8");
 
   const brief = buildSamanthaResearchBrief({
     item: {
@@ -1226,10 +1232,32 @@ function validateSamanthaResearchRules() {
   assert(reportTypes.includes("SamanthaResearchReport"), "Samantha research types should include report contract");
   assert(reportSource.includes("isSafeSourceUrl"), "Samantha report validator should validate source URLs");
   assert(reportSource.includes("MAX_REPORT_INPUT_LENGTH"), "Samantha report validator should limit raw report length");
+  assert(reportSource.includes("UNSAFE_RESEARCH_PATTERNS"), "Samantha report validator should reject unsafe research claims");
+  assert(packageSource.includes("test:estimate-gates"), "web package should expose estimate gate tests");
+  assert(packageSource.includes("test:samantha-report-validation"), "web package should expose Samantha report validation tests");
+
+  const strongFixture = parseSamanthaResearchReport(JSON.stringify(strongValidSamanthaReport));
+  assert(strongFixture.valid, `strong Samantha fixture should be valid: ${strongFixture.errors.join(", ")}`);
+  assert(
+    shouldAcceptSuggestedEstimate(strongFixture.report),
+    "strong Samantha fixture should pass suggested estimate acceptance",
+  );
+  const weakFixture = parseSamanthaResearchReport(JSON.stringify(weakValidSamanthaReport));
+  assert(weakFixture.valid, `weak Samantha fixture should be structurally valid: ${weakFixture.errors.join(", ")}`);
+  assert(!shouldAcceptSuggestedEstimate(weakFixture.report), "weak Samantha fixture should not create final estimate");
+  for (const [label, fixture] of Object.entries({
+    roiClaim: invalidSamanthaReportCases.roiClaim,
+    scriptInjection: invalidSamanthaReportCases.scriptInjection,
+    tradingInstruction: invalidSamanthaReportCases.tradingInstruction,
+    winRateClaim: invalidSamanthaReportCases.winRateClaim,
+  })) {
+    const parsed = parseSamanthaResearchReport(JSON.stringify(fixture));
+    assert(!parsed.valid, `Samantha validator must reject ${label}`);
+  }
 
   return {
     brief_safe: true,
-    parser_cases: 10,
+    parser_cases: 16,
     task_packet_safe: true,
     valid_signals: convertSamanthaReportToSignals(validReport.report).length,
   };

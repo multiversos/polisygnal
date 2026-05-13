@@ -26,6 +26,7 @@ const METHODOLOGY_PATH = "/methodology";
 const ANALYZE_PATH = "/analyze";
 const DATA_HEALTH_PATH = "/data-health";
 const INTERNAL_DATA_STATUS_PATH = "/internal/data-status";
+const LEGACY_SAMANTHA_ANALYSIS_PATH = "/api/samantha-polysignal-analysis";
 const WORKFLOW_PATH = "/workflow";
 const RENDER_ERROR_TEXT = [
   "Datos no disponibles",
@@ -96,10 +97,13 @@ const PUBLIC_SECURITY_TEXT = [
   "localhost",
 ];
 const PUBLIC_WALLET_FORBIDDEN_TEXT = [
+  "betting advice",
   "copy this trader",
+  "copy-trading",
   "guaranteed",
   "whale knows",
   "insider",
+  "place a bet",
   "smart money guaranteed",
   "ROI 100%",
   "win rate 100%",
@@ -1047,6 +1051,16 @@ async function main() {
     JSON.stringify(invalidAnalyzeRoute.body),
     ["DATABASE_URL", "SECRET", "TOKEN", "postgres://", "https://polisygnal.onrender.com", "markets"],
     "analyze-polymarket-link invalid response",
+  );
+  const legacySamanthaRoute = await fetchJsonAllowFailure(LEGACY_SAMANTHA_ANALYSIS_PATH);
+  assert(
+    legacySamanthaRoute.status === 404 || legacySamanthaRoute.status === 405,
+    `legacy samantha-polysignal-analysis route was reintroduced with status ${legacySamanthaRoute.status}`,
+  );
+  assertTextExcludes(
+    JSON.stringify(legacySamanthaRoute.body),
+    ["DATABASE_URL", "SECRET", "TOKEN", "postgres://", "markets/overview", "sports/soccer"],
+    "legacy samantha route response",
   );
   const nbaAnalyzeRoute = await postJsonAllowFailure("/api/analyze-polymarket-link", {
     url: "https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11",

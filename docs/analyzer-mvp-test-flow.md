@@ -49,7 +49,22 @@ The product must not invent evidence, must not mark the analysis as completed, a
 2. Click `Validar reporte`.
 3. If valid, click `Cargar reporte al analisis`.
 4. Confirm PolySignal validates/sanitizes evidence before updating the DeepAnalysisJob.
-5. Confirm no prediction is generated unless the report passes the existing estimate gates.
+5. Confirm no prediction is generated unless the report passes the conservative estimate gates.
+6. Run `npm.cmd --workspace apps/web run test:samantha-report-validation` to
+   confirm invalid report fixtures are rejected before manual QA.
+
+## Estimate Gate Test
+
+1. Run `npm.cmd --workspace apps/web run test:estimate-gates`.
+2. Confirm the script reports pending cases for:
+   - no Samantha report;
+   - market price only;
+   - weak Samantha context;
+   - valid-shape report without enough support.
+3. Confirm the script reports available cases only when a valid Samantha report
+   is paired with real independent support.
+4. Confirm the market reference contribution is marked as reference, not used
+   for the PolySignal estimate.
 
 ## What Must Not Happen
 

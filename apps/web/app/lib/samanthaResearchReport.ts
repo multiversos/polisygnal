@@ -26,6 +26,18 @@ const SECRET_PATTERNS = [
   /secret\s*[:=]/i,
   /token\s*[:=]/i,
 ] as const;
+const UNSAFE_RESEARCH_PATTERNS = [
+  /<\s*\/?\s*script\b/i,
+  /javascript\s*:/i,
+  /\bon\w+\s*=/i,
+  /\b(place|make|execute)\s+(a\s+)?(bet|trade|wager)\b/i,
+  /\b(buy|sell)\s+(yes|no)\b/i,
+  /\bcopy[-\s]?trading\b/i,
+  /\bcopy\s+this\s+trader\b/i,
+  /\bguaranteed\b/i,
+  /\broi\s*(?:of\s*)?(?:100|\d{3,})\s*%/i,
+  /\bwin\s*rate\s*(?:of\s*)?(?:100|\d{3,})\s*%/i,
+] as const;
 const MAX_REPORT_INPUT_LENGTH = 60000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -107,6 +119,10 @@ function toNumber(value: unknown): number | undefined {
 
 function containsSensitiveText(value: string): boolean {
   return SECRET_PATTERNS.some((pattern) => pattern.test(value)) || FULL_WALLET_ADDRESS_PATTERN.test(value);
+}
+
+function containsUnsafeResearchText(value: string): boolean {
+  return containsSensitiveText(value) || UNSAFE_RESEARCH_PATTERNS.some((pattern) => pattern.test(value));
 }
 
 function isPrivateIpv4(hostname: string): boolean {
@@ -261,8 +277,8 @@ export function validateSamanthaResearchReport(report: SamanthaResearchReport): 
       errors.push(`${label} no puede marcar Reddit/social como high reliability.`);
     }
     const text = [item.title, item.sourceName, item.sourceUrl, item.summary, item.quote].filter(Boolean).join(" ");
-    if (containsSensitiveText(text)) {
-      errors.push(`${label} contiene secreto, direccion completa o dato sensible.`);
+    if (containsUnsafeResearchText(text)) {
+      errors.push(`${label} contiene secreto, direccion completa o contenido inseguro.`);
     }
     if (item.quote && item.quote.length > MAX_QUOTE_LENGTH) {
       warnings.push(`${label} quote fue truncada.`);
@@ -271,8 +287,14 @@ export function validateSamanthaResearchReport(report: SamanthaResearchReport): 
   if (report.oddsComparison?.found && !report.oddsComparison.summary) {
     errors.push("oddsComparison requiere summary si found=true.");
   }
+  if (report.oddsComparison && containsUnsafeResearchText(report.oddsComparison.summary)) {
+    errors.push("oddsComparison contiene contenido inseguro.");
+  }
   if (report.kalshiComparison?.found && !report.kalshiComparison.summary) {
     errors.push("kalshiComparison requiere summary si found=true.");
+  }
+  if (report.kalshiComparison && containsUnsafeResearchText(report.kalshiComparison.summary)) {
+    errors.push("kalshiComparison contiene contenido inseguro.");
   }
   if (
     report.kalshiComparison?.found &&
@@ -301,7 +323,15 @@ export function validateSamanthaResearchReport(report: SamanthaResearchReport): 
     if (!estimate.reason) {
       errors.push("suggestedEstimate requiere reason.");
     }
+    if (containsUnsafeResearchText(estimate.reason)) {
+      errors.push("suggestedEstimate contiene contenido inseguro.");
+    }
   }
+  report.warnings.forEach((warning, index) => {
+    if (containsUnsafeResearchText(warning)) {
+      errors.push(`warnings[${index}] contiene secreto, direccion completa o contenido inseguro.`);
+    }
+  });
   return {
     errors,
     report: errors.length === 0 ? report : undefined,
@@ -320,9 +350,9 @@ export function parseSamanthaResearchReport(input: string | unknown): SamanthaRe
         warnings: [],
       };
     }
-    if (containsSensitiveText(input)) {
+    if (containsUnsafeResearchText(input)) {
       return {
-        errors: ["Posible secreto o direccion completa detectada en el reporte."],
+        errors: ["Posible secreto, direccion completa o contenido inseguro detectado en el reporte."],
         valid: false,
         warnings: [],
       };

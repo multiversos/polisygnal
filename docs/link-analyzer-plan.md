@@ -91,6 +91,10 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
   from real wallet data, wallet profiles, comparable odds/Kalshi, or strong
   external evidence. If any gate fails, the UI shows `Estimacion PolySignal
   pendiente` with blockers instead of filling a percentage.
+- `docs/analyzer-estimate-gates.md` documents these gates and the test-only
+  Samantha fixtures. Focused scripts `test:estimate-gates` and
+  `test:samantha-report-validation` prove market price alone, weak Samantha
+  context and unsafe report payloads do not generate a PolySignal estimate.
 - Wallet Intelligence can appear as an auxiliary layer when the read-only
   endpoint returns real sanitized data. It can improve readiness, but cannot
   create a PolySignal prediction by itself.

@@ -340,6 +340,9 @@ If this test fails, stop feature work and treat it as a production regression.
 30. Confirm `Estimacion PolySignal` shows a pending state unless the conservative
    gates pass: Polymarket reference, validated Samantha report with accepted
    estimate, and at least one independent real support.
+30a. Run the controlled gate tests locally before trusting a new estimate UI:
+   `npm.cmd --workspace apps/web run test:estimate-gates` and
+   `npm.cmd --workspace apps/web run test:samantha-report-validation`.
 31. Confirm a market-price-only match does not show the same value as a
    PolySignal estimate and does not show a `0.0 pts` difference as useful
    analysis.
@@ -608,6 +611,9 @@ Use these quick checks when reviewing public pages:
 6. Paste a report with a dangerous URL, a secret-like value, an estimate outside
    `0..100`, Reddit high reliability, or Kalshi non-equivalent strong signal
    and confirm it is rejected.
+6a. Paste or test a report containing script-like text, trading instructions,
+   ROI `100%`, win rate `100%`, or a full wallet address and confirm the
+   validator rejects it.
 7. Paste a valid structured report in a safe test environment, click
    `Validar reporte`, confirm the preview summarizes evidence counts, then
    click `Cargar reporte al analisis`.

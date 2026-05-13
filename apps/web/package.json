@@ -7,7 +7,9 @@
     "build": "next build",
     "security:checks": "node scripts/security-checks.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
-    "start": "next start"
+    "start": "next start",
+    "test:estimate-gates": "node scripts/test-estimate-gates.mjs",
+    "test:samantha-report-validation": "node scripts/test-samantha-report-validation.mjs"
   },
   "dependencies": {
     "next": "15.5.15",

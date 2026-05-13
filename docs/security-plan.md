@@ -266,7 +266,8 @@ Current controls:
 - report import is manual paste;
 - report validator rejects unsafe URLs, secret-like text, full wallet addresses,
   invalid JSON, oversized text, invalid probabilities, Reddit/social high
-  reliability, and non-equivalent Kalshi strong signals;
+  reliability, non-equivalent Kalshi strong signals, script-like text, trading
+  instructions and unsupported ROI/win-rate claims;
 - the UI validates reports before applying them to the local job;
 - suggested estimates are accepted only after a strict evidence gate and remain
   traceable to the imported report.
@@ -277,6 +278,10 @@ Current controls:
   odds, or an equivalent Kalshi comparison.
 - A validated Samantha report below the 55% clear-decision threshold can remain
   useful context, but it must not create a countable history prediction.
+- Dedicated test scripts cover the estimator gates and report validator:
+  `test:estimate-gates` and `test:samantha-report-validation`. Fixtures are
+  controlled, test-only records and must not be displayed as production
+  evidence.
 
 Camino B controls:
 
