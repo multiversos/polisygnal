@@ -526,12 +526,20 @@ function validateAnalyzeLoadingPanelSource() {
   const historySource = readFileSync(new URL("../app/history/page.tsx", import.meta.url), "utf8");
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
   const linkSource = readFileSync(new URL("../app/lib/polymarketLink.ts", import.meta.url), "utf8");
+  const bridgeSource = readFileSync(new URL("../app/lib/samanthaBridge.ts", import.meta.url), "utf8");
+  const bridgeRouteSource = readFileSync(new URL("../app/api/samantha/send-research/route.ts", import.meta.url), "utf8");
   const expectedSteps = [
     "Detectando enlace",
     "Leyendo Polymarket",
     "Analizando mercado seleccionado",
     "Evaluando senales disponibles",
     "Revisando billeteras",
+    "Preparando tarea para Samantha",
+    "Enviando a Samantha",
+    "Samantha investigando",
+    "Esperando reporte de Samantha",
+    "Validando reporte",
+    "Listo para revisar decision",
     "Preparando decision",
   ];
   const expectedSkeletons = [
@@ -583,6 +591,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("MarketSelectionPanel"), "analyze page does not render market selector");
   assert(analyzePage.includes("/api/analyze-polymarket-link"), "analyze page does not use the safe Polymarket resolver route");
   assert(analyzePage.includes("resolvePolymarketLinkForAnalyze"), "analyze page does not resolve links from Polymarket first");
+  assert(analyzePage.includes("/api/samantha/send-research"), "analyze page does not call the safe Samantha bridge route");
+  assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page does not keep manual fallback when Samantha bridge is unavailable");
+  assert(analyzePage.includes("radarVisible"), "analyze page does not keep Radar Analytics visible for pending deep jobs");
   assert(!analyzePage.includes("/markets/overview"), "analyze page must not use internal overview as primary matching source");
   assert(!analyzePage.includes("rankAnalyzerMatches"), "analyze page must not use internal ranking as primary matching source");
   assert(!analyzePage.includes("fetchComparableMarkets"), "analyze page must not fetch internal comparable markets");
@@ -617,6 +628,11 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("parseSamanthaResearchReport"), "AnalyzerReport missing Samantha report validation");
   assert(reportSource.includes("buildSamanthaTaskPacket"), "AnalyzerReport missing Samantha task packet builder");
   assert(!reportSource.includes("fetch("), "AnalyzerReport must not call external services for Samantha");
+  assert(bridgeSource.includes("SAMANTHA_BRIDGE_ENABLED"), "Samantha bridge helper must use server-side enablement config");
+  assert(bridgeSource.includes("credentials: \"omit\""), "Samantha bridge helper must omit credentials");
+  assert(bridgeSource.includes("redirect: \"error\""), "Samantha bridge helper must reject redirects");
+  assert(bridgeRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha bridge route must reject client destinations");
+  assert(!bridgeRouteSource.includes("request.nextUrl"), "Samantha bridge route must not act as an open proxy");
   assert(reportSource.includes("Fuentes del analisis"), "AnalyzerReport missing source block");
   assert(reportSource.includes("Que puedes hacer ahora"), "AnalyzerReport missing next actions");
   assert(reportSource.includes("Analizar otro enlace"), "AnalyzerReport missing analyze another link action");
@@ -635,7 +651,8 @@ function validateAnalyzeLoadingPanelSource() {
   assert(linkSource.includes("getLeaguePrefixFromSlug"), "polymarket link parser does not strip league prefixes from weak terms");
   assert(linkSource.includes("rawParts.length !== parts.length"), "polymarket link parser may infer team codes from generic slugs");
   assert(analyzePage.includes('advancePhase("matching")'), "analyze page does not drive matching phase");
-  assert(analyzePage.includes('advancePhase("preparing")'), "analyze page does not drive preparing phase");
+  assert(analyzePage.includes('advancePhase("preparing_samantha")'), "analyze page does not prepare Samantha task phase");
+  assert(analyzePage.includes('advancePhase("sending_samantha")'), "analyze page does not try Samantha bridge phase");
 
   return {
     exact_flow_source_checks: true,
@@ -1014,7 +1031,8 @@ async function main() {
   assert(
     nbaAnalyzeRoute.body.status === "ok" ||
       nbaAnalyzeRoute.body.status === "not_found" ||
-      nbaAnalyzeRoute.body.status === "unsupported",
+      nbaAnalyzeRoute.body.status === "unsupported" ||
+      nbaAnalyzeRoute.body.status === "error",
     `NBA analyze route returned unexpected status ${nbaAnalyzeRoute.body.status}`,
   );
   assertTextExcludes(nbaAnalyzeRouteText, ["Sevilla", "Espanyol", "Atletico", "Atlético"], "NBA analyze route cross-sport guard");

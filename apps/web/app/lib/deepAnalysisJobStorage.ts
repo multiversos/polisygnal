@@ -32,6 +32,33 @@ function normalizeBoolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
 }
 
+function normalizeBridge(value: unknown): DeepAnalysisJob["samanthaBridge"] | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const candidate = value as NonNullable<DeepAnalysisJob["samanthaBridge"]>;
+  const status = normalizeString(candidate.status, 80) as NonNullable<DeepAnalysisJob["samanthaBridge"]>["status"] | undefined;
+  if (
+    status !== "not_configured" &&
+    status !== "fallback_manual" &&
+    status !== "sending" &&
+    status !== "researching" &&
+    status !== "report_received" &&
+    status !== "report_invalid" &&
+    status !== "failed"
+  ) {
+    return undefined;
+  }
+  return {
+    automaticAvailable: normalizeBoolean(candidate.automaticAvailable),
+    fallbackRequired: normalizeBoolean(candidate.fallbackRequired),
+    lastAttemptAt: normalizeString(candidate.lastAttemptAt, 80),
+    reason: normalizeString(candidate.reason, 240),
+    status,
+    taskId: normalizeString(candidate.taskId, 120),
+  };
+}
+
 function normalizeStep(value: unknown): DeepAnalysisJobStep | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -78,7 +105,20 @@ function normalizeJob(value: unknown): DeepAnalysisJob | null {
   if (!id || !url || !status || !createdAt || !updatedAt) {
     return null;
   }
-  if (!["idle", "running", "awaiting_samantha", "ready_to_score", "completed", "failed"].includes(status)) {
+  if (
+    ![
+      "idle",
+      "running",
+      "sending_to_samantha",
+      "samantha_researching",
+      "receiving_samantha_report",
+      "validating_samantha_report",
+      "awaiting_samantha",
+      "ready_to_score",
+      "completed",
+      "failed",
+    ].includes(status)
+  ) {
     return null;
   }
   const steps = Array.isArray(candidate.steps)
@@ -101,6 +141,7 @@ function normalizeJob(value: unknown): DeepAnalysisJob | null {
     marketTitle: normalizeString(candidate.marketTitle, 240),
     normalizedUrl: normalizeString(candidate.normalizedUrl, 600),
     resultReady: normalizeBoolean(candidate.resultReady),
+    samanthaBridge: normalizeBridge(candidate.samanthaBridge),
     samanthaReportLoaded: normalizeBoolean(candidate.samanthaReportLoaded),
     status,
     steps,

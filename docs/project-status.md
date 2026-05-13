@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con arquitectura Deep Analyzer read-only preparada y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `61e5cfc`
+- ultimo deploy production verificado antes de este sprint: `3c5852d`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -124,6 +124,23 @@ Estado visible verificado:
   preparar una tarea completa para Samantha, copiarla o descargarla, validar un
   reporte pegado por el usuario en dos pasos y mostrar evidencia estructurada
   sin ejecutar Samantha automaticamente.
+- Camino B para Samantha automatica esta preparado pero apagado por defecto:
+  `samanthaBridgeTypes.ts`, `samanthaBridge.ts` y
+  `POST /api/samantha/send-research` permiten enviar un Task Packet solo si hay
+  configuracion server-side segura (`SAMANTHA_BRIDGE_ENABLED` y endpoint
+  allowlisted). Sin configuracion, la ruta responde fallback manual y el
+  `DeepAnalysisJob` queda `awaiting_samantha`.
+- `/analyze` ya soporta estados operativos del puente:
+  `sending_to_samantha`, `samantha_researching`,
+  `receiving_samantha_report` y `validating_samantha_report`. Radar Analytics
+  permanece visible mientras el job esta activo, pendiente de Samantha o
+  listo para scoring; no usa timers falsos ni marca completado si falta
+  investigacion externa.
+- Auditoria local: existe una carpeta untracked
+  `apps/web/app/api/samantha-polysignal-analysis/` con un route viejo que usa
+  backend `/markets/overview`; no se integro porque violaria la regla
+  Polymarket-first. `N:/samantha` existe como bridge WhatsApp/OpenClaw, pero no
+  expone todavia un endpoint directo para recibir el Task Packet de PolySignal.
 - El paquete para Samantha incluye brief JSON, instrucciones TXT, schema de
   respuesta, reglas de seguridad e instrucciones de devolucion. Prohibe fuentes
   inventadas, trading, Neon, `.env`, doxxing, secretos, copy-trading y

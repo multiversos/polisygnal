@@ -596,6 +596,12 @@ function validateAnalyzeLoadingPanelSource() {
     "Analizando mercado seleccionado",
     "Evaluando senales disponibles",
     "Revisando billeteras",
+    "Preparando tarea para Samantha",
+    "Enviando a Samantha",
+    "Samantha investigando",
+    "Esperando reporte de Samantha",
+    "Validando reporte",
+    "Listo para revisar decision",
     "Preparando decision",
   ];
   const expectedSkeletons = [
@@ -660,7 +666,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes('advancePhase("context")'), "expected /analyze loader to enter context phase");
   assert(analyzePage.includes('advancePhase("readiness")'), "expected /analyze loader to enter readiness phase");
   assert(analyzePage.includes('advancePhase("research")'), "expected /analyze loader to enter research phase");
-  assert(analyzePage.includes('advancePhase("preparing")'), "expected /analyze loader to enter preparing phase");
+  assert(analyzePage.includes('advancePhase("preparing_samantha")'), "expected /analyze loader to prepare Samantha task");
+  assert(analyzePage.includes('advancePhase("sending_samantha")'), "expected /analyze loader to try the safe Samantha bridge");
+  assert(analyzePage.includes("radarVisible"), "expected /analyze to keep Radar Analytics visible while job is pending");
 
   return { phases: expectedSteps.length, skeletons: expectedSkeletons.length };
 }
@@ -736,6 +744,10 @@ function validateSamanthaResearchRules() {
   const reportTypes = readFileSync(resolve(appRoot, "app/lib/samanthaResearchTypes.ts"), "utf8");
   const reportSource = readFileSync(resolve(appRoot, "app/lib/samanthaResearchReport.ts"), "utf8");
   const taskPacketSource = readFileSync(resolve(appRoot, "app/lib/samanthaTaskPacket.ts"), "utf8");
+  const bridgeTypesSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridgeTypes.ts"), "utf8");
+  const bridgeSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridge.ts"), "utf8");
+  const bridgeRouteSource = readFileSync(resolve(appRoot, "app/api/samantha/send-research/route.ts"), "utf8");
+  const analyzePageSource = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
 
   const brief = buildSamanthaResearchBrief({
     item: {
@@ -793,6 +805,23 @@ function validateSamanthaResearchRules() {
   assert(!/0x[a-fA-F0-9]{40}/.test(taskPacketText), "Samantha task packet must not include full wallet addresses");
   assert(!taskPacketText.toLowerCase().includes("database_url="), "Samantha task packet must not include secrets");
   assert(!taskPacketSource.includes("fetch("), "Samantha task packet builder must not call external services");
+  assert(bridgeTypesSource.includes('"disabled" | "manual_fallback" | "automatic"'), "Samantha bridge types must model disabled/manual/automatic modes");
+  assert(bridgeSource.includes("SAMANTHA_BRIDGE_ENABLED"), "Samantha bridge must read server-side enabled config");
+  assert(bridgeSource.includes("SAMANTHA_BRIDGE_URL"), "Samantha bridge must read server-side endpoint config");
+  assert(bridgeSource.includes("credentials: \"omit\""), "Samantha bridge fetch must omit credentials");
+  assert(bridgeSource.includes("redirect: \"error\""), "Samantha bridge fetch must reject redirects");
+  assert(bridgeSource.includes("endpointIsSafe"), "Samantha bridge must validate configured endpoint");
+  assert(bridgeSource.includes("Private network bridge endpoints are blocked"), "Samantha bridge must block unsafe private endpoints");
+  assert(!bridgeSource.includes("NEXT_PUBLIC"), "Samantha bridge must not use client-exposed env vars");
+  assert(bridgeRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha send route must reject client-provided destinations");
+  assert(bridgeRouteSource.includes("bridgeUrl"), "Samantha send route must block bridgeUrl input");
+  assert(bridgeRouteSource.includes("sendSamanthaResearchTask"), "Samantha send route must use the bridge helper");
+  assert(!bridgeRouteSource.includes("request.nextUrl"), "Samantha send route must not derive destination from request URL");
+  assert(!bridgeRouteSource.includes("rawBody") || !bridgeRouteSource.includes("raw payload"), "Samantha send route must not expose raw payloads");
+  assert(analyzePageSource.includes("/api/samantha/send-research"), "analyze page must try the safe Samantha bridge route");
+  assert(analyzePageSource.includes("markJobSamanthaBridgeFallback"), "analyze page must keep manual fallback when bridge is unavailable");
+  assert(analyzePageSource.includes("markJobSendingToSamantha"), "analyze page must mark sending_to_samantha state");
+  assert(analyzePageSource.includes("setSamanthaAutoReportResult"), "analyze page must pass validated automatic reports to the report UI");
 
   const validReport = parseSamanthaResearchReport({
     completedAt: "2026-05-12T12:00:00.000Z",
@@ -1157,8 +1186,13 @@ function validateDeepAnalysisJobRules() {
     markJobAwaitingSamantha,
     markJobMarketAnalyzed,
     markJobPolymarketRead,
+    markJobReceivingSamanthaReport,
     markJobSamanthaBriefReady,
+    markJobSamanthaBridgeFallback,
     markJobSamanthaReportLoaded,
+    markJobSamanthaResearching,
+    markJobSendingToSamantha,
+    markJobValidatingSamanthaReport,
     markJobWalletsAnalyzed,
   } = loadTsModule("app/lib/deepAnalysisJob.ts");
   const storageSource = readFileSync(resolve(appRoot, "app/lib/deepAnalysisJobStorage.ts"), "utf8");
@@ -1201,6 +1235,25 @@ function validateDeepAnalysisJobRules() {
     "awaiting job summary should point to Samantha report workflow",
   );
 
+  const sendingJob = markJobSendingToSamantha(job);
+  assert(sendingJob.status === "sending_to_samantha", "bridge send attempt should set sending_to_samantha");
+  assert(
+    sendingJob.steps.find((step) => step.id === "awaiting_samantha_report")?.status === "running",
+    "sending job should keep awaiting_samantha_report running",
+  );
+  const researchingJob = markJobSamanthaResearching(sendingJob, { reason: "Queued safely.", taskId: "task-1" });
+  assert(researchingJob.status === "samantha_researching", "accepted bridge task should mark Samantha researching");
+  const receivingJob = markJobReceivingSamanthaReport(researchingJob);
+  assert(receivingJob.status === "receiving_samantha_report", "candidate report should mark receiving state");
+  const validatingJob = markJobValidatingSamanthaReport(receivingJob);
+  assert(validatingJob.status === "validating_samantha_report", "candidate report should mark validating state");
+  const fallbackJob = markJobSamanthaBridgeFallback(sendingJob, {
+    automaticAvailable: false,
+    reason: "Bridge disabled for fixture.",
+  });
+  assert(fallbackJob.status === "awaiting_samantha", "bridge fallback must keep job awaiting Samantha");
+  assert(fallbackJob.resultReady !== true, "bridge fallback must not complete the analysis");
+
   const withEvidenceNoDecision = markJobSamanthaReportLoaded(job, {
     acceptedEstimate: false,
     signalCount: 2,
@@ -1226,7 +1279,8 @@ function validateDeepAnalysisJobRules() {
   assert(!storageSource.includes("fetch("), "deep analysis job storage must not call external services");
   assert(!storageSource.includes("raw payload"), "deep analysis job storage should not store raw payloads");
   assert(analyzePage.includes("createDeepAnalysisJob"), "analyze page should create local deep analysis jobs");
-  assert(analyzePage.includes("markJobAwaitingSamantha"), "analyze page should mark jobs awaiting Samantha");
+  assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page should keep jobs awaiting Samantha when bridge is unavailable");
+  assert(analyzePage.includes("markJobSendingToSamantha"), "analyze page should expose automatic bridge states");
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
   assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport should show job state");
   assert(reportSource.includes("Esperando reporte de Samantha"), "AnalyzerReport should show manual research wait state");

@@ -46,11 +46,16 @@ import {
 } from "../lib/analyzerResult";
 import {
   createDeepAnalysisJob,
-  markJobAwaitingSamantha,
   markJobFailed,
   markJobMarketAnalyzed,
   markJobPolymarketRead,
+  markJobReceivingSamanthaReport,
   markJobSamanthaBriefReady,
+  markJobSamanthaBridgeFallback,
+  markJobSamanthaReportLoaded,
+  markJobSamanthaResearching,
+  markJobSendingToSamantha,
+  markJobValidatingSamanthaReport,
   markJobWalletsAnalyzed,
   type DeepAnalysisJob,
 } from "../lib/deepAnalysisJob";
@@ -74,6 +79,13 @@ import {
 import { getWalletIntelligenceForMarket } from "../lib/walletIntelligenceAdapter";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
+import { buildSamanthaResearchBrief } from "../lib/samanthaResearchBrief";
+import {
+  convertSamanthaReportToSignals,
+  parseSamanthaResearchReport,
+  shouldAcceptSuggestedEstimate,
+} from "../lib/samanthaResearchReport";
+import type { SamanthaResearchParseResult } from "../lib/samanthaResearchTypes";
 import {
   ANALYSIS_HISTORY_STORAGE_EVENT,
   getAnalysisHistory,
@@ -131,6 +143,17 @@ type SearchState =
       normalizedUrl: string;
       status: "result";
     };
+
+type SamanthaBridgeRouteResult = {
+  automaticAvailable?: boolean;
+  fallbackRequired?: boolean;
+  reason?: string;
+  report?: unknown;
+  status?: string;
+  taskId?: string;
+  validationErrors?: string[];
+  warnings?: string[];
+};
 
 function toNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -349,6 +372,61 @@ function safeOutcomesForHistory(item: MarketOverviewItem) {
     }));
 }
 
+function jobAwaitsResearch(job?: DeepAnalysisJob | null): boolean {
+  return Boolean(
+    job &&
+      [
+        "awaiting_samantha",
+        "ready_to_score",
+        "receiving_samantha_report",
+        "samantha_researching",
+        "sending_to_samantha",
+        "validating_samantha_report",
+      ].includes(job.status),
+  );
+}
+
+function deepJobSupportsPersistentRadar(job?: DeepAnalysisJob | null): boolean {
+  return Boolean(
+    job &&
+      [
+        "idle",
+        "running",
+        "awaiting_samantha",
+        "ready_to_score",
+        "receiving_samantha_report",
+        "samantha_researching",
+        "sending_to_samantha",
+        "validating_samantha_report",
+      ].includes(job.status),
+  );
+}
+
+function loadingPhaseFromJob(job?: DeepAnalysisJob | null): AnalyzeLoadingPhase | null {
+  if (!job) {
+    return null;
+  }
+  if (job.status === "sending_to_samantha") {
+    return "sending_samantha";
+  }
+  if (job.status === "samantha_researching") {
+    return "samantha_researching";
+  }
+  if (job.status === "receiving_samantha_report" || job.status === "validating_samantha_report") {
+    return "validating_report";
+  }
+  if (job.status === "awaiting_samantha") {
+    return "awaiting_samantha";
+  }
+  if (job.status === "ready_to_score") {
+    return "ready_to_score";
+  }
+  if (job.briefReady) {
+    return "preparing_samantha";
+  }
+  return null;
+}
+
 function historyPayloadFromMarket(
   item: MarketOverviewItem,
   normalizedUrl: string,
@@ -409,9 +487,7 @@ function historyPayloadFromMarket(
           ? decision.evaluationReason
           : "Sin estimacion PolySignal suficiente.",
     evaluationStatus: decision.evaluationStatus,
-    awaitingResearch: deepJob
-      ? deepJob.status === "awaiting_samantha" || deepJob.status === "ready_to_score"
-      : undefined,
+    awaitingResearch: jobAwaitsResearch(deepJob),
     deepAnalysisJobId: deepJob?.id,
     id: `link-${item.market?.id ?? item.market?.remote_id ?? item.market?.market_slug ?? "market"}-${Date.now()}`,
     marketId: item.market?.id ? String(item.market.id) : undefined,
@@ -437,7 +513,7 @@ function historyPayloadFromMarket(
     status: "open" as const,
     title: marketTitle(item),
     trackingStatus:
-      deepJob?.status === "awaiting_samantha"
+      jobAwaitsResearch(deepJob)
         ? ("analyzing" as const)
         : decision.predictedSide === "UNKNOWN"
           ? ("no_clear_decision" as const)
@@ -1256,6 +1332,8 @@ export default function AnalyzePage() {
   const [savedHistoryKeys, setSavedHistoryKeys] = useState<Set<string>>(new Set());
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
   const [deepAnalysisJob, setDeepAnalysisJob] = useState<DeepAnalysisJob | null>(null);
+  const [samanthaAutoReportResult, setSamanthaAutoReportResult] =
+    useState<SamanthaResearchParseResult | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const analysisRunRef = useRef(0);
@@ -1329,6 +1407,137 @@ export default function AnalyzePage() {
     return stored;
   }, []);
 
+  const tryAutomaticSamanthaBridge = useCallback(
+    async (input: {
+      isCurrentRun: () => boolean;
+      item: AnalyzeMarketItem;
+      job: DeepAnalysisJob;
+      normalizedUrl: string;
+      walletSummary: WalletIntelligenceSummary;
+    }): Promise<{ job: DeepAnalysisJob; message: string; reportResult: SamanthaResearchParseResult | null }> => {
+      let job = persistDeepAnalysisJob(markJobSendingToSamantha(input.job));
+      if (!input.isCurrentRun()) {
+        return {
+          job,
+          message: "El analisis cambio antes de enviar a Samantha.",
+          reportResult: null,
+        };
+      }
+      try {
+        const brief = buildSamanthaResearchBrief({
+          item: input.item,
+          normalizedUrl: input.normalizedUrl,
+          url: input.normalizedUrl,
+          walletSummary: input.walletSummary,
+        });
+        const response = await fetch("/api/samantha/send-research", {
+          body: JSON.stringify({
+            brief,
+            deepAnalysisJobId: job.id,
+            normalizedUrl: input.normalizedUrl,
+          }),
+          cache: "no-store",
+          credentials: "omit",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+          redirect: "error",
+        });
+        const result = (await response.json().catch(() => ({}))) as SamanthaBridgeRouteResult;
+        if (!input.isCurrentRun()) {
+          return {
+            job,
+            message: "El analisis cambio antes de recibir respuesta de Samantha.",
+            reportResult: null,
+          };
+        }
+        if (!response.ok || result.fallbackRequired || result.status === "disabled" || result.status === "fallback_required") {
+          const reason =
+            !result.reason || /bridge|fallback/i.test(result.reason)
+              ? "Samantha automatica no esta configurada; usa el Task Packet manual."
+              : result.reason;
+          job = persistDeepAnalysisJob(
+            markJobSamanthaBridgeFallback(job, {
+              automaticAvailable: result.automaticAvailable,
+              reason,
+              warnings: result.warnings ?? result.validationErrors ?? [],
+            }),
+          );
+          return {
+            job,
+            message: reason,
+            reportResult: null,
+          };
+        }
+        if (result.report) {
+          job = persistDeepAnalysisJob(markJobReceivingSamanthaReport(job));
+          job = persistDeepAnalysisJob(markJobValidatingSamanthaReport(job));
+          const reportResult = parseSamanthaResearchReport(result.report);
+          if (!reportResult.valid || !reportResult.report) {
+            const reason =
+              reportResult.errors[0] ||
+              "Samantha devolvio un reporte, pero no paso la validacion PolySignal.";
+            job = persistDeepAnalysisJob(
+              markJobSamanthaBridgeFallback(job, {
+                automaticAvailable: true,
+                reason,
+                warnings: reportResult.errors.slice(0, 4),
+              }),
+            );
+            return {
+              job,
+              message: reason,
+              reportResult,
+            };
+          }
+          job = persistDeepAnalysisJob(
+            markJobSamanthaReportLoaded(job, {
+              acceptedEstimate: shouldAcceptSuggestedEstimate(reportResult.report),
+              kalshiEquivalent:
+                reportResult.report.kalshiComparison?.found === true &&
+                reportResult.report.kalshiComparison.equivalent === true,
+              oddsFound: reportResult.report.oddsComparison?.found === true,
+              reportStatus: reportResult.report.status,
+              signalCount: convertSamanthaReportToSignals(reportResult.report).length,
+            }),
+          );
+          return {
+            job,
+            message: "Samantha devolvio un reporte validado; PolySignal actualizo las senales del job.",
+            reportResult,
+          };
+        }
+        job = persistDeepAnalysisJob(
+          markJobSamanthaResearching(job, {
+            reason: result.reason || "Samantha recibio la tarea; la investigacion sigue pendiente.",
+            taskId: result.taskId,
+          }),
+        );
+        return {
+          job,
+          message: result.reason || "Samantha recibio la tarea; esperando reporte estructurado.",
+          reportResult: null,
+        };
+      } catch {
+        const reason = "Samantha automatica no respondio de forma segura; usa el Task Packet manual.";
+        job = persistDeepAnalysisJob(
+          markJobSamanthaBridgeFallback(job, {
+            automaticAvailable: true,
+            reason,
+          }),
+        );
+        return {
+          job,
+          message: reason,
+          reportResult: null,
+        };
+      }
+    },
+    [persistDeepAnalysisJob],
+  );
+
   const runAnalysis = useCallback(async (value = input) => {
     const runId = analysisRunRef.current + 1;
     analysisRunRef.current = runId;
@@ -1345,6 +1554,7 @@ export default function AnalyzePage() {
     setLoadingPhase("validating");
     const validation = getPolymarketUrlValidationMessage(value);
     setActionMessage(null);
+    setSamanthaAutoReportResult(null);
     if (!validation.ok || !validation.normalizedUrl) {
       setState({ message: validation.message, status: "invalid" });
       return;
@@ -1450,6 +1660,7 @@ export default function AnalyzePage() {
     };
 
     setActionMessage(null);
+    setSamanthaAutoReportResult(null);
     let job =
       getLatestDeepAnalysisJobForUrl(normalizedUrl) ??
       createDeepAnalysisJob(normalizedUrl);
@@ -1504,14 +1715,46 @@ export default function AnalyzePage() {
         }),
       );
 
-      if (!(await advancePhase("preparing"))) {
+      if (!(await advancePhase("preparing_samantha"))) {
         return;
       }
       job = persistDeepAnalysisJob(markJobSamanthaBriefReady(job));
-      job = persistDeepAnalysisJob(markJobAwaitingSamantha(job));
+      if (!(await advancePhase("sending_samantha"))) {
+        return;
+      }
+      const bridgeResult = await tryAutomaticSamanthaBridge({
+        isCurrentRun,
+        item: enrichedMatch.item,
+        job,
+        normalizedUrl,
+        walletSummary,
+      });
+      if (!isCurrentRun()) {
+        return;
+      }
+      job = bridgeResult.job;
+      setSamanthaAutoReportResult(bridgeResult.reportResult);
+      if (job.status === "awaiting_samantha" && !(await advancePhase("awaiting_samantha"))) {
+        return;
+      }
+      if (job.status === "samantha_researching" && !(await advancePhase("samantha_researching"))) {
+        return;
+      }
+      if (
+        (job.status === "receiving_samantha_report" || job.status === "validating_samantha_report") &&
+        !(await advancePhase("validating_report"))
+      ) {
+        return;
+      }
+      if (job.status === "ready_to_score" && !(await advancePhase("ready_to_score"))) {
+        return;
+      }
       setState({
         match: enrichedMatch,
-        message: "Analisis profundo iniciado: Polymarket leido, Wallet Intelligence revisada y brief de Samantha listo.",
+        message:
+          job.status === "completed"
+            ? "Analisis profundo actualizado con reporte de Samantha validado."
+            : `Analisis profundo iniciado: Polymarket leido, Wallet Intelligence revisada y ${bridgeResult.message}`,
         normalizedUrl,
         status: "result",
       });
@@ -1534,7 +1777,7 @@ export default function AnalyzePage() {
         setLoading(false);
       }
     }
-  }, [persistDeepAnalysisJob]);
+  }, [persistDeepAnalysisJob, tryAutomaticSamanthaBridge]);
 
   const handleSaveHistory = useCallback(async (item: MarketOverviewItem) => {
     if (state.status !== "result") {
@@ -1615,6 +1858,7 @@ export default function AnalyzePage() {
     setLoading(false);
     setLoadingPhase("validating");
     setActionMessage(null);
+    setSamanthaAutoReportResult(null);
     setDeepAnalysisJob(null);
   }, []);
 
@@ -1623,6 +1867,9 @@ export default function AnalyzePage() {
     state.status === "needs_selection" || state.status === "no_exact_match" || state.status === "result"
       ? state.normalizedUrl
       : "";
+  const radarVisible =
+    loading || (state.status === "result" && deepJobSupportsPersistentRadar(deepAnalysisJob));
+  const radarPhase = loadingPhaseFromJob(deepAnalysisJob) ?? loadingPhase;
 
   return (
     <main className="dashboard-shell analyze-page">
@@ -1735,11 +1982,11 @@ export default function AnalyzePage() {
         </section>
       ) : null}
 
-      {state.status === "detecting" || state.status === "analyzing_selected" ? (
+      {radarVisible ? (
         <AnalyzeLoadingPanel
-          isVisible={loading}
+          isVisible={radarVisible}
           jobSteps={deepAnalysisJob?.steps}
-          phase={loadingPhase}
+          phase={radarPhase}
         />
       ) : null}
 
@@ -1794,6 +2041,7 @@ export default function AnalyzePage() {
                   <AnalyzerReport
                     busy={actionBusy}
                     deepAnalysisJob={deepAnalysisJob}
+                    initialSamanthaReportResult={samanthaAutoReportResult}
                     item={match.item}
                     matchScore={match.score}
                     normalizedUrl={analyzedNormalizedUrl}

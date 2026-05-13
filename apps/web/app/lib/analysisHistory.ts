@@ -46,7 +46,11 @@ export type AnalysisHistoryResearchStatus =
   | "completed"
   | "failed"
   | "idle"
+  | "receiving_samantha_report"
   | "ready_to_score"
+  | "samantha_researching"
+  | "sending_to_samantha"
+  | "validating_samantha_report"
   | "running";
 
 export type AnalysisHistoryAnalyzerLayer = {
@@ -257,7 +261,11 @@ function normalizeResearchStatus(value: unknown): AnalysisHistoryResearchStatus 
     value === "completed" ||
     value === "failed" ||
     value === "idle" ||
+    value === "receiving_samantha_report" ||
     value === "ready_to_score" ||
+    value === "samantha_researching" ||
+    value === "sending_to_samantha" ||
+    value === "validating_samantha_report" ||
     value === "running"
   ) {
     return value;
@@ -658,7 +666,11 @@ export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): Ana
     (item) =>
       item.awaitingResearch ||
       item.researchStatus === "awaiting_samantha" ||
-      item.researchStatus === "ready_to_score",
+      item.researchStatus === "ready_to_score" ||
+      item.researchStatus === "sending_to_samantha" ||
+      item.researchStatus === "samantha_researching" ||
+      item.researchStatus === "receiving_samantha_report" ||
+      item.researchStatus === "validating_samantha_report",
   ).length;
   const resolved = hits + misses;
   const countableResolved = resolved;

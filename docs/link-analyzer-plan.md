@@ -117,6 +117,11 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
   prepares a structured brief, lets the user paste a structured Samantha report,
   validates it locally, and shows accepted evidence without executing Samantha
   automatically.
+- Camino B esta preparado con `POST /api/samantha/send-research`: `/analyze`
+  puede intentar enviar el Task Packet a Samantha solo si existe configuracion
+  server-side segura. Si no esta configurado, el job queda `awaiting_samantha`
+  y el flujo manual completo sigue disponible. Esta ruta no acepta destinos del
+  cliente y no es un proxy abierto.
 - The report closes with `Que puedes hacer ahora`: save the analysis, save as
   follow-up when there is no PolySignal estimate, view history, follow the
   market, open market detail, or analyze another link.
@@ -195,6 +200,13 @@ Prepared as frontend contracts only.
 - `samanthaResearchBrief.ts` and `samanthaResearchReport.ts` define the manual
   bridge to Samantha: export brief, paste report, validate evidence, then feed
   accepted signals into the Deep Analyzer.
+- `samanthaBridgeTypes.ts`, `samanthaBridge.ts` y
+  `/api/samantha/send-research` preparan Camino B automatico seguro. Por
+  defecto responde fallback manual; solo usa un endpoint server-side allowlisted
+  si `SAMANTHA_BRIDGE_ENABLED` y `SAMANTHA_BRIDGE_URL` estan configurados.
+- `DeepAnalysisJob` soporta estados de puente:
+  `sending_to_samantha`, `samantha_researching`,
+  `receiving_samantha_report` y `validating_samantha_report`.
 - The v0 engine never creates a PolySignal probability from market price.
 - With only Polymarket data, the decision remains unavailable and does not
   count for accuracy.

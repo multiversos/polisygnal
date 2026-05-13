@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
   buildAnalyzerResult,
@@ -85,6 +85,7 @@ type AnalyzeMarketItem = MarketOverviewItem & {
 type AnalyzerReportProps = {
   busy: boolean;
   deepAnalysisJob?: DeepAnalysisJob | null;
+  initialSamanthaReportResult?: SamanthaResearchParseResult | null;
   item: AnalyzeMarketItem;
   matchScore: number;
   normalizedUrl: string;
@@ -321,6 +322,7 @@ function AnalyzerLayerDetails({
 export function AnalyzerReport({
   busy,
   deepAnalysisJob,
+  initialSamanthaReportResult,
   item,
   matchScore,
   normalizedUrl,
@@ -444,6 +446,19 @@ export function AnalyzerReport({
       ? "Guarda esta lectura para medirla cuando el mercado tenga resultado confiable."
       : "No hay estimacion propia suficiente; puedes guardarlo como seguimiento sin convertirlo en prediccion.";
   const jobSummary = deepAnalysisJob ? getJobProgressSummary(deepAnalysisJob) : null;
+
+  useEffect(() => {
+    if (!initialSamanthaReportResult) {
+      return;
+    }
+    setSamanthaReportDraftResult(initialSamanthaReportResult);
+    setSamanthaReportResult(initialSamanthaReportResult.valid ? initialSamanthaReportResult : null);
+    setSamanthaActionMessage(
+      initialSamanthaReportResult.valid
+        ? "Reporte automatico de Samantha validado y cargado."
+        : "Samantha devolvio un reporte, pero no paso la validacion.",
+    );
+  }, [initialSamanthaReportResult]);
 
   function handleValidateSamanthaReport() {
     const result = parseSamanthaResearchReport(samanthaReportInput);

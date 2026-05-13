@@ -11,6 +11,12 @@ export type AnalyzeLoadingPhase =
   | "context"
   | "readiness"
   | "research"
+  | "preparing_samantha"
+  | "sending_samantha"
+  | "samantha_researching"
+  | "awaiting_samantha"
+  | "validating_report"
+  | "ready_to_score"
   | "preparing";
 
 type AnalyzeLoadingPanelProps = {
@@ -68,6 +74,42 @@ const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
     shortLabel: "Wallets",
   },
   {
+    detail: "Task Packet listo para puente seguro o flujo manual",
+    label: "Preparando tarea para Samantha",
+    phase: "preparing_samantha",
+    shortLabel: "Samantha",
+  },
+  {
+    detail: "Usando solo configuracion server-side allowlisted",
+    label: "Enviando a Samantha",
+    phase: "sending_samantha",
+    shortLabel: "Envio",
+  },
+  {
+    detail: "Samantha recibio la tarea; esperando evidencia estructurada",
+    label: "Samantha investigando",
+    phase: "samantha_researching",
+    shortLabel: "Research",
+  },
+  {
+    detail: "Investigacion externa pendiente; el flujo manual sigue disponible",
+    label: "Esperando reporte de Samantha",
+    phase: "awaiting_samantha",
+    shortLabel: "Pendiente",
+  },
+  {
+    detail: "Validando reporte antes de aceptar evidencia",
+    label: "Validando reporte",
+    phase: "validating_report",
+    shortLabel: "Validacion",
+  },
+  {
+    detail: "Evidencia cargada; decision bloqueada si no pasa compuertas",
+    label: "Listo para revisar decision",
+    phase: "ready_to_score",
+    shortLabel: "Scoring",
+  },
+  {
     detail: "Sin prediccion si faltan evidencias",
     label: "Preparando decision",
     phase: "preparing",
@@ -76,7 +118,7 @@ const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
 ];
 
 const DEEP_LAYER_PREVIEW = [
-  "Samantha Research: brief listo / esperando reporte / reporte cargado",
+  "Samantha Research: puente seguro o flujo manual",
   "Perfiles de billeteras: pendiente",
   "Investigacion externa: pendiente",
   "Odds externas: pendiente",

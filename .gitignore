@@ -45,6 +45,10 @@ USER.md
 # Test validation artifacts
 **/.validation/
 
+# Audited local Samantha/PolySignal experiment. Keep out of commits unless it is
+# rewritten to preserve Polymarket-first analyzer rules.
+apps/web/app/api/samantha-polysignal-analysis/
+
 # SQLite databases
 *.sqlite3
 *.db

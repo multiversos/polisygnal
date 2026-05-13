@@ -1,6 +1,10 @@
 export type DeepAnalysisJobStatus =
   | "idle"
   | "running"
+  | "sending_to_samantha"
+  | "samantha_researching"
+  | "receiving_samantha_report"
+  | "validating_samantha_report"
   | "awaiting_samantha"
   | "ready_to_score"
   | "completed"
@@ -51,6 +55,21 @@ export type DeepAnalysisJob = {
   marketSlug?: string;
   steps: DeepAnalysisJobStep[];
   briefReady?: boolean;
+  samanthaBridge?: {
+    automaticAvailable?: boolean;
+    fallbackRequired?: boolean;
+    lastAttemptAt?: string;
+    reason?: string;
+    status:
+      | "not_configured"
+      | "fallback_manual"
+      | "sending"
+      | "researching"
+      | "report_received"
+      | "report_invalid"
+      | "failed";
+    taskId?: string;
+  };
   samanthaReportLoaded?: boolean;
   resultReady?: boolean;
   error?: string;
@@ -263,11 +282,108 @@ export function markJobWalletsAnalyzed(
 export function markJobSamanthaBriefReady(job: DeepAnalysisJob): DeepAnalysisJob {
   const next = updateDeepAnalysisJobStep(job, "preparing_samantha_research", {
     status: "completed",
-    summary: "Brief estructurado listo para Samantha en flujo manual.",
+    summary: "Task Packet de Samantha listo para puente automatico seguro o flujo manual.",
   });
   return {
     ...next,
     briefReady: true,
+  };
+}
+
+export function markJobSendingToSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
+  const next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
+    requiresExternalIntegration: true,
+    status: "running",
+    summary: "Enviando Task Packet a Samantha mediante el puente automatico configurado.",
+  });
+  return {
+    ...next,
+    resultReady: false,
+    samanthaBridge: {
+      automaticAvailable: true,
+      fallbackRequired: false,
+      lastAttemptAt: nowIso(),
+      status: "sending",
+    },
+    status: "sending_to_samantha",
+  };
+}
+
+export function markJobSamanthaResearching(
+  job: DeepAnalysisJob,
+  input: { reason?: string; taskId?: string },
+): DeepAnalysisJob {
+  const next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
+    requiresExternalIntegration: true,
+    status: "running",
+    summary: input.reason || "Samantha recibio la tarea y la investigacion externa sigue pendiente.",
+  });
+  return {
+    ...next,
+    resultReady: false,
+    samanthaBridge: {
+      automaticAvailable: true,
+      fallbackRequired: false,
+      lastAttemptAt: nowIso(),
+      reason: input.reason,
+      status: "researching",
+      taskId: input.taskId,
+    },
+    status: "samantha_researching",
+  };
+}
+
+export function markJobReceivingSamanthaReport(job: DeepAnalysisJob): DeepAnalysisJob {
+  const next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
+    status: "running",
+    summary: "Reporte candidato recibido desde Samantha; pendiente de validacion PolySignal.",
+  });
+  return {
+    ...next,
+    resultReady: false,
+    samanthaBridge: {
+      ...next.samanthaBridge,
+      automaticAvailable: true,
+      fallbackRequired: false,
+      lastAttemptAt: nowIso(),
+      status: "report_received",
+    },
+    status: "receiving_samantha_report",
+  };
+}
+
+export function markJobValidatingSamanthaReport(job: DeepAnalysisJob): DeepAnalysisJob {
+  const next = updateDeepAnalysisJobStep(job, "scoring_evidence", {
+    status: "running",
+    summary: "Validando reporte de Samantha y convirtiendo evidencia en senales.",
+  });
+  return {
+    ...next,
+    resultReady: false,
+    status: "validating_samantha_report",
+  };
+}
+
+export function markJobSamanthaBridgeFallback(
+  job: DeepAnalysisJob,
+  input: { automaticAvailable?: boolean; reason: string; warnings?: string[] },
+): DeepAnalysisJob {
+  let next = markJobAwaitingSamantha(job);
+  next = updateDeepAnalysisJobStep(next, "awaiting_samantha_report", {
+    requiresManualInput: true,
+    status: "running",
+    summary: input.reason || "Samantha automatica no configurada; usa el Task Packet manual.",
+    warnings: input.warnings ?? [],
+  });
+  return {
+    ...next,
+    samanthaBridge: {
+      automaticAvailable: Boolean(input.automaticAvailable),
+      fallbackRequired: true,
+      lastAttemptAt: nowIso(),
+      reason: input.reason,
+      status: input.automaticAvailable ? "failed" : "fallback_manual",
+    },
   };
 }
 
@@ -294,6 +410,13 @@ export function markJobAwaitingSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
     ...next,
     briefReady: true,
     resultReady: false,
+    samanthaBridge: next.samanthaBridge ?? {
+      automaticAvailable: false,
+      fallbackRequired: true,
+      lastAttemptAt: nowIso(),
+      reason: "Samantha automatica no configurada; usa el Task Packet manual.",
+      status: "not_configured",
+    },
     status: "awaiting_samantha",
   };
 }
@@ -410,12 +533,39 @@ export function getJobProgressSummary(job: DeepAnalysisJob): DeepAnalysisJobSumm
       totalSteps,
     };
   }
+  if (job.status === "sending_to_samantha") {
+    return {
+      completedSteps,
+      detail: "PolySignal esta enviando la tarea a Samantha desde el endpoint seguro configurado.",
+      headline: "Enviando a Samantha",
+      nextAction: "Mantener abierto el analisis; si el puente falla, el flujo manual queda disponible.",
+      totalSteps,
+    };
+  }
+  if (job.status === "samantha_researching") {
+    return {
+      completedSteps,
+      detail: job.samanthaBridge?.reason || "Samantha recibio la tarea y la investigacion externa sigue pendiente.",
+      headline: "Samantha investigando",
+      nextAction: "Esperar reporte automatico o continuar con el flujo manual si tarda demasiado.",
+      totalSteps,
+    };
+  }
+  if (job.status === "receiving_samantha_report" || job.status === "validating_samantha_report") {
+    return {
+      completedSteps,
+      detail: "PolySignal recibio un reporte candidato y esta aplicando validacion estricta.",
+      headline: "Validando reporte de Samantha",
+      nextAction: "No guardar como prediccion hasta que el reporte pase las compuertas.",
+      totalSteps,
+    };
+  }
   if (job.status === "awaiting_samantha") {
     return {
       completedSteps,
-      detail: "PolySignal leyo Polymarket, reviso capas disponibles y preparo el brief externo.",
+      detail: job.samanthaBridge?.reason || "PolySignal leyo Polymarket, reviso capas disponibles y preparo el brief externo.",
       headline: "Analisis profundo iniciado",
-      nextAction: "Copia el brief para Samantha y carga su reporte estructurado para continuar.",
+      nextAction: "Copia la tarea para Samantha o carga su reporte estructurado para continuar.",
       totalSteps,
     };
   }

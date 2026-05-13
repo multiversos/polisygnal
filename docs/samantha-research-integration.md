@@ -23,14 +23,70 @@ Auditoria local:
 Decision de arquitectura:
 
 - Integracion v0 por archivo/texto estructurado manual.
+- Camino B preparado: puente automatico server-side seguro, apagado por
+  defecto y con fallback manual obligatorio cuando no esta configurado.
 - PolySignal genera un `SamanthaResearchBrief`.
 - El usuario lo lleva a Samantha fuera de PolySignal.
 - Samantha devuelve un `SamanthaResearchReport`.
 - El usuario pega el reporte en `/analyze`.
 - PolySignal valida, sanitiza y muestra evidencia.
 
-No hay envio automatico a terceros, scraping, llamadas externas nuevas, DB
-writes ni ejecucion de procesos de Samantha desde PolySignal.
+No hay scraping, DB writes ni ejecucion directa de procesos de Samantha desde
+PolySignal. El puente automatico solo puede activarse con configuracion
+server-side explicita y allowlisted; sin esa configuracion el producto queda en
+fallback manual.
+
+## Auditoria Camino B
+
+`apps/web/app/api/samantha-polysignal-analysis/` existe como carpeta
+untracked local. Su `route.ts` consulta el backend de PolySignal y
+`/markets/overview` para buscar mercados, por lo que pertenece al enfoque viejo
+de matching interno. No se integra, no se borra y no debe stagearse sin una
+revision separada.
+
+`N:/samantha` existe, pero la auditoria encontro un bridge WhatsApp/OpenClaw
+con health/webhooks y scripts de analista. No se encontro un endpoint directo y
+seguro que acepte el `SamanthaTaskPacket` desde PolySignal. Por eso Camino B
+queda preparado en modo disabled/manual fallback hasta que Samantha exponga un
+canal de investigacion compatible.
+
+## Camino B: puente automatico seguro
+
+Archivos:
+
+- `apps/web/app/lib/samanthaBridgeTypes.ts`
+- `apps/web/app/lib/samanthaBridge.ts`
+- `apps/web/app/api/samantha/send-research/route.ts`
+
+Modo por defecto:
+
+- `disabled` o `manual_fallback`.
+- `/api/samantha/send-research` devuelve una respuesta controlada con
+  `automaticAvailable=false` y `fallbackRequired=true`.
+- El `DeepAnalysisJob` queda `awaiting_samantha`, no `completed`.
+
+Configuracion server-side opcional:
+
+- `SAMANTHA_BRIDGE_ENABLED`
+- `SAMANTHA_BRIDGE_URL`
+- `SAMANTHA_BRIDGE_TOKEN`
+- `SAMANTHA_BRIDGE_ALLOW_LOCALHOST`
+- `SAMANTHA_BRIDGE_TIMEOUT_MS`
+- `SAMANTHA_BRIDGE_MAX_REQUEST_BYTES`
+- `SAMANTHA_BRIDGE_MAX_RESPONSE_BYTES`
+
+Controles:
+
+- no usa variables `NEXT_PUBLIC`;
+- no acepta URL destino enviada por el cliente;
+- valida endpoint allowlisted desde server env;
+- bloquea credenciales, redirects peligrosos, puertos no permitidos, redes
+  privadas y protocolos no HTTP/HTTPS;
+- usa timeout corto, `credentials: omit`, `redirect: error`, `no-store` y
+  limites de request/response;
+- devuelve solo acuse/reporte normalizado, nunca payload crudo ni tokens;
+- si Samantha devuelve reporte, PolySignal vuelve a validarlo con
+  `parseSamanthaResearchReport` antes de aceptarlo.
 
 ## Integracion con DeepAnalysisJob
 
@@ -41,16 +97,23 @@ El flujo manual de Samantha ahora es una etapa del job local del analizador:
 3. Wallet Intelligence se revisa solo para el mercado seleccionado si hay id
    compatible.
 4. PolySignal genera el brief de Samantha.
-5. El job queda en `awaiting_samantha`.
-6. El usuario copia o descarga el brief y lo usa fuera de PolySignal.
-7. El usuario pega el reporte estructurado.
-8. PolySignal valida y sanitiza el reporte.
-9. Si el reporte es valido, el paso `awaiting_samantha_report` pasa a
+5. PolySignal intenta Camino B solo si existe configuracion segura.
+6. Si el bridge no esta configurado, el job queda en `awaiting_samantha` con
+   fallback manual.
+7. Si el bridge acepta la tarea, el job puede pasar por
+   `sending_to_samantha`, `samantha_researching`,
+   `receiving_samantha_report` y `validating_samantha_report`.
+8. El usuario puede copiar o descargar el brief en cualquier momento y usarlo
+   fuera de PolySignal.
+9. El usuario pega el reporte estructurado si Samantha lo devuelve por fuera
+   del puente.
+10. PolySignal valida y sanitiza el reporte.
+11. Si el reporte es valido, el paso `awaiting_samantha_report` pasa a
    `completed`.
-10. Si hay senales, `scoring_evidence` se marca `completed`.
-11. Si la estimacion sugerida pasa las compuertas, `generating_decision` y el
+12. Si hay senales, `scoring_evidence` se marca `completed`.
+13. Si la estimacion sugerida pasa las compuertas, `generating_decision` y el
     job se marcan `completed`.
-12. Si no alcanza, el job queda `ready_to_score` o `awaiting_samantha`, sin
+14. Si no alcanza, el job queda `ready_to_score` o `awaiting_samantha`, sin
     prediccion final.
 
 Este estado vive en localStorage y sirve para reabrir el analisis desde

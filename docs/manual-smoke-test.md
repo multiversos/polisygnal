@@ -66,6 +66,9 @@ Use these checks after a production deploy. Correct domains:
    response and does not expose backend hostnames, connection strings, or stack
    traces.
 6. Confirm `/internal/data-status` is still not linked from public navigation.
+7. Confirm `POST /api/samantha/send-research` without server-side bridge
+   configuration returns a controlled manual-fallback response, not a stack
+   trace and not a proxy to a user-provided URL.
 
 ## Local Privacy
 
@@ -218,6 +221,23 @@ If this test fails, stop feature work and treat it as a production regression.
 13. Confirm `Borrar historial local` is visible and requires browser
     confirmation before clearing local data.
 14. Confirm `Actualizar resultados` is visible.
+
+## Deep Analyzer / Samantha
+
+1. Open `/analyze` and analyze a valid Polymarket link.
+2. Confirm Radar Analytics remains visible when the job is waiting for Samantha
+   instead of disappearing after Polymarket is read.
+3. Confirm the report shows `Copiar tarea para Samantha`, `Descargar tarea
+   JSON`, `Descargar instrucciones TXT`, `Copiar schema de respuesta` and
+   `Descargar brief JSON`.
+4. Confirm the UI says Samantha automatic bridge is unavailable or pending when
+   no server-side config exists, and that manual fallback is available.
+5. Paste invalid report JSON and confirm the error is specific and friendly.
+6. Paste a valid controlled report JSON and confirm the job advances to evidence
+   loaded or ready-to-score without inventing a prediction.
+7. Save the analysis and confirm `/history` shows `Esperando Samantha`,
+   `Samantha investigando`, or equivalent pending research state, not hit/miss.
+8. Confirm `/performance` does not count research-pending analyses as failures.
 15. Click `Actualizar resultados` and confirm the page says it is verifying
     automatically. It must not ask the user to choose `Gano YES` or `Gano NO`.
 16. Confirm the page explains `Como se mide PolySignal`: only clear PolySignal

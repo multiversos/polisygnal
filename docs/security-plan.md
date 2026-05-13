@@ -212,13 +212,16 @@ Before enabling any external Deep Analyzer layer:
 
 ## Samantha Research Safety
 
-Samantha is treated as an external manual research agent. PolySignal prepares a
-brief and validates a pasted report, but does not execute Samantha.
+Samantha is treated as an external research agent. The default production-safe
+mode is manual fallback: PolySignal prepares a brief and validates a pasted
+report. Camino B adds a server-side bridge route, but it is disabled unless a
+safe endpoint is explicitly configured in server-side environment variables.
 
 Current controls:
 
 - no automatic agent execution;
-- no outbound calls from PolySignal to Samantha or OpenClaw;
+- no outbound calls from PolySignal to Samantha or OpenClaw unless the
+  server-side bridge config is explicitly enabled and allowlisted;
 - no backend run, DB write, migration, scoring, trading, or command with
   `--apply`;
 - task packet generation is local to `/analyze`;
@@ -238,6 +241,23 @@ Current controls:
 - the UI validates reports before applying them to the local job;
 - suggested estimates are accepted only after a strict evidence gate and remain
   traceable to the imported report.
+
+Camino B controls:
+
+- `POST /api/samantha/send-research` accepts only a sanitized brief/task body;
+- the client cannot provide the destination URL (`bridgeUrl`, `targetUrl`,
+  `endpoint`, callback or similar keys are rejected);
+- endpoint, token, localhost allowance, timeout and size limits are read only
+  from server-side environment variables;
+- the bridge helper blocks credentials in URLs, unsafe protocols, dangerous
+  redirects, non-allowlisted ports and private network hosts unless localhost is
+  explicitly allowed for local development;
+- request uses `credentials: omit`, `redirect: error`, `no-store`, timeout and
+  request/response size caps;
+- if the bridge is disabled or unsafe, the route returns a controlled fallback
+  response and the job remains `awaiting_samantha`;
+- if Samantha returns a report, PolySignal validates it with the same report
+  validator before exposing evidence.
 
 History and performance safety:
 

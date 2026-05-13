@@ -833,6 +833,15 @@ export default function HistoryPage() {
                       {item.awaitingResearch || item.researchStatus === "awaiting_samantha" ? (
                         <span className="badge muted">Esperando Samantha</span>
                       ) : null}
+                      {item.researchStatus === "sending_to_samantha" ? (
+                        <span className="badge muted">Enviando a Samantha</span>
+                      ) : null}
+                      {item.researchStatus === "samantha_researching" ? (
+                        <span className="badge muted">Samantha investigando</span>
+                      ) : null}
+                      {item.researchStatus === "receiving_samantha_report" || item.researchStatus === "validating_samantha_report" ? (
+                        <span className="badge muted">Validando reporte</span>
+                      ) : null}
                       {item.researchStatus === "ready_to_score" ? (
                         <span className="badge external-hint">Evidencia cargada</span>
                       ) : null}
