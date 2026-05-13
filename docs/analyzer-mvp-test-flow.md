@@ -53,6 +53,19 @@ The product must not invent evidence, must not mark the analysis as completed, a
 6. Run `npm.cmd --workspace apps/web run test:samantha-report-validation` to
    confirm invalid report fixtures are rejected before manual QA.
 
+## Samantha Queue Composer Test
+
+1. In `N:/samantha`, run `npm run polysignal:research:list` and choose a safe
+   pending task id.
+2. Run `npm run polysignal:research:process -- --task-id=<task-id>`.
+3. Confirm the normal result is `manual_needed` when no authorized evidence
+   package exists.
+4. For local contract testing only, run
+   `npm run polysignal:research:process -- --task-id=<task-id> --fixture=strongEvidenceInput`
+   against a fresh safe task.
+5. Confirm a completed report is only produced from the controlled fixture and
+   still validates through PolySignal before it affects the estimate gates.
+
 ## Estimate Gate Test
 
 1. Run `npm.cmd --workspace apps/web run test:estimate-gates`.

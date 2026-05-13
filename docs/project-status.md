@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con arquitectura Deep Analyzer read-only preparada y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `f8adf21`
+- ultimo deploy production verificado antes de este sprint: `1c1dd12`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -157,6 +157,12 @@ Estado visible verificado:
   o `failed_safe`) y un procesador local
   `npm run polysignal:research:process`. PolySignal consulta esto mediante
   `/api/samantha/research-status`, sin aceptar destinos enviados por el cliente.
+- Samantha tiene un contrato espejo y report composer local:
+  `src/polysignal/polysignal-report-contract.js` y
+  `src/polysignal/samantha-report-composer.js`. El procesador puede escribir
+  `completed` solo si recibe evidencia estructurada real suficiente y el
+  reporte pasa las mismas barreras que PolySignal; sin evidencia autorizada
+  sigue devolviendo `manual_needed`.
 - El paquete para Samantha incluye brief JSON, instrucciones TXT, schema de
   respuesta, reglas de seguridad e instrucciones de devolucion. Prohibe fuentes
   inventadas, trading, Neon, `.env`, doxxing, secretos, copy-trading y

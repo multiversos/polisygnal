@@ -58,7 +58,10 @@ Se agrego en Samantha un endpoint local/dev compatible:
 
 Este endpoint esta deshabilitado por defecto y, cuando se habilita, acepta la
 tarea y la deja pendiente. No inventa reportes ni ejecuta investigacion
-automatica si Samantha no tiene una capa real disponible.
+automatica si Samantha no tiene una capa real disponible. Samantha ahora tambien
+tiene un composer local seguro que puede producir `completed` solo cuando se le
+entrega evidencia estructurada real y el reporte pasa un contrato espejo
+compatible con PolySignal; sin esa evidencia sigue devolviendo `manual_needed`.
 
 ## Camino B: puente automatico seguro
 
@@ -222,10 +225,14 @@ Procesamiento local en Samantha:
 ```powershell
 npm run polysignal:research:list
 npm run polysignal:research:process -- --task-id=<task-id>
+npm run polysignal:research:process -- --task-id=<task-id> --fixture=strongEvidenceInput
 ```
 
-El procesador actual valida de nuevo la tarea encolada y, si no hay proveedor
-real de investigacion externa autorizado, escribe `manual_needed`. No inventa
+El procesador valida de nuevo la tarea encolada y llama al composer local. El
+argumento `--fixture=strongEvidenceInput` es solo para pruebas de contrato: usa
+evidencia controlada test-only y no representa investigacion real. En el flujo
+normal, si no hay proveedor real de investigacion externa autorizado ni
+evidencia estructurada suficiente, escribe `manual_needed`. No inventa
 evidencia.
 
 Briefs:
@@ -282,6 +289,11 @@ Parser/validator:
 
 - `apps/web/app/lib/samanthaResearchReport.ts`
 
+Contrato espejo en Samantha:
+
+- `N:/samantha/src/polysignal/polysignal-report-contract.js`
+- `N:/samantha/src/polysignal/samantha-report-composer.js`
+
 Campos principales:
 
 - version `1.0`
@@ -318,6 +330,12 @@ PolySignal rechaza:
 - Kalshi no equivalente usado como senal fuerte YES/NO
 - texto que parezca secreto
 - direcciones completas de wallet
+
+Samantha aplica las mismas barreras antes de escribir `completed` en
+`research-results.jsonl`: rechaza full wallets, secretos, scripts,
+trading/copy-trading, ROI/win rate claims, Reddit/social con confiabilidad alta
+y Kalshi no equivalente como senal fuerte. Si el reporte no tiene al menos dos
+senales reales alineadas para el lado sugerido, queda `manual_needed`.
 
 PolySignal sanitiza:
 

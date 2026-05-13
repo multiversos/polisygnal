@@ -83,3 +83,10 @@ Run the focused checks:
 npm.cmd --workspace apps/web run test:estimate-gates
 npm.cmd --workspace apps/web run test:samantha-report-validation
 ```
+
+Samantha also keeps mirror contract fixtures in
+`N:/samantha/src/polysignal/__fixtures__/polysignal-report-fixtures.js`.
+Those fixtures are local test inputs for the queue processor and are never
+treated as production evidence. `strongEvidenceInput` can produce a completed
+report only in tests; normal queued tasks still return `manual_needed` unless a
+real structured evidence package is provided.
