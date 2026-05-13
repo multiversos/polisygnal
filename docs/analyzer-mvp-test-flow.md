@@ -82,6 +82,23 @@ The product must not invent evidence, must not mark the analysis as completed, a
    source-backed evidence and that no injuries, teams, odds or schedule context
    are invented.
 
+## Samantha NBA Manual Evidence Test
+
+1. In `N:/samantha`, load a safe local evidence file into temporary or local
+   storage:
+   `npm run polysignal:nba:evidence:add -- --file .\fixtures\nba-evidence-example.json`.
+2. Confirm Samantha returns `accepted` with the expected `taskId` and
+   `evidenceCount`.
+3. Process the matching queued NBA task:
+   `npm run polysignal:research:process -- --task-id=<task-id>`.
+4. Confirm two aligned medium/high source-backed NBA notes can produce
+   `completed` only after the report composer validates the report and estimate
+   gates.
+5. Confirm a weak single note remains `manual_needed`.
+6. Confirm unsafe evidence returns `failed_safe` and does not write raw payload,
+   secrets, full wallets, raw HTML, invented odds or betting advice.
+7. Run `npm run polysignal:nba-manual-evidence:test`.
+
 ## Estimate Gate Test
 
 1. Run `npm.cmd --workspace apps/web run test:estimate-gates`.

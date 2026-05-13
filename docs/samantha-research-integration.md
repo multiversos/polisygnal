@@ -1,6 +1,6 @@
 # Samantha Research Integration
 
-Fecha de corte: `2026-05-12`.
+Fecha de corte: `2026-05-13`.
 
 Samantha es el agente externo de investigacion profunda del usuario. No vive en
 este repo y no debe ejecutarse automaticamente desde PolySignal en esta fase.
@@ -361,6 +361,76 @@ nota estructurada segura devuelve `manual_needed` y recomienda revisar NBA
 Official Injury Report, pagina oficial del juego/calendario, updates oficiales
 de equipos y noticias NBA reputadas. Una sola nota de jugador `questionable` o
 `probable` queda informativa y no fuerza porcentaje.
+
+## NBA Manual Evidence Flow
+
+Samantha ahora tiene un primer flujo local/manual para evidencia NBA real y
+estructurada. Sigue sin hacer fetch automatico, scraping, scoring productivo ni
+trading. El operador humano revisa fuentes permitidas y carga solo notas
+estructuradas.
+
+Endpoint local en Samantha:
+
+```text
+POST http://127.0.0.1:8787/polysignal/nba/manual-evidence
+```
+
+Debe usarse con el bridge habilitado y token local si esta configurado. Por
+defecto solo acepta requests locales. La respuesta segura esperada es:
+
+```json
+{
+  "ok": true,
+  "status": "accepted",
+  "taskId": "...",
+  "evidenceCount": 2
+}
+```
+
+CLI local equivalente:
+
+```powershell
+cd N:\samantha
+npm run polysignal:nba:evidence:add -- --file .\fixtures\nba-evidence-example.json
+```
+
+Contrato manual aceptado:
+
+- `taskId`, `marketUrl`, `sport: "nba"`, `teams`, `eventDate`.
+- `evidenceItems[]` con `sourceType`, `sourceName`, `sourceUrl`,
+  `observedAt`, `team`, `player` opcional, `status` opcional,
+  `claim`, `supports`, `confidence`, `reliability`, `summary` y
+  `limitations`.
+- `supports`: `YES`, `NO`, `neutral` o `unknown`.
+- `confidence` y `reliability`: `low`, `medium` o `high`.
+- `status`: `out`, `doubtful`, `questionable`, `probable`, `available` o
+  `unknown`.
+
+Samantha guarda solo JSONL sanitizado en:
+
+```text
+N:\samantha\data\polysignal\nba-manual-evidence.jsonl
+```
+
+No guarda payload crudo, HTML, tokens, wallets completas ni secretos. Al
+procesar una tarea NBA, Samantha vuelve a validar la evidencia almacenada,
+la pasa al adaptador NBA y despues al report composer.
+
+Estados:
+
+- `completed`: solo si hay al menos dos senales NBA alineadas, medium/high,
+  de fuentes distintas, y el reporte final pasa el contrato PolySignal con
+  estimate conservador. Ese estimate se deriva de la evidencia alineada, no del
+  precio de mercado.
+- `manual_needed`: si falta fecha/equipos, no hay evidencia, solo hay una nota
+  debil, o la evidencia esta en conflicto.
+- `failed_safe`: si aparece URL peligrosa, script, secreto, wallet completa,
+  advice de apuesta, copy-trading, odds-like fields, raw HTML o evidencia de
+  lesion sin fuente.
+
+PolySignal sigue validando el `SamanthaResearchReport` al recibirlo. La
+estimacion no se acepta si replica el precio de mercado, si falta evidencia
+externa suficiente o si no pasa las gates conservadoras.
 
 PolySignal sanitiza:
 

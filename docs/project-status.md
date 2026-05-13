@@ -2,12 +2,12 @@
 
 ## Snapshot
 
-- fecha de corte: `2026-05-12`
+- fecha de corte: `2026-05-13`
 - etapa: `visible_product_mvp`
 - foco actual: `/analyze` como centro del producto, con arquitectura Deep Analyzer read-only preparada y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `1c1dd12`
+- ultimo deploy production reportado antes de este sprint: `f7b9513`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -171,6 +171,17 @@ Estado visible verificado:
   `manual_needed` con fuentes recomendadas para revision manual. En NBA,
   prioriza NBA Official Injury Report, disponibilidad, equipos/fecha y contexto
   basico, pero no inventa lesiones ni schedule si no hay fuente.
+- Samantha ahora tiene un flujo NBA manual-controlado:
+  `POST /polysignal/nba/manual-evidence`,
+  `src/polysignal/nba-manual-evidence-contract.js`,
+  `scripts/add-nba-manual-evidence.js` y storage local sanitizado
+  `data/polysignal/nba-manual-evidence.jsonl`. Acepta solo evidencia
+  estructurada con fuente, URL segura y timestamp; rechaza scripts, secretos,
+  wallets completas, odds-like fields, betting advice, copy-trading y payload
+  crudo. Al procesar una task NBA, Samantha revalida esa evidencia y puede
+  producir `completed` solo con dos senales alineadas medium/high de fuentes
+  distintas y gates de reporte aprobadas. Sigue sin fetch automatico ni
+  produccion automatizada.
 - El paquete para Samantha incluye brief JSON, instrucciones TXT, schema de
   respuesta, reglas de seguridad e instrucciones de devolucion. Prohibe fuentes
   inventadas, trading, Neon, `.env`, doxxing, secretos, copy-trading y
