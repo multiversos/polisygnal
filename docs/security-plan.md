@@ -175,6 +175,29 @@ Before expanding real wallet lookups:
 - document retention and deletion rules;
 - keep logs free of complete wallet lists.
 
+## Samantha Result Lookup Safety
+
+`POST /api/samantha/research-status` lets the browser ask PolySignal to check a
+known Samantha task id. It is not a proxy and does not accept destinations from
+the client.
+
+Controls:
+
+- accepts only `POST`;
+- accepts only a bounded `taskId` field;
+- rejects fields such as `bridgeUrl`, `targetUrl`, `endpoint`, `destination`,
+  `webhookUrl`, and similar client-provided destinations;
+- reads Samantha bridge URL/token only through server-side configuration in
+  `samanthaBridge.ts`;
+- uses `credentials: "omit"`, `redirect: "error"`, short timeout and response
+  size limits;
+- validates any completed report through the existing Samantha report validator
+  before returning it to the UI;
+- returns `pending`, `processing`, or `manual_needed` as waiting states, not as
+  completed analysis;
+- never exposes the bridge token, raw payloads, stack traces, full wallet
+  addresses, or secret-like values.
+
 ## Deep Analyzer External-Layer Safety
 
 The Deep Analyzer contracts expose future layers for external research, odds

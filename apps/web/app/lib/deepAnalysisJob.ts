@@ -321,7 +321,7 @@ export function markJobSendingToSamantha(job: DeepAnalysisJob): DeepAnalysisJob 
 
 export function markJobSamanthaResearching(
   job: DeepAnalysisJob,
-  input: { reason?: string; taskId?: string },
+  input: { bridgeStatus?: "accepted" | "pending" | "processing" | "queued"; reason?: string; taskId?: string },
 ): DeepAnalysisJob {
   const next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
     requiresExternalIntegration: true,
@@ -334,7 +334,7 @@ export function markJobSamanthaResearching(
     samanthaBridge: {
       automaticAvailable: true,
       bridgeMode: "automatic",
-      bridgeStatus: "accepted",
+      bridgeStatus: input.bridgeStatus ?? "accepted",
       bridgeTaskId: input.taskId,
       fallbackRequired: false,
       fallbackAvailable: true,
@@ -395,8 +395,9 @@ export function markJobSamanthaBridgeFallback(
   return {
     ...next,
     samanthaBridge: {
+      ...next.samanthaBridge,
       automaticAvailable: Boolean(input.automaticAvailable),
-      bridgeMode: input.automaticAvailable ? "automatic" : "manual_fallback",
+      bridgeMode: next.samanthaBridge?.bridgeMode ?? (input.automaticAvailable ? "automatic" : "manual_fallback"),
       bridgeStatus: "manual_needed",
       fallbackRequired: true,
       fallbackAvailable: true,

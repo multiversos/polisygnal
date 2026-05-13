@@ -10,9 +10,22 @@ import {
   getAnalysisHistory,
   removeAnalysisHistoryItem,
   replaceAnalysisHistory,
+  updateAnalysisHistoryItem,
   type AnalysisHistoryItem,
   type AnalysisHistoryStats,
 } from "../lib/analysisHistory";
+import {
+  markJobReceivingSamanthaReport,
+  markJobSamanthaBridgeFallback,
+  markJobSamanthaReportLoaded,
+  markJobSamanthaResearching,
+  markJobValidatingSamanthaReport,
+  type DeepAnalysisJob,
+} from "../lib/deepAnalysisJob";
+import {
+  getDeepAnalysisJob,
+  updateDeepAnalysisJob,
+} from "../lib/deepAnalysisJobStorage";
 import { getDecisionLabel, hasClearPrediction } from "../lib/analysisDecision";
 import {
   getAnalysisLifecycleState,
@@ -29,6 +42,11 @@ import {
 } from "../lib/marketProbabilities";
 import { getEstimateQualityLabel } from "../lib/marketEstimateQuality";
 import { formatLastUpdated } from "../lib/useAutoRefresh";
+import {
+  convertSamanthaReportToSignals,
+  parseSamanthaResearchReport,
+  shouldAcceptSuggestedEstimate,
+} from "../lib/samanthaResearchReport";
 
 type HistoryFilter =
   | "all"
@@ -42,6 +60,18 @@ type HistoryFilter =
   | "not-countable"
   | "pending"
   | "unknown";
+
+type SamanthaStatusRouteResult = {
+  automaticAvailable?: boolean;
+  bridgeTaskStatus?: AnalysisHistoryItem["bridgeStatus"];
+  fallbackRequired?: boolean;
+  reason?: string;
+  report?: unknown;
+  status?: string;
+  taskId?: string;
+  validationErrors?: string[];
+  warnings?: string[];
+};
 
 function formatPercent(value: number | null): string {
   if (value === null) {
@@ -103,6 +133,68 @@ function sourceLabel(value: AnalysisHistoryItem["source"]): string {
     return "Manual";
   }
   return "Origen pendiente";
+}
+
+function bridgeTaskIdForItem(item: AnalysisHistoryItem, job?: DeepAnalysisJob | null): string | null {
+  return (
+    item.bridgeTaskId ||
+    job?.samanthaBridge?.bridgeTaskId ||
+    job?.samanthaBridge?.taskId ||
+    null
+  );
+}
+
+function bridgeStatusForItem(item: AnalysisHistoryItem, job?: DeepAnalysisJob | null): AnalysisHistoryItem["bridgeStatus"] | undefined {
+  return item.bridgeStatus ?? job?.samanthaBridge?.bridgeStatus;
+}
+
+function researchStageLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | null): string {
+  const bridgeStatus = bridgeStatusForItem(item, job);
+  if (bridgeStatus === "accepted" || bridgeStatus === "queued") {
+    return "Samantha recibio la tarea";
+  }
+  if (bridgeStatus === "pending" || item.researchStatus === "samantha_researching") {
+    return "Pendiente de Samantha";
+  }
+  if (bridgeStatus === "processing") {
+    return "Samantha procesando";
+  }
+  if (bridgeStatus === "manual_needed") {
+    return "Necesita reporte manual";
+  }
+  if (bridgeStatus === "completed" || item.researchStatus === "receiving_samantha_report") {
+    return "Reporte cargado";
+  }
+  if (bridgeStatus === "failed_safe" || item.researchStatus === "failed") {
+    return "Fallo seguro";
+  }
+  if (item.researchStatus === "validating_samantha_report") {
+    return "Validando reporte";
+  }
+  if (item.researchStatus === "ready_to_score") {
+    return "Listo para revisar";
+  }
+  if (item.researchStatus === "completed") {
+    return "Completado";
+  }
+  if (item.awaitingResearch || item.researchStatus === "awaiting_samantha") {
+    return "Pendiente de Samantha";
+  }
+  return "Sin investigacion externa activa";
+}
+
+function researchSourceLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | null): string {
+  const bridgeMode = item.bridgeMode ?? job?.samanthaBridge?.bridgeMode;
+  if (item.researchStatus === "ready_to_score" || item.researchStatus === "completed") {
+    return "Reporte manual o validado";
+  }
+  if (bridgeMode === "automatic" || bridgeMode === "local") {
+    return "Samantha automatica";
+  }
+  if (bridgeMode === "manual_fallback" || item.awaitingResearch) {
+    return "Reporte manual";
+  }
+  return "Enlace Polymarket";
 }
 
 function resolutionSourceLabel(value: AnalysisHistoryItem["resolutionSource"]): string {
@@ -395,6 +487,164 @@ export default function HistoryPage() {
     };
   }, [comparisonItems]);
 
+  const handleCheckSamanthaStatus = useCallback(async (item: AnalysisHistoryItem) => {
+    const job = item.deepAnalysisJobId ? getDeepAnalysisJob(item.deepAnalysisJobId) : null;
+    const taskId = bridgeTaskIdForItem(item, job);
+    if (!taskId) {
+      setResolutionMessage("Este analisis no tiene taskId de Samantha guardado. Reabre el enlace para continuar.");
+      return;
+    }
+
+    setBusyItemId(item.id);
+    setError(null);
+    try {
+      const response = await fetch("/api/samantha/research-status", {
+        body: JSON.stringify({ taskId }),
+        cache: "no-store",
+        credentials: "omit",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        redirect: "error",
+      });
+      const result = (await response.json().catch(() => ({}))) as SamanthaStatusRouteResult;
+      if (!response.ok) {
+        setResolutionMessage(result.reason || "No pudimos consultar Samantha para este analisis.");
+        return;
+      }
+
+      const checkedAt = new Date().toISOString();
+      let nextJob = job;
+      let patch: Partial<AnalysisHistoryItem> = {
+        awaitingResearch: true,
+        bridgeStatus: result.bridgeTaskStatus ?? item.bridgeStatus,
+        bridgeTaskId: result.taskId || taskId,
+        lastCheckedAt: checkedAt,
+        nextCheckHint: "La investigacion externa sigue pendiente; no cuenta para precision.",
+        researchStatus: "awaiting_samantha",
+        trackingStatus: "analyzing",
+      };
+      let message = result.reason || "Samantha mantiene la tarea pendiente.";
+
+      if (result.report && !nextJob) {
+        patch = {
+          ...patch,
+          bridgeStatus: "completed",
+          nextCheckHint: "Samantha tiene un reporte; reabre el analizador para validarlo contra el job.",
+          researchStatus: "ready_to_score",
+        };
+        message = "Samantha devolvio un reporte, pero falta el job local para cargarlo. Reanaliza el enlace para reconstruir el contexto.";
+      } else if (result.report && nextJob) {
+        nextJob = updateDeepAnalysisJob(markJobReceivingSamanthaReport(nextJob)) ?? markJobReceivingSamanthaReport(nextJob);
+        nextJob = updateDeepAnalysisJob(markJobValidatingSamanthaReport(nextJob)) ?? markJobValidatingSamanthaReport(nextJob);
+        const reportResult = parseSamanthaResearchReport(result.report);
+        if (!reportResult.valid || !reportResult.report) {
+          nextJob =
+            updateDeepAnalysisJob(
+              markJobSamanthaBridgeFallback(nextJob, {
+                automaticAvailable: true,
+                reason:
+                  reportResult.errors[0] ||
+                  "Samantha devolvio un reporte, pero no paso la validacion PolySignal.",
+                warnings: reportResult.errors.slice(0, 4),
+              }),
+            ) ?? nextJob;
+          patch = {
+            ...patch,
+            bridgeStatus: "manual_needed",
+            nextCheckHint: "Samantha devolvio un reporte invalido; carga un reporte manual validable.",
+            researchStatus: "awaiting_samantha",
+          };
+          message = "Samantha devolvio un reporte invalido; el flujo manual sigue disponible.";
+        } else {
+          nextJob =
+            updateDeepAnalysisJob(
+              markJobSamanthaReportLoaded(nextJob, {
+                acceptedEstimate: shouldAcceptSuggestedEstimate(reportResult.report),
+                kalshiEquivalent:
+                  reportResult.report.kalshiComparison?.found === true &&
+                  reportResult.report.kalshiComparison.equivalent === true,
+                oddsFound: reportResult.report.oddsComparison?.found === true,
+                reportStatus: reportResult.report.status,
+                signalCount: convertSamanthaReportToSignals(reportResult.report).length,
+              }),
+            ) ?? nextJob;
+          patch = {
+            ...patch,
+            awaitingResearch: nextJob.status !== "completed",
+            bridgeStatus: "completed",
+            nextCheckHint:
+              nextJob.status === "completed"
+                ? "Reporte validado; queda esperar resultado final de Polymarket si hay prediccion clara."
+                : "Reporte validado; revisa senales antes de generar decision.",
+            researchStatus: nextJob.status,
+            trackingStatus:
+              nextJob.status === "completed" && item.predictedSide !== "UNKNOWN"
+                ? "awaiting_resolution"
+                : nextJob.status === "completed"
+                  ? "no_clear_decision"
+                  : "analyzing",
+          };
+          message = "Reporte de Samantha consultado, validado y cargado.";
+        }
+      } else if (result.status === "manual_needed" || result.fallbackRequired) {
+        if (nextJob) {
+          nextJob =
+            updateDeepAnalysisJob(
+              markJobSamanthaBridgeFallback(nextJob, {
+                automaticAvailable: result.automaticAvailable,
+                reason:
+                  result.reason ||
+                  "Samantha recibio la tarea, pero todavia necesita investigacion externa manual.",
+                warnings: result.warnings ?? result.validationErrors ?? [],
+              }),
+            ) ?? nextJob;
+        }
+        patch = {
+          ...patch,
+          bridgeStatus: "manual_needed",
+          nextCheckHint: "Carga un reporte manual de Samantha o vuelve a consultar mas tarde.",
+          researchStatus: "awaiting_samantha",
+        };
+        message =
+          "Samantha recibio la tarea, pero todavia necesita investigacion externa manual para completar este analisis.";
+      } else {
+        if (nextJob) {
+          nextJob =
+            updateDeepAnalysisJob(
+              markJobSamanthaResearching(nextJob, {
+                bridgeStatus:
+                  result.bridgeTaskStatus === "processing"
+                    ? "processing"
+                    : result.bridgeTaskStatus === "pending"
+                      ? "pending"
+                      : undefined,
+                reason: result.reason || "Samantha mantiene la tarea en cola.",
+                taskId: result.taskId || taskId,
+              }),
+            ) ?? nextJob;
+        }
+        patch = {
+          ...patch,
+          bridgeStatus: result.bridgeTaskStatus ?? "pending",
+          nextCheckHint: "Samantha recibio la tarea; consulta mas tarde o usa el reporte manual.",
+          researchStatus: "samantha_researching",
+        };
+      }
+
+      const updated = await updateAnalysisHistoryItem(item.id, patch);
+      setItems((current) => current.map((entry) => (entry.id === item.id ? updated : entry)));
+      setUpdatedAt(new Date());
+      setResolutionMessage(message);
+    } catch {
+      setResolutionMessage("No pudimos consultar Samantha de forma segura. El fallback manual sigue disponible.");
+    } finally {
+      setBusyItemId(null);
+    }
+  }, []);
+
   const handleRemove = useCallback(async (id: string) => {
     setBusyItemId(id);
     setError(null);
@@ -619,6 +869,11 @@ export default function HistoryPage() {
           <p>Esperan resultado final</p>
         </article>
         <article className="metric-card">
+          <span>Pendientes de investigacion</span>
+          <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.researchPending}</strong>
+          <p>Samantha, reporte manual o senales</p>
+        </article>
+        <article className="metric-card">
           <span>Predicciones claras</span>
           <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.clearPredictions}</strong>
           <p>Superan umbral de 55%</p>
@@ -821,12 +1076,18 @@ export default function HistoryPage() {
               const probabilityGap = getProbabilityGap(marketProbability, polySignalProbability);
               const reanalyzeHref = analyzerHrefForItem(item);
               const lifecycle = getAnalysisLifecycleState(item);
+              const deepJob = item.deepAnalysisJobId ? getDeepAnalysisJob(item.deepAnalysisJobId) : null;
+              const bridgeTaskId = bridgeTaskIdForItem(item, deepJob);
+              const researchStage = researchStageLabel(item, deepJob);
+              const researchSource = researchSourceLabel(item, deepJob);
+              const continueHref = reanalyzeHref ? `${reanalyzeHref}#samantha-research` : null;
               return (
                 <article className="history-card" key={item.id}>
                   <div className="history-card-header">
                     <div>
                       <span className="badge external-hint">{sourceLabel(item.source)}</span>
                       <span className="badge muted">{item.sport || "Mercado"}</span>
+                      <span className="badge muted">{researchStage}</span>
                       <span className={`history-result-badge ${item.result || "unknown"}`}>
                         {statusLabel(item)}
                       </span>
@@ -869,13 +1130,23 @@ export default function HistoryPage() {
                     <span>Resultado Polymarket {outcomeLabel(item.outcome)}</span>
                     <span>Evaluacion {evaluationLabel(item)}</span>
                     <span>Seguimiento {lifecycle.label}</span>
-                    {item.researchStatus ? <span>Investigacion {item.researchStatus}</span> : null}
+                    <span>Investigacion {researchStage}</span>
+                    <span>Fuente de investigacion {researchSource}</span>
+                    {bridgeTaskId ? <span>Task Samantha {bridgeTaskId}</span> : null}
+                    {item.sentToSamanthaAt ? <span>Enviado a Samantha {formatDate(item.sentToSamanthaAt)}</span> : null}
                     {item.researchBriefReadyAt ? <span>Brief listo {formatDate(item.researchBriefReadyAt)}</span> : null}
                     <span>Fuente {resolutionSourceLabel(item.resolutionSource)}</span>
                     <span>Verificado {item.verifiedAt ? formatDate(item.verifiedAt) : "pendiente"}</span>
                     <span>Ultima revision {item.lastCheckedAt ? formatDate(item.lastCheckedAt) : "sin revision"}</span>
                   </div>
                   <p className="section-note">{lifecycle.summary}</p>
+                  {bridgeStatusForItem(item, deepJob) === "manual_needed" ? (
+                    <p className="section-note">
+                      Samantha recibio la tarea, pero todavia necesita investigacion externa
+                      manual para completar este analisis. Puedes cargar un reporte manual o
+                      volver a consultar mas tarde.
+                    </p>
+                  ) : null}
                   <p className="section-note">{item.nextCheckHint || getNextCheckHintForHistory(item)}</p>
                   <p className="section-note">
                     {item.evaluationReason ||
@@ -906,11 +1177,29 @@ export default function HistoryPage() {
                     <p className="section-note">Guardado para comparar cuando exista resultado final.</p>
                   )}
                   <div className="watchlist-actions">
-                    {reanalyzeHref ? (
-                      <a className="analysis-link" href={reanalyzeHref}>
-                        {item.awaitingResearch || item.researchStatus === "awaiting_samantha"
+                    {continueHref ? (
+                      <a className="analysis-link" href={continueHref}>
+                        {item.awaitingResearch ||
+                        item.researchStatus === "awaiting_samantha" ||
+                        item.researchStatus === "samantha_researching" ||
+                        bridgeStatusForItem(item, deepJob) === "manual_needed"
                           ? "Continuar analisis"
                           : "Reanalizar enlace"}
+                      </a>
+                    ) : null}
+                    {bridgeTaskId ? (
+                      <button
+                        className="watchlist-button"
+                        disabled={busyItemId === item.id}
+                        onClick={() => void handleCheckSamanthaStatus(item)}
+                        type="button"
+                      >
+                        {busyItemId === item.id ? "Consultando" : "Consultar resultado de Samantha"}
+                      </button>
+                    ) : null}
+                    {continueHref ? (
+                      <a className="analysis-link secondary" href={continueHref}>
+                        Cargar reporte manual
                       </a>
                     ) : null}
                     {item.marketId ? (

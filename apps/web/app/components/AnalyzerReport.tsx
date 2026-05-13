@@ -404,6 +404,10 @@ export function AnalyzerReport({
   const samanthaBridgeTaskId =
     deepAnalysisJob?.samanthaBridge?.taskId ??
     deepAnalysisJob?.samanthaBridge?.bridgeTaskId;
+  const samanthaNeedsManualResearch =
+    deepAnalysisJob?.samanthaBridge?.bridgeStatus === "manual_needed" ||
+    (deepAnalysisJob?.samanthaBridge?.fallbackRequired === true &&
+      deepAnalysisJob.status === "awaiting_samantha");
   const samanthaDraftReport = samanthaReportDraftResult?.valid ? samanthaReportDraftResult.report : undefined;
   const samanthaReport = samanthaReportResult?.valid ? samanthaReportResult.report : undefined;
   const samanthaDraftEvidence = samanthaDraftReport ? convertSamanthaReportToEvidence(samanthaDraftReport) : [];
@@ -587,12 +591,20 @@ export function AnalyzerReport({
             }),
           ) ?? deepAnalysisJob;
         onDeepAnalysisJobChange?.(nextJob);
-        setSamanthaActionMessage(result.reason || "Samantha requiere investigacion manual; el fallback sigue disponible.");
+        setSamanthaActionMessage(
+          "Samantha recibio la tarea, pero todavia necesita investigacion externa manual para completar este analisis.",
+        );
         return;
       }
       const nextJob =
         updateDeepAnalysisJob(
           markJobSamanthaResearching(deepAnalysisJob, {
+            bridgeStatus:
+              result.bridgeTaskStatus === "processing"
+                ? "processing"
+                : result.bridgeTaskStatus === "pending"
+                  ? "pending"
+                  : undefined,
             reason:
               result.reason ||
               "Samantha mantiene la tarea en cola; la investigacion sigue pendiente.",
@@ -870,6 +882,16 @@ export function AnalyzerReport({
           pegalo aqui para continuar el analisis. PolySignal no ejecuta agentes,
           no envia datos a terceros y no convierte el reporte en prediccion sin validacion.
         </p>
+        {samanthaNeedsManualResearch ? (
+          <div className="focus-notice active">
+            <strong>Samantha necesita investigacion manual</strong>
+            <span>
+              Samantha recibio la tarea, pero todavia necesita investigacion externa
+              manual para completar este analisis. Puedes cargar un reporte manual o
+              volver a consultar mas tarde.
+            </span>
+          </div>
+        ) : null}
         <div className="samantha-action-row">
           <button
             className="watchlist-button active"

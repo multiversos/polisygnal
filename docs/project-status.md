@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con arquitectura Deep Analyzer read-only preparada y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `1dccf35`
+- ultimo deploy production verificado antes de este sprint: `6702d63`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -118,6 +118,13 @@ Estado visible verificado:
   `deepAnalyzerTypes.ts`, `deepAnalyzerEngine.ts` y `deepAnalysisProgress.ts`.
   No hacen fetch, no escriben DB, no activan research externo, no consultan
   odds/Kalshi y no generan probabilidades PolySignal nuevas.
+- El MVP de continuidad del analizador guarda metadatos seguros del
+  DeepAnalysisJob en Historial: `deepAnalysisJobId`, estado de investigacion,
+  `bridgeTaskId` de Samantha cuando existe, estado del bridge, fecha de envio y
+  enlace Polymarket original. `/history` permite continuar el analisis,
+  consultar el resultado de Samantha por task id y cargar reporte manual desde
+  `/analyze`, sin marcar `accepted`, `pending`, `processing` ni `manual_needed`
+  como completados.
 - Existe contrato manual para Samantha Research:
   `samanthaResearchTypes.ts`, `samanthaResearchBrief.ts`,
   `samanthaTaskPacket.ts` y `samanthaResearchReport.ts`. `/analyze` puede

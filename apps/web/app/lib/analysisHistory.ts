@@ -52,6 +52,15 @@ export type AnalysisHistoryResearchStatus =
   | "sending_to_samantha"
   | "validating_samantha_report"
   | "running";
+export type AnalysisHistoryBridgeMode = "automatic" | "local" | "manual_fallback";
+export type AnalysisHistoryBridgeStatus =
+  | "accepted"
+  | "completed"
+  | "failed_safe"
+  | "manual_needed"
+  | "pending"
+  | "processing"
+  | "queued";
 
 export type AnalysisHistoryAnalyzerLayer = {
   id: string;
@@ -88,6 +97,9 @@ export type AnalysisHistoryItem = {
   analyzedAt: string;
   analyzerLayers?: AnalysisHistoryAnalyzerLayer[];
   awaitingResearch?: boolean;
+  bridgeMode?: AnalysisHistoryBridgeMode;
+  bridgeStatus?: AnalysisHistoryBridgeStatus;
+  bridgeTaskId?: string;
   confidence?: AnalysisHistoryConfidence;
   conditionId?: string;
   decision?: AnalysisHistoryDecision;
@@ -118,6 +130,7 @@ export type AnalysisHistoryItem = {
   result?: AnalysisHistoryResult;
   researchBriefReadyAt?: string;
   researchStatus?: AnalysisHistoryResearchStatus;
+  sentToSamanthaAt?: string;
   remoteId?: string;
   source: AnalysisHistorySource;
   sport?: string;
@@ -160,6 +173,7 @@ export type AnalysisHistoryStats = {
 
 const ANALYSIS_HISTORY_STORAGE_KEY = "polysignal-analysis-history-v1";
 export const ANALYSIS_HISTORY_STORAGE_EVENT = "polysignal:analysis-history-updated";
+const FULL_WALLET_PATTERN = /0x[a-fA-F0-9]{40}/g;
 
 function browserStorage(): Storage | null {
   if (typeof window === "undefined") {
@@ -322,8 +336,12 @@ function normalizeResolutionConfidence(value: unknown): AnalysisHistoryResolutio
   return "low";
 }
 
-function normalizeString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+function normalizeString(value: unknown, limit = 600): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const cleaned = value.replace(FULL_WALLET_PATTERN, "[wallet redacted]").trim();
+  return cleaned ? cleaned.slice(0, limit) : undefined;
 }
 
 function normalizeStringList(value: unknown, limit = 8): string[] {
@@ -332,8 +350,30 @@ function normalizeStringList(value: unknown, limit = 8): string[] {
   }
   return value
     .filter((item): item is string => typeof item === "string" && item.trim() !== "")
-    .map((item) => item.trim())
+    .map((item) => item.replace(FULL_WALLET_PATTERN, "[wallet redacted]").trim().slice(0, 600))
     .slice(0, limit);
+}
+
+function normalizeBridgeMode(value: unknown): AnalysisHistoryBridgeMode | undefined {
+  if (value === "automatic" || value === "local" || value === "manual_fallback") {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeBridgeStatus(value: unknown): AnalysisHistoryBridgeStatus | undefined {
+  if (
+    value === "accepted" ||
+    value === "completed" ||
+    value === "failed_safe" ||
+    value === "manual_needed" ||
+    value === "pending" ||
+    value === "processing" ||
+    value === "queued"
+  ) {
+    return value;
+  }
+  return undefined;
 }
 
 function normalizeMarketOutcomes(value: unknown): AnalysisHistoryMarketOutcome[] | undefined {
@@ -501,6 +541,9 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     analyzedAt: value.analyzedAt || nowIso(),
     analyzerLayers: normalizeAnalyzerLayers(value.analyzerLayers),
     awaitingResearch: value.awaitingResearch === true,
+    bridgeMode: normalizeBridgeMode(value.bridgeMode),
+    bridgeStatus: normalizeBridgeStatus(value.bridgeStatus),
+    bridgeTaskId: normalizeString(value.bridgeTaskId, 160),
     confidence: normalizeConfidence(value.confidence),
     conditionId: normalizeString(value.conditionId),
     decision: decision.decision,
@@ -541,6 +584,7 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     researchStatus: normalizeResearchStatus(value.researchStatus),
     remoteId: normalizeString(value.remoteId),
     source: normalizeSource(value.source),
+    sentToSamanthaAt: normalizeString(value.sentToSamanthaAt),
     sport: value.sport || undefined,
     status,
     title,
@@ -670,7 +714,12 @@ export function calculateAnalysisHistoryStats(items: AnalysisHistoryItem[]): Ana
       item.researchStatus === "sending_to_samantha" ||
       item.researchStatus === "samantha_researching" ||
       item.researchStatus === "receiving_samantha_report" ||
-      item.researchStatus === "validating_samantha_report",
+      item.researchStatus === "validating_samantha_report" ||
+      item.bridgeStatus === "accepted" ||
+      item.bridgeStatus === "queued" ||
+      item.bridgeStatus === "pending" ||
+      item.bridgeStatus === "processing" ||
+      item.bridgeStatus === "manual_needed",
   ).length;
   const resolved = hits + misses;
   const countableResolved = resolved;

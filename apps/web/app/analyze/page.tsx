@@ -488,8 +488,12 @@ function historyPayloadFromMarket(
           : "Sin estimacion PolySignal suficiente.",
     evaluationStatus: decision.evaluationStatus,
     awaitingResearch: jobAwaitsResearch(deepJob),
+    bridgeMode: deepJob?.samanthaBridge?.bridgeMode,
+    bridgeStatus: deepJob?.samanthaBridge?.bridgeStatus,
+    bridgeTaskId: deepJob?.samanthaBridge?.bridgeTaskId ?? deepJob?.samanthaBridge?.taskId,
     deepAnalysisJobId: deepJob?.id,
     id: `link-${item.market?.id ?? item.market?.remote_id ?? item.market?.market_slug ?? "market"}-${Date.now()}`,
+    lastCheckedAt: deepJob?.updatedAt,
     marketId: item.market?.id ? String(item.market.id) : undefined,
     marketSlug: item.market?.market_slug || undefined,
     marketNoProbability: marketProbabilities?.no,
@@ -509,6 +513,7 @@ function historyPayloadFromMarket(
     resolutionStatus: "pending" as const,
     remoteId: item.market?.remote_id || undefined,
     source: "link_analyzer" as const,
+    sentToSamanthaAt: deepJob?.samanthaBridge?.sentToSamanthaAt,
     sport: item.market?.sport_type || undefined,
     status: "open" as const,
     title: marketTitle(item),
@@ -1559,7 +1564,10 @@ export default function AnalyzePage() {
       setState({ message: validation.message, status: "invalid" });
       return;
     }
-    let job = persistDeepAnalysisJob(createDeepAnalysisJob(validation.normalizedUrl));
+    let job = persistDeepAnalysisJob(
+      getLatestDeepAnalysisJobForUrl(validation.normalizedUrl) ??
+        createDeepAnalysisJob(validation.normalizedUrl),
+    );
     setLoading(true);
     setState({
       message: "Resolviendo mercado o evento directamente desde Polymarket.",
@@ -1719,6 +1727,38 @@ export default function AnalyzePage() {
         return;
       }
       job = persistDeepAnalysisJob(markJobSamanthaBriefReady(job));
+      const existingBridgeTaskId =
+        job.samanthaBridge?.bridgeTaskId ?? job.samanthaBridge?.taskId;
+      if (
+        existingBridgeTaskId ||
+        [
+          "awaiting_samantha",
+          "ready_to_score",
+          "receiving_samantha_report",
+          "samantha_researching",
+          "validating_samantha_report",
+        ].includes(job.status)
+      ) {
+        if (job.status === "awaiting_samantha" && !(await advancePhase("awaiting_samantha"))) {
+          return;
+        }
+        if (job.status === "samantha_researching" && !(await advancePhase("samantha_researching"))) {
+          return;
+        }
+        if (job.status === "ready_to_score" && !(await advancePhase("ready_to_score"))) {
+          return;
+        }
+        setState({
+          match: enrichedMatch,
+          message:
+            existingBridgeTaskId
+              ? "Analisis profundo restaurado: Samantha ya recibio la tarea y la investigacion sigue pendiente."
+              : "Analisis profundo restaurado: la investigacion externa sigue pendiente.",
+          normalizedUrl,
+          status: "result",
+        });
+        return;
+      }
       if (!(await advancePhase("sending_samantha"))) {
         return;
       }

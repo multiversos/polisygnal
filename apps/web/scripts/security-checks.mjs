@@ -749,6 +749,7 @@ function validateSamanthaResearchRules() {
   const bridgeSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridge.ts"), "utf8");
   const bridgeRouteSource = readFileSync(resolve(appRoot, "app/api/samantha/send-research/route.ts"), "utf8");
   const bridgeStatusRouteSource = readFileSync(resolve(appRoot, "app/api/samantha/research-status/route.ts"), "utf8");
+  const historySource = readFileSync(resolve(appRoot, "app/history/page.tsx"), "utf8");
   const analyzePageSource = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
 
   const brief = buildSamanthaResearchBrief({
@@ -822,7 +823,10 @@ function validateSamanthaResearchRules() {
   assert(!bridgeRouteSource.includes("rawBody") || !bridgeRouteSource.includes("raw payload"), "Samantha send route must not expose raw payloads");
   assert(bridgeStatusRouteSource.includes("lookupSamanthaResearchTask"), "Samantha status route must use bridge lookup helper");
   assert(bridgeStatusRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha status route must reject client-provided destinations");
+  assert(bridgeStatusRouteSource.includes("targetUrl"), "Samantha status route must reject URL destinations from the client");
   assert(!bridgeStatusRouteSource.includes("SAMANTHA_BRIDGE_TOKEN"), "Samantha status route must not read or expose bridge token directly");
+  assert(historySource.includes("Consultar resultado de Samantha"), "history should expose safe Samantha result lookup");
+  assert(historySource.includes("updateAnalysisHistoryItem"), "history should update pending research state without raw payloads");
   assert(analyzePageSource.includes("/api/samantha/send-research"), "analyze page must try the safe Samantha bridge route");
   assert(analyzePageSource.includes("markJobSamanthaBridgeFallback"), "analyze page must keep manual fallback when bridge is unavailable");
   assert(analyzePageSource.includes("markJobSendingToSamantha"), "analyze page must mark sending_to_samantha state");
@@ -1281,9 +1285,14 @@ function validateDeepAnalysisJobRules() {
 
   assert(storageSource.includes("localStorage"), "deep analysis job storage should use localStorage");
   assert(storageSource.includes("FULL_WALLET_PATTERN"), "deep analysis job storage should redact full wallets");
+  assert(storageSource.includes("bridgeTaskId"), "deep analysis job storage should preserve Samantha bridge task ids");
+  assert(storageSource.includes("bridgeStatus"), "deep analysis job storage should preserve Samantha bridge statuses");
+  assert(storageSource.includes("sentToSamanthaAt"), "deep analysis job storage should preserve Samantha send timestamp");
   assert(!storageSource.includes("fetch("), "deep analysis job storage must not call external services");
   assert(!storageSource.includes("raw payload"), "deep analysis job storage should not store raw payloads");
   assert(analyzePage.includes("createDeepAnalysisJob"), "analyze page should create local deep analysis jobs");
+  assert(analyzePage.includes("getLatestDeepAnalysisJobForUrl(validation.normalizedUrl)"), "analyze page should reuse pending jobs by URL");
+  assert(analyzePage.includes("existingBridgeTaskId"), "analyze page should not duplicate Samantha sends when continuing a job");
   assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page should keep jobs awaiting Samantha when bridge is unavailable");
   assert(analyzePage.includes("markJobSendingToSamantha"), "analyze page should expose automatic bridge states");
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
@@ -1291,6 +1300,10 @@ function validateDeepAnalysisJobRules() {
   assert(reportSource.includes("Esperando reporte de Samantha"), "AnalyzerReport should show manual research wait state");
   assert(reportSource.includes("markJobSamanthaReportLoaded"), "AnalyzerReport should merge Samantha report into the job");
   assert(historySource.includes("Continuar analisis"), "history should let users continue pending deep research");
+  assert(historySource.includes("/api/samantha/research-status"), "history should query Samantha status through same-origin route");
+  assert(historySource.includes("manual_needed"), "history should show manual_needed as a continuation state");
+  assert(historySource.includes("bridgeTaskId"), "history should preserve Samantha task ids without raw payloads");
+  assert(!/0x[a-fA-F0-9]{40}/.test(historySource), "history source should not include full wallet literals");
 
   return {
     awaiting_samantha_guard: true,
@@ -2033,6 +2046,7 @@ function validateAnalyzerFirstProductSource() {
   const performance = readFileSync(resolve(appRoot, "app/performance/page.tsx"), "utf8");
   const methodology = readFileSync(resolve(appRoot, "app/methodology/page.tsx"), "utf8");
   const legacySports = readFileSync(resolve(appRoot, "app/sports/page.tsx"), "utf8");
+  const legacySamanthaRoute = resolve(appRoot, "app/api/samantha-polysignal-analysis");
 
   for (const item of ["Analizar enlace", "Historial", "Rendimiento", "Alertas", "Metodologia"]) {
     assert(shell.includes(item), `expected analyzer-first nav item: ${item}`);
@@ -2049,6 +2063,7 @@ function validateAnalyzerFirstProductSource() {
   assert(performance.includes("stats.researchPending"), "performance should not mix research pending items with misses");
   assert(methodology.includes("umbral para decision clara es 55%"), "methodology should explain clear decision threshold");
   assert(legacySports.includes("Vista legacy"), "sports route should be marked legacy");
+  assert(!existsSync(legacySamanthaRoute), "legacy samantha-polysignal-analysis route must not be reintroduced");
 
   return { analyzer_first_source_checks: true };
 }

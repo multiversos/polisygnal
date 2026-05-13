@@ -31,6 +31,10 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
   internally for similar markets.
 - The user flow is `Detectar -> Confirmar -> Analizar -> Guardar -> Verificar
   resultado`.
+- The MVP continuity checklist lives in `docs/analyzer-mvp-test-flow.md`; it
+  covers History continuation, Samantha `pending/manual_needed`, manual report
+  fallback, and the rule that research-pending analyses do not count for
+  accuracy.
 - If there is a match, `/analyze` first shows a compact selector. It does not
   open deep analysis for every candidate.
 - The selector is a confirmation step, not the final report. It labels exact,

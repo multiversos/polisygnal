@@ -69,6 +69,8 @@ Use these checks after a production deploy. Correct domains:
 7. Confirm `POST /api/samantha/send-research` without server-side bridge
    configuration returns a controlled manual-fallback response, not a stack
    trace and not a proxy to a user-provided URL.
+8. Confirm `POST /api/samantha/research-status` accepts only a bounded `taskId`
+   body and never accepts client-provided bridge/destination URLs.
 
 ## Local Privacy
 
@@ -86,6 +88,11 @@ Use these checks after a production deploy. Correct domains:
    history in this browser.
 7. Confirm none of these pages claim that accounts, cloud sync, or customer
    storage already exist.
+8. Save an analyzer result that is waiting for Samantha and confirm `/history`
+   shows the original link, `Continuar analisis`, `Consultar resultado de
+   Samantha` when a task id exists, and `Cargar reporte manual`.
+9. Confirm `manual_needed`, `pending`, `processing`, or `accepted` research
+   states do not appear as completed and do not count as precision.
 
 ## Visual Polish
 

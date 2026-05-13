@@ -38,6 +38,8 @@ function normalizeBridge(value: unknown): DeepAnalysisJob["samanthaBridge"] | un
   }
   const candidate = value as NonNullable<DeepAnalysisJob["samanthaBridge"]>;
   const status = normalizeString(candidate.status, 80) as NonNullable<DeepAnalysisJob["samanthaBridge"]>["status"] | undefined;
+  const bridgeMode = normalizeString(candidate.bridgeMode, 80) as NonNullable<DeepAnalysisJob["samanthaBridge"]>["bridgeMode"] | undefined;
+  const bridgeStatus = normalizeString(candidate.bridgeStatus, 80) as NonNullable<DeepAnalysisJob["samanthaBridge"]>["bridgeStatus"] | undefined;
   if (
     status !== "not_configured" &&
     status !== "fallback_manual" &&
@@ -49,11 +51,36 @@ function normalizeBridge(value: unknown): DeepAnalysisJob["samanthaBridge"] | un
   ) {
     return undefined;
   }
+  if (
+    bridgeMode !== undefined &&
+    bridgeMode !== "automatic" &&
+    bridgeMode !== "local" &&
+    bridgeMode !== "manual_fallback"
+  ) {
+    return undefined;
+  }
+  if (
+    bridgeStatus !== undefined &&
+    bridgeStatus !== "accepted" &&
+    bridgeStatus !== "queued" &&
+    bridgeStatus !== "pending" &&
+    bridgeStatus !== "processing" &&
+    bridgeStatus !== "manual_needed" &&
+    bridgeStatus !== "completed" &&
+    bridgeStatus !== "failed_safe"
+  ) {
+    return undefined;
+  }
   return {
     automaticAvailable: normalizeBoolean(candidate.automaticAvailable),
+    bridgeMode,
+    bridgeStatus,
+    bridgeTaskId: normalizeString(candidate.bridgeTaskId, 120),
     fallbackRequired: normalizeBoolean(candidate.fallbackRequired),
+    fallbackAvailable: normalizeBoolean(candidate.fallbackAvailable),
     lastAttemptAt: normalizeString(candidate.lastAttemptAt, 80),
     reason: normalizeString(candidate.reason, 240),
+    sentToSamanthaAt: normalizeString(candidate.sentToSamanthaAt, 80),
     status,
     taskId: normalizeString(candidate.taskId, 120),
   };

@@ -528,6 +528,7 @@ function validateAnalyzeLoadingPanelSource() {
   const linkSource = readFileSync(new URL("../app/lib/polymarketLink.ts", import.meta.url), "utf8");
   const bridgeSource = readFileSync(new URL("../app/lib/samanthaBridge.ts", import.meta.url), "utf8");
   const bridgeRouteSource = readFileSync(new URL("../app/api/samantha/send-research/route.ts", import.meta.url), "utf8");
+  const bridgeStatusRouteSource = readFileSync(new URL("../app/api/samantha/research-status/route.ts", import.meta.url), "utf8");
   const expectedSteps = [
     "Detectando enlace",
     "Leyendo Polymarket",
@@ -593,6 +594,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("resolvePolymarketLinkForAnalyze"), "analyze page does not resolve links from Polymarket first");
   assert(analyzePage.includes("/api/samantha/send-research"), "analyze page does not call the safe Samantha bridge route");
   assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page does not keep manual fallback when Samantha bridge is unavailable");
+  assert(analyzePage.includes("existingBridgeTaskId"), "analyze page should not duplicate Samantha sends when continuing a job");
   assert(analyzePage.includes("radarVisible"), "analyze page does not keep Radar Analytics visible for pending deep jobs");
   assert(!analyzePage.includes("/markets/overview"), "analyze page must not use internal overview as primary matching source");
   assert(!analyzePage.includes("rankAnalyzerMatches"), "analyze page must not use internal ranking as primary matching source");
@@ -616,6 +618,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Resumen del analisis"), "AnalyzerReport missing executive summary");
   assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport missing deep job state");
   assert(reportSource.includes("Esperando reporte de Samantha"), "AnalyzerReport missing Samantha wait state");
+  assert(reportSource.includes("Samantha necesita investigacion manual"), "AnalyzerReport missing manual_needed state");
   assert(reportSource.includes("Analisis profundo"), "AnalyzerReport missing deep analysis section");
   assert(reportSource.includes("Capas del motor"), "AnalyzerReport missing deep analyzer layers");
   assert(reportSource.includes("Pendiente de integracion"), "AnalyzerReport should label future layers as pending");
@@ -634,6 +637,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(bridgeSource.includes("redirect: \"error\""), "Samantha bridge helper must reject redirects");
   assert(bridgeRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha bridge route must reject client destinations");
   assert(!bridgeRouteSource.includes("request.nextUrl"), "Samantha bridge route must not act as an open proxy");
+  assert(bridgeStatusRouteSource.includes("lookupSamanthaResearchTask"), "Samantha status route must use bridge lookup helper");
+  assert(bridgeStatusRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha status route must reject client destinations");
+  assert(!bridgeStatusRouteSource.includes("SAMANTHA_BRIDGE_TOKEN"), "Samantha status route must not expose bridge token");
   assert(reportSource.includes("Fuentes del analisis"), "AnalyzerReport missing source block");
   assert(reportSource.includes("Que puedes hacer ahora"), "AnalyzerReport missing next actions");
   assert(reportSource.includes("Analizar otro enlace"), "AnalyzerReport missing analyze another link action");
@@ -644,6 +650,8 @@ function validateAnalyzeLoadingPanelSource() {
   assert(historySource.includes("Analizar nuevo enlace"), "history page does not link back to analyzer");
   assert(historySource.includes("Continuar analisis"), "history page should reopen pending deep research jobs");
   assert(historySource.includes("Esperando Samantha"), "history page should label pending Samantha research");
+  assert(historySource.includes("Consultar resultado de Samantha"), "history page should allow safe Samantha status checks");
+  assert(historySource.includes("Necesita reporte manual"), "history page should show manual_needed as a continuation state");
   assert(historySource.includes("Ver rendimiento"), "history page does not link to performance");
   assert(analyzePage.includes("analyzer-selection-card"), "analyze page does not render compact selector cards");
   assert(!analyzePage.includes("Ver mercados deportivos"), "analyze no-match state must not offer internal market fallback");
