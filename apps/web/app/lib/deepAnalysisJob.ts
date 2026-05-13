@@ -100,34 +100,34 @@ type StepDefinition = {
 const STEP_DEFINITIONS: StepDefinition[] = [
   {
     id: "reading_polymarket",
-    label: "Leyendo Polymarket",
+    label: "Mercado leido desde Polymarket",
     summary: "Pendiente de leer mercado, outcomes, precios y estado desde Polymarket.",
   },
   {
     id: "analyzing_market",
-    label: "Analizando mercado",
+    label: "Datos principales revisados",
     summary: "Pendiente de revisar volumen, liquidez, precios visibles y estado.",
   },
   {
     id: "analyzing_wallets",
-    label: "Revisando Wallet Intelligence",
+    label: "Actividad de billeteras",
     summary: "Pendiente de revisar wallets publicas si hay id compatible.",
   },
   {
     id: "profiling_wallets",
-    label: "Perfil de wallets",
+    label: "Perfil de billeteras",
     requiresExternalIntegration: true,
     summary: "Pendiente de fuente confiable para historial cerrado por wallet.",
     warnings: ["No se infiere identidad personal ni se calcula ROI sin fuente real."],
   },
   {
     id: "preparing_samantha_research",
-    label: "Brief de Samantha",
+    label: "Tarea de investigacion preparada",
     summary: "Pendiente de preparar brief estructurado para investigacion externa manual.",
   },
   {
     id: "awaiting_samantha_report",
-    label: "Esperando reporte de Samantha",
+    label: "Esperando investigacion externa",
     requiresManualInput: true,
     summary: "Pendiente de que el usuario cargue un reporte estructurado validable.",
   },
@@ -613,13 +613,13 @@ export function getJobProgressSummary(job: DeepAnalysisJob): DeepAnalysisJobSumm
 
 export function jobStepStatusLabel(status: DeepAnalysisJobStepStatus): string {
   if (status === "completed") {
-    return "OK";
+    return "Completado";
   }
   if (status === "running") {
-    return "Ahora";
+    return "En curso";
   }
   if (status === "blocked") {
-    return "Esperando";
+    return "Pendiente";
   }
   if (status === "failed") {
     return "Error";

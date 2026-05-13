@@ -385,7 +385,8 @@ Si no pasa la compuerta:
 Los analisis guardados que esperan investigacion externa se muestran como
 pendientes, no como fallos:
 
-- `/history` muestra `Esperando Samantha`, fecha de brief si existe y accion
+- `/history` muestra `Pendiente de investigacion`, `Samantha recibio la tarea`
+  o `Necesita reporte manual`, fecha de brief si existe y accion
   `Continuar analisis`.
 - `/performance` separa `Pendientes de investigacion` de `Pendientes de
   resolucion`.

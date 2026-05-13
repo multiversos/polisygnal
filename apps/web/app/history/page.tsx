@@ -1092,7 +1092,7 @@ export default function HistoryPage() {
                         {statusLabel(item)}
                       </span>
                       {item.awaitingResearch || item.researchStatus === "awaiting_samantha" ? (
-                        <span className="badge muted">Esperando Samantha</span>
+                        <span className="badge muted">Pendiente de investigacion</span>
                       ) : null}
                       {item.researchStatus === "sending_to_samantha" ? (
                         <span className="badge muted">Enviando a Samantha</span>

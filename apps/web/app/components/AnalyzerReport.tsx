@@ -815,29 +815,57 @@ export function AnalyzerReport({
             contar con fuentes independientes validadas.
           </p>
           <p className="section-note">
-            Estado manual: Esperando reporte de Samantha cuando el brief ya esta listo y la
-            investigacion externa aun no fue cargada.
+            Estado actual: Esperando investigacion externa.
+          </p>
+          <p className="section-note">
+            El analisis todavia no esta terminado. Ya leimos el mercado y preparamos
+            la tarea de investigacion, pero falta recibir o cargar el reporte externo
+            de Samantha. Puedes guardar este analisis y continuarlo despues.
           </p>
           <div className="watchlist-actions">
             <button
               className="watchlist-button"
-              disabled={!samanthaBriefValidation.valid}
-              onClick={handleCopySamanthaTask}
+              disabled={!samanthaBridgeTaskId || samanthaLookupBusy}
+              onClick={handleCheckSamanthaStatus}
               type="button"
             >
-              Copiar tarea para Samantha
+              {samanthaLookupBusy ? "Consultando Samantha" : "Consultar resultado de Samantha"}
             </button>
             <a className="analysis-link secondary" href="#samantha-research">
-              Pegar reporte de Samantha
+              Cargar reporte manual
             </a>
+            <button
+              className="watchlist-button"
+              disabled={!samanthaBriefValidation.valid}
+              onClick={handleDownloadSamanthaTaskJson}
+              type="button"
+            >
+              Descargar tarea
+            </button>
+            <button
+              className="watchlist-button"
+              disabled={!samanthaBriefValidation.valid}
+              onClick={() =>
+                void copyTextToClipboard(
+                  samanthaTaskPacket.samanthaInstructionsText,
+                  "Instrucciones para Samantha copiadas.",
+                )
+              }
+              type="button"
+            >
+              Copiar instrucciones
+            </button>
             <button
               className="watchlist-button"
               disabled={busy}
               onClick={() => onSaveHistory(item)}
               type="button"
             >
-              Guardar en Historial como pendiente
+              Guardar y continuar despues
             </button>
+            <a className="analysis-link secondary" href="/history">
+              Ver en historial
+            </a>
           </div>
           <p className="section-note">{jobSummary.nextAction}</p>
         </section>
@@ -892,57 +920,11 @@ export function AnalyzerReport({
             </span>
           </div>
         ) : null}
-        <div className="samantha-action-row">
-          <button
-            className="watchlist-button active"
-            disabled={!samanthaBriefValidation.valid}
-            onClick={handleCopySamanthaTask}
-            type="button"
-          >
-            Copiar tarea para Samantha
-          </button>
-          <button
-            className="watchlist-button"
-            disabled={!samanthaBriefValidation.valid}
-            onClick={handleDownloadSamanthaTaskJson}
-            type="button"
-          >
-            Descargar tarea JSON
-          </button>
-          <button
-            className="watchlist-button"
-            disabled={!samanthaBriefValidation.valid}
-            onClick={handleDownloadSamanthaInstructions}
-            type="button"
-          >
-            Descargar instrucciones TXT
-          </button>
-          <button
-            className="watchlist-button"
-            disabled={!samanthaBriefValidation.valid}
-            onClick={handleCopySamanthaSchema}
-            type="button"
-          >
-            Copiar schema de respuesta
-          </button>
-          <button
-            className="watchlist-button"
-            disabled={!samanthaBriefValidation.valid}
-            onClick={handleDownloadSamanthaBrief}
-            type="button"
-          >
-            Descargar brief JSON
-          </button>
-          <button
-            className="watchlist-button"
-            disabled={!samanthaBridgeTaskId || samanthaLookupBusy}
-            onClick={handleCheckSamanthaStatus}
-            type="button"
-          >
-            {samanthaLookupBusy ? "Consultando Samantha" : "Consultar resultado de Samantha"}
-          </button>
-          <span>{samanthaBriefValidation.valid ? "Brief validado" : "Brief no disponible"}</span>
-        </div>
+        <p className="section-note">
+          {samanthaBriefValidation.valid
+            ? "Tarea de investigacion validada y lista para descargar, copiar o guardar desde el bloque de progreso."
+            : "Tarea de investigacion no disponible todavia."}
+        </p>
         {samanthaBridgeTaskId ? (
           <p className="section-note">
             Tarea enviada a Samantha: {samanthaBridgeTaskId}. Si Samantha responde

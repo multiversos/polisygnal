@@ -592,14 +592,14 @@ function validateAnalyzeLoadingPanelSource() {
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
   const expectedSteps = [
     "Detectando enlace",
-    "Leyendo Polymarket",
-    "Analizando mercado seleccionado",
+    "Mercado leido desde Polymarket",
+    "Datos principales revisados",
     "Evaluando senales disponibles",
     "Revisando billeteras",
     "Preparando tarea para Samantha",
     "Enviando a Samantha",
     "Samantha investigando",
-    "Esperando reporte de Samantha",
+    "Esperando investigacion externa",
     "Validando reporte",
     "Listo para revisar decision",
     "Preparando decision",
@@ -633,7 +633,13 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("scouting-radar-core"), "expected radar center mark");
   assert(source.includes("RADAR_MARKET_CATEGORIES"), "expected multi-market radar category config");
   assert(source.includes("DEEP_LAYER_PREVIEW"), "expected deep analyzer pending-layer preview in loading panel");
-  assert(source.includes("Deep Analysis Job"), "expected loading panel to expose local deep-analysis job state");
+  assert(source.includes("Progreso del analisis"), "expected loading panel to expose human analysis progress state");
+  assert(!source.includes("Deep Analysis Job"), "loading panel should not expose technical Deep Analysis Job title");
+  assert(!source.includes("Leyendo Polymarket"), "loading panel should use human Polymarket read copy");
+  assert(!source.includes("Analizando mercado seleccionado"), "loading panel should use human market review copy");
+  assert(!source.includes("Esperando reporte de Samantha"), "loading panel should use external research wait copy");
+  assert(!source.includes('return "OK"'), "loading panel should not expose OK as public status copy");
+  assert(!source.includes('return "Ahora"'), "loading panel should not expose Ahora as public status copy");
   assert(source.includes("aria-live=\"polite\""), "expected polite live region in loading panel");
   assert(source.includes("aria-busy=\"true\""), "expected busy state in loading panel");
   for (const step of expectedSteps) {
@@ -684,11 +690,10 @@ function validateAnalyzerReportSource() {
     "Capas del motor",
     "Pendiente de integracion",
     "Investigacion con Samantha",
-    "Esperando reporte de Samantha",
-    "Copiar tarea para Samantha",
-    "Descargar tarea JSON",
-    "Descargar instrucciones TXT",
-    "Copiar schema de respuesta",
+    "Esperando investigacion externa",
+    "Descargar tarea",
+    "Copiar instrucciones",
+    "Guardar y continuar despues",
     "Validar reporte",
     "Cargar reporte al analisis",
     "Que puedes hacer ahora",
@@ -714,6 +719,8 @@ function validateAnalyzerReportSource() {
   assert(source.includes("/api/samantha/research-status"), "AnalyzerReport should query Samantha status only through same-origin route");
   assert(!/fetch\(\s*["']https?:\/\//.test(source), "AnalyzerReport must not call external services for Samantha");
   assert(!source.includes("OpenClaw"), "AnalyzerReport must not try to execute OpenClaw");
+  assert(!source.includes("Deep Analysis Job"), "AnalyzerReport should not expose technical Deep Analysis Job title");
+  assert(!source.includes(">OK<"), "AnalyzerReport should not expose OK status chip");
   for (const copy of requiredCopy) {
     assert(source.includes(copy), `AnalyzerReport missing required copy: ${copy}`);
   }
@@ -1297,7 +1304,8 @@ function validateDeepAnalysisJobRules() {
   assert(analyzePage.includes("markJobSendingToSamantha"), "analyze page should expose automatic bridge states");
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
   assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport should show job state");
-  assert(reportSource.includes("Esperando reporte de Samantha"), "AnalyzerReport should show manual research wait state");
+  assert(reportSource.includes("Esperando investigacion externa"), "AnalyzerReport should show human external research wait state");
+  assert(reportSource.includes("Samantha necesita investigacion manual"), "AnalyzerReport should show manual_needed state");
   assert(reportSource.includes("markJobSamanthaReportLoaded"), "AnalyzerReport should merge Samantha report into the job");
   assert(historySource.includes("Continuar analisis"), "history should let users continue pending deep research");
   assert(historySource.includes("/api/samantha/research-status"), "history should query Samantha status through same-origin route");

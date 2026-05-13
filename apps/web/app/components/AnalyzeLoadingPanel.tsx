@@ -51,13 +51,13 @@ const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
   },
   {
     detail: "Mercado, outcomes y estado",
-    label: "Leyendo Polymarket",
+    label: "Mercado leido desde Polymarket",
     phase: "matching",
     shortLabel: "Polymarket",
   },
   {
     detail: "Volumen, liquidez y precios visibles",
-    label: "Analizando mercado seleccionado",
+    label: "Datos principales revisados",
     phase: "context",
     shortLabel: "Mercado",
   },
@@ -93,7 +93,7 @@ const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
   },
   {
     detail: "Investigacion externa pendiente; el flujo manual sigue disponible",
-    label: "Esperando reporte de Samantha",
+    label: "Esperando investigacion externa",
     phase: "awaiting_samantha",
     shortLabel: "Pendiente",
   },
@@ -383,10 +383,10 @@ function stepStatus(stepIndex: number, activeIndex: number): "completed" | "acti
 
 function statusLabel(status: "completed" | "active" | "pending"): string {
   if (status === "completed") {
-    return "OK";
+    return "Completado";
   }
   if (status === "active") {
-    return "Ahora";
+    return "En curso";
   }
   return "Pendiente";
 }
@@ -417,7 +417,7 @@ export function AnalyzeLoadingPanel({
       <div className="analyze-loading-header">
         <div>
           <p className="eyebrow">Analisis en curso</p>
-          <h2>Analizando mercado</h2>
+          <h2>Estado del analisis</h2>
           <p>
             PolySignal esta revisando el enlace, detectando el tipo de mercado
             y preparando una lectura segura.
@@ -482,7 +482,7 @@ export function AnalyzeLoadingPanel({
             return (
               <li className={`analyze-loading-step ${status}`} key={step.phase}>
                 <span className="analyze-loading-step-marker" aria-hidden="true">
-                  {status === "completed" ? "OK" : index + 1}
+                  {status === "completed" ? "Completado" : index + 1}
                 </span>
                 <span className="analyze-loading-step-copy">
                   <strong>{step.label}</strong>
@@ -518,8 +518,8 @@ export function AnalyzeLoadingPanel({
         ))}
       </div>
       {jobSteps && jobSteps.length > 0 ? (
-        <div className="deep-job-preview" aria-label="Estado del Deep Analysis Job">
-          <strong>Deep Analysis Job</strong>
+        <div className="deep-job-preview" aria-label="Estado del analisis">
+          <strong>Progreso del analisis</strong>
           <ol>
             {jobSteps.slice(0, 6).map((step) => (
               <li className={step.status} key={step.id}>

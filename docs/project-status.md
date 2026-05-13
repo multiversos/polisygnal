@@ -165,9 +165,10 @@ Estado visible verificado:
   demasiado largos, URLs peligrosas, secretos, direcciones completas de wallet,
   estimates fuera de rango, Reddit/social con confiabilidad alta y Kalshi no
   equivalente usado como senal fuerte.
-- Los jobs `awaiting_samantha` quedan visibles en Historial como `Esperando
-  Samantha` con accion `Continuar analisis`. `/performance` separa pendientes
-  de investigacion de pendientes de resolucion y no los cuenta como fallos.
+- Los jobs `awaiting_samantha` quedan visibles en Historial como `Pendiente de
+  investigacion` o `Necesita reporte manual` con accion `Continuar analisis`.
+  `/performance` separa pendientes de investigacion de pendientes de resolucion
+  y no los cuenta como fallos.
 - La estimacion PolySignal pasa por una compuerta de calidad: si el valor solo
   replica el precio visible del mercado, se muestra como probabilidad del
   mercado y no como estimacion propia.

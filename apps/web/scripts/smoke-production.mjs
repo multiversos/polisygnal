@@ -531,14 +531,14 @@ function validateAnalyzeLoadingPanelSource() {
   const bridgeStatusRouteSource = readFileSync(new URL("../app/api/samantha/research-status/route.ts", import.meta.url), "utf8");
   const expectedSteps = [
     "Detectando enlace",
-    "Leyendo Polymarket",
-    "Analizando mercado seleccionado",
+    "Mercado leido desde Polymarket",
+    "Datos principales revisados",
     "Evaluando senales disponibles",
     "Revisando billeteras",
     "Preparando tarea para Samantha",
     "Enviando a Samantha",
     "Samantha investigando",
-    "Esperando reporte de Samantha",
+    "Esperando investigacion externa",
     "Validando reporte",
     "Listo para revisar decision",
     "Preparando decision",
@@ -567,12 +567,17 @@ function validateAnalyzeLoadingPanelSource() {
     "Resolucion",
   ];
 
-  assert(source.includes("Analizando mercado"), "analyze loading panel heading is missing");
+  assert(source.includes("Estado del analisis"), "analyze loading panel heading is missing");
   assert(source.includes("scouting-radar-shell"), "analyze loading panel radar shell is missing");
   assert(source.includes("scouting-radar-core"), "analyze loading panel radar core is missing");
   assert(source.includes("RADAR_MARKET_CATEGORIES"), "analyze loading panel category config is missing");
   assert(source.includes("DEEP_LAYER_PREVIEW"), "analyze loading panel deep-layer preview is missing");
-  assert(source.includes("Deep Analysis Job"), "analyze loading panel should expose local deep-analysis job state");
+  assert(source.includes("Progreso del analisis"), "analyze loading panel should expose human analysis progress state");
+  assert(!source.includes("Deep Analysis Job"), "analyze loading panel should not expose technical job title");
+  assert(!source.includes("Leyendo Polymarket"), "analyze loading panel should use human Polymarket read copy");
+  assert(!source.includes("Esperando reporte de Samantha"), "analyze loading panel should use external research wait copy");
+  assert(!source.includes('return "OK"'), "analyze loading panel should not expose OK as status copy");
+  assert(!source.includes('return "Ahora"'), "analyze loading panel should not expose Ahora as status copy");
   assert(source.includes("aria-live=\"polite\""), "analyze loading panel needs polite live status");
   for (const step of expectedSteps) {
     assert(source.includes(step), `analyze loading panel missing step: ${step}`);
@@ -617,15 +622,15 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("AnalyzerReport"), "analyze page does not render AnalyzerReport");
   assert(reportSource.includes("Resumen del analisis"), "AnalyzerReport missing executive summary");
   assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport missing deep job state");
-  assert(reportSource.includes("Esperando reporte de Samantha"), "AnalyzerReport missing Samantha wait state");
+  assert(reportSource.includes("Esperando investigacion externa"), "AnalyzerReport missing external research wait state");
   assert(reportSource.includes("Samantha necesita investigacion manual"), "AnalyzerReport missing manual_needed state");
   assert(reportSource.includes("Analisis profundo"), "AnalyzerReport missing deep analysis section");
   assert(reportSource.includes("Capas del motor"), "AnalyzerReport missing deep analyzer layers");
   assert(reportSource.includes("Pendiente de integracion"), "AnalyzerReport should label future layers as pending");
   assert(reportSource.includes("Investigacion con Samantha"), "AnalyzerReport missing Samantha research workflow");
-  assert(reportSource.includes("Copiar tarea para Samantha"), "AnalyzerReport missing Samantha task copy action");
-  assert(reportSource.includes("Descargar tarea JSON"), "AnalyzerReport missing Samantha task JSON action");
-  assert(reportSource.includes("Copiar schema de respuesta"), "AnalyzerReport missing Samantha response schema action");
+  assert(reportSource.includes("Descargar tarea"), "AnalyzerReport missing Samantha task download action");
+  assert(reportSource.includes("Copiar instrucciones"), "AnalyzerReport missing Samantha instruction copy action");
+  assert(reportSource.includes("Guardar y continuar despues"), "AnalyzerReport missing save-and-continue action");
   assert(reportSource.includes("Validar reporte"), "AnalyzerReport missing Samantha report validation action");
   assert(reportSource.includes("Cargar reporte al analisis"), "AnalyzerReport missing Samantha report apply action");
   assert(reportSource.includes("parseSamanthaResearchReport"), "AnalyzerReport missing Samantha report validation");
@@ -649,7 +654,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(homeSource.includes("Pega un enlace"), "home analyzer steps are missing");
   assert(historySource.includes("Analizar nuevo enlace"), "history page does not link back to analyzer");
   assert(historySource.includes("Continuar analisis"), "history page should reopen pending deep research jobs");
-  assert(historySource.includes("Esperando Samantha"), "history page should label pending Samantha research");
+  assert(historySource.includes("Pendiente de investigacion"), "history page should label pending research");
   assert(historySource.includes("Consultar resultado de Samantha"), "history page should allow safe Samantha status checks");
   assert(historySource.includes("Necesita reporte manual"), "history page should show manual_needed as a continuation state");
   assert(historySource.includes("Ver rendimiento"), "history page does not link to performance");
