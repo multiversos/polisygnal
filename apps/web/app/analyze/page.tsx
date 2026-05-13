@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   AnalyzeLoadingPanel,
+  type AnalyzeProgressIssue,
   type AnalyzeLoadingPhase,
 } from "../components/AnalyzeLoadingPanel";
 import { AnalyzeHero } from "../components/analyze/AnalyzeHero";
@@ -164,6 +165,65 @@ type SamanthaBridgeRouteResult = {
   warnings?: string[];
 };
 
+const LINK_RESOLVE_TIMEOUT_MS = 45_000;
+const WALLET_INTELLIGENCE_TIMEOUT_MS = 45_000;
+const SAMANTHA_BRIDGE_TIMEOUT_MS = 45_000;
+
+class AnalyzeRequestTimeoutError extends Error {
+  constructor(label: string) {
+    super(label);
+    this.name = "AnalyzeRequestTimeoutError";
+  }
+}
+
+class AnalyzeRequestCancelledError extends Error {
+  constructor() {
+    super("analysis_cancelled");
+    this.name = "AnalyzeRequestCancelledError";
+  }
+}
+
+function isAnalyzeTimeout(error: unknown): boolean {
+  return error instanceof AnalyzeRequestTimeoutError;
+}
+
+function isAnalyzeCancelled(error: unknown): boolean {
+  return error instanceof AnalyzeRequestCancelledError;
+}
+
+async function withRequestTimeout<T>(
+  timeoutMs: number,
+  parentSignal: AbortSignal,
+  label: string,
+  task: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  if (parentSignal.aborted) {
+    throw new AnalyzeRequestCancelledError();
+  }
+  const controller = new AbortController();
+  let timedOut = false;
+  const abortFromParent = () => controller.abort();
+  const timeoutId = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  parentSignal.addEventListener("abort", abortFromParent, { once: true });
+  try {
+    return await task(controller.signal);
+  } catch (error) {
+    if (timedOut) {
+      throw new AnalyzeRequestTimeoutError(label);
+    }
+    if (parentSignal.aborted) {
+      throw new AnalyzeRequestCancelledError();
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+    parentSignal.removeEventListener("abort", abortFromParent);
+  }
+}
+
 function toNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -265,7 +325,10 @@ function watchlistDraftFromMatch(item: MarketOverviewItem): WatchlistMarketDraft
   };
 }
 
-async function resolvePolymarketLinkForAnalyze(url: string): Promise<PolymarketLinkResolveResult> {
+async function resolvePolymarketLinkForAnalyze(
+  url: string,
+  signal?: AbortSignal,
+): Promise<PolymarketLinkResolveResult> {
   const response = await fetch("/api/analyze-polymarket-link", {
     body: JSON.stringify({ url }),
     cache: "no-store",
@@ -276,6 +339,7 @@ async function resolvePolymarketLinkForAnalyze(url: string): Promise<PolymarketL
     },
     method: "POST",
     redirect: "error",
+    signal,
   });
   if (!response.ok) {
     throw new Error("link_resolve_failed");
@@ -328,7 +392,11 @@ function buildMatchesFromPolymarketResult(result: PolymarketLinkResolveResult): 
   });
 }
 
-async function enrichMatchWithWalletIntelligence(match: MatchResult, normalizedUrl: string): Promise<MatchResult> {
+async function enrichMatchWithWalletIntelligence(
+  match: MatchResult,
+  normalizedUrl: string,
+  signal?: AbortSignal,
+): Promise<MatchResult> {
   const market = match.item.market;
   const tokenIds = (market?.outcomes ?? [])
     .map((outcome) => outcome.token_id)
@@ -339,7 +407,7 @@ async function enrichMatchWithWalletIntelligence(match: MatchResult, normalizedU
     marketSlug: market?.market_slug ?? undefined,
     marketUrl: normalizedUrl,
     tokenIds,
-  });
+  }, undefined, { signal });
   return {
     ...match,
     item: {
@@ -1503,7 +1571,12 @@ export default function AnalyzePage() {
     useState<SamanthaResearchParseResult | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [progressStartedAt, setProgressStartedAt] = useState<number | null>(null);
+  const [progressElapsedSeconds, setProgressElapsedSeconds] = useState(0);
+  const [progressIssue, setProgressIssue] = useState<AnalyzeProgressIssue>(null);
+  const [lastWorkingUrl, setLastWorkingUrl] = useState("");
   const analysisRunRef = useRef(0);
+  const analysisAbortRef = useRef<AbortController | null>(null);
 
   const watchlistByMarketId = useMemo(() => {
     return new Set(watchlistItems.map((item) => item.market_id));
@@ -1547,6 +1620,27 @@ export default function AnalyzePage() {
   }, [deepAnalysisJob]);
 
   useEffect(() => {
+    if (progressStartedAt === null) {
+      setProgressElapsedSeconds(0);
+      return;
+    }
+    const updateElapsed = () => {
+      setProgressElapsedSeconds(
+        Math.max(0, Math.floor((Date.now() - progressStartedAt) / 1000)),
+      );
+    };
+    updateElapsed();
+    const intervalId = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [progressStartedAt]);
+
+  useEffect(() => {
+    return () => {
+      analysisAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const queryUrl = params.get("url");
     const queryJobId = params.get("job");
@@ -1580,6 +1674,7 @@ export default function AnalyzePage() {
       item: AnalyzeMarketItem;
       job: DeepAnalysisJob;
       normalizedUrl: string;
+      signal: AbortSignal;
       walletSummary: WalletIntelligenceSummary;
     }): Promise<{ job: DeepAnalysisJob; message: string; reportResult: SamanthaResearchParseResult | null }> => {
       let job = persistDeepAnalysisJob(markJobSendingToSamantha(input.job));
@@ -1597,21 +1692,28 @@ export default function AnalyzePage() {
           url: input.normalizedUrl,
           walletSummary: input.walletSummary,
         });
-        const response = await fetch("/api/samantha/send-research", {
-          body: JSON.stringify({
-            brief,
-            deepAnalysisJobId: job.id,
-            normalizedUrl: input.normalizedUrl,
-          }),
-          cache: "no-store",
-          credentials: "omit",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-          redirect: "error",
-        });
+        const response = await withRequestTimeout(
+          SAMANTHA_BRIDGE_TIMEOUT_MS,
+          input.signal,
+          "samantha_bridge_timeout",
+          (signal) =>
+            fetch("/api/samantha/send-research", {
+              body: JSON.stringify({
+                brief,
+                deepAnalysisJobId: job.id,
+                normalizedUrl: input.normalizedUrl,
+              }),
+              cache: "no-store",
+              credentials: "omit",
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+              },
+              method: "POST",
+              redirect: "error",
+              signal,
+            }),
+        );
         const result = (await response.json().catch(() => ({}))) as SamanthaBridgeRouteResult;
         if (!input.isCurrentRun()) {
           return {
@@ -1694,8 +1796,17 @@ export default function AnalyzePage() {
           message: result.reason || "Samantha recibio la tarea; esperando reporte estructurado.",
           reportResult: null,
         };
-      } catch {
-        const reason = "Samantha automatica no respondio de forma segura; usa el Task Packet manual.";
+      } catch (error) {
+        if (isAnalyzeCancelled(error)) {
+          return {
+            job,
+            message: "El analisis se cancelo antes de recibir respuesta de Samantha.",
+            reportResult: null,
+          };
+        }
+        const reason = isAnalyzeTimeout(error)
+          ? "Samantha esta tardando mas de lo normal; usa el Task Packet manual o vuelve a consultar despues."
+          : "Samantha automatica no respondio de forma segura; usa el Task Packet manual.";
         job = persistDeepAnalysisJob(
           markJobSamanthaBridgeFallback(job, {
             automaticAvailable: true,
@@ -1715,6 +1826,9 @@ export default function AnalyzePage() {
   const runAnalysis = useCallback(async (value = input) => {
     const runId = analysisRunRef.current + 1;
     analysisRunRef.current = runId;
+    analysisAbortRef.current?.abort();
+    const runController = new AbortController();
+    analysisAbortRef.current = runController;
     const isCurrentRun = () => analysisRunRef.current === runId;
     const advancePhase = async (phase: AnalyzeLoadingPhase) => {
       if (!isCurrentRun()) {
@@ -1729,25 +1843,38 @@ export default function AnalyzePage() {
     const validation = getPolymarketUrlValidationMessage(value);
     setActionMessage(null);
     setSamanthaAutoReportResult(null);
+    setProgressIssue(null);
     if (!validation.ok || !validation.normalizedUrl) {
+      setProgressStartedAt(null);
+      if (analysisAbortRef.current === runController) {
+        analysisAbortRef.current = null;
+      }
       setState({ message: validation.message, status: "invalid" });
       return;
     }
+    const normalizedUrl = validation.normalizedUrl;
+    setLastWorkingUrl(normalizedUrl);
     let job = persistDeepAnalysisJob(
-      getLatestDeepAnalysisJobForUrl(validation.normalizedUrl) ??
-        createDeepAnalysisJob(validation.normalizedUrl),
+      getLatestDeepAnalysisJobForUrl(normalizedUrl) ??
+        createDeepAnalysisJob(normalizedUrl),
     );
+    setProgressStartedAt(Date.now());
     setLoading(true);
     setState({
       message: "Resolviendo mercado o evento directamente desde Polymarket.",
-      normalizedUrl: validation.normalizedUrl,
+      normalizedUrl,
       status: "detecting",
     });
     try {
       if (!(await advancePhase("matching"))) {
         return;
       }
-      const resolved = await resolvePolymarketLinkForAnalyze(validation.normalizedUrl);
+      const resolved = await withRequestTimeout(
+        LINK_RESOLVE_TIMEOUT_MS,
+        runController.signal,
+        "polymarket_link_timeout",
+        (signal) => resolvePolymarketLinkForAnalyze(normalizedUrl, signal),
+      );
       if (!isCurrentRun()) {
         return;
       }
@@ -1756,7 +1883,7 @@ export default function AnalyzePage() {
           eventSlug: resolved.eventSlug ?? resolved.event?.slug,
           marketSlug: resolved.marketSlug,
           marketTitle: resolved.event?.title,
-          normalizedUrl: validation.normalizedUrl,
+          normalizedUrl,
         }),
       );
       if (resolved.status === "ok" && resolved.markets.length > 0) {
@@ -1767,9 +1894,10 @@ export default function AnalyzePage() {
             matches.length > 1
               ? "Polymarket devolvio este evento con varios mercados. Selecciona uno para analizar."
               : "Polymarket devolvio un mercado para este enlace. Confirma que quieres analizarlo.",
-          normalizedUrl: validation.normalizedUrl,
+          normalizedUrl,
           status: "needs_selection",
         });
+        setProgressStartedAt(null);
       } else if (resolved.status === "unsupported") {
         persistDeepAnalysisJob(
           markJobFailed(
@@ -1782,9 +1910,10 @@ export default function AnalyzePage() {
           message:
             resolved.warnings[0] ||
             "Este tipo de enlace todavia no esta soportado por el analizador.",
-          normalizedUrl: validation.normalizedUrl,
+          normalizedUrl,
           status: "no_exact_match",
         });
+        setProgressStartedAt(null);
       } else {
         persistDeepAnalysisJob(
           markJobFailed(
@@ -1797,28 +1926,41 @@ export default function AnalyzePage() {
           message:
             resolved.warnings[0] ||
             "No pudimos obtener este mercado desde Polymarket. No buscamos una alternativa en mercados internos.",
-          normalizedUrl: validation.normalizedUrl,
+          normalizedUrl,
           status: "no_exact_match",
         });
+        setProgressStartedAt(null);
       }
-    } catch {
+    } catch (error) {
       if (!isCurrentRun()) {
         return;
       }
+      if (isAnalyzeCancelled(error)) {
+        return;
+      }
+      const timedOut = isAnalyzeTimeout(error);
       persistDeepAnalysisJob(
         markJobFailed(
           job,
-          "No pudimos consultar Polymarket ahora. Intenta de nuevo en unos segundos.",
+          timedOut
+            ? "La consulta a Polymarket tardo mas de lo esperado."
+            : "No pudimos consultar Polymarket ahora. Intenta de nuevo en unos segundos.",
         ),
       );
+      setProgressIssue(timedOut ? "timeout" : "error");
       setState({
         message:
-          "No pudimos consultar Polymarket ahora. Intenta de nuevo en unos segundos.",
+          timedOut
+            ? "No pudimos completar esta busqueda ahora. Puedes reintentar o revisar el enlace."
+            : "No pudimos consultar Polymarket ahora. Intenta de nuevo en unos segundos.",
         status: "invalid",
       });
     } finally {
       if (isCurrentRun()) {
         setLoading(false);
+        if (analysisAbortRef.current === runController) {
+          analysisAbortRef.current = null;
+        }
       }
     }
   }, [input, persistDeepAnalysisJob]);
@@ -1826,6 +1968,9 @@ export default function AnalyzePage() {
   const analyzeSelectedMarket = useCallback(async (match: MatchResult, normalizedUrl: string) => {
     const runId = analysisRunRef.current + 1;
     analysisRunRef.current = runId;
+    analysisAbortRef.current?.abort();
+    const runController = new AbortController();
+    analysisAbortRef.current = runController;
     const isCurrentRun = () => analysisRunRef.current === runId;
     const advancePhase = async (phase: AnalyzeLoadingPhase) => {
       if (!isCurrentRun()) {
@@ -1838,6 +1983,8 @@ export default function AnalyzePage() {
 
     setActionMessage(null);
     setSamanthaAutoReportResult(null);
+    setProgressIssue(null);
+    setLastWorkingUrl(normalizedUrl);
     let job =
       getLatestDeepAnalysisJobForUrl(normalizedUrl) ??
       createDeepAnalysisJob(normalizedUrl);
@@ -1851,6 +1998,7 @@ export default function AnalyzePage() {
       }),
     );
     setLoading(true);
+    setProgressStartedAt(Date.now());
     setLoadingPhase("context");
     setState({
       message: "Analizando solo el mercado seleccionado.",
@@ -1877,7 +2025,12 @@ export default function AnalyzePage() {
         return;
       }
       getResearchCoverage(match.item, []);
-      const enrichedMatch = await enrichMatchWithWalletIntelligence(match, normalizedUrl);
+      const enrichedMatch = await withRequestTimeout(
+        WALLET_INTELLIGENCE_TIMEOUT_MS,
+        runController.signal,
+        "wallet_intelligence_timeout",
+        (signal) => enrichMatchWithWalletIntelligence(match, normalizedUrl, signal),
+      );
       if (!isCurrentRun()) {
         return;
       }
@@ -1936,6 +2089,7 @@ export default function AnalyzePage() {
         item: enrichedMatch.item,
         job,
         normalizedUrl,
+        signal: runController.signal,
         walletSummary,
       });
       if (!isCurrentRun()) {
@@ -1967,23 +2121,38 @@ export default function AnalyzePage() {
         normalizedUrl,
         status: "result",
       });
-    } catch {
+      if (!jobAwaitsResearch(job)) {
+        setProgressStartedAt(null);
+      }
+    } catch (error) {
       if (!isCurrentRun()) {
         return;
       }
+      if (isAnalyzeCancelled(error)) {
+        return;
+      }
+      const timedOut = isAnalyzeTimeout(error);
       persistDeepAnalysisJob(
         markJobFailed(
           job,
-          "No pudimos preparar el job profundo de este mercado ahora.",
+          timedOut
+            ? "La preparacion del analisis tardo mas de lo esperado."
+            : "No pudimos preparar el job profundo de este mercado ahora.",
         ),
       );
+      setProgressIssue(timedOut ? "timeout" : "error");
       setState({
-        message: "No pudimos preparar la lectura de este mercado ahora. Intenta de nuevo en unos segundos.",
+        message: timedOut
+          ? "No pudimos completar esta busqueda ahora. Puedes reintentar o revisar el enlace."
+          : "No pudimos preparar la lectura de este mercado ahora. Intenta de nuevo en unos segundos.",
         status: "invalid",
       });
     } finally {
       if (isCurrentRun()) {
         setLoading(false);
+        if (analysisAbortRef.current === runController) {
+          analysisAbortRef.current = null;
+        }
       }
     }
   }, [persistDeepAnalysisJob, tryAutomaticSamanthaBridge]);
@@ -2028,6 +2197,13 @@ export default function AnalyzePage() {
     }
   }, [analysisHistoryItems, deepAnalysisJob, state]);
 
+  const handleSaveCurrentAnalysis = useCallback(() => {
+    if (state.status !== "result") {
+      return;
+    }
+    void handleSaveHistory(state.match.item);
+  }, [handleSaveHistory, state]);
+
   const handleSavePending = useCallback(async () => {
     if (state.status !== "no_exact_match") {
       return;
@@ -2068,13 +2244,31 @@ export default function AnalyzePage() {
 
   const handleClear = useCallback(() => {
     analysisRunRef.current += 1;
+    analysisAbortRef.current?.abort();
+    analysisAbortRef.current = null;
     setInput("");
     setState({ status: "idle" });
     setLoading(false);
     setLoadingPhase("validating");
+    setProgressIssue(null);
+    setProgressStartedAt(null);
+    setLastWorkingUrl("");
     setActionMessage(null);
     setSamanthaAutoReportResult(null);
     setDeepAnalysisJob(null);
+  }, []);
+
+  const handleEditLink = useCallback(() => {
+    analysisRunRef.current += 1;
+    analysisAbortRef.current?.abort();
+    analysisAbortRef.current = null;
+    setState({ status: "idle" });
+    setLoading(false);
+    setLoadingPhase("validating");
+    setProgressIssue(null);
+    setProgressStartedAt(null);
+    setActionMessage(null);
+    setSamanthaAutoReportResult(null);
   }, []);
 
   const matches = state.status === "needs_selection" || state.status === "no_exact_match" ? state.matches : [];
@@ -2082,10 +2276,22 @@ export default function AnalyzePage() {
     state.status === "needs_selection" || state.status === "no_exact_match" || state.status === "result"
       ? state.normalizedUrl
       : "";
-  const radarVisible =
-    loading || (state.status === "result" && deepJobSupportsPersistentRadar(deepAnalysisJob));
+  const samanthaProgressPending = state.status === "result" && jobAwaitsResearch(deepAnalysisJob);
+  const radarVisible = loading || Boolean(progressIssue) || samanthaProgressPending;
   const radarPhase = loadingPhaseFromJob(deepAnalysisJob) ?? loadingPhase;
   const previewProps = previewPropsForState({ deepAnalysisJob, state });
+  const canSaveProgressForLater =
+    state.status === "result" && Boolean(state.match.item.market?.id || state.match.item.market?.market_slug);
+  const handleProgressRetry = () => {
+    if (loading) {
+      return;
+    }
+    if (state.status === "result") {
+      void analyzeSelectedMarket(state.match, state.normalizedUrl);
+      return;
+    }
+    void runAnalysis(lastWorkingUrl || input);
+  };
 
   return (
     <main className="dashboard-shell analyze-page">
@@ -2109,9 +2315,17 @@ export default function AnalyzePage() {
 
       {radarVisible ? (
         <AnalyzeLoadingPanel
+          canSaveForLater={canSaveProgressForLater}
+          elapsedSeconds={progressElapsedSeconds}
+          isBusy={loading}
           isVisible={radarVisible}
+          issue={progressIssue}
           jobSteps={deepAnalysisJob?.steps}
+          onEditLink={handleEditLink}
+          onRetry={handleProgressRetry}
+          onSaveForLater={handleSaveCurrentAnalysis}
           phase={radarPhase}
+          samanthaPending={samanthaProgressPending}
         />
       ) : null}
 

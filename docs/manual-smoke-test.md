@@ -287,33 +287,30 @@ If this test fails, stop feature work and treat it as a production regression.
 9. Paste a Polymarket link and confirm the page either finds a matching market
    selector, a single selected result, or clearly says it could not be obtained
    from Polymarket.
-6. While the valid link is being analyzed, confirm the guided loading panel
-   appears with `Analizando mercado` and a central multi-market Radar
-   Analytics visual.
-7. Confirm the radar is prominent, sober, and analytical: concentric rings,
-   subtle signal points, a central PolySignal mark, and category chips around
-   the scan.
-8. Confirm the loading panel shows the real analysis steps:
-   - Detectando enlace.
-   - Resolviendo mercado/evento.
-   - Analizando mercado seleccionado.
-   - Revisando senales disponibles.
-   - Revisando billeteras.
-   - Preparando lectura.
-9. Confirm the radar represents multiple prediction-market categories such as
-   Deportes, Noticias, Politica, Mercados, Cripto, Billeteras, Historial, and
-   Resolucion. It
-   should not feel like a soccer-only loader.
-10. Confirm the category visuals use local SVG/CSS only: no external images, no
-   real faces, no party logos, and no copyright logos.
-11. Confirm the loading panel shows skeleton placeholders for detected market,
-    market selection, market probability, PolySignal estimate, Wallet
-    Intelligence, and final verification.
-12. Confirm the steps have visible text states and do not depend only on color.
-13. Confirm the loading panel does not show a fake 0%-100% progress bar and does
-   not stay stuck after the analysis finishes.
-14. Confirm `Limpiar` removes the loader, result, and errors.
-15. Confirm mobile stacks as title, radar, steps, and skeletons without
+6. While the valid link is being analyzed, confirm the progress panel appears
+   with `Progreso del analisis`, `Analizando hace`, and clear wait guidance.
+7. Confirm the panel uses real stages instead of a fake percentage:
+   - Leyendo enlace.
+   - Buscando mercado en Polymarket.
+   - Confirmando coincidencias.
+   - Preparando tarea para Samantha.
+   - Esperando investigacion externa.
+   - Listo para revisar.
+8. Confirm the panel explains longer waits honestly:
+   - after a normal wait, `Esto normalmente toma unos segundos`;
+   - after a slow wait, it says the analysis is taking longer than usual;
+   - after a stalled wait, it offers retry/edit/history actions.
+9. Confirm the progress panel has recovery actions: `Reintentar`, `Editar
+   enlace`, `Ver historial`, and only shows `Guardar para continuar luego`
+   when a valid market/result exists.
+10. If Samantha is still pending, confirm the panel says `Samantha necesita
+    terminar la investigacion`, offers `Cargar reporte Samantha`, and links to
+    methodology without marking the analysis completed.
+11. Confirm the panel does not show a fake 0%-100% progress bar, raw errors,
+    stack traces, JSON, snapshot, proxy, OCR, secrets, localhost or raw payloads.
+12. Confirm `Limpiar` or `Editar enlace` removes the in-progress state without
+    losing control of the page.
+13. Confirm mobile stacks the timer, steps and recovery buttons without
     horizontal overflow.
 16. Confirm `/analyze` does not ask for screenshots, image upload, or OCR.
 17. Confirm a valid link first shows a compact selector or one confirmed result,
@@ -580,8 +577,8 @@ Use these quick checks when reviewing public pages:
    wallet profiles were actually queried.
 7. Confirm there are no fake news, fake odds, fake Kalshi matches, fake wallet
    ROI/win rate, fake outcomes, or fake PolySignal probabilities.
-8. Confirm the Radar Analytics loader marks unintegrated layers as pending
-   rather than completed evidence.
+8. Confirm the analyze progress panel marks unintegrated layers as pending or
+   needing attention rather than completed evidence.
 
 ## Progreso del analisis profundo
 

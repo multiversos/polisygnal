@@ -145,10 +145,10 @@ Estado visible verificado:
   `DeepAnalysisJob` queda `awaiting_samantha`.
 - `/analyze` ya soporta estados operativos del puente:
   `sending_to_samantha`, `samantha_researching`,
-  `receiving_samantha_report` y `validating_samantha_report`. Radar Analytics
-  permanece visible mientras el job esta activo, pendiente de Samantha o
-  listo para scoring; no usa timers falsos ni marca completado si falta
-  investigacion externa.
+  `receiving_samantha_report` y `validating_samantha_report`. La espera ahora
+  se muestra como progreso por etapas con tiempo transcurrido, mensajes a
+  esperas largas, timeout controlado, reintento y acciones de recuperacion. No
+  usa porcentajes falsos ni marca completado si falta investigacion externa.
 - Auditoria local: existia una carpeta ignored/untracked
   `apps/web/app/api/samantha-polysignal-analysis/` con un route viejo que usaba
   backend `/markets/overview`; se retiro del working tree local porque violaba
@@ -229,13 +229,13 @@ Estado visible verificado:
 - Existe una primera capa de readiness de investigacion externa:
   `ResearchFinding`, `researchReadiness.ts` y UI de evidencia pendiente. No
   llama fuentes externas ni muestra fixtures/demo como datos reales.
-- `/analyze` muestra un panel de carga guiado tipo Radar Analytics multi-market
-  mientras compara enlaces: radar central con categorias visuales de deportes,
-  noticias, politica, mercados, cripto, billeteras, historial y resolucion,
-  pasos laterales, skeletons inferiores y fases reales de enlace, mercado,
-  contexto, investigacion, billeteras y decision. No usa una barra de progreso
-  inventada, timers falsos, imagenes externas, logos ni rostros reales para
-  simular avance.
+- `/analyze` muestra un panel de progreso guiado mientras trabaja: etapas
+  reales de lectura de enlace, busqueda en Polymarket, confirmacion de
+  coincidencias, preparacion de Samantha, espera de investigacion externa y
+  revision final. Incluye contador visible, mensajes honestos cuando tarda mas
+  de lo normal, timeout/reintento y estado claro cuando Samantha sigue
+  pendiente. No usa una barra de progreso inventada ni convierte esperas en
+  evidencia.
 - No hay flujo de captura de pantalla, OCR ni subida de imagenes en el
   analizador de enlaces.
 - Existe una capa real de Wallet Intelligence para el analizador:

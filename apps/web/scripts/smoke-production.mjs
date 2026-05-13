@@ -535,48 +535,21 @@ function validateAnalyzeLoadingPanelSource() {
   const bridgeStatusRouteSource = readFileSync(new URL("../app/api/samantha/research-status/route.ts", import.meta.url), "utf8");
   const walletRouteSource = readFileSync(new URL("../app/api/polymarket-wallet-intelligence/route.ts", import.meta.url), "utf8");
   const expectedSteps = [
-    "Detectando enlace",
-    "Mercado leido desde Polymarket",
-    "Datos principales revisados",
-    "Evaluando senales disponibles",
-    "Actividad de billeteras",
+    "Leyendo enlace",
+    "Buscando mercado en Polymarket",
+    "Confirmando coincidencias",
     "Preparando tarea para Samantha",
-    "Enviando a Samantha",
-    "Samantha investigando",
     "Esperando investigacion externa",
-    "Validando reporte",
-    "Listo para revisar decision",
-    "Preparando decision",
-  ];
-  const expectedSkeletons = [
-    "Mercado detectado",
-    "Selector de mercados",
-    "Probabilidad del mercado",
-    "Estimacion PolySignal",
-    "Wallet Intelligence",
-    "Resultado/verificacion",
-  ];
-  const expectedCategories = [
-    "Deportes",
-    "Noticias",
-    "Politica",
-    "Mercados",
-    "Cripto",
-    "Billeteras",
-    "Perfiles",
-    "Samantha",
-    "Research",
-    "Odds",
-    "Kalshi",
-    "Historial",
-    "Resolucion",
+    "Listo para revisar",
   ];
 
-  assert(source.includes("Estado del analisis"), "analyze loading panel heading is missing");
-  assert(source.includes("scouting-radar-shell"), "analyze loading panel radar shell is missing");
-  assert(source.includes("scouting-radar-core"), "analyze loading panel radar core is missing");
-  assert(source.includes("RADAR_MARKET_CATEGORIES"), "analyze loading panel category config is missing");
-  assert(source.includes("DEEP_LAYER_PREVIEW"), "analyze loading panel deep-layer preview is missing");
+  assert(source.includes("export function AnalyzeProgressPanel"), "analyze progress panel component is missing");
+  assert(source.includes("Analizando hace"), "analyze progress panel elapsed timer is missing");
+  assert(source.includes("Esto normalmente toma unos segundos."), "analyze progress panel normal wait copy is missing");
+  assert(source.includes("Esta tardando mas de lo normal"), "analyze progress panel slow wait copy is missing");
+  assert(source.includes("Parece que esta busqueda se quedo esperando respuesta"), "analyze progress panel stalled copy is missing");
+  assert(source.includes("Samantha necesita terminar la investigacion"), "analyze progress panel Samantha pending copy is missing");
+  assert(source.includes("Guardar para continuar luego"), "analyze progress panel save recovery action is missing");
   assert(source.includes("Progreso del analisis"), "analyze loading panel should expose human analysis progress state");
   assert(!source.includes("Deep Analysis Job"), "analyze loading panel should not expose technical job title");
   assert(!source.includes("Leyendo Polymarket"), "analyze loading panel should use human Polymarket read copy");
@@ -587,17 +560,13 @@ function validateAnalyzeLoadingPanelSource() {
   for (const step of expectedSteps) {
     assert(source.includes(step), `analyze loading panel missing step: ${step}`);
   }
-  for (const skeleton of expectedSkeletons) {
-    assert(source.includes(skeleton), `analyze loading panel missing skeleton: ${skeleton}`);
-  }
-  for (const category of expectedCategories) {
-    assert(source.includes(category), `analyze loading panel missing multi-market category: ${category}`);
-  }
   assert(!source.includes("setTimeout"), "analyze loading panel should not use fake timers");
   assert(!source.includes("setInterval"), "analyze loading panel should not use fake progress intervals");
   assert(!source.includes("100%"), "analyze loading panel should not display invented 100% progress");
   assert(!source.includes("Buscando evidencia externa"), "analyze loading panel must not claim external research is running");
   assert(!source.includes("buscando internet"), "analyze loading panel must not claim internet search is running");
+  assert(analyzePage.includes("withRequestTimeout"), "analyze page does not use frontend request timeouts");
+  assert(analyzePage.includes("AbortController"), "analyze page does not make analyzer requests abortable");
   assert(analyzePage.includes("AnalyzeLoadingPanel"), "analyze page does not render AnalyzeLoadingPanel");
   assert(analyzePage.includes("MarketSelectionPanel"), "analyze page does not render market selector");
   assert(analyzePage.includes("/api/analyze-polymarket-link"), "analyze page does not use the safe Polymarket resolver route");
@@ -607,7 +576,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("/api/samantha/send-research"), "analyze page does not call the safe Samantha bridge route");
   assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page does not keep manual fallback when Samantha bridge is unavailable");
   assert(analyzePage.includes("existingBridgeTaskId"), "analyze page should not duplicate Samantha sends when continuing a job");
-  assert(analyzePage.includes("radarVisible"), "analyze page does not keep Radar Analytics visible for pending deep jobs");
+  assert(analyzePage.includes("progressIssue"), "analyze page does not keep recovery visible after timeout/error");
   assert(!analyzePage.includes("/markets/overview"), "analyze page must not use internal overview as primary matching source");
   assert(!analyzePage.includes("rankAnalyzerMatches"), "analyze page must not use internal ranking as primary matching source");
   assert(!analyzePage.includes("fetchComparableMarkets"), "analyze page must not fetch internal comparable markets");
@@ -688,7 +657,8 @@ function validateAnalyzeLoadingPanelSource() {
     exact_flow_source_checks: true,
     guided_loading_panel_found: true,
     phases: expectedSteps.length,
-    skeletons: expectedSkeletons.length,
+    recovery_actions: 4,
+    timeout_guard: true,
   };
 }
 

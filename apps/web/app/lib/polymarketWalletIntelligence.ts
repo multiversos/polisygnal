@@ -50,6 +50,7 @@ function cleanTokenIds(values?: Array<string | null | undefined> | null): string
 export async function getPolymarketWalletIntelligence(
   input: PolymarketWalletIntelligenceInput,
   thresholdUsd = WALLET_INTELLIGENCE_THRESHOLD_USD,
+  options?: { signal?: AbortSignal },
 ): Promise<WalletIntelligenceSummary> {
   const conditionId = cleanIdentifier(input.conditionId);
   if (!conditionId) {
@@ -74,6 +75,7 @@ export async function getPolymarketWalletIntelligence(
       },
       method: "POST",
       redirect: "error",
+      signal: options?.signal,
     });
     const text = await response.text();
     if (!response.ok || text.length > 256_000) {
@@ -89,7 +91,10 @@ export async function getPolymarketWalletIntelligence(
       thresholdUsd: summary.thresholdUsd ?? thresholdUsd,
       warnings: summary.warnings ?? [],
     };
-  } catch {
+  } catch (error) {
+    if (options?.signal?.aborted) {
+      throw error;
+    }
     return unavailableSummary("No pudimos consultar datos publicos de billeteras para este mercado.", thresholdUsd);
   }
 }

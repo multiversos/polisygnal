@@ -118,6 +118,29 @@ type SamanthaStatusRouteResult = {
   warnings?: string[];
 };
 
+const SAMANTHA_STATUS_TIMEOUT_MS = 30_000;
+
+async function fetchSamanthaStatus(taskId: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), SAMANTHA_STATUS_TIMEOUT_MS);
+  try {
+    return await fetch("/api/samantha/research-status", {
+      body: JSON.stringify({ taskId }),
+      cache: "no-store",
+      credentials: "omit",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      redirect: "error",
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 function toNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -593,17 +616,7 @@ export function AnalyzerReport({
     }
     setSamanthaLookupBusy(true);
     try {
-      const response = await fetch("/api/samantha/research-status", {
-        body: JSON.stringify({ taskId: samanthaBridgeTaskId }),
-        cache: "no-store",
-        credentials: "omit",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-        redirect: "error",
-      });
+      const response = await fetchSamanthaStatus(samanthaBridgeTaskId);
       const result = (await response.json().catch(() => ({}))) as SamanthaStatusRouteResult;
       if (!response.ok) {
         setSamanthaActionMessage(result.reason || "No pudimos consultar el estado de Samantha.");
@@ -686,7 +699,7 @@ export function AnalyzerReport({
       onDeepAnalysisJobChange?.(nextJob);
       setSamanthaActionMessage(result.reason || "Samantha todavia no devolvio un reporte.");
     } catch {
-      setSamanthaActionMessage("No pudimos consultar Samantha de forma segura; usa el flujo manual.");
+      setSamanthaActionMessage("Samantha esta tardando mas de lo normal. Puedes volver a consultar o cargar el reporte manual.");
     } finally {
       setSamanthaLookupBusy(false);
     }

@@ -1,9 +1,5 @@
-import type { CSSProperties, ReactNode } from "react";
-
-import {
-  jobStepStatusLabel,
-  type DeepAnalysisJobStep,
-} from "../lib/deepAnalysisJob";
+import type { DeepAnalysisJobStep } from "../lib/deepAnalysisJob";
+import { jobStepStatusLabel } from "../lib/deepAnalysisJob";
 
 export type AnalyzeLoadingPhase =
   | "validating"
@@ -19,507 +15,236 @@ export type AnalyzeLoadingPhase =
   | "ready_to_score"
   | "preparing";
 
-type AnalyzeLoadingPanelProps = {
-  phase: AnalyzeLoadingPhase;
-  jobSteps?: DeepAnalysisJobStep[];
-  message?: string;
-  isVisible: boolean;
-};
+export type AnalyzeProgressIssue = "error" | "timeout" | null;
 
-type AnalyzeLoadingStep = {
+type AnalyzeProgressStepStatus =
+  | "attention"
+  | "completed"
+  | "error"
+  | "pending"
+  | "running";
+
+type AnalyzeProgressStep = {
   detail: string;
+  id:
+    | "reading_link"
+    | "searching_polymarket"
+    | "confirming_matches"
+    | "preparing_samantha"
+    | "waiting_external"
+    | "ready";
   label: string;
+  phases: AnalyzeLoadingPhase[];
+};
+
+type AnalyzeProgressPanelProps = {
+  canSaveForLater?: boolean;
+  elapsedSeconds: number;
+  isBusy: boolean;
+  isVisible: boolean;
+  issue?: AnalyzeProgressIssue;
+  jobSteps?: DeepAnalysisJobStep[];
+  onEditLink: () => void;
+  onRetry: () => void;
+  onSaveForLater?: () => void;
   phase: AnalyzeLoadingPhase;
-  shortLabel: string;
+  samanthaPending?: boolean;
 };
 
-type RadarMarketCategory = {
-  angle: number;
-  icon: ReactNode;
-  id: string;
-  label: string;
-  shortLabel?: string;
-  status: "detected" | "scanning" | "pending";
-};
-
-const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
+const ANALYZE_PROGRESS_STEPS: AnalyzeProgressStep[] = [
   {
-    detail: "Validacion segura del enlace",
-    label: "Detectando enlace",
-    phase: "validating",
-    shortLabel: "Enlace",
+    detail: "Validamos que sea un enlace seguro de Polymarket.",
+    id: "reading_link",
+    label: "Leyendo enlace",
+    phases: ["validating"],
   },
   {
-    detail: "Mercado, outcomes y estado",
-    label: "Mercado leido desde Polymarket",
-    phase: "matching",
-    shortLabel: "Polymarket",
+    detail: "Consultamos el mercado o evento desde la ruta segura.",
+    id: "searching_polymarket",
+    label: "Buscando mercado en Polymarket",
+    phases: ["matching"],
   },
   {
-    detail: "Volumen, liquidez y precios visibles",
-    label: "Datos principales revisados",
-    phase: "context",
-    shortLabel: "Mercado",
+    detail: "Mostramos coincidencias y pedimos confirmacion si hay varias.",
+    id: "confirming_matches",
+    label: "Confirmando coincidencias",
+    phases: ["context", "readiness", "research"],
   },
   {
-    detail: "Capas disponibles y pendientes",
-    label: "Evaluando senales disponibles",
-    phase: "readiness",
-    shortLabel: "Senales",
-  },
-  {
-    detail: "Revisando datos disponibles de billeteras",
-    label: "Actividad de billeteras",
-    phase: "research",
-    shortLabel: "Wallets",
-  },
-  {
-    detail: "Task Packet listo para puente seguro o flujo manual",
+    detail: "Preparamos el brief; no se inventan fuentes ni senales.",
+    id: "preparing_samantha",
     label: "Preparando tarea para Samantha",
-    phase: "preparing_samantha",
-    shortLabel: "Samantha",
+    phases: ["preparing_samantha", "sending_samantha"],
   },
   {
-    detail: "Usando solo configuracion server-side allowlisted",
-    label: "Enviando a Samantha",
-    phase: "sending_samantha",
-    shortLabel: "Envio",
-  },
-  {
-    detail: "Samantha recibio la tarea; esperando evidencia estructurada",
-    label: "Samantha investigando",
-    phase: "samantha_researching",
-    shortLabel: "Research",
-  },
-  {
-    detail: "Investigacion externa pendiente; el flujo manual sigue disponible",
+    detail: "Si Samantha necesita investigar, el estado queda pendiente.",
+    id: "waiting_external",
     label: "Esperando investigacion externa",
-    phase: "awaiting_samantha",
-    shortLabel: "Pendiente",
+    phases: ["samantha_researching", "awaiting_samantha", "validating_report"],
   },
   {
-    detail: "Validando reporte antes de aceptar evidencia",
-    label: "Validando reporte",
-    phase: "validating_report",
-    shortLabel: "Validacion",
-  },
-  {
-    detail: "Evidencia cargada; decision bloqueada si no pasa compuertas",
-    label: "Listo para revisar decision",
-    phase: "ready_to_score",
-    shortLabel: "Scoring",
-  },
-  {
-    detail: "Sin prediccion si faltan evidencias",
-    label: "Preparando decision",
-    phase: "preparing",
-    shortLabel: "Decision",
+    detail: "El resultado solo avanza si pasan las compuertas.",
+    id: "ready",
+    label: "Listo para revisar",
+    phases: ["ready_to_score", "preparing"],
   },
 ];
 
-const DEEP_LAYER_PREVIEW = [
-  "Samantha Research: puente seguro o flujo manual",
-  "Perfiles de billeteras: pendiente",
-  "Investigacion externa: pendiente",
-  "Odds externas: pendiente",
-  "Kalshi: pendiente",
-] as const;
-
-const RESULT_SKELETONS = [
-  "Mercado detectado",
-  "Selector de mercados",
-  "Probabilidad del mercado",
-  "Estimacion PolySignal",
-  "Wallet Intelligence",
-  "Resultado/verificacion",
-] as const;
-
-function CategoryIcon({ id }: { id: string }) {
-  if (id === "sports") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="8" />
-        <path d="M6 12h12M12 4c2 2 3 5 3 8s-1 6-3 8M12 4c-2 2-3 5-3 8s1 6 3 8" />
-      </svg>
-    );
-  }
-  if (id === "basketball") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="8" />
-        <path d="M4 12h16M12 4v16M6.5 6.5c3.5 2 5 5.5 5 11M17.5 6.5c-3.5 2-5 5.5-5 11" />
-      </svg>
-    );
-  }
-  if (id === "baseball") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="8" />
-        <path d="M8 5c2.5 4.5 2.5 9.5 0 14M16 5c-2.5 4.5-2.5 9.5 0 14M7.5 9l2 1M7.5 13l2 1M16.5 9l-2 1M16.5 13l-2 1" />
-      </svg>
-    );
-  }
-  if (id === "news") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <path d="M5 6h12a2 2 0 0 1 2 2v10H7a2 2 0 0 1-2-2V6Z" />
-        <path d="M8 9h6M8 12h8M8 15h5M19 9h1v8a1 1 0 0 1-1 1" />
-      </svg>
-    );
-  }
-  if (id === "politics") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <path d="M5 10h14M7 10v7M11 10v7M15 10v7M19 17H5M12 4l7 4H5l7-4Z" />
-      </svg>
-    );
-  }
-  if (id === "markets") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <path d="M5 18V7M10 18v-5M15 18V9M20 18V5M4 18h17" />
-      </svg>
-    );
-  }
-  if (id === "crypto") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="7" />
-        <path d="M10 7v10M14 7v10M9 9h4.5a2 2 0 0 1 0 4H9M9 13h5a2 2 0 0 1 0 4H9" />
-      </svg>
-    );
-  }
-  if (id === "history") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <path d="M6 5h11a2 2 0 0 1 2 2v12H8a2 2 0 0 1-2-2V5Z" />
-        <path d="M9 9h6M9 12h7M9 15h4M6 17H5a2 2 0 0 1-2-2V7" />
-      </svg>
-    );
-  }
-  if (id === "resolution") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <path d="M12 4v4M12 16v4M4 12h4M16 12h4" />
-        <circle cx="12" cy="12" r="4" />
-        <path d="m10.5 12 1.1 1.2 2.2-2.5" />
-      </svg>
-    );
-  }
-  if (id === "wallets") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <path d="M5 7.5h12.5A2.5 2.5 0 0 1 20 10v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8.5A2.5 2.5 0 0 1 6.5 6H17" />
-        <path d="M16 12h4M16 15h4M8 11h4M8 14h3" />
-        <circle cx="17" cy="13.5" r=".7" />
-      </svg>
-    );
-  }
-  if (id === "profiles") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <circle cx="8" cy="8" r="3" />
-        <circle cx="16" cy="8" r="3" />
-        <path d="M4 19c.8-3 2.4-5 4-5s3.2 2 4 5M12 19c.8-3 2.4-5 4-5s3.2 2 4 5" />
-      </svg>
-    );
-  }
-  if (id === "research") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <circle cx="11" cy="11" r="6" />
-        <path d="m16 16 4 4M8 9h6M8 12h4" />
-      </svg>
-    );
-  }
-  if (id === "samantha") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <path d="M6 5h8l4 4v10H6V5Z" />
-        <path d="M14 5v4h4M8 13h8M8 16h5M9 9h2" />
-      </svg>
-    );
-  }
-  if (id === "odds") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <path d="M5 17V7h14v10H5Z" />
-        <path d="M8 14h2M12 14h4M8 10h8M6 20h12" />
-      </svg>
-    );
-  }
-  if (id === "kalshi") {
-    return (
-      <svg viewBox="0 0 24 24">
-        <path d="M5 18 12 5l7 13H5Z" />
-        <path d="M10 15h4M11 12l2-2" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="8" />
-      <path d="M4 12h16M12 4c2 2.5 3 5 3 8s-1 5.5-3 8M12 4c-2 2.5-3 5-3 8s1 5.5 3 8" />
-    </svg>
+function activeStepIndex(phase: AnalyzeLoadingPhase): number {
+  const index = ANALYZE_PROGRESS_STEPS.findIndex((step) =>
+    step.phases.includes(phase),
   );
+  return Math.max(index, 0);
 }
 
-const RADAR_MARKET_CATEGORIES: RadarMarketCategory[] = [
-  {
-    angle: 310,
-    icon: <CategoryIcon id="sports" />,
-    id: "sports",
-    label: "Deportes",
-    shortLabel: "en radar",
-    status: "scanning",
-  },
-  {
-    angle: 338,
-    icon: <CategoryIcon id="news" />,
-    id: "news",
-    label: "Noticias",
-    shortLabel: "contexto",
-    status: "scanning",
-  },
-  {
-    angle: 6,
-    icon: <CategoryIcon id="politics" />,
-    id: "politics",
-    label: "Politica",
-    shortLabel: "neutral",
-    status: "pending",
-  },
-  {
-    angle: 34,
-    icon: <CategoryIcon id="markets" />,
-    id: "markets",
-    label: "Mercados",
-    shortLabel: "actividad",
-    status: "detected",
-  },
-  {
-    angle: 62,
-    icon: <CategoryIcon id="crypto" />,
-    id: "crypto",
-    label: "Cripto",
-    shortLabel: "categoria",
-    status: "pending",
-  },
-  {
-    angle: 90,
-    icon: <CategoryIcon id="wallets" />,
-    id: "wallets",
-    label: "Billeteras",
-    shortLabel: "publicas",
-    status: "scanning",
-  },
-  {
-    angle: 118,
-    icon: <CategoryIcon id="history" />,
-    id: "history",
-    label: "Historial",
-    shortLabel: "local",
-    status: "scanning",
-  },
-  {
-    angle: 146,
-    icon: <CategoryIcon id="profiles" />,
-    id: "profiles",
-    label: "Perfiles",
-    shortLabel: "pendiente",
-    status: "pending",
-  },
-  {
-    angle: 174,
-    icon: <CategoryIcon id="samantha" />,
-    id: "samantha",
-    label: "Samantha",
-    shortLabel: "brief",
-    status: "pending",
-  },
-  {
-    angle: 202,
-    icon: <CategoryIcon id="research" />,
-    id: "research",
-    label: "Research",
-    shortLabel: "pendiente",
-    status: "pending",
-  },
-  {
-    angle: 230,
-    icon: <CategoryIcon id="odds" />,
-    id: "odds",
-    label: "Odds",
-    shortLabel: "futura",
-    status: "pending",
-  },
-  {
-    angle: 258,
-    icon: <CategoryIcon id="kalshi" />,
-    id: "kalshi",
-    label: "Kalshi",
-    shortLabel: "futura",
-    status: "pending",
-  },
-  {
-    angle: 286,
-    icon: <CategoryIcon id="resolution" />,
-    id: "resolution",
-    label: "Resolucion",
-    shortLabel: "outcome",
-    status: "pending",
-  },
-];
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds} segundos`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes} min ${remainder.toString().padStart(2, "0")} s`;
+}
 
-function stepStatus(stepIndex: number, activeIndex: number): "completed" | "active" | "pending" {
-  if (stepIndex < activeIndex) {
+function elapsedHint(seconds: number, issue: AnalyzeProgressIssue): string {
+  if (issue === "timeout") {
+    return "No pudimos completar esta busqueda ahora. Puedes reintentar o revisar el enlace.";
+  }
+  if (issue === "error") {
+    return "La busqueda se detuvo de forma segura. No mostramos detalles tecnicos ni datos internos.";
+  }
+  if (seconds >= 180) {
+    return "Parece que esta busqueda se quedo esperando respuesta. Puedes reintentar sin perder el enlace.";
+  }
+  if (seconds >= 90) {
+    return "Si no cambia, puedes reintentar o guardar este analisis para continuarlo luego.";
+  }
+  if (seconds >= 45) {
+    return "Esta tardando mas de lo normal, pero puedes seguir esperando.";
+  }
+  return "Esto normalmente toma unos segundos.";
+}
+
+function statusForStep(
+  index: number,
+  activeIndex: number,
+  issue: AnalyzeProgressIssue,
+  samanthaPending: boolean,
+): AnalyzeProgressStepStatus {
+  if (issue && index === activeIndex) {
+    return issue === "timeout" ? "attention" : "error";
+  }
+  if (samanthaPending && index === 4) {
+    return "attention";
+  }
+  if (index < activeIndex) {
     return "completed";
   }
-  if (stepIndex === activeIndex) {
-    return "active";
+  if (index === activeIndex) {
+    return "running";
   }
   return "pending";
 }
 
-function statusLabel(status: "completed" | "active" | "pending"): string {
+function statusLabel(status: AnalyzeProgressStepStatus): string {
   if (status === "completed") {
     return "Completado";
   }
-  if (status === "active") {
+  if (status === "running") {
     return "En curso";
+  }
+  if (status === "attention") {
+    return "Necesita atencion";
+  }
+  if (status === "error") {
+    return "Error";
   }
   return "Pendiente";
 }
 
-export function AnalyzeLoadingPanel({
-  phase,
-  jobSteps,
-  message,
+function markerForStatus(status: AnalyzeProgressStepStatus, index: number): string {
+  if (status === "completed") {
+    return "✓";
+  }
+  if (status === "attention") {
+    return "!";
+  }
+  if (status === "error") {
+    return "×";
+  }
+  return String(index + 1);
+}
+
+export function AnalyzeProgressPanel({
+  canSaveForLater = false,
+  elapsedSeconds,
+  isBusy,
   isVisible,
-}: AnalyzeLoadingPanelProps) {
+  issue = null,
+  jobSteps,
+  onEditLink,
+  onRetry,
+  onSaveForLater,
+  phase,
+  samanthaPending = false,
+}: AnalyzeProgressPanelProps) {
   if (!isVisible) {
     return null;
   }
 
-  const activeIndex = Math.max(
-    ANALYZE_LOADING_STEPS.findIndex((step) => step.phase === phase),
-    0,
-  );
-  const activeStep = ANALYZE_LOADING_STEPS[activeIndex];
+  const activeIndex = activeStepIndex(phase);
+  const title = samanthaPending
+    ? "Samantha necesita terminar la investigacion"
+    : issue
+      ? "No pudimos completar esta busqueda ahora"
+      : "Analisis en progreso";
+  const description = samanthaPending
+    ? "Ya detectamos el mercado, pero la lectura profunda todavia necesita el reporte validado de Samantha."
+    : "PolySignal avanza por etapas reales. No usamos porcentajes falsos ni asumimos evidencia que no existe.";
+  const showRecovery =
+    Boolean(issue) || elapsedSeconds >= 45 || samanthaPending || !isBusy;
 
   return (
     <section
-      aria-busy="true"
+      aria-busy={isBusy ? "true" : "false"}
       aria-live="polite"
-      className="analyze-loading-panel"
+      className={`analyze-progress-panel ${issue ? issue : ""} ${samanthaPending ? "samantha-pending" : ""}`}
       role="status"
     >
-      <div className="analyze-loading-header">
+      <div className="analyze-progress-header">
         <div>
-          <p className="eyebrow">Analisis en curso</p>
-          <h2>Estado del analisis</h2>
-          <p>
-            PolySignal esta revisando el enlace, detectando el tipo de mercado
-            y preparando una lectura segura.
-          </p>
+          <p className="eyebrow">Progreso del analisis</p>
+          <h2>{title}</h2>
+          <p>{description}</p>
         </div>
-        <span className="analyze-loading-phase-pill">{message || activeStep.detail}</span>
+        <div className="analyze-progress-timer">
+          <span>Analizando hace</span>
+          <strong>{formatElapsed(elapsedSeconds)}</strong>
+          <small>{elapsedHint(elapsedSeconds, issue)}</small>
+        </div>
       </div>
 
-      <div className="analyze-loading-stage">
-        <div
-          aria-label="Radar visual de categorias de mercado"
-          className="analyze-scouting-visual"
-        >
-          <div className="scouting-radar-shell">
-            <div className="scouting-radar">
-              <span className="scouting-radar-grid" />
-              <span className="scouting-radar-ring outer" />
-              <span className="scouting-radar-ring middle" />
-              <span className="scouting-radar-ring inner" />
-              <span className="scouting-radar-line horizontal" />
-              <span className="scouting-radar-line vertical" />
-              <span className="scouting-radar-sweep" />
-              <span className="scouting-radar-pulse" />
-              <span className="scouting-radar-dot primary" />
-              <span className="scouting-radar-dot secondary" />
-              <span className="scouting-radar-dot tertiary" />
-              <span className="scouting-radar-core">
-                <span className="scouting-radar-core-mark" />
-                <span className="scouting-radar-core-label">PS</span>
+      <ol className="analyze-progress-steps" aria-label="Etapas del analisis">
+        {ANALYZE_PROGRESS_STEPS.map((step, index) => {
+          const status = statusForStep(index, activeIndex, issue, samanthaPending);
+          return (
+            <li className={`analyze-progress-step ${status}`} key={step.id}>
+              <span className="analyze-progress-step-marker" aria-hidden="true">
+                {markerForStatus(status, index)}
               </span>
-              <div className="radar-market-categories">
-                {RADAR_MARKET_CATEGORIES.map((category) => (
-                  <span
-                    className={`radar-market-category ${category.status}`}
-                    key={category.id}
-                    style={{ "--category-angle": `${category.angle}deg` } as CSSProperties}
-                  >
-                    <span className="radar-market-category-chip">
-                      <span className="radar-market-category-icon" aria-hidden="true">
-                        {category.icon}
-                      </span>
-                      <span className="radar-market-category-copy">
-                        <strong>{category.label}</strong>
-                        {category.shortLabel ? <small>{category.shortLabel}</small> : null}
-                      </span>
-                    </span>
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="scouting-legend">
-              <span>Escaneando categorias</span>
-              <span>Datos disponibles</span>
-              <span>Cobertura pendiente</span>
-            </div>
-          </div>
-        </div>
+              <span className="analyze-progress-step-copy">
+                <strong>{step.label}</strong>
+                <small>{step.detail}</small>
+              </span>
+              <span className="analyze-progress-step-status">{statusLabel(status)}</span>
+            </li>
+          );
+        })}
+      </ol>
 
-        <ol className="analyze-loading-steps" aria-label="Pasos del analisis">
-          {ANALYZE_LOADING_STEPS.map((step, index) => {
-            const status = stepStatus(index, activeIndex);
-            return (
-              <li className={`analyze-loading-step ${status}`} key={step.phase}>
-                <span className="analyze-loading-step-marker" aria-hidden="true">
-                  {status === "completed" ? "Completado" : index + 1}
-                </span>
-                <span className="analyze-loading-step-copy">
-                  <strong>{step.label}</strong>
-                  <small>{step.detail}</small>
-                </span>
-                <span className="analyze-loading-step-status">{status === "active" ? step.shortLabel : statusLabel(status)}</span>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-
-      <div className="analyze-loading-skeletons" aria-label="Vista previa del resultado">
-        {RESULT_SKELETONS.map((label, index) => (
-          <article className="analyze-loading-skeleton-card" key={label}>
-            <span>{label}</span>
-            <div className="skeleton-line wide" />
-            <div className="skeleton-line medium" />
-            <div className="skeleton-line short" />
-            {index % 2 === 0 ? (
-              <div className="skeleton-pill-row" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
-            ) : null}
-          </article>
-        ))}
-      </div>
-      <div className="scouting-legend deep-layer-preview" aria-label="Capas futuras preparadas">
-        {DEEP_LAYER_PREVIEW.map((item) => (
-          <span key={item}>{item}</span>
-        ))}
-      </div>
       {jobSteps && jobSteps.length > 0 ? (
-        <div className="deep-job-preview" aria-label="Estado del analisis">
-          <strong>Progreso del analisis</strong>
+        <div className="analyze-progress-job" aria-label="Estado local del analisis">
+          <strong>Estado guardado del analisis</strong>
           <ol>
             {jobSteps.slice(0, 6).map((step) => (
               <li className={step.status} key={step.id}>
@@ -530,10 +255,36 @@ export function AnalyzeLoadingPanel({
           </ol>
         </div>
       ) : null}
-      <p className="analyze-loading-footnote">
-        Detectando primero y analizando solo el mercado confirmado. Las capas no
-        integradas se muestran como pendientes, no como evidencia real.
+
+      {showRecovery ? (
+        <div className="analyze-progress-actions" aria-label="Acciones de recuperacion">
+          <button disabled={isBusy} onClick={onRetry} type="button">
+            Reintentar
+          </button>
+          <button onClick={onEditLink} type="button">
+            Editar enlace
+          </button>
+          <a href="/history">Ver historial</a>
+          {canSaveForLater && onSaveForLater ? (
+            <button disabled={isBusy} onClick={onSaveForLater} type="button">
+              Guardar para continuar luego
+            </button>
+          ) : null}
+          {samanthaPending ? (
+            <>
+              <a href="#samantha-research">Cargar reporte Samantha</a>
+              <a href="/methodology">Ver metodologia</a>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      <p className="analyze-progress-footnote">
+        Si falta una fuente o un reporte validado, el analisis queda pendiente.
+        PolySignal no convierte esperas ni precios de mercado en predicciones propias.
       </p>
     </section>
   );
 }
+
+export const AnalyzeLoadingPanel = AnalyzeProgressPanel;

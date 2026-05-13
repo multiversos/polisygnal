@@ -752,48 +752,22 @@ function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(resolve(appRoot, "app/components/AnalyzeLoadingPanel.tsx"), "utf8");
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
   const expectedSteps = [
-    "Detectando enlace",
-    "Mercado leido desde Polymarket",
-    "Datos principales revisados",
-    "Evaluando senales disponibles",
-    "Actividad de billeteras",
+    "Leyendo enlace",
+    "Buscando mercado en Polymarket",
+    "Confirmando coincidencias",
     "Preparando tarea para Samantha",
-    "Enviando a Samantha",
-    "Samantha investigando",
     "Esperando investigacion externa",
-    "Validando reporte",
-    "Listo para revisar decision",
-    "Preparando decision",
-  ];
-  const expectedSkeletons = [
-    "Mercado detectado",
-    "Selector de mercados",
-    "Probabilidad del mercado",
-    "Estimacion PolySignal",
-    "Wallet Intelligence",
-    "Resultado/verificacion",
-  ];
-  const expectedCategories = [
-    "Deportes",
-    "Noticias",
-    "Politica",
-    "Mercados",
-    "Cripto",
-    "Billeteras",
-    "Perfiles",
-    "Samantha",
-    "Research",
-    "Odds",
-    "Kalshi",
-    "Historial",
-    "Resolucion",
+    "Listo para revisar",
   ];
 
   assert(source.includes("export type AnalyzeLoadingPhase"), "expected typed analyze loading phases");
-  assert(source.includes("scouting-radar-shell"), "expected prominent radar analytics visual shell");
-  assert(source.includes("scouting-radar-core"), "expected radar center mark");
-  assert(source.includes("RADAR_MARKET_CATEGORIES"), "expected multi-market radar category config");
-  assert(source.includes("DEEP_LAYER_PREVIEW"), "expected deep analyzer pending-layer preview in loading panel");
+  assert(source.includes("export function AnalyzeProgressPanel"), "expected clear analyzer progress component");
+  assert(source.includes("Analizando hace"), "expected elapsed-time copy in progress panel");
+  assert(source.includes("Esto normalmente toma unos segundos."), "expected normal wait guidance");
+  assert(source.includes("Esta tardando mas de lo normal"), "expected slow wait guidance");
+  assert(source.includes("Puedes reintentar o revisar el enlace"), "expected retry guidance");
+  assert(source.includes("Samantha necesita terminar la investigacion"), "expected honest Samantha pending state");
+  assert(source.includes("Guardar para continuar luego"), "expected save-for-later recovery action");
   assert(source.includes("Progreso del analisis"), "expected loading panel to expose human analysis progress state");
   assert(!source.includes("Deep Analysis Job"), "loading panel should not expose technical Deep Analysis Job title");
   assert(!source.includes("Leyendo Polymarket"), "loading panel should use human Polymarket read copy");
@@ -802,21 +776,17 @@ function validateAnalyzeLoadingPanelSource() {
   assert(!source.includes('return "OK"'), "loading panel should not expose OK as public status copy");
   assert(!source.includes('return "Ahora"'), "loading panel should not expose Ahora as public status copy");
   assert(source.includes("aria-live=\"polite\""), "expected polite live region in loading panel");
-  assert(source.includes("aria-busy=\"true\""), "expected busy state in loading panel");
+  assert(source.includes('aria-busy={isBusy ? "true" : "false"}'), "expected real busy state in loading panel");
   for (const step of expectedSteps) {
     assert(source.includes(step), `expected loading step copy: ${step}`);
-  }
-  for (const skeleton of expectedSkeletons) {
-    assert(source.includes(skeleton), `expected loading skeleton copy: ${skeleton}`);
-  }
-  for (const category of expectedCategories) {
-    assert(source.includes(category), `expected multi-market radar category: ${category}`);
   }
   assert(!source.includes("setTimeout"), "loading panel should not use fake timers");
   assert(!source.includes("setInterval"), "loading panel should not use interval-based fake progress");
   assert(!source.includes("100%"), "loading panel should not expose invented percent progress");
   assert(!source.includes("Buscando evidencia externa"), "loading panel must not claim external research is running");
   assert(!source.includes("buscando internet"), "loading panel must not claim internet search is running");
+  assert(analyzePage.includes("withRequestTimeout"), "expected frontend request timeouts for analyzer calls");
+  assert(analyzePage.includes("AbortController"), "expected analyzer requests to be abortable");
   assert(analyzePage.includes("AnalyzeLoadingPanel"), "expected /analyze to render the loading panel");
   assert(analyzePage.includes("MarketSelectionPanel"), "expected /analyze to render the confirmation selector");
   assert(analyzePage.includes("analyzeSelectedMarket"), "expected /analyze to analyze only a selected market");
@@ -837,9 +807,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes('advancePhase("research")'), "expected /analyze loader to enter research phase");
   assert(analyzePage.includes('advancePhase("preparing_samantha")'), "expected /analyze loader to prepare Samantha task");
   assert(analyzePage.includes('advancePhase("sending_samantha")'), "expected /analyze loader to try the safe Samantha bridge");
-  assert(analyzePage.includes("radarVisible"), "expected /analyze to keep Radar Analytics visible while job is pending");
+  assert(analyzePage.includes("progressIssue"), "expected /analyze to keep progress recovery visible after timeout or error");
 
-  return { phases: expectedSteps.length, skeletons: expectedSkeletons.length };
+  return { phases: expectedSteps.length, recovery_actions: 4, timeout_guard: true };
 }
 
 function validateAnalyzerReportSource() {
@@ -1524,7 +1494,7 @@ function validateDeepAnalysisJobRules() {
   assert(!storageSource.includes("fetch("), "deep analysis job storage must not call external services");
   assert(!storageSource.includes("raw payload"), "deep analysis job storage should not store raw payloads");
   assert(analyzePage.includes("createDeepAnalysisJob"), "analyze page should create local deep analysis jobs");
-  assert(analyzePage.includes("getLatestDeepAnalysisJobForUrl(validation.normalizedUrl)"), "analyze page should reuse pending jobs by URL");
+  assert(analyzePage.includes("getLatestDeepAnalysisJobForUrl(normalizedUrl)"), "analyze page should reuse pending jobs by URL");
   assert(analyzePage.includes("existingBridgeTaskId"), "analyze page should not duplicate Samantha sends when continuing a job");
   assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page should keep jobs awaiting Samantha when bridge is unavailable");
   assert(analyzePage.includes("markJobSendingToSamantha"), "analyze page should expose automatic bridge states");
