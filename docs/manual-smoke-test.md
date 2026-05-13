@@ -605,6 +605,30 @@ Use these quick checks when reviewing public pages:
 12. Confirm no prediction is created unless the suggested estimate passes the
     strict validation gate.
 
+## Samantha Bridge Local Dev
+
+Use only in local/dev. Production must remain disabled unless explicitly
+configured.
+
+1. In Samantha, enable the local endpoint with
+   `POLYSIGNAL_RESEARCH_BRIDGE_ENABLED=true` and a local
+   `POLYSIGNAL_RESEARCH_BRIDGE_TOKEN`.
+2. In PolySignal server-side config, set
+   `SAMANTHA_BRIDGE_URL=http://127.0.0.1:8787/polysignal/research-task`,
+   `SAMANTHA_BRIDGE_ENABLED=true`, `SAMANTHA_BRIDGE_ALLOW_LOCALHOST=true`, and
+   the matching `SAMANTHA_BRIDGE_TOKEN`.
+3. Analyze a Polymarket link.
+4. Confirm PolySignal sends the task, receives `accepted`, and keeps the job in
+   `samantha_researching` or `awaiting_samantha`.
+5. Confirm Radar Analytics remains visible and manual fallback buttons remain
+   available.
+6. Confirm the job is not marked completed until a valid Samantha report is
+   loaded and passes PolySignal gates.
+7. Confirm Samantha's pending queue contains only a sanitized summary, not raw
+   payloads, secrets or full wallet addresses.
+8. Confirm rejected requests include: missing token, non-Polymarket URL, full
+   wallet address, script-like text, oversized payload and trading instruction.
+
 ## Cache Troubleshooting
 
 If a normal browser shows old data but backend/proxy checks pass:

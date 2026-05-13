@@ -122,6 +122,10 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
   server-side segura. Si no esta configurado, el job queda `awaiting_samantha`
   y el flujo manual completo sigue disponible. Esta ruta no acepta destinos del
   cliente y no es un proxy abierto.
+- En desarrollo local, Samantha puede recibir la tarea en
+  `POST /polysignal/research-task` si su bridge esta explicitamente habilitado.
+  La respuesta actual esperada es `accepted`/`queued_or_manual`; PolySignal no
+  marca el analisis como completado hasta recibir un reporte validado.
 - The report closes with `Que puedes hacer ahora`: save the analysis, save as
   follow-up when there is no PolySignal estimate, view history, follow the
   market, open market detail, or analyze another link.
@@ -204,6 +208,8 @@ Prepared as frontend contracts only.
   `/api/samantha/send-research` preparan Camino B automatico seguro. Por
   defecto responde fallback manual; solo usa un endpoint server-side allowlisted
   si `SAMANTHA_BRIDGE_ENABLED` y `SAMANTHA_BRIDGE_URL` estan configurados.
+- Endpoint local recomendado para Samantha:
+  `http://127.0.0.1:8787/polysignal/research-task`.
 - `DeepAnalysisJob` soporta estados de puente:
   `sending_to_samantha`, `samantha_researching`,
   `receiving_samantha_report` y `validating_samantha_report`.

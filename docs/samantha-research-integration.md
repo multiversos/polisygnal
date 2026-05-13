@@ -38,17 +38,27 @@ fallback manual.
 
 ## Auditoria Camino B
 
-`apps/web/app/api/samantha-polysignal-analysis/` existe como carpeta
-untracked local. Su `route.ts` consulta el backend de PolySignal y
-`/markets/overview` para buscar mercados, por lo que pertenece al enfoque viejo
-de matching interno. No se integra, no se borra y no debe stagearse sin una
-revision separada.
+`apps/web/app/api/samantha-polysignal-analysis/` existia como carpeta local
+ignored/untracked. Su `route.ts` consultaba el backend de PolySignal y
+`/markets/overview` para buscar mercados, por lo que pertenecia al enfoque
+viejo de matching interno. Se retiro del working tree local y no se integro ni
+se stageo.
 
-`N:/samantha` existe, pero la auditoria encontro un bridge WhatsApp/OpenClaw
-con health/webhooks y scripts de analista. No se encontro un endpoint directo y
-seguro que acepte el `SamanthaTaskPacket` desde PolySignal. Por eso Camino B
-queda preparado en modo disabled/manual fallback hasta que Samantha exponga un
-canal de investigacion compatible.
+`N:/samantha` existe como bridge WhatsApp/OpenClaw. La auditoria encontro
+health/webhooks, modo `POLYSIGNAL_ANALYST_MODE`, logs de analista y scripts de
+prueba, pero no habia un endpoint directo y seguro que aceptara el
+`SamanthaTaskPacket` desde PolySignal.
+
+Se agrego en Samantha un endpoint local/dev compatible:
+
+- `POST /polysignal/research-task`
+- contrato: `src/polysignal/samantha-task-contract.js`
+- cola local: `data/polysignal/research-tasks-pending.jsonl`
+- audit log local: `data/polysignal/research-audit-log.jsonl`
+
+Este endpoint esta deshabilitado por defecto y, cuando se habilita, acepta la
+tarea y la deja pendiente. No inventa reportes ni ejecuta investigacion
+automatica si Samantha no tiene una capa real disponible.
 
 ## Camino B: puente automatico seguro
 
@@ -68,7 +78,7 @@ Modo por defecto:
 Configuracion server-side opcional:
 
 - `SAMANTHA_BRIDGE_ENABLED`
-- `SAMANTHA_BRIDGE_URL`
+- `SAMANTHA_BRIDGE_URL` (local dev: `http://127.0.0.1:8787/polysignal/research-task`)
 - `SAMANTHA_BRIDGE_TOKEN`
 - `SAMANTHA_BRIDGE_ALLOW_LOCALHOST`
 - `SAMANTHA_BRIDGE_TIMEOUT_MS`
@@ -154,6 +164,38 @@ datos, secretos, doxxing, identificacion de personas reales detras de wallets y
 fuentes inventadas.
 
 ## Rutas seguras
+
+### Endpoint local en Samantha
+
+Para usar Camino B en desarrollo local:
+
+1. En Samantha, configurar solo en entorno local:
+   - `POLYSIGNAL_RESEARCH_BRIDGE_ENABLED=true`
+   - `POLYSIGNAL_RESEARCH_BRIDGE_TOKEN=<token-local>`
+   - `POLYSIGNAL_RESEARCH_BRIDGE_ALLOW_REMOTE=false`
+2. En PolySignal, configurar solo server-side:
+   - `SAMANTHA_BRIDGE_ENABLED=true`
+   - `SAMANTHA_BRIDGE_URL=http://127.0.0.1:8787/polysignal/research-task`
+   - `SAMANTHA_BRIDGE_TOKEN=<mismo-token-local>`
+   - `SAMANTHA_BRIDGE_ALLOW_LOCALHOST=true`
+3. Iniciar Samantha localmente.
+4. Analizar un enlace en `/analyze`.
+
+Respuesta esperada si Samantha acepta la tarea sin investigacion inmediata:
+
+```json
+{
+  "ok": true,
+  "status": "accepted",
+  "taskId": "samantha-task-...",
+  "mode": "queued_or_manual",
+  "message": "Task accepted; research pending"
+}
+```
+
+PolySignal interpreta esa respuesta como `samantha_researching` o
+`awaiting_samantha`; el Radar permanece visible y el fallback manual sigue
+disponible. El job no queda `completed`.
 
 Briefs:
 

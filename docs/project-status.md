@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con arquitectura Deep Analyzer read-only preparada y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `3c5852d`
+- ultimo deploy production verificado antes de este sprint: `1dccf35`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -136,11 +136,15 @@ Estado visible verificado:
   permanece visible mientras el job esta activo, pendiente de Samantha o
   listo para scoring; no usa timers falsos ni marca completado si falta
   investigacion externa.
-- Auditoria local: existe una carpeta untracked
-  `apps/web/app/api/samantha-polysignal-analysis/` con un route viejo que usa
-  backend `/markets/overview`; no se integro porque violaria la regla
-  Polymarket-first. `N:/samantha` existe como bridge WhatsApp/OpenClaw, pero no
-  expone todavia un endpoint directo para recibir el Task Packet de PolySignal.
+- Auditoria local: existia una carpeta ignored/untracked
+  `apps/web/app/api/samantha-polysignal-analysis/` con un route viejo que usaba
+  backend `/markets/overview`; se retiro del working tree local porque violaba
+  la regla Polymarket-first y no se integro a Camino B.
+- `N:/samantha` existe como bridge WhatsApp/OpenClaw. Se agrego un endpoint
+  local/dev `POST /polysignal/research-task` para recibir el Task Packet de
+  PolySignal, validarlo, escribir una cola local sanitizada y responder
+  `accepted`/`queued_or_manual`. Esta deshabilitado por defecto y no inventa
+  reportes ni ejecuta investigacion automatica si no hay capa real configurada.
 - El paquete para Samantha incluye brief JSON, instrucciones TXT, schema de
   respuesta, reglas de seguridad e instrucciones de devolucion. Prohibe fuentes
   inventadas, trading, Neon, `.env`, doxxing, secretos, copy-trading y
