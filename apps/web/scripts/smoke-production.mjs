@@ -990,6 +990,30 @@ async function main() {
   const analyzeText = visibleText(analyzeDom);
   assertTextIncludes(analyzeText, "Polymarket", "analyze polymarket copy");
   assertTextIncludes(analyzeText, "Analizar", "analyze button");
+  assert(
+    analyzeDom.includes("Pega aquí el enlace del evento o mercado") ||
+      analyzeDom.includes("Pega aquÃ­ el enlace del evento o mercado") ||
+      analyzeDom.includes("Pega aqu"),
+    "analyze link placeholder missing",
+  );
+  assertTextIncludesOneOf(
+    analyzeText,
+    ["Vista previa del análisis", "Vista previa del anÃ¡lisis", "Vista previa del anÃƒÂ¡lisis"],
+    "analyze preview heading",
+  );
+  assertTextIncludesOneOf(
+    analyzeText,
+    ["Qué hace Samantha", "QuÃ© hace Samantha", "QuÃƒÂ© hace Samantha"],
+    "analyze Samantha explainer",
+  );
+  assertTextIncludes(analyzeText, "Pegar enlace", "analyze step one");
+  assertTextIncludes(analyzeText, "Confirmar mercado", "analyze step two");
+  assertTextIncludes(analyzeText, "Recibir lectura clara", "analyze step three");
+  assertTextExcludes(
+    analyzeText,
+    ["JSON", "snapshot", "proxy", "OCR", "stack trace", "localhost", "DATABASE_URL", "secret"],
+    "analyze initial technical noise",
+  );
   assertTextIncludesOneOf(
     analyzeText,
     ["Pega un enlace", "Enlace de Polymarket"],

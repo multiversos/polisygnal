@@ -53,6 +53,12 @@ Estado visible verificado:
 - `/analyze` esta disponible para validar enlaces de Polymarket, resolverlos
   directamente desde Polymarket/Gamma read-only y guardar resultados locales en
   Historial.
+- `/analyze` ahora usa una direccion visual Samantha-first tipo SaaS
+  financiero/deportivo: fondo dark navy, sidebar glass oscuro, logo PolySignal
+  mas grande, hero con banner degradado, ilustracion CSS/SVG editable,
+  flujo visual de tres pasos, vista previa con gauge semicircular, mini grafica,
+  riesgo y resumen Samantha. Es un cambio visual/UX; no cambia backend, Neon,
+  `.env`, migraciones, trading, scoring ni datos reales.
 - El estado inicial de `/analyze` explica el flujo antes de pegar un enlace:
   detectar mercado, confirmar si hay varias opciones, analizar solo el mercado
   elegido y guardar la lectura para medirla con el tiempo.

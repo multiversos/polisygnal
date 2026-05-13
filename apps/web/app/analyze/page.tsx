@@ -6,6 +6,12 @@ import {
   AnalyzeLoadingPanel,
   type AnalyzeLoadingPhase,
 } from "../components/AnalyzeLoadingPanel";
+import { AnalyzeHero } from "../components/analyze/AnalyzeHero";
+import { AnalyzeSteps } from "../components/analyze/AnalyzeSteps";
+import {
+  AnalysisPreview,
+  type AnalysisPreviewProps,
+} from "../components/analyze/AnalysisPreview";
 import { AnalyzerReport } from "../components/AnalyzerReport";
 import { MainNavigation } from "../components/MainNavigation";
 import { getPolySignalDecision } from "../lib/analysisDecision";
@@ -1411,6 +1417,79 @@ function MatchCard({
   );
 }
 
+function previewPropsForState({
+  deepAnalysisJob,
+  state,
+}: {
+  deepAnalysisJob?: DeepAnalysisJob | null;
+  state: SearchState;
+}): AnalysisPreviewProps {
+  if (state.status === "result") {
+    const marketProbability = getMarketImpliedProbabilities({
+      marketNoPrice: state.match.item.latest_snapshot?.no_price,
+      marketYesPrice: state.match.item.latest_snapshot?.yes_price,
+    });
+    const polySignalProbability = getRealPolySignalProbabilities(state.match.item);
+    const warnings = [
+      ...state.match.warnings,
+      ...(deepAnalysisJob?.steps ?? [])
+        .filter((step) => step.status === "blocked")
+        .map((step) => step.summary || step.label),
+    ].filter(Boolean);
+    return {
+      marketProbability: marketProbability ? marketProbability.yes * 100 : null,
+      marketProbabilityCopy: marketProbability
+        ? `Precio visible: YES ${formatPublicProbability(marketProbability.yes)} / NO ${formatPublicProbability(marketProbability.no)}.`
+        : "Se mostrará al detectar el mercado.",
+      polySignalCopy: polySignalProbability
+        ? `Estimación real disponible: YES ${formatPublicProbability(polySignalProbability.yes)} / NO ${formatPublicProbability(polySignalProbability.no)}.`
+        : "Disponible solo con señales suficientes.",
+      polySignalReady: Boolean(polySignalProbability),
+      riskCopy: warnings[0] || "Samantha revisará riesgos relevantes.",
+      riskTone: warnings.length > 0 ? "warning" : "neutral",
+      samanthaCopy:
+        deepAnalysisJob?.status === "completed"
+          ? "Reporte validado y listo para revisar."
+          : jobAwaitsResearch(deepAnalysisJob)
+            ? "Lectura pendiente de evidencia externa validable."
+            : "Lectura clara en 2–3 líneas.",
+    };
+  }
+
+  if (state.status === "invalid") {
+    return {
+      marketProbability: null,
+      marketProbabilityCopy: "Se mostrará al detectar el mercado.",
+      polySignalCopy: "Disponible solo con señales suficientes.",
+      riskCopy: "Revisa que el enlace sea de Polymarket y esté completo.",
+      riskTone: "warning",
+      samanthaCopy: "Lectura clara en 2–3 líneas.",
+    };
+  }
+
+  if (state.status === "needs_selection" || state.status === "no_exact_match") {
+    return {
+      marketProbability: null,
+      marketProbabilityCopy: "Se mostrará al confirmar un mercado.",
+      polySignalCopy: "Disponible solo con señales suficientes.",
+      riskCopy:
+        state.status === "no_exact_match"
+          ? "No se encontró mercado validable; no se inventan datos."
+          : "Samantha revisará riesgos relevantes.",
+      riskTone: state.status === "no_exact_match" ? "warning" : "neutral",
+      samanthaCopy: "Confirma un mercado para preparar la lectura.",
+    };
+  }
+
+  return {
+    marketProbability: null,
+    marketProbabilityCopy: "Se mostrará al detectar el mercado.",
+    polySignalCopy: "Disponible solo con señales suficientes.",
+    riskCopy: "Samantha revisará riesgos relevantes.",
+    samanthaCopy: "Lectura clara en 2–3 líneas.",
+  };
+}
+
 export default function AnalyzePage() {
   const [input, setInput] = useState("");
   const [state, setState] = useState<SearchState>({ status: "idle" });
@@ -2006,110 +2085,20 @@ export default function AnalyzePage() {
   const radarVisible =
     loading || (state.status === "result" && deepJobSupportsPersistentRadar(deepAnalysisJob));
   const radarPhase = loadingPhaseFromJob(deepAnalysisJob) ?? loadingPhase;
+  const previewProps = previewPropsForState({ deepAnalysisJob, state });
 
   return (
     <main className="dashboard-shell analyze-page">
       <MainNavigation />
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Analizar enlace</p>
-          <h1>Analizar enlace</h1>
-          <p className="subtitle">
-            Pega un enlace de Polymarket. PolySignal detectara el mercado o
-            evento y te pedira confirmar que quieres analizar antes de preparar
-            el analisis profundo.
-          </p>
-        </div>
-        <div className="topbar-actions">
-          <a className="analysis-link secondary" href="/history">
-            Ver historial
-          </a>
-        </div>
-      </header>
-
-      <section className="safety-strip">
-        <strong>Flujo responsable:</strong>
-        <span>
-          Detectar -&gt; Confirmar -&gt; Analisis profundo. Resolvemos el enlace desde
-          Polymarket/Gamma en modo solo lectura; no usamos capturas, OCR ni
-          mercados internos como alternativa. Si guardas una lectura, queda en el historial local de este navegador.
-        </span>
-      </section>
-
-      <section className="dashboard-panel analyze-form-panel">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Polymarket</p>
-            <h2>Pegar enlace</h2>
-            <p>Puede ser un enlace de evento, mercado o deporte de Polymarket.</p>
-          </div>
-        </div>
-        <div className="analyze-form">
-          <label>
-            Enlace de Polymarket
-            <input
-              aria-label="Enlace de Polymarket"
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="https://polymarket.com/event/..."
-              value={input}
-            />
-          </label>
-          <div className="watchlist-actions">
-            <button
-              className="watchlist-button active"
-              disabled={loading}
-              onClick={() => void runAnalysis()}
-              type="button"
-            >
-              {loading ? "Analizando" : "Analizar"}
-            </button>
-            <button className="watchlist-button" onClick={handleClear} type="button">
-              Limpiar
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {state.status === "idle" ? (
-        <section className="dashboard-panel analyzer-start-panel" aria-label="Como funciona el analizador">
-          <div className="panel-heading compact">
-            <div>
-              <p className="eyebrow">Como funciona</p>
-              <h2>Detectar, confirmar y analizar en profundidad</h2>
-              <p>
-                Pega un enlace de evento o mercado de Polymarket. Si el enlace
-                contiene varios mercados, te mostraremos un selector antes de analizar.
-              </p>
-            </div>
-          </div>
-          <div className="analyzer-start-steps">
-            <article>
-              <span>1</span>
-              <strong>Resolvemos el enlace en Polymarket</strong>
-              <p>El evento o mercado viene de Gamma/Polymarket read-only, no de una busqueda interna.</p>
-            </article>
-            <article>
-              <span>2</span>
-              <strong>Te pedimos confirmar si hay varias opciones</strong>
-              <p>PolySignal no abre analisis profundos de coincidencias secundarias.</p>
-            </article>
-            <article>
-              <span>3</span>
-              <strong>Analizamos solo el mercado elegido</strong>
-              <p>El reporte prepara capas profundas: mercado, movimiento, billeteras, research, odds, Kalshi y decision.</p>
-            </article>
-            <article>
-              <span>4</span>
-              <strong>Guardas la lectura para medirla con el tiempo</strong>
-              <p>El historial mide predicciones claras cuando el mercado se resuelve.</p>
-            </article>
-          </div>
-          <p className="analyzer-report-note">
-            La probabilidad del mercado viene de Polymarket. La estimacion PolySignal
-            solo aparece si hay senales suficientes; Wallet Intelligence es auxiliar.
-          </p>
-        </section>
-      ) : null}
+      <AnalyzeHero
+        input={input}
+        loading={loading}
+        onClear={handleClear}
+        onInputChange={setInput}
+        onSubmit={() => void runAnalysis()}
+      />
+      <AnalyzeSteps />
+      <AnalysisPreview {...previewProps} />
 
       {state.status === "invalid" ? (
         <section className="alert-panel compact" role="status">
@@ -2194,6 +2183,13 @@ export default function AnalyzePage() {
           </div>
         </section>
       ) : null}
+
+      <section className="analyze-bottom-disclaimer" aria-label="Aviso responsable">
+        <span>
+          PolySignal no garantiza resultados. Las predicciones del mercado pueden cambiar rápidamente.
+        </span>
+        <a href="/methodology">Conoce más en Metodología →</a>
+      </section>
 
       {actionMessage ? (
         <section className="focus-notice active" role="status">

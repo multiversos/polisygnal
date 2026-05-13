@@ -260,15 +260,31 @@ If this test fails, stop feature work and treat it as a production regression.
 ## Analizar Enlace
 
 1. Open `https://polisygnal-web.vercel.app/analyze` from the sidebar.
-2. Confirm the page shows an input for a Polymarket link and an `Analizar`
-   button.
-3. Confirm the initial state explains:
+2. Confirm the page uses the Samantha-first dark visual system:
+   - large dark-gradient hero banner;
+   - larger PolySignal logo in the sidebar;
+   - premium link input with cyan/blue primary button;
+   - editable CSS/SVG hero illustration, gauge and mini chart;
+   - `Vista previa del análisis` cards;
+   - `Qué hace Samantha` side card.
+3. Confirm the page shows an input for a Polymarket link and an `Analizar`
+   button with placeholder `Pega aquí el enlace del evento o mercado`.
+4. Confirm the three-step flow is visible:
+   - `Pegar enlace`;
+   - `Confirmar mercado`;
+   - `Recibir lectura clara`.
+5. Confirm the initial preview is clearly pending and does not present demo
+   probabilities, invented signals, fake wallets, odds, news or predictions as
+   real data.
+6. Confirm no visible default copy mentions JSON, snapshot, proxy, OCR,
+   localhost, stack traces, secrets or raw payloads.
+7. Confirm the initial state explains:
    - Resolvemos el enlace en Polymarket.
    - Confirmas si hay varias opciones.
    - Analizamos solo el mercado elegido.
    - Guardas la lectura para medirla con el tiempo.
-4. Paste an invalid link and confirm the page shows a friendly message.
-5. Paste a Polymarket link and confirm the page either finds a matching market
+8. Paste an invalid link and confirm the page shows a friendly message.
+9. Paste a Polymarket link and confirm the page either finds a matching market
    selector, a single selected result, or clearly says it could not be obtained
    from Polymarket.
 6. While the valid link is being analyzed, confirm the guided loading panel

@@ -97,7 +97,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="app-sidebar" aria-label="Navegación principal">
         <Link className="app-logo" href="/" aria-label="Ir al inicio de PolySignal">
-          <img src="/brand/polysignal-logo-option5.svg" alt="PolySignal" />
+          <img src="/brand/polysignal-icon-option5.svg" alt="" aria-hidden="true" />
+          <span>
+            <strong>PolySignal</strong>
+            <small>DETECTA. LEE. REACCIONA.</small>
+          </span>
         </Link>
         <nav className="app-nav">
           {publicNavigationItems.map((item) => (
@@ -131,6 +135,21 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div>
               <span>PolySignal</span>
               <strong>Analizador de mercados Polymarket</strong>
+            </div>
+          </div>
+          <div className="app-header-actions" aria-label="Estado de Samantha">
+            <span className="app-header-icon-button" aria-label="Notificaciones" role="img">
+              <NavIcon name="alerts" />
+            </span>
+            <span className="app-header-icon-button" aria-label="Guia" role="img">
+              <NavIcon name="evidence" />
+            </span>
+            <div className="app-samantha-profile">
+              <span>S</span>
+              <div>
+                <strong>Samantha</strong>
+                <small>Research copilot</small>
+              </div>
             </div>
           </div>
         </header>
