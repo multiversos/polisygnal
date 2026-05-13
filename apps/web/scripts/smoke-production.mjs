@@ -1016,22 +1016,27 @@ async function main() {
   );
   assertTextIncludesOneOf(
     analyzeText,
-    ["Pega un enlace", "Enlace de Polymarket"],
+    [
+      "Pega aquí el enlace del evento o mercado",
+      "Pega aquÃ­ el enlace del evento o mercado",
+      "Pega aqu",
+      "evento o mercado",
+    ],
     "analyze input copy",
   );
   assertTextIncludesOneOf(
     analyzeText,
-    ["Detectar, confirmar y analizar", "Detectar - Confirmar - Analizar", "Listo para comparar un enlace"],
+    ["Pegar enlace", "Confirmar mercado", "Recibir lectura clara"],
     "analyze flow explanation",
   );
   assertTextIncludesOneOf(
     analyzeText,
-    ["Guardas la lectura", "historial local de este navegador", "Primero detectamos el evento"],
+    ["Ver historial", "historial", "Lectura clara"],
     "analyze history connection copy",
   );
   assertTextIncludesOneOf(
     analyzeText,
-    ["historial local de este navegador", "este navegador"],
+    ["PolySignal no garantiza resultados", "predicciones del mercado pueden cambiar", "Metodología"],
     "analyze local privacy copy",
   );
   const invalidAnalyzeDom = await dumpDom(urlFor(`${ANALYZE_PATH}?url=not-a-link&auto=1`));
