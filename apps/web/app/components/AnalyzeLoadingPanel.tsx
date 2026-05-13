@@ -69,7 +69,7 @@ const ANALYZE_LOADING_STEPS: AnalyzeLoadingStep[] = [
   },
   {
     detail: "Revisando datos disponibles de billeteras",
-    label: "Revisando billeteras",
+    label: "Actividad de billeteras",
     phase: "research",
     shortLabel: "Wallets",
   },

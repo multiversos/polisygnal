@@ -154,7 +154,7 @@ function researchStageLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | n
     return "Samantha recibio la tarea";
   }
   if (bridgeStatus === "pending" || item.researchStatus === "samantha_researching") {
-    return "Pendiente de Samantha";
+    return "Pendiente de investigacion";
   }
   if (bridgeStatus === "processing") {
     return "Samantha procesando";
@@ -178,7 +178,7 @@ function researchStageLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | n
     return "Completado";
   }
   if (item.awaitingResearch || item.researchStatus === "awaiting_samantha") {
-    return "Pendiente de Samantha";
+    return "Pendiente de investigacion";
   }
   return "Sin investigacion externa activa";
 }

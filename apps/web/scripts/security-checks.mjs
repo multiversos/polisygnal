@@ -756,7 +756,7 @@ function validateAnalyzeLoadingPanelSource() {
     "Mercado leido desde Polymarket",
     "Datos principales revisados",
     "Evaluando senales disponibles",
-    "Revisando billeteras",
+    "Actividad de billeteras",
     "Preparando tarea para Samantha",
     "Enviando a Samantha",
     "Samantha investigando",
@@ -1529,7 +1529,8 @@ function validateDeepAnalysisJobRules() {
   assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page should keep jobs awaiting Samantha when bridge is unavailable");
   assert(analyzePage.includes("markJobSendingToSamantha"), "analyze page should expose automatic bridge states");
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
-  assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport should show job state");
+  assert(reportSource.includes("Progreso del analisis"), "AnalyzerReport should show human progress copy");
+  assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport should expose an accessible job-state label");
   assert(reportSource.includes("Esperando investigacion externa"), "AnalyzerReport should show human external research wait state");
   assert(reportSource.includes("Samantha necesita investigacion manual"), "AnalyzerReport should show manual_needed state");
   assert(reportSource.includes("markJobSamanthaReportLoaded"), "AnalyzerReport should merge Samantha report into the job");

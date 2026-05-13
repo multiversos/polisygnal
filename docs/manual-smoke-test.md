@@ -567,24 +567,24 @@ Use these quick checks when reviewing public pages:
 8. Confirm the Radar Analytics loader marks unintegrated layers as pending
    rather than completed evidence.
 
-## Deep Analysis Job Workflow
+## Progreso del analisis profundo
 
 1. Open `/analyze`.
 2. Paste a valid Polymarket link and confirm/select one market.
-3. Confirm the report shows `Estado del analisis profundo`.
+3. Confirm the report shows `Progreso del analisis`.
 4. Confirm the job shows:
-   - Polymarket read.
-   - Market analyzed.
-   - Wallet Intelligence reviewed or blocked honestly.
-   - Brief for Samantha ready.
-   - `Esperando reporte de Samantha`.
+   - Mercado leido desde Polymarket.
+   - Datos principales revisados.
+   - Actividad de billeteras revisada o bloqueada de forma honesta.
+   - Tarea de investigacion preparada.
+   - `Esperando investigacion externa`.
    - Odds/Kalshi/profile steps blocked or pending integration.
 5. Confirm the report does not say the deep analysis is completed while waiting
    for Samantha.
 6. Use `Copiar tarea para Samantha`, `Descargar tarea JSON`,
    `Descargar instrucciones TXT`, or `Copiar schema de respuesta`.
 7. Save the analysis as pending and open `/history`.
-8. Confirm the saved item shows `Esperando Samantha`, the brief date when
+8. Confirm the saved item shows `Pendiente de investigacion`, the brief date when
    available, and a `Continuar analisis` action.
 9. Paste an invalid Samantha report and confirm it fails without changing the
    job to completed.

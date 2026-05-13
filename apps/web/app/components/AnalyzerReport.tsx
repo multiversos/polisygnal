@@ -938,7 +938,7 @@ export function AnalyzerReport({
         <section className="analyzer-deep-job-state" aria-label="Estado del analisis profundo">
           <div className="probability-display-heading">
             <div>
-              <p className="eyebrow">Estado del analisis profundo</p>
+              <p className="eyebrow">Progreso del analisis</p>
               <h4>{jobSummary.headline}</h4>
             </div>
             <span>

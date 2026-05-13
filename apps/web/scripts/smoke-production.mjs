@@ -539,7 +539,7 @@ function validateAnalyzeLoadingPanelSource() {
     "Mercado leido desde Polymarket",
     "Datos principales revisados",
     "Evaluando senales disponibles",
-    "Revisando billeteras",
+    "Actividad de billeteras",
     "Preparando tarea para Samantha",
     "Enviando a Samantha",
     "Samantha investigando",
@@ -628,7 +628,8 @@ function validateAnalyzeLoadingPanelSource() {
   );
   assert(analyzePage.includes("AnalyzerReport"), "analyze page does not render AnalyzerReport");
   assert(reportSource.includes("Resumen del analisis"), "AnalyzerReport missing executive summary");
-  assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport missing deep job state");
+  assert(reportSource.includes("Progreso del analisis"), "AnalyzerReport missing human progress copy");
+  assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport missing accessible deep job state");
   assert(reportSource.includes("Esperando investigacion externa"), "AnalyzerReport missing external research wait state");
   assert(reportSource.includes("Samantha necesita investigacion manual"), "AnalyzerReport missing manual_needed state");
   assert(reportSource.includes("Analisis profundo"), "AnalyzerReport missing deep analysis section");

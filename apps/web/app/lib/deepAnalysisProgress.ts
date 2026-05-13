@@ -37,8 +37,8 @@ export const DEEP_ANALYSIS_PROGRESS_STEPS: DeepAnalysisProgressStep[] = [
   {
     canRunNow: true,
     isLongRunning: false,
-    label: "Leyendo Polymarket",
-    publicCopy: "Leyendo mercado, outcomes, precios y estado desde Polymarket.",
+    label: "Mercado leido desde Polymarket",
+    publicCopy: "Mercado, outcomes, precios y estado leidos desde Polymarket.",
     requiresBackendJob: false,
     requiresExternalSource: false,
     state: "reading_polymarket",
@@ -46,7 +46,7 @@ export const DEEP_ANALYSIS_PROGRESS_STEPS: DeepAnalysisProgressStep[] = [
   {
     canRunNow: true,
     isLongRunning: false,
-    label: "Analizando mercado",
+    label: "Datos principales revisados",
     publicCopy: "Revisando volumen, liquidez y datos visibles disponibles.",
     requiresBackendJob: false,
     requiresExternalSource: false,
@@ -55,7 +55,7 @@ export const DEEP_ANALYSIS_PROGRESS_STEPS: DeepAnalysisProgressStep[] = [
   {
     canRunNow: true,
     isLongRunning: false,
-    label: "Revisando billeteras",
+    label: "Actividad de billeteras",
     publicCopy: "Revisando datos publicos de billeteras cuando hay id compatible.",
     requiresBackendJob: false,
     requiresExternalSource: false,
@@ -64,7 +64,7 @@ export const DEEP_ANALYSIS_PROGRESS_STEPS: DeepAnalysisProgressStep[] = [
   {
     canRunNow: false,
     isLongRunning: true,
-    label: "Perfilando wallets",
+    label: "Perfil de billeteras",
     publicCopy: "Pendiente de integracion: historial cerrado y desempeno real por wallet.",
     requiresBackendJob: true,
     requiresExternalSource: true,
@@ -73,7 +73,7 @@ export const DEEP_ANALYSIS_PROGRESS_STEPS: DeepAnalysisProgressStep[] = [
   {
     canRunNow: true,
     isLongRunning: false,
-    label: "Brief para Samantha",
+    label: "Tarea de investigacion preparada",
     publicCopy: "Preparando brief estructurado para investigacion externa manual.",
     requiresBackendJob: false,
     requiresExternalSource: false,
@@ -82,7 +82,7 @@ export const DEEP_ANALYSIS_PROGRESS_STEPS: DeepAnalysisProgressStep[] = [
   {
     canRunNow: false,
     isLongRunning: true,
-    label: "Reporte de Samantha",
+    label: "Esperando investigacion externa",
     publicCopy: "Esperando que el usuario pegue un reporte estructurado validable.",
     requiresBackendJob: false,
     requiresExternalSource: false,

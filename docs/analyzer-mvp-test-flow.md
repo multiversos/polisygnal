@@ -16,32 +16,33 @@ The product must not invent evidence, must not mark the analysis as completed, a
 
 ## Test Steps
 
-1. Open `/analyze`.
-2. Paste a real Polymarket event or market URL.
-3. Confirm PolySignal resolves the URL from Polymarket/Gamma/CLOB and shows a market selector if needed.
-4. Select one market and start the deep analysis.
-5. Confirm Radar Analytics remains visible while the job is running or waiting for Samantha.
-6. If the bridge is configured locally, confirm the Samantha task is sent and a `taskId` appears.
-7. If Samantha returns `pending` or `accepted`, confirm the job remains pending and does not show `completed`.
-8. Confirm the progress block says the analysis is not finished yet and shows:
-   - Consult Samantha result
-   - Load manual report
-   - Download task
-   - Copy instructions
-   - Save and continue later
-   - View in History
-9. If Samantha returns `manual_needed`, confirm the report says manual research is required and is not shown as a fatal error.
-10. Save the analysis to `/history`.
-11. Open `/history` and confirm the item shows:
-    - Original Polymarket link
-    - DeepAnalysisJob id continuity through the continue link
-    - Samantha task id when available
-    - Research status such as `Pending`, `Samantha received task`, or `Manual report needed`
-    - Actions to continue, consult Samantha, load a manual report, view detail, and reanalyze/open the link.
-12. Click `Continuar analisis` from History and confirm `/analyze` restores the URL/job context.
-13. Click `Consultar resultado de Samantha` from History when a task id exists.
-14. Confirm `pending`, `processing`, or `manual_needed` updates History without marking the job completed.
-15. Open `/performance` and confirm research-pending analyses are shown separately and do not count as misses.
+1. Abrir `/analyze`.
+2. Pegar un link valido de evento o mercado de Polymarket.
+3. Confirmar que PolySignal resuelve la URL desde Polymarket/Gamma/CLOB y muestra selector si hace falta.
+4. Confirmar el mercado y crear el analisis profundo.
+5. Confirmar que Radar Analytics sigue visible mientras el job corre o espera a Samantha.
+6. Enviar o guardar la tarea Samantha. Si el bridge local esta configurado, debe aparecer `taskId`.
+7. Ver el estado pendiente: `accepted`, `pending`, `processing` o `manual_needed` no deben mostrar `completed`.
+8. Confirmar que el bloque de progreso explica que el analisis no termino y muestra:
+   - Consultar resultado de Samantha
+   - Cargar reporte manual
+   - Descargar tarea
+   - Copiar instrucciones
+   - Guardar y continuar despues
+   - Ver en historial
+9. Si Samantha devuelve `manual_needed`, confirmar que se muestra como investigacion manual requerida, no como error fatal.
+10. Guardar el analisis en `/history`.
+11. Ir a `/history` y confirmar que el item muestra:
+    - mercado y link original de Polymarket;
+    - continuidad por `deepAnalysisJobId`;
+    - `bridgeTaskId` cuando existe;
+    - estado humano como `Pendiente de investigacion`, `Samantha recibio la tarea` o `Necesita reporte manual`;
+    - acciones para continuar, consultar Samantha, cargar reporte manual, ver detalle y abrir/reanalizar el enlace.
+12. Hacer click en `Continuar analisis` desde History y confirmar que `/analyze` restaura URL y job.
+13. Hacer click en `Consultar resultado de Samantha` desde History cuando exista task id.
+14. Confirmar que `pending`, `processing` o `manual_needed` actualizan History sin marcar el job como completado.
+15. Cargar un reporte manual estructurado solo si existe evidencia real validable.
+16. Abrir `/performance` y confirmar que los pendientes de investigacion aparecen separados y no cuentan como fallos ni precision.
 
 ## Manual Report Test
 
