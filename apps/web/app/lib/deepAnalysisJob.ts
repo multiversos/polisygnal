@@ -122,14 +122,14 @@ const STEP_DEFINITIONS: StepDefinition[] = [
   },
   {
     id: "preparing_samantha_research",
-    label: "Tarea de investigacion preparada",
-    summary: "Pendiente de preparar brief estructurado para investigacion externa manual.",
+    label: "Samantha automatica preparada",
+    summary: "Pendiente de preparar contexto seguro para el puente automatico de Samantha.",
   },
   {
     id: "awaiting_samantha_report",
-    label: "Esperando investigacion externa",
-    requiresManualInput: true,
-    summary: "Pendiente de que el usuario cargue un reporte estructurado validable.",
+    label: "Samantha analizando",
+    requiresExternalIntegration: true,
+    summary: "Pendiente de respuesta automatica o fuente disponible.",
   },
   {
     id: "checking_odds",
@@ -287,7 +287,7 @@ export function markJobWalletsAnalyzed(
 export function markJobSamanthaBriefReady(job: DeepAnalysisJob): DeepAnalysisJob {
   const next = updateDeepAnalysisJobStep(job, "preparing_samantha_research", {
     status: "completed",
-    summary: "Task Packet de Samantha listo para puente automatico seguro o flujo manual.",
+    summary: "Contexto de Samantha listo para el puente automatico seguro.",
   });
   return {
     ...next,
@@ -300,7 +300,7 @@ export function markJobSendingToSamantha(job: DeepAnalysisJob): DeepAnalysisJob 
   const next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
     requiresExternalIntegration: true,
     status: "running",
-    summary: "Enviando Task Packet a Samantha mediante el puente automatico configurado.",
+    summary: "Enviando contexto a Samantha mediante el puente automatico configurado.",
   });
   return {
     ...next,
@@ -387,9 +387,9 @@ export function markJobSamanthaBridgeFallback(
 ): DeepAnalysisJob {
   let next = markJobAwaitingSamantha(job);
   next = updateDeepAnalysisJobStep(next, "awaiting_samantha_report", {
-    requiresManualInput: true,
+    requiresExternalIntegration: true,
     status: "running",
-    summary: input.reason || "Samantha automatica no configurada; usa el Task Packet manual.",
+    summary: input.reason || "Samantha automatica no esta conectada todavia.",
     warnings: input.warnings ?? [],
   });
   return {
@@ -415,13 +415,13 @@ export function markJobAwaitingSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
     warnings: ["No se calcula win rate ni ROI sin historial cerrado real."],
   });
   next = updateDeepAnalysisJobStep(next, "awaiting_samantha_report", {
-    requiresManualInput: true,
+    requiresExternalIntegration: true,
     status: "running",
-    summary: "Esperando reporte estructurado de Samantha para evaluar evidencia externa.",
+    summary: "Esperando respuesta automatica de Samantha o una fuente segura disponible.",
   });
   next = updateDeepAnalysisJobStep(next, "checking_odds", {
     status: "blocked",
-    summary: "Odds externas pendientes de integracion segura; Samantha puede aportar comparacion manual validable.",
+    summary: "Odds externas pendientes de integracion segura; no se inventan odds.",
   });
   next = updateDeepAnalysisJobStep(next, "checking_kalshi", {
     status: "blocked",
@@ -438,7 +438,7 @@ export function markJobAwaitingSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
       fallbackRequired: true,
       fallbackAvailable: true,
       lastAttemptAt: nowIso(),
-      reason: "Samantha automatica no configurada; usa el Task Packet manual.",
+      reason: "Samantha automatica no esta conectada todavia.",
       status: "not_configured",
     },
     status: "awaiting_samantha",
@@ -553,7 +553,7 @@ export function getJobProgressSummary(job: DeepAnalysisJob): DeepAnalysisJobSumm
       completedSteps,
       detail: "Hay evidencia estructurada cargada, pero no basta para una estimacion final responsable.",
       headline: "Evidencia cargada, decision pendiente",
-      nextAction: "Revisar el reporte o cargar evidencia adicional antes de guardar como prediccion.",
+      nextAction: "Guardar como lectura parcial o volver a analizar cuando haya nuevas fuentes automaticas.",
       totalSteps,
     };
   }
@@ -562,7 +562,7 @@ export function getJobProgressSummary(job: DeepAnalysisJob): DeepAnalysisJobSumm
       completedSteps,
       detail: "PolySignal esta enviando la tarea a Samantha desde el endpoint seguro configurado.",
       headline: "Enviando a Samantha",
-      nextAction: "Mantener abierto el analisis; si el puente falla, el flujo manual queda disponible.",
+      nextAction: "Mantener abierto el analisis o guardarlo como lectura parcial si tarda demasiado.",
       totalSteps,
     };
   }
@@ -571,7 +571,7 @@ export function getJobProgressSummary(job: DeepAnalysisJob): DeepAnalysisJobSumm
       completedSteps,
       detail: job.samanthaBridge?.reason || "Samantha recibio la tarea y la investigacion externa sigue pendiente.",
       headline: "Samantha investigando",
-      nextAction: "Esperar reporte automatico o continuar con el flujo manual si tarda demasiado.",
+      nextAction: "Esperar respuesta automatica o guardar esta lectura para volver despues.",
       totalSteps,
     };
   }
@@ -589,7 +589,7 @@ export function getJobProgressSummary(job: DeepAnalysisJob): DeepAnalysisJobSumm
       completedSteps,
       detail: job.samanthaBridge?.reason || "PolySignal leyo Polymarket, reviso capas disponibles y preparo el brief externo.",
       headline: "Analisis profundo iniciado",
-      nextAction: "Copia la tarea para Samantha o carga su reporte estructurado para continuar.",
+      nextAction: "Guardar como lectura parcial o reintentar cuando Samantha automatica este disponible.",
       totalSteps,
     };
   }

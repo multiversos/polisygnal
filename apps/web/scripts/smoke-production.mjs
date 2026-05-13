@@ -536,11 +536,11 @@ function validateAnalyzeLoadingPanelSource() {
   const walletRouteSource = readFileSync(new URL("../app/api/polymarket-wallet-intelligence/route.ts", import.meta.url), "utf8");
   const expectedSteps = [
     "Leyendo enlace",
-    "Buscando mercado en Polymarket",
-    "Confirmando coincidencias",
-    "Preparando tarea para Samantha",
-    "Esperando investigacion externa",
-    "Listo para revisar",
+    "Detectando mercado",
+    "Cargando datos de Polymarket",
+    "Revisando billeteras",
+    "Samantha analizando",
+    "Preparando lectura",
   ];
 
   assert(source.includes("export function AnalyzeProgressPanel"), "analyze progress panel component is missing");
@@ -548,12 +548,13 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("Esto normalmente toma unos segundos."), "analyze progress panel normal wait copy is missing");
   assert(source.includes("Esta tardando mas de lo normal"), "analyze progress panel slow wait copy is missing");
   assert(source.includes("Parece que esta busqueda se quedo esperando respuesta"), "analyze progress panel stalled copy is missing");
-  assert(source.includes("Samantha necesita terminar la investigacion"), "analyze progress panel Samantha pending copy is missing");
+  assert(source.includes("Samantha sigue analizando fuentes automaticas"), "analyze progress panel Samantha automatic pending copy is missing");
   assert(source.includes("Guardar para continuar luego"), "analyze progress panel save recovery action is missing");
   assert(source.includes("Progreso del analisis"), "analyze loading panel should expose human analysis progress state");
   assert(!source.includes("Deep Analysis Job"), "analyze loading panel should not expose technical job title");
   assert(!source.includes("Leyendo Polymarket"), "analyze loading panel should use human Polymarket read copy");
-  assert(!source.includes("Esperando reporte de Samantha"), "analyze loading panel should use external research wait copy");
+  assert(!source.includes("Esperando reporte de Samantha"), "analyze loading panel should not ask for manual Samantha reports");
+  assert(!source.includes("Cargar reporte Samantha"), "analyze loading panel should not expose manual upload");
   assert(!source.includes('return "OK"'), "analyze loading panel should not expose OK as status copy");
   assert(!source.includes('return "Ahora"'), "analyze loading panel should not expose Ahora as status copy");
   assert(source.includes("aria-live=\"polite\""), "analyze loading panel needs polite live status");
@@ -574,7 +575,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("getPolymarketWalletIntelligence"), "analyze page should use Polymarket-first wallet intelligence");
   assert(!analyzePage.includes("getWalletIntelligenceForMarket"), "analyze page must not use internal market IDs for wallet lookup");
   assert(analyzePage.includes("/api/samantha/send-research"), "analyze page does not call the safe Samantha bridge route");
-  assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page does not keep manual fallback when Samantha bridge is unavailable");
+  assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page does not keep safe partial state when Samantha bridge is unavailable");
   assert(analyzePage.includes("existingBridgeTaskId"), "analyze page should not duplicate Samantha sends when continuing a job");
   assert(analyzePage.includes("progressIssue"), "analyze page does not keep recovery visible after timeout/error");
   assert(!analyzePage.includes("/markets/overview"), "analyze page must not use internal overview as primary matching source");
@@ -599,17 +600,14 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Resumen del analisis"), "AnalyzerReport missing executive summary");
   assert(reportSource.includes("Progreso del analisis"), "AnalyzerReport missing human progress copy");
   assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport missing accessible deep job state");
-  assert(reportSource.includes("Esperando investigacion externa"), "AnalyzerReport missing external research wait state");
-  assert(reportSource.includes("Samantha necesita investigacion manual"), "AnalyzerReport missing manual_needed state");
+  assert(reportSource.includes("Samantha automatica"), "AnalyzerReport missing automatic Samantha state");
+  assert(reportSource.includes("Fuente automatica no disponible"), "AnalyzerReport missing automatic-source unavailable state");
   assert(reportSource.includes("Analisis profundo"), "AnalyzerReport missing deep analysis section");
   assert(reportSource.includes("Capas del motor"), "AnalyzerReport missing deep analyzer layers");
   assert(reportSource.includes("Pendiente de integracion"), "AnalyzerReport should label future layers as pending");
-  assert(reportSource.includes("Investigacion con Samantha"), "AnalyzerReport missing Samantha research workflow");
-  assert(reportSource.includes("Descargar tarea"), "AnalyzerReport missing Samantha task download action");
-  assert(reportSource.includes("Copiar instrucciones"), "AnalyzerReport missing Samantha instruction copy action");
+  assert(reportSource.includes("Lectura con fuentes disponibles"), "AnalyzerReport missing public Samantha reading workflow");
+  assert(reportSource.includes("NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS"), "AnalyzerReport should gate manual debug tools");
   assert(reportSource.includes("Guardar y continuar despues"), "AnalyzerReport missing save-and-continue action");
-  assert(reportSource.includes("Validar reporte"), "AnalyzerReport missing Samantha report validation action");
-  assert(reportSource.includes("Cargar reporte al analisis"), "AnalyzerReport missing Samantha report apply action");
   assert(reportSource.includes("parseSamanthaResearchReport"), "AnalyzerReport missing Samantha report validation");
   assert(reportSource.includes("buildSamanthaTaskPacket"), "AnalyzerReport missing Samantha task packet builder");
   assert(reportSource.includes("/api/samantha/research-status"), "AnalyzerReport should query Samantha status only through same-origin route");
@@ -640,8 +638,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(historySource.includes("Analizar nuevo enlace"), "history page does not link back to analyzer");
   assert(historySource.includes("Continuar analisis"), "history page should reopen pending deep research jobs");
   assert(historySource.includes("Pendiente de investigacion"), "history page should label pending research");
-  assert(historySource.includes("Consultar resultado de Samantha"), "history page should allow safe Samantha status checks");
-  assert(historySource.includes("Necesita reporte manual"), "history page should show manual_needed as a continuation state");
+  assert(historySource.includes("Actualizar lectura automatica"), "history page should allow safe Samantha status checks");
+  assert(historySource.includes("Fuente automatica no disponible"), "history page should show unavailable automatic source state");
+  assert(!historySource.includes("Cargar reporte manual"), "history page should not expose manual report upload");
   assert(historySource.includes("Ver rendimiento"), "history page does not link to performance");
   assert(analyzePage.includes("analyzer-selection-card"), "analyze page does not render compact selector cards");
   assert(!analyzePage.includes("Ver mercados deportivos"), "analyze no-match state must not offer internal market fallback");
@@ -976,12 +975,32 @@ async function main() {
     ["Qué hace Samantha", "QuÃ© hace Samantha", "QuÃƒÂ© hace Samantha"],
     "analyze Samantha explainer",
   );
+  assertTextIncludesOneOf(
+    analyzeText,
+    ["Samantha analiza", "Samantha har", "Pega el enlace"],
+    "analyze automatic Samantha copy",
+  );
   assertTextIncludes(analyzeText, "Pegar enlace", "analyze step one");
   assertTextIncludes(analyzeText, "Confirmar mercado", "analyze step two");
   assertTextIncludes(analyzeText, "Recibir lectura clara", "analyze step three");
   assertTextExcludes(
     analyzeText,
-    ["JSON", "snapshot", "proxy", "OCR", "stack trace", "localhost", "DATABASE_URL", "secret"],
+    [
+      "JSON",
+      "snapshot",
+      "proxy",
+      "OCR",
+      "stack trace",
+      "localhost",
+      "DATABASE_URL",
+      "secret",
+      "Descargar tarea",
+      "Copiar schema",
+      "Cargar reporte",
+      "Validar reporte",
+      "Descargar instrucciones",
+      "Descargar brief",
+    ],
     "analyze initial technical noise",
   );
   assertTextIncludesOneOf(

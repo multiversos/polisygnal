@@ -28,10 +28,10 @@ type AnalyzeProgressStep = {
   detail: string;
   id:
     | "reading_link"
-    | "searching_polymarket"
-    | "confirming_matches"
+    | "detecting_market"
+    | "loading_polymarket"
+    | "reviewing_wallets"
     | "preparing_samantha"
-    | "waiting_external"
     | "ready";
   label: string;
   phases: AnalyzeLoadingPhase[];
@@ -59,33 +59,33 @@ const ANALYZE_PROGRESS_STEPS: AnalyzeProgressStep[] = [
     phases: ["validating"],
   },
   {
-    detail: "Consultamos el mercado o evento desde la ruta segura.",
-    id: "searching_polymarket",
-    label: "Buscando mercado en Polymarket",
+    detail: "Detectamos si el enlace apunta a un mercado unico o a un evento con varias opciones.",
+    id: "detecting_market",
+    label: "Detectando mercado",
     phases: ["matching"],
   },
   {
-    detail: "Mostramos coincidencias y pedimos confirmacion si hay varias.",
-    id: "confirming_matches",
-    label: "Confirmando coincidencias",
-    phases: ["context", "readiness", "research"],
+    detail: "Leemos precio, volumen, liquidez y estado desde fuentes publicas de Polymarket.",
+    id: "loading_polymarket",
+    label: "Cargando datos de Polymarket",
+    phases: ["context", "readiness"],
   },
   {
-    detail: "Preparamos el brief; no se inventan fuentes ni senales.",
+    detail: "Revisamos actividad publica disponible sin mostrar direcciones completas.",
+    id: "reviewing_wallets",
+    label: "Revisando billeteras",
+    phases: ["research"],
+  },
+  {
+    detail: "Samantha usa el puente automatico cuando esta configurado y reporta fuentes no disponibles.",
     id: "preparing_samantha",
-    label: "Preparando tarea para Samantha",
-    phases: ["preparing_samantha", "sending_samantha"],
+    label: "Samantha analizando",
+    phases: ["preparing_samantha", "sending_samantha", "samantha_researching", "awaiting_samantha", "validating_report"],
   },
   {
-    detail: "Si Samantha necesita investigar, el estado queda pendiente.",
-    id: "waiting_external",
-    label: "Esperando investigacion externa",
-    phases: ["samantha_researching", "awaiting_samantha", "validating_report"],
-  },
-  {
-    detail: "El resultado solo avanza si pasan las compuertas.",
+    detail: "Preparamos una lectura completa o parcial con las fuentes reales disponibles.",
     id: "ready",
-    label: "Listo para revisar",
+    label: "Preparando lectura",
     phases: ["ready_to_score", "preparing"],
   },
 ];
@@ -194,12 +194,12 @@ export function AnalyzeProgressPanel({
 
   const activeIndex = activeStepIndex(phase);
   const title = samanthaPending
-    ? "Samantha necesita terminar la investigacion"
+    ? "Samantha sigue analizando fuentes automaticas"
     : issue
       ? "No pudimos completar esta busqueda ahora"
       : "Analisis en progreso";
   const description = samanthaPending
-    ? "Ya detectamos el mercado, pero la lectura profunda todavia necesita el reporte validado de Samantha."
+    ? "Ya detectamos el mercado. Si una fuente automatica no esta disponible, PolySignal prepara una lectura parcial honesta."
     : "PolySignal avanza por etapas reales. No usamos porcentajes falsos ni asumimos evidencia que no existe.";
   const showRecovery =
     Boolean(issue) || elapsedSeconds >= 45 || samanthaPending || !isBusy;
@@ -270,17 +270,12 @@ export function AnalyzeProgressPanel({
               Guardar para continuar luego
             </button>
           ) : null}
-          {samanthaPending ? (
-            <>
-              <a href="#samantha-research">Cargar reporte Samantha</a>
-              <a href="/methodology">Ver metodologia</a>
-            </>
-          ) : null}
+          {samanthaPending ? <a href="/methodology">Ver metodologia</a> : null}
         </div>
       ) : null}
 
       <p className="analyze-progress-footnote">
-        Si falta una fuente o un reporte validado, el analisis queda pendiente.
+        Si falta una fuente automatica, el analisis queda como lectura parcial o sin senales suficientes.
         PolySignal no convierte esperas ni precios de mercado en predicciones propias.
       </p>
     </section>

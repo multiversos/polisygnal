@@ -93,15 +93,15 @@ export default function MethodologyPage() {
             <h2>No hay modo rapido</h2>
             <p>
               Cada enlace inicia un job profundo local. PolySignal lee Polymarket,
-              revisa las capas disponibles, prepara el brief de Samantha y puede
-              quedar esperando investigacion externa antes de generar decision.
+              revisa las capas disponibles, prepara contexto seguro para Samantha y puede
+              quedar como lectura parcial si una fuente automatica no esta disponible.
             </p>
           </div>
         </div>
         <div className="history-card-metrics">
           <span>Job local: Polymarket leido</span>
           <span>Wallet Intelligence: revisada si hay id compatible</span>
-          <span>Samantha: reporte manual validable</span>
+          <span>Samantha: puente automatico o fuente no disponible</span>
           <span>Odds/Kalshi: pendientes de integracion segura</span>
           <span>No cuenta: pendiente de investigacion</span>
           <span>No cuenta: evidencia insuficiente</span>

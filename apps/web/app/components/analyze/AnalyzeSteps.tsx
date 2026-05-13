@@ -8,13 +8,13 @@ const steps = [
     tone: "cyan",
   },
   {
-    copy: "PolySignal detecta el mercado y confirma que es válido para analizar.",
+    copy: "PolySignal confirma automaticamente el mercado; si hay varios, eliges uno.",
     icon: "check" as const,
     title: "Confirmar mercado",
     tone: "blue",
   },
   {
-    copy: "Samantha procesa todo y te entrega una lectura simple y accionable.",
+    copy: "Samantha procesa las fuentes disponibles y entrega una lectura clara.",
     icon: "sparkles" as const,
     title: "Recibir lectura clara",
     tone: "violet",

@@ -89,8 +89,8 @@ Use these checks after a production deploy. Correct domains:
 7. Confirm none of these pages claim that accounts, cloud sync, or customer
    storage already exist.
 8. Save an analyzer result that is waiting for Samantha and confirm `/history`
-   shows the original link, `Continuar analisis`, `Consultar resultado de
-   Samantha` when a task id exists, and `Cargar reporte manual`.
+   shows the original link, `Continuar analisis`, and `Actualizar lectura
+   automatica` when a task id exists. It must not offer manual report upload.
 9. Confirm `manual_needed`, `pending`, `processing`, or `accepted` research
    states do not appear as completed and do not count as precision.
 
@@ -234,14 +234,13 @@ If this test fails, stop feature work and treat it as a production regression.
 1. Open `/analyze` and analyze a valid Polymarket link.
 2. Confirm Radar Analytics remains visible when the job is waiting for Samantha
    instead of disappearing after Polymarket is read.
-3. Confirm the report shows `Copiar tarea para Samantha`, `Descargar tarea
-   JSON`, `Descargar instrucciones TXT`, `Copiar schema de respuesta` and
-   `Descargar brief JSON`.
+3. Confirm the public report shows `Samantha automatica`, source availability,
+   Wallet Intelligence status, and a partial-reading state when needed.
 4. Confirm the UI says Samantha automatic bridge is unavailable or pending when
-   no server-side config exists, and that manual fallback is available.
-5. Paste invalid report JSON and confirm the error is specific and friendly.
-6. Paste a valid controlled report JSON and confirm the job advances to evidence
-   loaded or ready-to-score without inventing a prediction.
+   no server-side config exists, without asking the user to upload a report.
+5. Confirm no JSON/schema/debug/manual report tools are visible by default.
+6. In local debug mode only, report validation can still be tested behind
+   `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`; it must never invent a prediction.
 7. Save the analysis and confirm `/history` shows `Esperando Samantha`,
    `Samantha investigando`, or equivalent pending research state, not hit/miss.
 8. Confirm `/performance` does not count research-pending analyses as failures.
@@ -291,11 +290,11 @@ If this test fails, stop feature work and treat it as a production regression.
    with `Progreso del analisis`, `Analizando hace`, and clear wait guidance.
 7. Confirm the panel uses real stages instead of a fake percentage:
    - Leyendo enlace.
-   - Buscando mercado en Polymarket.
-   - Confirmando coincidencias.
-   - Preparando tarea para Samantha.
-   - Esperando investigacion externa.
-   - Listo para revisar.
+   - Detectando mercado.
+   - Cargando datos de Polymarket.
+   - Revisando billeteras.
+   - Samantha analizando.
+   - Preparando lectura.
 8. Confirm the panel explains longer waits honestly:
    - after a normal wait, `Esto normalmente toma unos segundos`;
    - after a slow wait, it says the analysis is taking longer than usual;
@@ -303,9 +302,9 @@ If this test fails, stop feature work and treat it as a production regression.
 9. Confirm the progress panel has recovery actions: `Reintentar`, `Editar
    enlace`, `Ver historial`, and only shows `Guardar para continuar luego`
    when a valid market/result exists.
-10. If Samantha is still pending, confirm the panel says `Samantha necesita
-    terminar la investigacion`, offers `Cargar reporte Samantha`, and links to
-    methodology without marking the analysis completed.
+10. If Samantha is still pending or unavailable, confirm the panel says Samantha
+    is analyzing automatic sources or that the automatic source is unavailable,
+    links to methodology, and does not offer report upload.
 11. Confirm the panel does not show a fake 0%-100% progress bar, raw errors,
     stack traces, JSON, snapshot, proxy, OCR, secrets, localhost or raw payloads.
 12. Confirm `Limpiar` or `Editar enlace` removes the in-progress state without
@@ -589,13 +588,12 @@ Use these quick checks when reviewing public pages:
    - Mercado leido desde Polymarket.
    - Datos principales revisados.
    - Actividad de billeteras revisada o bloqueada de forma honesta.
-   - Tarea de investigacion preparada.
-   - `Esperando investigacion externa`.
+   - Samantha automatica preparada.
+   - `Samantha analizando`.
    - Odds/Kalshi/profile steps blocked or pending integration.
 5. Confirm the report does not say the deep analysis is completed while waiting
    for Samantha.
-6. Use `Copiar tarea para Samantha`, `Descargar tarea JSON`,
-   `Descargar instrucciones TXT`, or `Copiar schema de respuesta`.
+6. Confirm public UI does not show copy/download/schema/report-upload tools.
 7. Save the analysis as pending and open `/history`.
 8. Confirm the saved item shows `Pendiente de investigacion`, the brief date when
    available, and a `Continuar analisis` action.
@@ -608,35 +606,23 @@ Use these quick checks when reviewing public pages:
 12. Confirm `/performance` separates `Pendientes de investigacion` from
     `Pendientes de resolucion`.
 
-## Samantha Research Manual Workflow
+## Samantha Automatic Workflow
 
 1. Open `/analyze` and analyze a Polymarket link.
-2. Confirm the selected report shows `Investigacion con Samantha`.
-3. Confirm these actions are present:
-   - `Copiar tarea para Samantha`.
-   - `Descargar tarea JSON`.
-   - `Descargar instrucciones TXT`.
-   - `Copiar schema de respuesta`.
-   - `Descargar brief JSON`.
-4. Confirm the copy says this is manual/local and does not execute Samantha.
-5. Paste invalid JSON and confirm `Validar reporte` shows a friendly validation
-   error without applying the report.
-6. Paste a report with a dangerous URL, a secret-like value, an estimate outside
-   `0..100`, Reddit high reliability, or Kalshi non-equivalent strong signal
-   and confirm it is rejected.
-6a. Paste or test a report containing script-like text, trading instructions,
-   ROI `100%`, win rate `100%`, or a full wallet address and confirm the
-   validator rejects it.
-7. Paste a valid structured report in a safe test environment, click
-   `Validar reporte`, confirm the preview summarizes evidence counts, then
-   click `Cargar reporte al analisis`.
-8. Confirm evidence appears as source-backed context.
-9. Confirm Reddit/social evidence is never accepted as high reliability.
-10. Confirm Kalshi evidence is accepted only when equivalent.
-11. Confirm no full wallet addresses, secrets, raw payloads or copy-trading
-   language appear.
-12. Confirm no prediction is created unless the suggested estimate passes the
-    strict validation gate.
+2. Confirm the selected report shows `Samantha automatica` and
+   `Lectura con fuentes disponibles`.
+3. Confirm the public flow does not show manual upload/copy/download/schema
+   controls by default.
+4. Confirm unavailable sources appear as `Fuente automatica no disponible` or
+   partial reading, not as a request for user evidence.
+5. Confirm no full wallet addresses, secrets, raw payloads, fake ROI/win rate,
+   copy-trading language, fake odds, fake news, fake injuries, or betting advice
+   appear.
+6. Confirm no prediction is created unless validated Samantha output and the
+   conservative PolySignal gates pass.
+7. Local debug-only manual report tooling may exist behind
+   `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`; it is not part of the public
+   production flow.
 
 ## Samantha Bridge Local Dev
 
@@ -653,13 +639,13 @@ configured.
 3. Analyze a Polymarket link.
 4. Confirm PolySignal sends the task, receives `accepted`, and keeps the job in
    `samantha_researching` or `awaiting_samantha`.
-5. Click `Consultar resultado de Samantha` and confirm a pending response keeps
+5. Click `Actualizar lectura automatica` and confirm a pending response keeps
    the job waiting, without marking it completed.
 6. Run `npm run polysignal:research:process -- --task-id=<task-id>` in
-   Samantha and confirm PolySignal then reads `manual_needed`, keeps manual
-   fallback visible and does not invent a report.
-7. Confirm Radar Analytics remains visible and manual fallback buttons remain
-   available.
+   Samantha and confirm PolySignal then reads `manual_needed`, shows source
+   unavailable/partial reading, and does not invent a report.
+7. Confirm Radar Analytics remains visible and public manual report buttons are
+   not shown.
 8. Confirm the job is not marked completed until a valid Samantha report is
    loaded and passes PolySignal gates.
 9. Confirm Samantha's pending queue contains only a sanitized summary, not raw

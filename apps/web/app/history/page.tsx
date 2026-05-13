@@ -160,7 +160,7 @@ function researchStageLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | n
     return "Samantha procesando";
   }
   if (bridgeStatus === "manual_needed") {
-    return "Necesita reporte manual";
+    return "Fuente automatica no disponible";
   }
   if (bridgeStatus === "completed" || item.researchStatus === "receiving_samantha_report") {
     return "Reporte cargado";
@@ -186,13 +186,13 @@ function researchStageLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | n
 function researchSourceLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | null): string {
   const bridgeMode = item.bridgeMode ?? job?.samanthaBridge?.bridgeMode;
   if (item.researchStatus === "ready_to_score" || item.researchStatus === "completed") {
-    return "Reporte manual o validado";
+    return "Samantha validada";
   }
   if (bridgeMode === "automatic" || bridgeMode === "local") {
     return "Samantha automatica";
   }
   if (bridgeMode === "manual_fallback" || item.awaitingResearch) {
-    return "Reporte manual";
+    return "Lectura parcial automatica";
   }
   return "Enlace Polymarket";
 }
@@ -554,10 +554,10 @@ export default function HistoryPage() {
           patch = {
             ...patch,
             bridgeStatus: "manual_needed",
-            nextCheckHint: "Samantha devolvio un reporte invalido; carga un reporte manual validable.",
+            nextCheckHint: "Samantha devolvio un reporte invalido; la lectura queda parcial.",
             researchStatus: "awaiting_samantha",
           };
-          message = "Samantha devolvio un reporte invalido; el flujo manual sigue disponible.";
+          message = "Samantha devolvio un reporte invalido; la lectura queda parcial.";
         } else {
           const polySignalEstimate = buildConservativePolySignalEstimate({
             marketImpliedProbability: getMarketImpliedProbabilities({
@@ -644,7 +644,7 @@ export default function HistoryPage() {
                 automaticAvailable: result.automaticAvailable,
                 reason:
                   result.reason ||
-                  "Samantha recibio la tarea, pero todavia necesita investigacion externa manual.",
+                  "Samantha no pudo completar todas las fuentes automaticas.",
                 warnings: result.warnings ?? result.validationErrors ?? [],
               }),
             ) ?? nextJob;
@@ -652,11 +652,11 @@ export default function HistoryPage() {
         patch = {
           ...patch,
           bridgeStatus: "manual_needed",
-          nextCheckHint: "Carga un reporte manual de Samantha o vuelve a consultar mas tarde.",
+          nextCheckHint: "Fuente automatica no disponible; puedes volver a consultar mas tarde.",
           researchStatus: "awaiting_samantha",
         };
         message =
-          "Samantha recibio la tarea, pero todavia necesita investigacion externa manual para completar este analisis.";
+          "Samantha no pudo completar todas las fuentes automaticas; la lectura queda parcial.";
       } else {
         if (nextJob) {
           nextJob =
@@ -676,7 +676,7 @@ export default function HistoryPage() {
         patch = {
           ...patch,
           bridgeStatus: result.bridgeTaskStatus ?? "pending",
-          nextCheckHint: "Samantha recibio la tarea; consulta mas tarde o usa el reporte manual.",
+          nextCheckHint: "Samantha recibio la tarea; consulta mas tarde o guarda la lectura parcial.",
           researchStatus: "samantha_researching",
         };
       }
@@ -686,7 +686,7 @@ export default function HistoryPage() {
       setUpdatedAt(new Date());
       setResolutionMessage(message);
     } catch {
-      setResolutionMessage("No pudimos consultar Samantha de forma segura. El fallback manual sigue disponible.");
+      setResolutionMessage("No pudimos consultar Samantha de forma segura. La lectura queda parcial.");
     } finally {
       setBusyItemId(null);
     }
@@ -918,7 +918,7 @@ export default function HistoryPage() {
         <article className="metric-card">
           <span>Pendientes de investigacion</span>
           <strong>{loading ? "..." : stats.total === 0 ? "Sin datos" : stats.researchPending}</strong>
-          <p>Samantha, reporte manual o senales</p>
+          <p>Samantha automatica, billeteras o senales</p>
         </article>
         <article className="metric-card">
           <span>Predicciones claras</span>
@@ -1189,9 +1189,8 @@ export default function HistoryPage() {
                   <p className="section-note">{lifecycle.summary}</p>
                   {bridgeStatusForItem(item, deepJob) === "manual_needed" ? (
                     <p className="section-note">
-                      Samantha recibio la tarea, pero todavia necesita investigacion externa
-                      manual para completar este analisis. Puedes cargar un reporte manual o
-                      volver a consultar mas tarde.
+                      Samantha no pudo completar todas las fuentes automaticas para este
+                      analisis. Puedes volver a consultar mas tarde o guardar la lectura parcial.
                     </p>
                   ) : null}
                   <p className="section-note">{item.nextCheckHint || getNextCheckHintForHistory(item)}</p>
@@ -1253,12 +1252,12 @@ export default function HistoryPage() {
                         onClick={() => void handleCheckSamanthaStatus(item)}
                         type="button"
                       >
-                        {busyItemId === item.id ? "Consultando" : "Consultar resultado de Samantha"}
+                        {busyItemId === item.id ? "Consultando" : "Actualizar lectura automatica"}
                       </button>
                     ) : null}
                     {continueHref ? (
                       <a className="analysis-link secondary" href={continueHref}>
-                        Cargar reporte manual
+                        Abrir analisis
                       </a>
                     ) : null}
                     {item.marketId ? (

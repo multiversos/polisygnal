@@ -127,22 +127,21 @@ Estado visible verificado:
 - El MVP de continuidad del analizador guarda metadatos seguros del
   DeepAnalysisJob en Historial: `deepAnalysisJobId`, estado de investigacion,
   `bridgeTaskId` de Samantha cuando existe, estado del bridge, fecha de envio y
-  enlace Polymarket original. `/history` permite continuar el analisis,
-  consultar el resultado de Samantha por task id y cargar reporte manual desde
-  `/analyze`, sin marcar `accepted`, `pending`, `processing` ni `manual_needed`
-  como completados.
-- Existe contrato manual para Samantha Research:
+  enlace Polymarket original. `/history` permite continuar el analisis y
+  actualizar la lectura automatica por task id, sin marcar `accepted`,
+  `pending`, `processing` ni `manual_needed` como completados.
+- Existe contrato interno para Samantha Research:
   `samanthaResearchTypes.ts`, `samanthaResearchBrief.ts`,
-  `samanthaTaskPacket.ts` y `samanthaResearchReport.ts`. `/analyze` puede
-  preparar una tarea completa para Samantha, copiarla o descargarla, validar un
-  reporte pegado por el usuario en dos pasos y mostrar evidencia estructurada
-  sin ejecutar Samantha automaticamente.
+  `samanthaTaskPacket.ts` y `samanthaResearchReport.ts`. `/analyze` prepara
+  contexto seguro para Samantha automaticamente; las herramientas de copia,
+  descarga, schema y validacion manual quedan fuera del flujo publico y solo
+  pueden usarse en debug local con `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`.
 - Camino B para Samantha automatica esta preparado pero apagado por defecto:
   `samanthaBridgeTypes.ts`, `samanthaBridge.ts` y
-  `POST /api/samantha/send-research` permiten enviar un Task Packet solo si hay
+  `POST /api/samantha/send-research` permiten enviar el contexto solo si hay
   configuracion server-side segura (`SAMANTHA_BRIDGE_ENABLED` y endpoint
-  allowlisted). Sin configuracion, la ruta responde fallback manual y el
-  `DeepAnalysisJob` queda `awaiting_samantha`.
+  allowlisted). Sin configuracion, la ruta responde fuente automatica no
+  disponible y el `DeepAnalysisJob` queda como lectura parcial/pendiente.
 - `/analyze` ya soporta estados operativos del puente:
   `sending_to_samantha`, `samantha_researching`,
   `receiving_samantha_report` y `validating_samantha_report`. La espera ahora
@@ -197,7 +196,8 @@ Estado visible verificado:
   estimates fuera de rango, Reddit/social con confiabilidad alta y Kalshi no
   equivalente usado como senal fuerte.
 - Los jobs `awaiting_samantha` quedan visibles en Historial como `Pendiente de
-  investigacion` o `Necesita reporte manual` con accion `Continuar analisis`.
+  investigacion` o `Fuente automatica no disponible` con accion
+  `Continuar analisis`/`Actualizar lectura automatica`.
   `/performance` separa pendientes de investigacion de pendientes de resolucion
   y no los cuenta como fallos.
 - La estimacion PolySignal pasa por una compuerta de calidad: si el valor solo

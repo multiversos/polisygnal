@@ -119,6 +119,8 @@ type SamanthaStatusRouteResult = {
 };
 
 const SAMANTHA_STATUS_TIMEOUT_MS = 30_000;
+const SHOW_ANALYZER_DEBUG_TOOLS =
+  process.env.NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS === "1";
 
 async function fetchSamanthaStatus(taskId: string): Promise<Response> {
   const controller = new AbortController();
@@ -460,7 +462,7 @@ export function AnalyzerReport({
   const samanthaBridgeTaskId =
     deepAnalysisJob?.samanthaBridge?.taskId ??
     deepAnalysisJob?.samanthaBridge?.bridgeTaskId;
-  const samanthaNeedsManualResearch =
+  const samanthaAutomaticUnavailable =
     deepAnalysisJob?.samanthaBridge?.bridgeStatus === "manual_needed" ||
     (deepAnalysisJob?.samanthaBridge?.fallbackRequired === true &&
       deepAnalysisJob.status === "awaiting_samantha");
@@ -470,6 +472,20 @@ export function AnalyzerReport({
   const samanthaDraftSignals = samanthaDraftReport ? convertSamanthaReportToSignals(samanthaDraftReport) : [];
   const samanthaEvidence = samanthaReport ? convertSamanthaReportToEvidence(samanthaReport) : [];
   const samanthaSignals = samanthaReport ? convertSamanthaReportToSignals(samanthaReport) : [];
+  const samanthaAutomaticStatus = samanthaReport
+    ? "Reporte validado"
+    : samanthaAutomaticUnavailable
+      ? "Fuente automatica no disponible"
+      : samanthaBridgeTaskId
+        ? "En curso"
+        : "Preparando lectura";
+  const samanthaAutomaticCopy = samanthaReport
+    ? "Samantha devolvio una lectura estructurada que paso la validacion de PolySignal."
+    : samanthaAutomaticUnavailable
+      ? "Samantha no pudo completar todas las fuentes automaticas. PolySignal mantiene una lectura parcial con Polymarket y Wallet Intelligence disponibles."
+      : samanthaBridgeTaskId
+        ? "Samantha esta trabajando desde el puente automatico seguro. Puedes guardar esta lectura y volver despues."
+        : "PolySignal preparo contexto seguro para Samantha. Si el puente automatico no responde, la lectura queda parcial sin pedir carga manual.";
   const samanthaEstimateAccepted = samanthaReport ? shouldAcceptSuggestedEstimate(samanthaReport) : false;
   const polySignalEstimate = buildConservativePolySignalEstimate({
     marketImpliedProbability: probabilityState.market,
@@ -639,7 +655,7 @@ export function AnalyzerReport({
               }),
             ) ?? nextJob;
           onDeepAnalysisJobChange?.(nextJob);
-          setSamanthaActionMessage("Samantha devolvio un reporte invalido; sigue disponible el flujo manual.");
+          setSamanthaActionMessage("Samantha devolvio un reporte invalido; la lectura queda parcial.");
           return;
         }
         setSamanthaReportResult(reportResult);
@@ -671,13 +687,13 @@ export function AnalyzerReport({
               automaticAvailable: result.automaticAvailable,
               reason:
                 result.reason ||
-                "Samantha marco la tarea como pendiente de investigacion manual.",
+                "Samantha no pudo completar todas las fuentes automaticas.",
               warnings: result.warnings ?? result.validationErrors ?? [],
             }),
           ) ?? deepAnalysisJob;
         onDeepAnalysisJobChange?.(nextJob);
         setSamanthaActionMessage(
-          "Samantha recibio la tarea, pero todavia necesita investigacion externa manual para completar este analisis.",
+          "Samantha no pudo completar todas las fuentes automaticas; la lectura queda parcial.",
         );
         return;
       }
@@ -699,7 +715,7 @@ export function AnalyzerReport({
       onDeepAnalysisJobChange?.(nextJob);
       setSamanthaActionMessage(result.reason || "Samantha todavia no devolvio un reporte.");
     } catch {
-      setSamanthaActionMessage("Samantha esta tardando mas de lo normal. Puedes volver a consultar o cargar el reporte manual.");
+      setSamanthaActionMessage("Samantha esta tardando mas de lo normal. Puedes volver a consultar o guardar la lectura parcial.");
     } finally {
       setSamanthaLookupBusy(false);
     }
@@ -966,57 +982,34 @@ export function AnalyzerReport({
                 <div>
                   <strong>{step.label}</strong>
                   <small>{step.summary}</small>
-                  {step.requiresManualInput ? <em>Requiere accion manual</em> : null}
+                  {step.requiresManualInput && SHOW_ANALYZER_DEBUG_TOOLS ? <em>Requiere accion manual</em> : null}
                   {step.requiresExternalIntegration ? <em>Pendiente de integracion segura</em> : null}
                 </div>
               </li>
             ))}
           </ol>
           <p className="section-note">
-            El analisis profundo no esta completo hasta cargar evidencia externa suficiente o
-            contar con fuentes independientes validadas.
+            El analisis profundo solo se completa con fuentes reales suficientes.
+            Si una fuente automatica no esta disponible, queda como lectura parcial.
           </p>
           <p className="section-note">
-            Estado actual: Esperando investigacion externa.
+            Estado actual: Samantha automatica o fuentes externas en progreso.
           </p>
           <p className="section-note">
-            El analisis todavia no esta terminado. Ya leimos el mercado y preparamos
-            la tarea de investigacion, pero falta recibir o cargar el reporte externo
-            de Samantha. Puedes guardar este analisis y continuarlo despues.
+            Ya leimos el mercado, revisamos billeteras disponibles y preparamos la lectura.
+            No necesitas cargar reportes ni pegar evidencia para guardar este analisis.
           </p>
           <div className="watchlist-actions">
-            <button
-              className="watchlist-button"
-              disabled={!samanthaBridgeTaskId || samanthaLookupBusy}
-              onClick={handleCheckSamanthaStatus}
-              type="button"
-            >
-              {samanthaLookupBusy ? "Consultando Samantha" : "Consultar resultado de Samantha"}
-            </button>
-            <a className="analysis-link secondary" href="#samantha-research">
-              Cargar reporte manual
-            </a>
-            <button
-              className="watchlist-button"
-              disabled={!samanthaBriefValidation.valid}
-              onClick={handleDownloadSamanthaTaskJson}
-              type="button"
-            >
-              Descargar tarea
-            </button>
-            <button
-              className="watchlist-button"
-              disabled={!samanthaBriefValidation.valid}
-              onClick={() =>
-                void copyTextToClipboard(
-                  samanthaTaskPacket.samanthaInstructionsText,
-                  "Instrucciones para Samantha copiadas.",
-                )
-              }
-              type="button"
-            >
-              Copiar instrucciones
-            </button>
+            {samanthaBridgeTaskId ? (
+              <button
+                className="watchlist-button"
+                disabled={samanthaLookupBusy}
+                onClick={handleCheckSamanthaStatus}
+                type="button"
+              >
+                {samanthaLookupBusy ? "Actualizando lectura" : "Actualizar lectura automatica"}
+              </button>
+            ) : null}
             <button
               className="watchlist-button"
               disabled={busy}
@@ -1027,6 +1020,9 @@ export function AnalyzerReport({
             </button>
             <a className="analysis-link secondary" href="/history">
               Ver en historial
+            </a>
+            <a className="analysis-link secondary" href="/methodology">
+              Ver metodologia
             </a>
           </div>
           <p className="section-note">{jobSummary.nextAction}</p>
@@ -1053,6 +1049,54 @@ export function AnalyzerReport({
         </div>
       </section>
 
+      {!SHOW_ANALYZER_DEBUG_TOOLS ? (
+        <section className="samantha-research-panel" aria-label="Analisis automatico de Samantha">
+          <div className="probability-display-heading">
+            <div>
+              <p className="eyebrow">Samantha automatica</p>
+              <h4>Lectura con fuentes disponibles</h4>
+            </div>
+            <span>{samanthaAutomaticStatus}</span>
+          </div>
+          <p className="analyzer-report-note">{samanthaAutomaticCopy}</p>
+          <div className="wallet-report-summary">
+            <div>
+              <span>Polymarket</span>
+              <strong>Leido</strong>
+            </div>
+            <div>
+              <span>Wallet Intelligence</span>
+              <strong>{walletSummary.available ? "Revisada" : "No disponible"}</strong>
+            </div>
+            <div>
+              <span>Samantha</span>
+              <strong>{samanthaAutomaticStatus}</strong>
+            </div>
+            <div>
+              <span>Senales externas</span>
+              <strong>{samanthaSignals.length}</strong>
+            </div>
+          </div>
+          {samanthaActionMessage ? <p className="section-note">{samanthaActionMessage}</p> : null}
+          {samanthaReport ? (
+            <div className="samantha-evidence-list">
+              {samanthaEvidence.slice(0, 4).map((evidence) => (
+                <article className="samantha-evidence-card" key={evidence.id}>
+                  <span>{shortDirectionLabel(evidence.direction)} - {evidence.reliability}</span>
+                  <strong>{evidence.title}</strong>
+                  <p>{evidence.summary}</p>
+                  <small>{evidence.sourceName}</small>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="section-note">
+              Fuente automatica no disponible o aun en progreso. No se inventan noticias,
+              odds, lesiones ni senales externas.
+            </p>
+          )}
+        </section>
+      ) : (
       <section className="samantha-research-panel" id="samantha-research" aria-label="Investigacion con Samantha">
         <div className="probability-display-heading">
           <div>
@@ -1072,7 +1116,7 @@ export function AnalyzerReport({
           pegalo aqui para continuar el analisis. PolySignal no ejecuta agentes,
           no envia datos a terceros y no convierte el reporte en prediccion sin validacion.
         </p>
-        {samanthaNeedsManualResearch ? (
+        {samanthaAutomaticUnavailable ? (
           <div className="focus-notice active">
             <strong>Samantha necesita investigacion manual</strong>
             <span>
@@ -1230,6 +1274,7 @@ export function AnalyzerReport({
           </div>
         ) : null}
       </section>
+      )}
 
       <section className="analyzer-report-layers" aria-label="Capas revisadas">
         <div className="probability-display-heading">

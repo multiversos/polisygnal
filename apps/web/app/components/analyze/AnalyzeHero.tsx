@@ -21,7 +21,7 @@ export function AnalyzeHero({
         <span className="analyze-hero-badge">ANALIZAR ENLACE</span>
         <h1>Analizar enlace</h1>
         <p>
-          PolySignal detecta el mercado y Samantha prepara una lectura clara.
+          Pega el enlace. Samantha analiza el resto con las fuentes automaticas disponibles.
         </p>
         <div className="analyze-hero-form" role="search">
           <label className="analyze-link-field">

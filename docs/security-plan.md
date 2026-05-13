@@ -57,6 +57,14 @@ it to a same-origin server route for structured read-only resolution. It never
 fetches the submitted URL as a destination, never follows redirects from the
 submitted URL, and does not scrape Polymarket HTML.
 
+The public analyzer flow is automatic: the user pastes a Polymarket link,
+PolySignal resolves the market, loads Polymarket/Gamma data, runs Wallet
+Intelligence when compatible data exists, and attempts Samantha through the
+server-side bridge. Public UI must not ask users to upload reports, paste
+external evidence, copy schemas, download task packets, or inspect raw JSON. If
+Samantha or another source is unavailable, the UI must say the automatic source
+is unavailable or show a partial reading.
+
 Accepted links:
 
 - `https://polymarket.com/event/...`
@@ -241,20 +249,20 @@ Before enabling any external Deep Analyzer layer:
 
 ## Samantha Research Safety
 
-Samantha is treated as an external research agent. The default production-safe
-mode is manual fallback: PolySignal prepares a brief and validates a pasted
-report. Camino B adds a server-side bridge route, but it is disabled unless a
-safe endpoint is explicitly configured in server-side environment variables.
+Samantha is treated as an external research agent. The public production-safe
+mode is automatic-or-partial: PolySignal prepares sanitized context, attempts the
+server-side bridge only when explicitly configured, and otherwise reports
+`Fuente automatica no disponible` without asking the user to paste evidence.
 
 Current controls:
 
-- no automatic agent execution;
+- no uncontrolled agent execution;
 - no outbound calls from PolySignal to Samantha or OpenClaw unless the
   server-side bridge config is explicitly enabled and allowlisted;
 - no backend run, DB write, migration, scoring, trading, or command with
   `--apply`;
-- task packet generation is local to `/analyze`;
-- the packet includes a research brief, plain-text Samantha instructions,
+- task/context generation is local to `/analyze` and server-side bridge routes;
+- debug-only packets include a research brief, plain-text Samantha instructions,
   expected JSON schema, return instructions, and safety rules;
 - the packet includes normalized market fields and summarized wallet state only;
 - the packet does not include raw payloads, full wallet addresses, secrets, or
@@ -263,7 +271,8 @@ Current controls:
   invented evidence, treat Reddit/social as weak, use Kalshi only for clear
   equivalents, use odds only when comparable, and avoid trading, DB access,
   secrets, doxxing, and identity mapping;
-- report import is manual paste;
+- public report upload/import is hidden by default and only available in local
+  debug mode with `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`;
 - report validator rejects unsafe URLs, secret-like text, full wallet addresses,
   invalid JSON, oversized text, invalid probabilities, Reddit/social high
   reliability, non-equivalent Kalshi strong signals, script-like text, trading

@@ -55,6 +55,11 @@ Partially available today:
 - Research/finding/report objects in market detail.
 - External signal objects when already loaded.
 - Odds/news counts that were used by scoring.
+- Wallet Intelligence as an auxiliary signal when real public Polymarket data is
+  available and sanitized.
+- Samantha automatic analysis as context only when a validated structured
+  response exists; unavailable sources must remain partial and must not create a
+  PolySignal estimate.
 
 Missing or incomplete for a full real estimator:
 

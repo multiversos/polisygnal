@@ -753,11 +753,11 @@ function validateAnalyzeLoadingPanelSource() {
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
   const expectedSteps = [
     "Leyendo enlace",
-    "Buscando mercado en Polymarket",
-    "Confirmando coincidencias",
-    "Preparando tarea para Samantha",
-    "Esperando investigacion externa",
-    "Listo para revisar",
+    "Detectando mercado",
+    "Cargando datos de Polymarket",
+    "Revisando billeteras",
+    "Samantha analizando",
+    "Preparando lectura",
   ];
 
   assert(source.includes("export type AnalyzeLoadingPhase"), "expected typed analyze loading phases");
@@ -766,13 +766,14 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("Esto normalmente toma unos segundos."), "expected normal wait guidance");
   assert(source.includes("Esta tardando mas de lo normal"), "expected slow wait guidance");
   assert(source.includes("Puedes reintentar o revisar el enlace"), "expected retry guidance");
-  assert(source.includes("Samantha necesita terminar la investigacion"), "expected honest Samantha pending state");
+  assert(source.includes("Samantha sigue analizando fuentes automaticas"), "expected honest Samantha automatic pending state");
   assert(source.includes("Guardar para continuar luego"), "expected save-for-later recovery action");
   assert(source.includes("Progreso del analisis"), "expected loading panel to expose human analysis progress state");
   assert(!source.includes("Deep Analysis Job"), "loading panel should not expose technical Deep Analysis Job title");
   assert(!source.includes("Leyendo Polymarket"), "loading panel should use human Polymarket read copy");
   assert(!source.includes("Analizando mercado seleccionado"), "loading panel should use human market review copy");
-  assert(!source.includes("Esperando reporte de Samantha"), "loading panel should use external research wait copy");
+  assert(!source.includes("Esperando reporte de Samantha"), "loading panel should not ask for manual Samantha reports");
+  assert(!source.includes("Cargar reporte Samantha"), "loading panel should not expose manual report upload");
   assert(!source.includes('return "OK"'), "loading panel should not expose OK as public status copy");
   assert(!source.includes('return "Ahora"'), "loading panel should not expose Ahora as public status copy");
   assert(source.includes("aria-live=\"polite\""), "expected polite live region in loading panel");
@@ -797,7 +798,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(!analyzePage.includes("/markets/overview"), "analyzer must not use internal markets overview for primary matching");
   assert(!analyzePage.includes("rankAnalyzerMatches"), "analyzer must not rank internal markets as the primary source");
   assert(!analyzePage.includes("fetchComparableMarkets"), "analyzer must not fetch comparable internal markets");
-  assert(analyzePage.includes('status: "needs_selection"'), "expected exact matches to require confirmation");
+  assert(analyzePage.includes("Mercado unico detectado. Continuamos automaticamente"), "expected exact matches to continue automatically");
   assert(analyzePage.includes('status: "analyzing_selected"'), "expected selected-market loading state");
   assert(analyzePage.includes('status: "result"'), "expected single selected result state");
   assert(!analyzePage.includes("enrichMatchesWithWalletIntelligence(matches)"), "expected wallet lookup not to run for all matches");
@@ -822,13 +823,11 @@ function validateAnalyzerReportSource() {
     "Analisis profundo",
     "Capas del motor",
     "Pendiente de integracion",
-    "Investigacion con Samantha",
-    "Esperando investigacion externa",
-    "Descargar tarea",
-    "Copiar instrucciones",
+    "Samantha automatica",
+    "Lectura con fuentes disponibles",
+    "Fuente automatica no disponible",
+    "Actualizar lectura automatica",
     "Guardar y continuar despues",
-    "Validar reporte",
-    "Cargar reporte al analisis",
     "Que puedes hacer ahora",
     "Analizar otro enlace",
     "Capas revisadas",
@@ -850,6 +849,8 @@ function validateAnalyzerReportSource() {
   assert(source.includes("parseSamanthaResearchReport"), "expected AnalyzerReport to validate Samantha reports locally");
   assert(source.includes("handleValidateSamanthaReport"), "expected AnalyzerReport to validate reports before applying");
   assert(source.includes("handleApplySamanthaReport"), "expected AnalyzerReport to apply valid reports explicitly");
+  assert(source.includes("NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS"), "expected manual Samantha tools to be behind a debug flag");
+  assert(source.includes("!SHOW_ANALYZER_DEBUG_TOOLS"), "expected debug tools not to render by default");
   assert(source.includes("mergeSamanthaResearchLayer"), "expected AnalyzerReport to merge Samantha research into deep readiness");
   assert(source.includes("mergeWalletIntelligenceLayer"), "expected AnalyzerReport to merge wallet layer into deep readiness");
   assert(source.includes("getWalletIntelligenceSummary"), "expected AnalyzerReport to summarize wallet intelligence");
@@ -989,10 +990,10 @@ function validateSamanthaResearchRules() {
   assert(bridgeStatusRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha status route must reject client-provided destinations");
   assert(bridgeStatusRouteSource.includes("targetUrl"), "Samantha status route must reject URL destinations from the client");
   assert(!bridgeStatusRouteSource.includes("SAMANTHA_BRIDGE_TOKEN"), "Samantha status route must not read or expose bridge token directly");
-  assert(historySource.includes("Consultar resultado de Samantha"), "history should expose safe Samantha result lookup");
+  assert(historySource.includes("Actualizar lectura automatica"), "history should expose safe Samantha result lookup");
   assert(historySource.includes("updateAnalysisHistoryItem"), "history should update pending research state without raw payloads");
   assert(analyzePageSource.includes("/api/samantha/send-research"), "analyze page must try the safe Samantha bridge route");
-  assert(analyzePageSource.includes("markJobSamanthaBridgeFallback"), "analyze page must keep manual fallback when bridge is unavailable");
+  assert(analyzePageSource.includes("markJobSamanthaBridgeFallback"), "analyze page must keep safe partial state when bridge is unavailable");
   assert(analyzePageSource.includes("markJobSendingToSamantha"), "analyze page must mark sending_to_samantha state");
   assert(analyzePageSource.includes("setSamanthaAutoReportResult"), "analyze page must pass validated automatic reports to the report UI");
 
@@ -1436,15 +1437,15 @@ function validateDeepAnalysisJobRules() {
   assert(job.briefReady === true, "job should mark Samantha brief ready");
   assert(
     job.steps.find((step) => step.id === "awaiting_samantha_report")?.status === "running",
-    "awaiting_samantha_report should be the manual running step",
+    "awaiting_samantha_report should be the automatic Samantha running step",
   );
   assert(
     job.steps.find((step) => step.id === "completed")?.status !== "completed",
     "awaiting Samantha job must not be marked completed",
   );
   assert(
-    getJobProgressSummary(job).nextAction.includes("Samantha"),
-    "awaiting job summary should point to Samantha report workflow",
+    getJobProgressSummary(job).nextAction.includes("lectura parcial"),
+    "awaiting job summary should offer a partial automatic reading",
   );
 
   const sendingJob = markJobSendingToSamantha(job);
@@ -1501,12 +1502,15 @@ function validateDeepAnalysisJobRules() {
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
   assert(reportSource.includes("Progreso del analisis"), "AnalyzerReport should show human progress copy");
   assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport should expose an accessible job-state label");
-  assert(reportSource.includes("Esperando investigacion externa"), "AnalyzerReport should show human external research wait state");
-  assert(reportSource.includes("Samantha necesita investigacion manual"), "AnalyzerReport should show manual_needed state");
+  assert(reportSource.includes("Samantha automatica"), "AnalyzerReport should show automatic Samantha state");
+  assert(reportSource.includes("Fuente automatica no disponible"), "AnalyzerReport should show unavailable automatic source state");
+  assert(reportSource.includes("NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS"), "AnalyzerReport should gate manual tools behind debug flag");
   assert(reportSource.includes("markJobSamanthaReportLoaded"), "AnalyzerReport should merge Samantha report into the job");
   assert(historySource.includes("Continuar analisis"), "history should let users continue pending deep research");
   assert(historySource.includes("/api/samantha/research-status"), "history should query Samantha status through same-origin route");
   assert(historySource.includes("manual_needed"), "history should show manual_needed as a continuation state");
+  assert(!historySource.includes("Cargar reporte manual"), "history should not expose manual report upload as a public action");
+  assert(!historySource.includes("Necesita reporte manual"), "history should not label pending Samantha as manual report needed");
   assert(historySource.includes("bridgeTaskId"), "history should preserve Samantha task ids without raw payloads");
   assert(!/0x[a-fA-F0-9]{40}/.test(historySource), "history source should not include full wallet literals");
 

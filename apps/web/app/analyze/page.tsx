@@ -1519,7 +1519,7 @@ function previewPropsForState({
         deepAnalysisJob?.status === "completed"
           ? "Reporte validado y listo para revisar."
           : jobAwaitsResearch(deepAnalysisJob)
-            ? "Lectura pendiente de evidencia externa validable."
+            ? "Lectura parcial hasta que haya fuentes automaticas suficientes."
             : "Lectura clara en 2–3 líneas.",
     };
   }
@@ -1725,7 +1725,7 @@ export default function AnalyzePage() {
         if (!response.ok || result.fallbackRequired || result.status === "disabled" || result.status === "fallback_required") {
           const reason =
             !result.reason || /bridge|fallback/i.test(result.reason)
-              ? "Samantha automatica no esta configurada; usa el Task Packet manual."
+              ? "Samantha automatica no esta conectada todavia; prepararemos una lectura parcial con las fuentes disponibles."
               : result.reason;
           job = persistDeepAnalysisJob(
             markJobSamanthaBridgeFallback(job, {
@@ -1805,8 +1805,8 @@ export default function AnalyzePage() {
           };
         }
         const reason = isAnalyzeTimeout(error)
-          ? "Samantha esta tardando mas de lo normal; usa el Task Packet manual o vuelve a consultar despues."
-          : "Samantha automatica no respondio de forma segura; usa el Task Packet manual.";
+          ? "Samantha esta tardando mas de lo normal; puedes guardar la lectura parcial o volver a consultar despues."
+          : "Samantha automatica no respondio de forma segura; la lectura queda parcial con las fuentes disponibles.";
         job = persistDeepAnalysisJob(
           markJobSamanthaBridgeFallback(job, {
             automaticAvailable: true,
@@ -1893,7 +1893,7 @@ export default function AnalyzePage() {
           message:
             matches.length > 1
               ? "Polymarket devolvio este evento con varios mercados. Selecciona uno para analizar."
-              : "Polymarket devolvio un mercado para este enlace. Confirma que quieres analizarlo.",
+              : "Mercado unico detectado. Continuamos automaticamente con Polymarket, Wallet Intelligence y Samantha.",
           normalizedUrl,
           status: "needs_selection",
         });
@@ -2156,6 +2156,17 @@ export default function AnalyzePage() {
       }
     }
   }, [persistDeepAnalysisJob, tryAutomaticSamanthaBridge]);
+
+  useEffect(() => {
+    if (
+      loading ||
+      state.status !== "needs_selection" ||
+      state.matches.length !== 1
+    ) {
+      return;
+    }
+    void analyzeSelectedMarket(state.matches[0], state.normalizedUrl);
+  }, [analyzeSelectedMarket, loading, state]);
 
   const handleSaveHistory = useCallback(async (item: MarketOverviewItem, polySignalEstimate?: PolySignalEstimateResult) => {
     if (state.status !== "result") {

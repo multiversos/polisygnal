@@ -46,7 +46,7 @@ export function SamanthaExplainerCard() {
         Samantha trabaja por ti para que revises menos ruido y tomes mejores decisiones.
       </div>
       <p className="samantha-explainer-disclaimer">
-        Cuando falten fuentes o evidencia validable, la lectura queda pendiente en vez de inventar señales.
+        Cuando falten fuentes automaticas suficientes, la lectura queda parcial en vez de inventar señales.
       </p>
     </aside>
   );

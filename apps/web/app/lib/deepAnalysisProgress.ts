@@ -73,8 +73,8 @@ export const DEEP_ANALYSIS_PROGRESS_STEPS: DeepAnalysisProgressStep[] = [
   {
     canRunNow: true,
     isLongRunning: false,
-    label: "Tarea de investigacion preparada",
-    publicCopy: "Preparando brief estructurado para investigacion externa manual.",
+    label: "Samantha automatica preparada",
+    publicCopy: "Preparando contexto seguro para el puente automatico de Samantha.",
     requiresBackendJob: false,
     requiresExternalSource: false,
     state: "preparing_samantha_brief",
@@ -82,8 +82,8 @@ export const DEEP_ANALYSIS_PROGRESS_STEPS: DeepAnalysisProgressStep[] = [
   {
     canRunNow: false,
     isLongRunning: true,
-    label: "Esperando investigacion externa",
-    publicCopy: "Esperando que el usuario pegue un reporte estructurado validable.",
+    label: "Samantha analizando",
+    publicCopy: "Esperando respuesta automatica o fuente segura disponible.",
     requiresBackendJob: false,
     requiresExternalSource: false,
     state: "waiting_samantha_report",

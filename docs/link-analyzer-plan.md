@@ -32,8 +32,8 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
 - The user flow is `Detectar -> Confirmar -> Analizar -> Guardar -> Verificar
   resultado`.
 - The MVP continuity checklist lives in `docs/analyzer-mvp-test-flow.md`; it
-  covers History continuation, Samantha `pending/manual_needed`, manual report
-  fallback, and the rule that research-pending analyses do not count for
+  covers History continuation, Samantha `pending/manual_needed`, automatic
+  partial readings, and the rule that research-pending analyses do not count for
   accuracy.
 - If there is a match, `/analyze` first shows a compact selector. It does not
   open deep analysis for every candidate.
@@ -127,23 +127,23 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
   market/event data from Polymarket/Gamma read-only, wallet data from public
   Polymarket/Gamma read-only sources when available, external research as pending
   or verified, and history from this browser.
-- The report includes a manual `Investigacion con Samantha` workflow. It
-  prepares a structured brief, lets the user paste a structured Samantha report,
-  validates it locally, and shows accepted evidence without executing Samantha
-  automatically.
+- The public report includes an automatic Samantha workflow. It prepares safe
+  context, attempts the configured server-side bridge, and shows completed,
+  partial, or unavailable-source states without asking the user to paste a
+  report.
 - Camino B esta preparado con `POST /api/samantha/send-research`: `/analyze`
-  puede intentar enviar el Task Packet a Samantha solo si existe configuracion
+  puede intentar enviar el contexto de Samantha solo si existe configuracion
   server-side segura. Si no esta configurado, el job queda `awaiting_samantha`
-  y el flujo manual completo sigue disponible. Esta ruta no acepta destinos del
-  cliente y no es un proxy abierto.
+  como lectura parcial/fuente automatica no disponible. Esta ruta no acepta
+  destinos del cliente y no es un proxy abierto.
 - En desarrollo local, Samantha puede recibir la tarea en
   `POST /polysignal/research-task` si su bridge esta explicitamente habilitado.
   La respuesta actual esperada es `accepted`/`queued_or_manual`; PolySignal no
   marca el analisis como completado hasta recibir un reporte validado.
 - `/analyze` ofrece `Consultar resultado de Samantha` cuando existe `taskId`.
   La consulta pasa por `/api/samantha/research-status`; si Samantha responde
-  `pending` o `manual_needed`, el job sigue esperando investigacion y el fallback
-  manual permanece disponible.
+  `pending` o `manual_needed`, el job sigue esperando investigacion o queda
+  como lectura parcial sin pedir carga manual al usuario.
 - The report closes with `Que puedes hacer ahora`: save the analysis, save as
   follow-up when there is no PolySignal estimate, view history, follow the
   market, open market detail, or analyze another link.
@@ -216,16 +216,17 @@ Prepared as frontend contracts only.
 - `deepAnalyzerEngine.ts` builds conservative v0 layers from already available
   Polymarket market data and sanitized Wallet Intelligence.
 - `deepAnalysisProgress.ts` models future job phases:
-  reading Polymarket, analyzing movement, wallets, wallet profiles, preparing a
-  Samantha brief, waiting for a manual Samantha report, external research, odds,
-  Kalshi, evidence scoring and decision.
-- `samanthaResearchBrief.ts` and `samanthaResearchReport.ts` define the manual
-  bridge to Samantha: export brief, paste report, validate evidence, then feed
-  accepted signals into the Deep Analyzer.
+  reading Polymarket, analyzing movement, wallets, wallet profiles, preparing
+  Samantha automatic context, waiting for automatic sources, external research,
+  odds, Kalshi, evidence scoring and decision.
+- `samanthaResearchBrief.ts` and `samanthaResearchReport.ts` define the
+  structured Samantha contracts. Public UI uses them through the automatic
+  bridge and hides manual copy/download/schema tooling behind debug mode.
 - `samanthaBridgeTypes.ts`, `samanthaBridge.ts` y
   `/api/samantha/send-research` preparan Camino B automatico seguro. Por
-  defecto responde fallback manual; solo usa un endpoint server-side allowlisted
-  si `SAMANTHA_BRIDGE_ENABLED` y `SAMANTHA_BRIDGE_URL` estan configurados.
+  defecto responde fuente automatica no disponible; solo usa un endpoint
+  server-side allowlisted si `SAMANTHA_BRIDGE_ENABLED` y
+  `SAMANTHA_BRIDGE_URL` estan configurados.
 - Endpoint local recomendado para Samantha:
   `http://127.0.0.1:8787/polysignal/research-task`.
 - `DeepAnalysisJob` soporta estados de puente:
