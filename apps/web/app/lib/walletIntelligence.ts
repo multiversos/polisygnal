@@ -3,6 +3,7 @@ import type {
   WalletIntelligenceSummary,
   WalletMarketPosition,
   WalletPerformanceProfile,
+  WalletProfileSummary,
   WalletPublicSignalSummary,
   WalletReliability,
   WalletRiskProfile,
@@ -16,16 +17,20 @@ type WalletIntelligenceSource = {
   [key: string]: unknown;
   walletIntelligence?: {
     positions?: WalletMarketPosition[] | null;
+    profileSummaries?: WalletProfileSummary[] | null;
     profiles?: WalletPerformanceProfile[] | null;
     summary?: WalletIntelligenceSummary | null;
   } | null;
+  walletProfileSummaries?: WalletProfileSummary[] | null;
   walletPositions?: WalletMarketPosition[] | null;
   walletProfiles?: WalletPerformanceProfile[] | null;
   wallet_intelligence?: {
     positions?: WalletMarketPosition[] | null;
+    profileSummaries?: WalletProfileSummary[] | null;
     profiles?: WalletPerformanceProfile[] | null;
     summary?: WalletIntelligenceSummary | null;
   } | null;
+  wallet_profile_summaries?: WalletProfileSummary[] | null;
   wallet_positions?: WalletMarketPosition[] | null;
   wallet_profiles?: WalletPerformanceProfile[] | null;
 };
@@ -63,6 +68,13 @@ function cleanProfiles(profiles?: WalletPerformanceProfile[] | null): WalletPerf
   return profiles.filter((profile) => typeof profile.walletAddress === "string" && profile.walletAddress.trim());
 }
 
+function cleanProfileSummaries(profiles?: WalletProfileSummary[] | null): WalletProfileSummary[] {
+  if (!Array.isArray(profiles)) {
+    return [];
+  }
+  return profiles.filter((profile) => typeof profile.shortAddress === "string" && profile.shortAddress.trim());
+}
+
 function getWalletPositions(input: WalletIntelligenceSource): WalletMarketPosition[] {
   return [
     ...cleanPositions(input.walletIntelligence?.summary?.topWallets),
@@ -80,6 +92,17 @@ function getWalletProfiles(input: WalletIntelligenceSource): WalletPerformancePr
     ...cleanProfiles(input.wallet_intelligence?.profiles),
     ...cleanProfiles(input.walletProfiles),
     ...cleanProfiles(input.wallet_profiles),
+  ];
+}
+
+function getWalletProfileSummaries(input: WalletIntelligenceSource): WalletProfileSummary[] {
+  return [
+    ...cleanProfileSummaries(input.walletIntelligence?.summary?.profileSummaries),
+    ...cleanProfileSummaries(input.walletIntelligence?.profileSummaries),
+    ...cleanProfileSummaries(input.wallet_intelligence?.summary?.profileSummaries),
+    ...cleanProfileSummaries(input.wallet_intelligence?.profileSummaries),
+    ...cleanProfileSummaries(input.walletProfileSummaries),
+    ...cleanProfileSummaries(input.wallet_profile_summaries),
   ];
 }
 
@@ -228,6 +251,7 @@ export function getWalletIntelligenceSummary(
   const positions = getWalletPositions(input);
   const relevantPositions = filterRelevantWallets(positions, thresholdUsd);
   const profiles = getWalletProfiles(input);
+  const profileSummaries = getWalletProfileSummaries(input);
   if (relevantPositions.length === 0) {
     return {
       available: false,
@@ -247,6 +271,7 @@ export function getWalletIntelligenceSummary(
 
   const bias = calculateWalletSideBias(relevantPositions, thresholdUsd);
   const reliableProfiles = profiles.filter((profile) => reliabilityScore(profile.reliability) >= 2);
+  const reliableProfileSummaries = profileSummaries.filter((profile) => profile.profileAvailable);
   const reliableWallets = new Set(reliableProfiles.map((profile) => profile.walletAddress.toLowerCase()));
   const trustedYesWallets = relevantPositions.filter(
     (position) => position.side === "YES" && reliableWallets.has(position.walletAddress.toLowerCase()),
@@ -260,6 +285,7 @@ export function getWalletIntelligenceSummary(
     available: true,
     confidence: bias.confidence === "none" ? "low" : bias.confidence,
     noCapitalUsd: bias.noCapitalUsd,
+    profileSummaries,
     reason:
       "Hay posiciones publicas por encima del umbral. Esta lectura requiere validacion antes de usarse como senal de estimacion.",
     relevantWalletsCount: bias.relevantWalletsCount,
@@ -267,8 +293,8 @@ export function getWalletIntelligenceSummary(
     source: "local",
     thresholdUsd,
     topWallets: relevantPositions.slice(0, 5),
-    trustedNoWallets,
-    trustedYesWallets,
+    trustedNoWallets: trustedNoWallets + reliableProfileSummaries.filter((profile) => profile.commonSideBias === "NO").length,
+    trustedYesWallets: trustedYesWallets + reliableProfileSummaries.filter((profile) => profile.commonSideBias === "YES").length,
     warnings: [
       "No copiar traders ciegamente.",
       "No identificar personas reales detras de direcciones publicas.",
@@ -386,6 +412,7 @@ export function getWalletIntelligenceReadiness(
   const input = market ?? {};
   const positions = getWalletPositions(input);
   const profiles = getWalletProfiles(input);
+  const profileSummaries = getWalletProfileSummaries(input);
   const relevantPositions = filterRelevantWallets(positions, thresholdUsd);
   const checklist = [
     {
@@ -407,12 +434,21 @@ export function getWalletIntelligenceReadiness(
       reason: "Necesario para saber inclinacion sin inventarla.",
     },
     {
-      available: profiles.some((profile) => (profile.resolvedMarkets ?? 0) > 0),
+      available:
+        profiles.some((profile) => (profile.resolvedMarkets ?? 0) > 0) ||
+        profileSummaries.some((profile) => (profile.resolvedMarketsCount ?? 0) > 0),
       label: "Historial cerrado",
       reason: "Necesario para medir desempeno real de una billetera.",
     },
     {
-      available: profiles.some((profile) => typeof profile.winRate === "number"),
+      available:
+        profiles.some((profile) => typeof profile.winRate === "number") ||
+        profileSummaries.some(
+          (profile) =>
+            typeof profile.winRate === "number" &&
+            typeof profile.wins === "number" &&
+            typeof profile.losses === "number",
+        ),
       label: "Tasa de acierto historica",
       reason: "Solo se mostrara cuando exista historial resuelto confiable.",
     },
@@ -431,7 +467,7 @@ export function getWalletIntelligenceReadiness(
   return {
     available: relevantPositions.length > 0,
     checklist,
-    level: relevantPositions.length > 0 && profiles.length > 0 ? "partial" : "none",
+    level: relevantPositions.length > 0 && (profiles.length > 0 || profileSummaries.length > 0) ? "partial" : "none",
     missing,
     thresholdUsd,
     warnings: [

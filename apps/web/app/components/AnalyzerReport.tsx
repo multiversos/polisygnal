@@ -45,6 +45,7 @@ import {
   formatProbability,
   getProbabilityDisplayState,
 } from "../lib/marketProbabilities";
+import { buildConservativePolySignalSignalMix } from "../lib/polySignalSignalMixer";
 import {
   getMarketActivityLabel,
   getMarketReviewReason,
@@ -297,6 +298,9 @@ function sourceLabel(summary: WalletIntelligenceSummary): string {
   if (summary.source === "backend") {
     return "datos publicos Polymarket/Gamma de solo lectura";
   }
+  if (summary.source === "polymarket_data") {
+    return "Polymarket Data API de solo lectura";
+  }
   return "datos publicos cargados";
 }
 
@@ -388,6 +392,8 @@ export function AnalyzerReport({
   const walletSummary = getWalletIntelligenceSummary(item);
   const walletReading = getWalletSignalSummary(walletSummary);
   const walletReadiness = getWalletIntelligenceReadiness(item);
+  const walletProfiles = walletSummary.profileSummaries ?? [];
+  const availableWalletProfiles = walletProfiles.filter((profile) => profile.profileAvailable);
   const samanthaBrief = useMemo(
     () =>
       buildSamanthaResearchBrief({
@@ -415,6 +421,12 @@ export function AnalyzerReport({
   const samanthaEvidence = samanthaReport ? convertSamanthaReportToEvidence(samanthaReport) : [];
   const samanthaSignals = samanthaReport ? convertSamanthaReportToSignals(samanthaReport) : [];
   const samanthaEstimateAccepted = samanthaReport ? shouldAcceptSuggestedEstimate(samanthaReport) : false;
+  const signalMix = buildConservativePolySignalSignalMix({
+    externalOddsSignalAvailable: Boolean(samanthaReport?.oddsComparison?.found),
+    marketImpliedProbability: probabilityState.market,
+    samanthaResearchSignalCount: samanthaSignals.length,
+    walletSignal: walletSummary,
+  });
   const samanthaDraftDirectionCounts = samanthaDraftEvidence.reduce(
     (counts, evidence) => ({
       ...counts,
@@ -1129,6 +1141,9 @@ export function AnalyzerReport({
           <p className="section-note">
             Preparacion de estimacion PolySignal: {readinessScore.disclaimer}
           </p>
+          <p className="section-note">
+            Porcentaje PolySignal: {signalMix.reason}
+          </p>
           {missingEstimateData.length > 0 ? (
             <div className="data-health-notes">
               {missingEstimateData.slice(0, 5).map((reason) => (
@@ -1214,9 +1229,33 @@ export function AnalyzerReport({
             </details>
           ) : (
             <p className="section-note">
-              No hay suficiente actividad publica de billeteras para este mercado.
+              No encontramos datos publicos suficientes de billeteras para este mercado.
+              Este analisis no usara wallets como senal fuerte.
             </p>
           )}
+          <div className="wallet-profile-summary">
+            <strong>Perfil de billeteras</strong>
+            {availableWalletProfiles.length > 0 ? (
+              <div className="wallet-report-table" role="list">
+                {availableWalletProfiles.slice(0, 3).map((profile) => (
+                  <div className="wallet-report-row" key={profile.shortAddress} role="listitem">
+                    <strong>{profile.shortAddress}</strong>
+                    <span>{profile.resolvedMarketsCount ?? 0} mercados cerrados</span>
+                    <span>
+                      {typeof profile.winRate === "number" && typeof profile.wins === "number" && typeof profile.losses === "number"
+                        ? `Win rate ${Math.round(profile.winRate * 100)}% (${profile.wins}-${profile.losses})`
+                        : "Win rate no disponible"}
+                    </span>
+                    <span>Confianza {profile.confidence}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="section-note">
+                No hay historial publico suficiente para calificar estas billeteras.
+              </p>
+            )}
+          </div>
           <div className="data-health-notes">
             {walletReadiness.checklist.slice(0, 5).map((entry) => (
               <span className={entry.available ? "badge external-hint" : "badge muted"} key={entry.label}>

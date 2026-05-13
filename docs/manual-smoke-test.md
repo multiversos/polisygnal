@@ -362,19 +362,24 @@ If this test fails, stop feature work and treat it as a production regression.
 39. If wallet data exists, confirm it shows only shortened wallet addresses,
    threshold `$100+`, capital observed, YES/NO/Neutral bias, confidence, and
    auxiliary-signal copy.
-40. If no wallet data exists, confirm it says pending or unavailable without
-   breaking the analysis result.
-41. Confirm it does not show fake wallets, full wallet addresses, ROI, win rate,
+40. Confirm wallet lookup uses the resolved Polymarket `conditionId`/token IDs
+   for the selected market, not an internal sports market fallback.
+41. If no wallet data exists, confirm it says `No encontramos datos publicos
+   suficientes de billeteras para este mercado` without breaking the analysis
+   result.
+42. Confirm wallet profile copy says there is not enough public history unless
+   closed-position history is actually present.
+43. Confirm it does not show fake wallets, full wallet addresses, ROI, win rate,
    or copied-trader advice.
-42. Confirm it says public wallet activity is not mapped to real people and that
+44. Confirm it says public wallet activity is not mapped to real people and that
    the signal is auxiliary, not a prediction or recommendation.
-43. Open `Ver todas las billeteras analizadas` when wallet data exists and
+45. Open `Ver todas las billeteras analizadas` when wallet data exists and
    confirm the drilldown stays compact, uses shortened addresses only, and does
    not show fake ROI or win-rate values.
-44. Confirm `Historial relacionado` is visible. If the market was analyzed
+46. Confirm `Historial relacionado` is visible. If the market was analyzed
    before, it should show the latest local record; otherwise it should say the
    market is not in local history yet.
-45. Confirm `Decision de PolySignal` follows the 55% threshold:
+47. Confirm `Decision de PolySignal` follows the 55% threshold:
    YES `>=55%` is clear YES, NO `>=55%` is clear NO, and 45/55 is `Sin decision fuerte`.
 46. Confirm market price alone never creates a PolySignal predicted side.
 47. Confirm it shows only real visible data: title, event, status, price if

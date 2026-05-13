@@ -148,10 +148,16 @@ not a customer-data feature and does not store wallet history today.
 
 Current constraints:
 
-- `/analyze` uses the existing read-only backend endpoint through the constrained
-  same-origin proxy; it does not call wallet sources directly from the browser.
-- `walletIntelligenceAdapter.ts` requests only
-  `/markets/{market_id}/wallet-intelligence` for numeric local market IDs.
+- `/analyze` uses `/api/polymarket-wallet-intelligence`, a same-origin
+  server-side route that accepts only sanitized market identifiers from the
+  resolved Polymarket link and builds its own allowlisted Polymarket Data API
+  requests.
+- The legacy `walletIntelligenceAdapter.ts` remains available for numeric local
+  market detail views, but it is not the primary wallet source for pasted
+  Polymarket links.
+- The wallet route does not accept a client-provided destination URL and does
+  not use `/markets/overview`, `/sports/soccer`, or internal sports markets as
+  fallback.
 - Wallet summaries use a `100 USD` relevance threshold.
 - Full wallet addresses must not be shown by default; public UI renders
   shortened addresses only.

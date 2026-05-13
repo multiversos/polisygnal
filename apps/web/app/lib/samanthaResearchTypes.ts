@@ -25,7 +25,17 @@ export type SamanthaResearchBrief = {
     walletIntelligence?: {
       available: boolean;
       bias?: SamanthaDirection;
+      notableWalletCount?: number;
       observedCapitalUsd?: number;
+      profileSummary?: Array<{
+        confidence: "high" | "low" | "medium" | "unknown";
+        profileAvailable: boolean;
+        reason: string;
+        resolvedMarketsCount?: number;
+        shortAddress: string;
+        winRate?: number;
+      }>;
+      walletSignalAvailable?: boolean;
       warnings?: string[];
     };
   };

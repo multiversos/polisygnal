@@ -76,7 +76,7 @@ import {
   getWalletSignalSummary,
   getWalletIntelligenceSummary,
 } from "../lib/walletIntelligence";
-import { getWalletIntelligenceForMarket } from "../lib/walletIntelligenceAdapter";
+import { getPolymarketWalletIntelligence } from "../lib/polymarketWalletIntelligence";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { buildSamanthaResearchBrief } from "../lib/samanthaResearchBrief";
@@ -319,17 +319,17 @@ function buildMatchesFromPolymarketResult(result: PolymarketLinkResolveResult): 
   });
 }
 
-async function enrichMatchWithWalletIntelligence(match: MatchResult): Promise<MatchResult> {
+async function enrichMatchWithWalletIntelligence(match: MatchResult, normalizedUrl: string): Promise<MatchResult> {
   const market = match.item.market;
-  const marketId = market?.id ? String(market.id) : market?.remote_id ?? undefined;
-  if (!marketId || !/^\d+$/.test(marketId)) {
-    return match;
-  }
-  const summary = await getWalletIntelligenceForMarket({
+  const tokenIds = (market?.outcomes ?? [])
+    .map((outcome) => outcome.token_id)
+    .filter((tokenId): tokenId is string => Boolean(tokenId));
+  const summary = await getPolymarketWalletIntelligence({
+    conditionId: market?.condition_id ?? undefined,
     eventSlug: market?.event_slug ?? undefined,
-    marketId,
     marketSlug: market?.market_slug ?? undefined,
-    remoteId: market?.remote_id ?? undefined,
+    marketUrl: normalizedUrl,
+    tokenIds,
   });
   return {
     ...match,
@@ -351,6 +351,20 @@ function safeWalletSummaryForHistory(item: MarketOverviewItem) {
     checkedAt: summary.checkedAt,
     confidence: summary.confidence,
     noCapitalUsd: summary.noCapitalUsd,
+    profileSummaries: (summary.profileSummaries ?? []).slice(0, 5).map((profile) => ({
+      commonSideBias: profile.commonSideBias,
+      confidence: profile.confidence,
+      losses: profile.losses,
+      observedMarketsCount: profile.observedMarketsCount,
+      profileAvailable: profile.profileAvailable,
+      reason: profile.reason,
+      resolvedMarketsCount: profile.resolvedMarketsCount,
+      shortAddress: profile.shortAddress,
+      volumeObservedUsd: profile.volumeObservedUsd,
+      warnings: profile.warnings.slice(0, 4),
+      winRate: profile.winRate,
+      wins: profile.wins,
+    })),
     reason: summary.reason,
     relevantWalletsCount: summary.relevantWalletsCount,
     signalDirection: summary.signalDirection,
@@ -370,6 +384,18 @@ function safeOutcomesForHistory(item: MarketOverviewItem) {
       price: toNumber(outcome.price) ?? undefined,
       side: outcome.side ? String(outcome.side) : undefined,
     }));
+}
+
+function safeTokenIdsForHistory(item: MarketOverviewItem): string[] | undefined {
+  const tokenIds = (item.market?.outcomes ?? [])
+    .map((outcome) => outcome.token_id)
+    .filter((tokenId): tokenId is string => Boolean(tokenId))
+    .slice(0, 8);
+  return tokenIds.length > 0 ? tokenIds : undefined;
+}
+
+function tokenIdForSide(item: MarketOverviewItem, side: "NO" | "YES"): string | undefined {
+  return (item.market?.outcomes ?? []).find((outcome) => outcome.side === side)?.token_id ?? undefined;
 }
 
 function jobAwaitsResearch(job?: DeepAnalysisJob | null): boolean {
@@ -476,6 +502,7 @@ function historyPayloadFromMarket(
             ? ("Media" as const)
             : ("Baja" as const),
     conditionId: item.market?.condition_id || undefined,
+    clobTokenIds: safeTokenIdsForHistory(item),
     decision: decision.decision,
     decisionThreshold: decision.decisionThreshold,
     eventSlug: item.market?.event_slug || undefined,
@@ -507,6 +534,7 @@ function historyPayloadFromMarket(
       (reason): reason is string => Boolean(reason),
     ),
     nextCheckHint: "Revisar cuando Polymarket confirme el resultado final.",
+    noTokenId: tokenIdForSide(item, "NO"),
     result: "pending" as const,
     researchBriefReadyAt: deepJob?.steps.find((step) => step.id === "preparing_samantha_research")?.completedAt,
     researchStatus: deepJob?.status,
@@ -525,6 +553,7 @@ function historyPayloadFromMarket(
           : ("awaiting_resolution" as const),
     url: normalizedUrl,
     walletIntelligenceSummary: safeWalletSummaryForHistory(item),
+    yesTokenId: tokenIdForSide(item, "YES"),
   };
 }
 
@@ -1708,7 +1737,7 @@ export default function AnalyzePage() {
         return;
       }
       getResearchCoverage(match.item, []);
-      const enrichedMatch = await enrichMatchWithWalletIntelligence(match);
+      const enrichedMatch = await enrichMatchWithWalletIntelligence(match, normalizedUrl);
       if (!isCurrentRun()) {
         return;
       }

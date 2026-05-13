@@ -84,10 +84,24 @@ export type AnalysisHistoryWalletSummary = {
   checkedAt?: string;
   confidence: "high" | "low" | "medium" | "none";
   noCapitalUsd?: number;
+  profileSummaries?: Array<{
+    commonSideBias?: AnalysisHistoryWalletSignalDirection;
+    confidence: "high" | "low" | "medium" | "unknown";
+    losses?: number;
+    observedMarketsCount?: number;
+    profileAvailable: boolean;
+    reason: string;
+    resolvedMarketsCount?: number;
+    shortAddress: string;
+    volumeObservedUsd?: number;
+    warnings: string[];
+    winRate?: number;
+    wins?: number;
+  }>;
   reason: string;
   relevantWalletsCount: number;
   signalDirection: AnalysisHistoryWalletSignalDirection;
-  source?: "backend" | "local" | "unavailable";
+  source?: "backend" | "local" | "polymarket_data" | "unavailable";
   thresholdUsd: number;
   warnings: string[];
   yesCapitalUsd?: number;
@@ -100,6 +114,7 @@ export type AnalysisHistoryItem = {
   bridgeMode?: AnalysisHistoryBridgeMode;
   bridgeStatus?: AnalysisHistoryBridgeStatus;
   bridgeTaskId?: string;
+  clobTokenIds?: string[];
   confidence?: AnalysisHistoryConfidence;
   conditionId?: string;
   decision?: AnalysisHistoryDecision;
@@ -140,6 +155,8 @@ export type AnalysisHistoryItem = {
   url?: string;
   verifiedAt?: string;
   walletIntelligenceSummary?: AnalysisHistoryWalletSummary;
+  noTokenId?: string;
+  yesTokenId?: string;
 };
 
 export type AnalysisHistoryStats = {
@@ -465,10 +482,53 @@ function normalizeWalletConfidence(value: unknown): AnalysisHistoryWalletSummary
 }
 
 function normalizeWalletSource(value: unknown): AnalysisHistoryWalletSummary["source"] {
-  if (value === "backend" || value === "local" || value === "unavailable") {
+  if (value === "backend" || value === "local" || value === "polymarket_data" || value === "unavailable") {
     return value;
   }
   return undefined;
+}
+
+function normalizeWalletReliability(value: unknown): "high" | "low" | "medium" | "unknown" {
+  if (value === "high" || value === "medium" || value === "low" || value === "unknown") {
+    return value;
+  }
+  return "unknown";
+}
+
+function normalizeWalletProfileSummaries(
+  value: unknown,
+): AnalysisHistoryWalletSummary["profileSummaries"] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const profiles = value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      const profile = item as NonNullable<AnalysisHistoryWalletSummary["profileSummaries"]>[number];
+      const shortAddress = normalizeString(profile.shortAddress, 32);
+      if (!shortAddress) {
+        return null;
+      }
+      return {
+        commonSideBias: normalizeWalletSignalDirection(profile.commonSideBias),
+        confidence: normalizeWalletReliability(profile.confidence),
+        losses: normalizeNumber(profile.losses),
+        observedMarketsCount: normalizeNumber(profile.observedMarketsCount),
+        profileAvailable: profile.profileAvailable === true,
+        reason: normalizeString(profile.reason) || "No hay historial publico suficiente para calificar esta billetera.",
+        resolvedMarketsCount: normalizeNumber(profile.resolvedMarketsCount),
+        shortAddress,
+        volumeObservedUsd: normalizeNumber(profile.volumeObservedUsd),
+        warnings: normalizeStringList(profile.warnings, 4),
+        winRate: normalizeNumber(profile.winRate),
+        wins: normalizeNumber(profile.wins),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 5) as NonNullable<AnalysisHistoryWalletSummary["profileSummaries"]>;
+  return profiles.length > 0 ? profiles : undefined;
 }
 
 function normalizeWalletSummary(value: unknown): AnalysisHistoryWalletSummary | undefined {
@@ -482,6 +542,7 @@ function normalizeWalletSummary(value: unknown): AnalysisHistoryWalletSummary | 
     checkedAt: normalizeString(summary.checkedAt),
     confidence: normalizeWalletConfidence(summary.confidence),
     noCapitalUsd: normalizeNumber(summary.noCapitalUsd),
+    profileSummaries: normalizeWalletProfileSummaries(summary.profileSummaries),
     reason:
       normalizeString(summary.reason) ||
       "Wallet Intelligence no tenia datos suficientes al guardar el analisis.",
@@ -544,6 +605,7 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     bridgeMode: normalizeBridgeMode(value.bridgeMode),
     bridgeStatus: normalizeBridgeStatus(value.bridgeStatus),
     bridgeTaskId: normalizeString(value.bridgeTaskId, 160),
+    clobTokenIds: normalizeStringList(value.clobTokenIds, 8),
     confidence: normalizeConfidence(value.confidence),
     conditionId: normalizeString(value.conditionId),
     decision: decision.decision,
@@ -592,6 +654,8 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     url: value.url || undefined,
     verifiedAt: normalizeString(value.verifiedAt),
     walletIntelligenceSummary: normalizeWalletSummary(value.walletIntelligenceSummary),
+    noTokenId: normalizeString(value.noTokenId),
+    yesTokenId: normalizeString(value.yesTokenId),
   };
 }
 

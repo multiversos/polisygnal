@@ -167,7 +167,22 @@ export function buildSamanthaResearchBrief(input: BuildSamanthaResearchBriefInpu
       walletIntelligence: {
         available: Boolean(input.walletSummary?.available),
         bias: input.walletSummary ? normalizeWalletBias(input.walletSummary.signalDirection) : "UNKNOWN",
+        notableWalletCount: input.walletSummary?.relevantWalletsCount,
         observedCapitalUsd: input.walletSummary?.analyzedCapitalUsd,
+        profileSummary: (input.walletSummary?.profileSummaries ?? []).slice(0, 5).map((profile) => ({
+          confidence: profile.confidence,
+          profileAvailable: profile.profileAvailable,
+          reason: cleanText(profile.reason, "No hay historial publico suficiente para calificar esta billetera."),
+          resolvedMarketsCount: profile.resolvedMarketsCount,
+          shortAddress: cleanText(profile.shortAddress),
+          winRate:
+            typeof profile.winRate === "number" &&
+            typeof profile.wins === "number" &&
+            typeof profile.losses === "number"
+              ? profile.winRate
+              : undefined,
+        })),
+        walletSignalAvailable: Boolean(input.walletSummary?.available && input.walletSummary.relevantWalletsCount > 0),
         warnings: walletReading.warnings,
       },
     },

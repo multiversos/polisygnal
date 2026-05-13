@@ -416,15 +416,23 @@ async function validateWalletIntelligenceRules() {
     getWalletIntelligenceReadiness,
     getWalletIntelligenceSummary,
     getWalletPublicExplanation,
+    getPolymarketWalletIntelligence,
     getWalletSignalSummary,
     getWalletWarnings,
     shouldUseWalletAsAuxiliarySignal,
   } = {
     ...loadTsModule("app/lib/walletIntelligence.ts"),
     ...loadTsModule("app/lib/walletIntelligenceAdapter.ts"),
+    ...loadTsModule("app/lib/polymarketWalletIntelligence.ts"),
   };
+  const { buildWalletProfileSummary } = loadTsModule("app/lib/walletProfiles.ts");
+  const { buildConservativePolySignalSignalMix } = loadTsModule("app/lib/polySignalSignalMixer.ts");
   const { collectIndependentSignals } = loadTsModule("app/lib/estimationSignals.ts");
   const { getPolySignalEstimate } = loadTsModule("app/lib/polySignalEstimateEngine.ts");
+  const polymarketWalletRouteSource = readFileSync(
+    resolve(appRoot, "app/api/polymarket-wallet-intelligence/route.ts"),
+    "utf8",
+  );
 
   const fullWallet = "0x1234567890abcdef1234567890abcdef12345678";
   const secondWallet = "0x2222222222222222222222222222222222222222";
@@ -554,9 +562,90 @@ async function validateWalletIntelligenceRules() {
     const unavailable = await getWalletIntelligenceForMarket({ marketId: "47" });
     assert(!unavailable.available, "expected no wallet data response to stay unavailable");
     assert(unavailable.reason.includes("Aun no hay datos"), "expected no-data adapter to explain unavailable data");
+
+    globalThis.fetch = async (url, init) => {
+      calls.push({ init, url: String(url) });
+      return new Response(
+        JSON.stringify({
+          analyzedCapitalUsd: 250,
+          available: true,
+          checkedAt: "2026-05-12T00:00:00Z",
+          confidence: "low",
+          noCapitalUsd: 0,
+          profileSummaries: [
+            {
+              confidence: "unknown",
+              profileAvailable: false,
+              reason: "No hay historial publico suficiente para calificar esta billetera.",
+              shortAddress: "0x1234...5678",
+              warnings: ["No se inventa ROI ni win rate sin mercados cerrados reales."],
+            },
+          ],
+          reason: "Actividad publica real.",
+          relevantWalletsCount: 1,
+          signalDirection: "YES",
+          source: "polymarket_data",
+          thresholdUsd: 100,
+          topWallets: [{ amountUsd: 250, shortAddress: "0x1234...5678", side: "YES", walletAddress: "0x1234...5678" }],
+          warnings: ["No se muestran direcciones completas."],
+          yesCapitalUsd: 250,
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 200 },
+      );
+    };
+    const external = await getPolymarketWalletIntelligence({
+      conditionId: "0xcondition",
+      marketUrl: "https://polymarket.com/event/test",
+      tokenIds: ["yes-token", "no-token"],
+    });
+    assert(external.available, "expected Polymarket-first wallet adapter to accept sanitized live wallet data");
+    assert(external.source === "polymarket_data", "expected live wallet adapter to mark Polymarket Data source");
+    assert(external.profileSummaries?.[0]?.profileAvailable === false, "expected insufficient wallet history to remain unavailable");
+    assert(calls.at(-1).url === "/api/polymarket-wallet-intelligence", "expected live wallet adapter to use same-origin wallet route");
+    assert(calls.at(-1).init?.method === "POST", "expected live wallet adapter to use POST");
+    assert(calls.at(-1).init?.credentials === "omit", "expected live wallet adapter not to send credentials");
+    assert(calls.at(-1).init?.redirect === "error", "expected live wallet adapter to reject redirects");
+    assert(!JSON.stringify(external).includes(fullWallet), "live wallet adapter leaked a full wallet address");
   } finally {
     globalThis.fetch = originalFetch;
   }
+
+  const insufficientProfile = buildWalletProfileSummary({
+    closedPositions: [],
+    currentSide: "YES",
+    observedCapitalUsd: 250,
+    shortAddress: "0x1234...5678",
+  });
+  assert(!insufficientProfile.profileAvailable, "expected wallet profile without closed history to stay unavailable");
+  assert(insufficientProfile.winRate === undefined, "expected wallet profile not to invent win rate");
+
+  const resolvedProfile = buildWalletProfileSummary({
+    closedPositions: [
+      { conditionId: "a", realizedPnlUsd: 10, volumeUsd: 100 },
+      { conditionId: "b", realizedPnlUsd: 5, volumeUsd: 100 },
+      { conditionId: "c", realizedPnlUsd: -2, volumeUsd: 100 },
+      { conditionId: "d", realizedPnlUsd: 8, volumeUsd: 100 },
+      { conditionId: "e", realizedPnlUsd: -1, volumeUsd: 100 },
+    ],
+    currentSide: "YES",
+    shortAddress: "0x1234...5678",
+  });
+  assert(resolvedProfile.profileAvailable, "expected enough closed wallet history to create a basic profile");
+  assert(resolvedProfile.wins === 3 && resolvedProfile.losses === 2, "expected wallet profile to use real wins/losses only");
+  assert(resolvedProfile.winRate === 0.6, "expected wallet win rate to be calculated from real wins/losses");
+
+  const conservativeMix = buildConservativePolySignalSignalMix({
+    marketImpliedProbability: { no: 0.4, yes: 0.6 },
+    walletSignal: { ...empty, available: true, relevantWalletsCount: 1, signalDirection: "YES" },
+  });
+  assert(!conservativeMix.finalEstimateAvailable, "expected wallet-only signal mix not to create final PolySignal estimate");
+  assert(conservativeMix.status === "estimate_pending", "expected incomplete signal mix to stay pending");
+
+  assert(polymarketWalletRouteSource.includes("https://data-api.polymarket.com"), "wallet route must use Polymarket Data API allowlist");
+  assert(polymarketWalletRouteSource.includes("SAFE_PATHS"), "wallet route must constrain upstream paths");
+  assert(polymarketWalletRouteSource.includes("credentials: \"omit\""), "wallet route must omit credentials");
+  assert(polymarketWalletRouteSource.includes("redirect: \"error\""), "wallet route must reject redirects");
+  assert(!polymarketWalletRouteSource.includes("NEXT_PUBLIC_API_BASE_URL"), "wallet route must not use internal backend overview fallback");
 
   const marketWithWalletData = {
     walletIntelligence: {
@@ -584,7 +673,7 @@ async function validateWalletIntelligenceRules() {
     "expected wallet data alone not to create a PolySignal estimate",
   );
 
-  return { cases: 28, threshold_usd: WALLET_INTELLIGENCE_THRESHOLD_USD };
+  return { cases: 43, threshold_usd: WALLET_INTELLIGENCE_THRESHOLD_USD };
 }
 
 function validateAnalyzeLoadingPanelSource() {
@@ -660,6 +749,8 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("MarketSelectionPanel"), "expected /analyze to render the confirmation selector");
   assert(analyzePage.includes("analyzeSelectedMarket"), "expected /analyze to analyze only a selected market");
   assert(analyzePage.includes("/api/analyze-polymarket-link"), "expected /analyze to resolve links through the safe Polymarket route");
+  assert(analyzePage.includes("getPolymarketWalletIntelligence"), "expected /analyze to use Polymarket-first wallet intelligence");
+  assert(!analyzePage.includes("getWalletIntelligenceForMarket"), "link analyzer must not use internal market IDs for wallet lookup");
   assert(analyzePage.includes("resolvePolymarketLinkForAnalyze"), "expected /analyze to use the live Polymarket resolver");
   assert(!analyzePage.includes("/markets/overview"), "analyzer must not use internal markets overview for primary matching");
   assert(!analyzePage.includes("rankAnalyzerMatches"), "analyzer must not rank internal markets as the primary source");
@@ -700,7 +791,9 @@ function validateAnalyzerReportSource() {
     "Analizar otro enlace",
     "Capas revisadas",
     "Ver todas las billeteras analizadas",
-    "No hay suficiente actividad publica de billeteras",
+    "No encontramos datos publicos suficientes de billeteras",
+    "Perfil de billeteras",
+    "Porcentaje PolySignal",
     "PolySignal separa el precio del mercado de su estimacion propia",
   ];
 
@@ -784,6 +877,15 @@ function validateSamanthaResearchRules() {
       available: true,
       confidence: "low",
       reason: "Fixture summary only.",
+      profileSummaries: [
+        {
+          confidence: "unknown",
+          profileAvailable: false,
+          reason: "No hay historial publico suficiente para calificar esta billetera.",
+          shortAddress: "0x1234...5678",
+          warnings: [],
+        },
+      ],
       relevantWalletsCount: 1,
       signalDirection: "YES",
       thresholdUsd: 100,
@@ -798,6 +900,9 @@ function validateSamanthaResearchRules() {
   assert(!serializedBrief.toLowerCase().includes("database_url="), "Samantha brief must not include secrets");
   assert(serializedBrief.includes("Do not invent sources"), "Samantha brief must include anti-invention rule");
   assert(serializedBrief.includes("Do not touch Neon"), "Samantha brief must include no-Neon rule");
+  assert(serializedBrief.includes("walletSignalAvailable"), "Samantha brief must include sanitized wallet signal availability");
+  assert(serializedBrief.includes("notableWalletCount"), "Samantha brief must include sanitized notable wallet count");
+  assert(serializedBrief.includes("profileSummary"), "Samantha brief must include sanitized wallet profile summary");
   const taskPacket = buildSamanthaTaskPacket(brief);
   const taskPacketText = [
     taskPacket.researchBriefJson,

@@ -34,11 +34,20 @@ Existing structured wallet-related code was found in the backend:
 - `apps/api/app/api/routes.py`
   - exposes `GET /markets/{market_id}/wallet-intelligence`.
 
-The frontend adapter is now connected read-only through the existing same-origin
-backend proxy. `/analyze` may request a bounded summary for matched local
-`marketId` values and stores only sanitized summary fields in component state.
-The adapter does not expose raw payloads, does not keep full wallet addresses in
-its public summary, and returns unavailable on any lookup failure.
+There are now two read-only paths:
+
+- legacy/internal market detail path:
+  `GET /markets/{market_id}/wallet-intelligence`, still useful for stored
+  PolySignal markets;
+- link-analyzer path:
+  `POST /api/polymarket-wallet-intelligence`, which uses the resolved
+  Polymarket `conditionId` and CLOB token IDs from the pasted link and queries
+  Polymarket Data API directly through a same-origin server route.
+
+`/analyze` uses the Polymarket-first path. It does not use internal market IDs
+as the primary Wallet Intelligence source for pasted links. The adapter does
+not expose raw payloads, does not keep full wallet addresses in its public
+summary, and returns unavailable on any lookup failure.
 
 ## Data Available Today
 
@@ -61,6 +70,9 @@ Current limitations:
 
 - PnL fields may be incomplete and should not be treated as complete ROI.
 - Win rate requires resolved historical positions and outcome matching.
+- The new profile helper only shows win rate when wins/losses come from real
+  closed public positions. If fewer than five resolved positions are available,
+  the profile remains unavailable.
 - A public profile or pseudonym is not a real-world identity.
 - The endpoint should remain read-only and bounded.
 - Backend payloads can include full public wallet addresses, so public UI must
@@ -102,6 +114,7 @@ Useful identifiers for real integration:
 - internal `marketId`;
 - Polymarket `conditionId`;
 - CLOB token IDs for YES/NO;
+- CLOB token IDs for non-binary outcomes when available;
 - `eventSlug`;
 - `marketSlug`;
 - wallet address, handled as public pseudonymous data.
@@ -197,6 +210,9 @@ result. The page can show:
 - YES/NO/Neutral bias when the endpoint provides side and amount;
 - confidence, usually low until historical wallet performance exists;
 - warnings that the signal is auxiliary and does not identify people.
+- a profile summary only when there is enough real public closed-position
+  history; otherwise it says there is not enough public history to qualify a
+  wallet.
 
 When the analysis is saved to local Historial, only the sanitized aggregate
 summary is stored. Top wallet rows are not saved in history metadata; public UI
@@ -208,9 +224,10 @@ flow quiet and avoids implying that secondary candidates were fully analyzed.
 
 In the Deep Analyzer contract, Wallet Intelligence is an auxiliary layer. If it
 has real read-only data it can contribute a real low-confidence signal with
-direction YES/NO/Neutral, but `WalletProfileAnalyzer` remains blocked until
-closed-position history, win rate and ROI can be computed from reliable public
-data. Wallet data alone must not create a PolySignal decision.
+direction YES/NO/Neutral. `WalletProfileAnalyzer` can now show a basic profile
+only when closed-position history is present; it does not invent ROI and does
+not show win rate without real wins/losses. Wallet data alone must not create a
+PolySignal decision.
 
 It must not:
 
@@ -222,8 +239,8 @@ It must not:
 
 ## Implementation Path
 
-1. Keep the frontend integration read-only and bounded through the backend
-   proxy.
+1. Keep the link-analyzer integration read-only and bounded through
+   `/api/polymarket-wallet-intelligence`.
 2. Add tests that verify no fake wallets, ROI, win rate or full addresses are
    emitted without real data.
 3. Keep `/analyze` display limited to shortened addresses, amount, side,

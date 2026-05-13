@@ -42,16 +42,35 @@ export type WalletPerformanceProfile = {
   wins?: number;
 };
 
+export type WalletProfileSummary = {
+  commonSideBias?: WalletSignalDirection;
+  confidence: WalletReliability;
+  losses?: number;
+  observedMarketsCount?: number;
+  profileAvailable: boolean;
+  reason: string;
+  resolvedMarketsCount?: number;
+  shortAddress: string;
+  volumeObservedUsd?: number;
+  warnings: string[];
+  winRate?: number;
+  wins?: number;
+};
+
 export type WalletIntelligenceSummary = {
   analyzedCapitalUsd?: number;
   available: boolean;
   checkedAt?: string;
   confidence: "high" | "low" | "medium" | "none";
+  largePositions?: WalletMarketPosition[];
+  largeTrades?: WalletMarketPosition[];
+  notableWallets?: WalletMarketPosition[];
   noCapitalUsd?: number;
+  profileSummaries?: WalletProfileSummary[];
   reason: string;
   relevantWalletsCount: number;
   signalDirection: WalletSignalDirection;
-  source?: "backend" | "local" | "unavailable";
+  source?: "backend" | "local" | "polymarket_data" | "unavailable";
   thresholdUsd: number;
   topWallets?: WalletMarketPosition[];
   trustedNoWallets?: number;

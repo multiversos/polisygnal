@@ -529,6 +529,7 @@ function validateAnalyzeLoadingPanelSource() {
   const bridgeSource = readFileSync(new URL("../app/lib/samanthaBridge.ts", import.meta.url), "utf8");
   const bridgeRouteSource = readFileSync(new URL("../app/api/samantha/send-research/route.ts", import.meta.url), "utf8");
   const bridgeStatusRouteSource = readFileSync(new URL("../app/api/samantha/research-status/route.ts", import.meta.url), "utf8");
+  const walletRouteSource = readFileSync(new URL("../app/api/polymarket-wallet-intelligence/route.ts", import.meta.url), "utf8");
   const expectedSteps = [
     "Detectando enlace",
     "Mercado leido desde Polymarket",
@@ -597,6 +598,8 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("MarketSelectionPanel"), "analyze page does not render market selector");
   assert(analyzePage.includes("/api/analyze-polymarket-link"), "analyze page does not use the safe Polymarket resolver route");
   assert(analyzePage.includes("resolvePolymarketLinkForAnalyze"), "analyze page does not resolve links from Polymarket first");
+  assert(analyzePage.includes("getPolymarketWalletIntelligence"), "analyze page should use Polymarket-first wallet intelligence");
+  assert(!analyzePage.includes("getWalletIntelligenceForMarket"), "analyze page must not use internal market IDs for wallet lookup");
   assert(analyzePage.includes("/api/samantha/send-research"), "analyze page does not call the safe Samantha bridge route");
   assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page does not keep manual fallback when Samantha bridge is unavailable");
   assert(analyzePage.includes("existingBridgeTaskId"), "analyze page should not duplicate Samantha sends when continuing a job");
@@ -649,7 +652,15 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Que puedes hacer ahora"), "AnalyzerReport missing next actions");
   assert(reportSource.includes("Analizar otro enlace"), "AnalyzerReport missing analyze another link action");
   assert(reportSource.includes("Ver todas las billeteras analizadas"), "AnalyzerReport missing wallet drilldown");
+  assert(reportSource.includes("No encontramos datos publicos suficientes de billeteras"), "AnalyzerReport missing honest wallet unavailable state");
+  assert(reportSource.includes("Perfil de billeteras"), "AnalyzerReport missing wallet profile summary");
+  assert(reportSource.includes("Porcentaje PolySignal"), "AnalyzerReport missing conservative signal mix copy");
   assert(!reportSource.includes("wallet.walletAddress"), "AnalyzerReport should not render full wallet addresses");
+  assert(walletRouteSource.includes("https://data-api.polymarket.com"), "wallet route must use Polymarket Data API allowlist");
+  assert(walletRouteSource.includes("SAFE_PATHS"), "wallet route must constrain upstream paths");
+  assert(walletRouteSource.includes("credentials: \"omit\""), "wallet route must omit credentials");
+  assert(walletRouteSource.includes("redirect: \"error\""), "wallet route must reject redirects");
+  assert(!walletRouteSource.includes("NEXT_PUBLIC_API_BASE_URL"), "wallet route must not use internal backend fallback");
   assert(homeSource.includes("Analiza enlaces de Polymarket y mide si PolySignal acierta"), "home does not position analyzer as primary entry");
   assert(homeSource.includes("Pega un enlace"), "home analyzer steps are missing");
   assert(historySource.includes("Analizar nuevo enlace"), "history page does not link back to analyzer");

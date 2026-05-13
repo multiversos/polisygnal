@@ -195,14 +195,16 @@ Estado visible verificado:
   simular avance.
 - No hay flujo de captura de pantalla, OCR ni subida de imagenes en el
   analizador de enlaces.
-- Existe una primera capa de Wallet Intelligence:
-  `walletIntelligenceTypes.ts`, `walletIntelligence.ts` y
-  `walletIntelligenceAdapter.ts`. El adapter consulta de forma read-only el
-  endpoint existente `/markets/{market_id}/wallet-intelligence` a traves del
-  proxy same-origin, filtra por `100 USD`, abrevia direcciones, no devuelve
-  payloads crudos y deja claro que no identifica personas ni recomienda copiar
-  operaciones. La UI resume capital observado, sesgo YES/NO/Neutral, confianza y
-  advertencias como senal auxiliar, no como prediccion final.
+- Existe una capa real de Wallet Intelligence para el analizador:
+  `walletIntelligenceTypes.ts`, `walletIntelligence.ts`,
+  `polymarketWalletIntelligence.ts`, `walletProfiles.ts` y
+  `/api/polymarket-wallet-intelligence`. Para enlaces pegados, `/analyze` usa
+  el `conditionId`/token IDs resueltos desde Polymarket y consulta
+  Polymarket Data API en modo read-only; no usa mercados internos como fuente
+  primaria. La UI resume capital observado, sesgo YES/NO/Neutral, perfiles
+  basicos solo si hay historial cerrado real, confianza y advertencias como
+  senal auxiliar, no como prediccion final. Si faltan datos, muestra estado
+  normal de no disponibilidad.
 - El guardado desde `/analyze` usa el resultado unificado para conservar en
   Historial un resumen local de capas y wallet summary agregado. No guarda
   payloads crudos ni direcciones completas.
