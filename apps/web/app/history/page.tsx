@@ -45,8 +45,8 @@ import { formatLastUpdated } from "../lib/useAutoRefresh";
 import {
   convertSamanthaReportToSignals,
   parseSamanthaResearchReport,
-  shouldAcceptSuggestedEstimate,
 } from "../lib/samanthaResearchReport";
+import { buildConservativePolySignalEstimate } from "../lib/polySignalSignalMixer";
 
 type HistoryFilter =
   | "all"
@@ -559,10 +559,18 @@ export default function HistoryPage() {
           };
           message = "Samantha devolvio un reporte invalido; el flujo manual sigue disponible.";
         } else {
+          const polySignalEstimate = buildConservativePolySignalEstimate({
+            marketImpliedProbability: getMarketImpliedProbabilities({
+              marketNoPrice: item.marketNoProbability,
+              marketYesPrice: item.marketYesProbability,
+            }),
+            samanthaReport: reportResult.report,
+            walletSignal: item.walletIntelligenceSummary,
+          });
           nextJob =
             updateDeepAnalysisJob(
               markJobSamanthaReportLoaded(nextJob, {
-                acceptedEstimate: shouldAcceptSuggestedEstimate(reportResult.report),
+                acceptedEstimate: polySignalEstimate.countsForHistoryAccuracy,
                 kalshiEquivalent:
                   reportResult.report.kalshiComparison?.found === true &&
                   reportResult.report.kalshiComparison.equivalent === true,
@@ -575,13 +583,52 @@ export default function HistoryPage() {
             ...patch,
             awaitingResearch: nextJob.status !== "completed",
             bridgeStatus: "completed",
+            confidence:
+              polySignalEstimate.confidence === "high"
+                ? "Alta"
+                : polySignalEstimate.confidence === "medium"
+                  ? "Media"
+                  : polySignalEstimate.confidence === "low"
+                    ? "Baja"
+                    : item.confidence,
+            estimateQuality: polySignalEstimate.available ? "real_polysignal_estimate" : item.estimateQuality,
+            evaluationReason: polySignalEstimate.available
+              ? polySignalEstimate.explanation
+              : "Reporte validado, pero la estimacion PolySignal sigue pendiente por compuertas.",
             nextCheckHint:
               nextJob.status === "completed"
                 ? "Reporte validado; queda esperar resultado final de Polymarket si hay prediccion clara."
                 : "Reporte validado; revisa senales antes de generar decision.",
+            polySignalEstimateAvailable: polySignalEstimate.available,
+            polySignalEstimateBlockers: polySignalEstimate.blockers.map((entry) => entry.label),
+            polySignalEstimateContributions: polySignalEstimate.contributions
+              .filter((contribution) => contribution.usedForEstimate)
+              .slice(0, 8)
+              .map((contribution) => ({
+                confidence: contribution.confidence,
+                direction: contribution.direction,
+                label: contribution.label,
+                source: contribution.source,
+                summary: contribution.summary,
+              })),
+            polySignalEstimateExplanation: polySignalEstimate.explanation,
+            polySignalNoProbability: polySignalEstimate.available
+              ? polySignalEstimate.estimateNoProbability
+              : item.polySignalNoProbability,
+            polySignalYesProbability: polySignalEstimate.available
+              ? polySignalEstimate.estimateYesProbability
+              : item.polySignalYesProbability,
+            reasons: [
+              ...(item.reasons ?? []),
+              polySignalEstimate.explanation,
+              ...polySignalEstimate.contributions
+                .filter((contribution) => contribution.usedForEstimate)
+                .slice(0, 3)
+                .map((contribution) => `${contribution.label}: ${contribution.summary}`),
+            ],
             researchStatus: nextJob.status,
             trackingStatus:
-              nextJob.status === "completed" && item.predictedSide !== "UNKNOWN"
+              nextJob.status === "completed" && polySignalEstimate.countsForHistoryAccuracy
                 ? "awaiting_resolution"
                 : nextJob.status === "completed"
                   ? "no_clear_decision"
@@ -1169,8 +1216,20 @@ export default function HistoryPage() {
                   ) : (
                     <p className="section-note">
                       Guardado con probabilidad del mercado, sin estimacion PolySignal suficiente.
+                      {item.polySignalEstimateBlockers && item.polySignalEstimateBlockers.length > 0
+                        ? ` Falta: ${item.polySignalEstimateBlockers.slice(0, 3).join(", ")}.`
+                        : ""}
                     </p>
                   )}
+                  {item.polySignalEstimateContributions && item.polySignalEstimateContributions.length > 0 ? (
+                    <div className="data-health-notes">
+                      {item.polySignalEstimateContributions.slice(0, 4).map((contribution) => (
+                        <span className="badge external-hint" key={`${item.id}-${contribution.source}-${contribution.label}`}>
+                          {contribution.label}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   {item.reasons && item.reasons.length > 0 ? (
                     <p className="section-note">{item.reasons.slice(0, 2).join(" ")}</p>
                   ) : (

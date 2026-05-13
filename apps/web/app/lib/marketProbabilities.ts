@@ -116,7 +116,7 @@ export function getProbabilityDisplayState(
   const market = getMarketImpliedProbabilities(input);
   const polySignal = getPolySignalProbabilities(input);
   return {
-    disclaimer: "No es una garantia ni recomendacion de apuesta.",
+    disclaimer: "No es garantia ni consejo financiero.",
     gap: getProbabilityGap(market, polySignal),
     market,
     marketDetail: market

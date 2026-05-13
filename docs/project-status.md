@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con arquitectura Deep Analyzer read-only preparada y sin auth ni escrituras
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production verificado antes de este sprint: `6702d63`
+- ultimo deploy production verificado antes de este sprint: `ef7a626`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -176,6 +176,13 @@ Estado visible verificado:
   `estimationSignals.ts`, `polySignalEstimateEngine.ts` y
   `evidenceTypes.ts`. Por ahora devuelve `available=false` cuando faltan
   senales independientes; no inventa porcentajes.
+- Existe una primera compuerta conservadora para porcentaje PolySignal en
+  `polySignalSignalMixer.ts`. Solo puede generar porcentaje si el mercado fue
+  leido desde Polymarket, hay reporte Samantha validado con estimacion aceptada
+  y existe al menos un soporte independiente real: evidencia externa fuerte,
+  Wallet Intelligence suficiente, perfil de billetera con historial cerrado,
+  odds comparables o Kalshi equivalente. El precio del mercado queda como
+  referencia y no se copia como estimacion propia.
 - Existe una primera capa de contexto deportivo para futbol:
   `soccerMatchContext.ts` extrae equipos y fecha desde datos ya cargados,
   mantiene local/visitante como desconocido si no esta estructurado y no

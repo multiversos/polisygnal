@@ -465,6 +465,12 @@ export function shouldAcceptSuggestedEstimate(report: SamanthaResearchReport): b
   if (estimate.decision === "NO" && estimate.noProbability <= estimate.yesProbability) {
     return false;
   }
+  if (estimate.decision === "YES" && estimate.yesProbability < 55) {
+    return false;
+  }
+  if (estimate.decision === "NO" && estimate.noProbability < 55) {
+    return false;
+  }
   const directionalSignals = convertSamanthaReportToSignals(report).filter(
     (signal) =>
       signal.direction === estimate.decision &&

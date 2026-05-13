@@ -107,6 +107,14 @@ export type AnalysisHistoryWalletSummary = {
   yesCapitalUsd?: number;
 };
 
+export type AnalysisHistorySignalContribution = {
+  confidence: "high" | "low" | "medium" | "unknown";
+  direction: "NEUTRAL" | "NO" | "UNKNOWN" | "YES";
+  label: string;
+  source: string;
+  summary: string;
+};
+
 export type AnalysisHistoryItem = {
   analyzedAt: string;
   analyzerLayers?: AnalysisHistoryAnalyzerLayer[];
@@ -133,6 +141,10 @@ export type AnalysisHistoryItem = {
   marketOutcomes?: AnalysisHistoryMarketOutcome[];
   marketYesProbability?: number;
   outcome?: AnalysisHistoryOutcome;
+  polySignalEstimateAvailable?: boolean;
+  polySignalEstimateBlockers?: string[];
+  polySignalEstimateContributions?: AnalysisHistorySignalContribution[];
+  polySignalEstimateExplanation?: string;
   polySignalNoProbability?: number;
   polySignalYesProbability?: number;
   predictedSide?: AnalysisHistoryPredictedSide;
@@ -555,6 +567,49 @@ function normalizeWalletSummary(value: unknown): AnalysisHistoryWalletSummary | 
   };
 }
 
+function normalizeSignalContributionConfidence(value: unknown): AnalysisHistorySignalContribution["confidence"] {
+  if (value === "high" || value === "medium" || value === "low" || value === "unknown") {
+    return value;
+  }
+  return "unknown";
+}
+
+function normalizeSignalContributionDirection(value: unknown): AnalysisHistorySignalContribution["direction"] {
+  if (value === "YES" || value === "NO" || value === "NEUTRAL") {
+    return value;
+  }
+  return "UNKNOWN";
+}
+
+function normalizeSignalContributions(value: unknown): AnalysisHistorySignalContribution[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const contributions = value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      const contribution = item as Partial<AnalysisHistorySignalContribution>;
+      const label = normalizeString(contribution.label, 120);
+      const source = normalizeString(contribution.source, 80);
+      const summary = normalizeString(contribution.summary, 360);
+      if (!label || !source || !summary) {
+        return null;
+      }
+      return {
+        confidence: normalizeSignalContributionConfidence(contribution.confidence),
+        direction: normalizeSignalContributionDirection(contribution.direction),
+        label,
+        source,
+        summary,
+      };
+    })
+    .filter((item): item is AnalysisHistorySignalContribution => Boolean(item))
+    .slice(0, 8);
+  return contributions.length > 0 ? contributions : undefined;
+}
+
 function normalizeEstimateQuality(value: unknown): AnalysisHistoryEstimateQuality | undefined {
   if (
     value === "insufficient_data" ||
@@ -630,6 +685,10 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     marketOutcomes: normalizeMarketOutcomes(value.marketOutcomes),
     marketYesProbability,
     outcome: normalizeOutcome(value.outcome),
+    polySignalEstimateAvailable: value.polySignalEstimateAvailable === true && estimateQuality === "real_polysignal_estimate",
+    polySignalEstimateBlockers: normalizeStringList(value.polySignalEstimateBlockers, 8),
+    polySignalEstimateContributions: normalizeSignalContributions(value.polySignalEstimateContributions),
+    polySignalEstimateExplanation: normalizeString(value.polySignalEstimateExplanation, 600),
     polySignalNoProbability,
     polySignalYesProbability,
     predictedSide: decision.predictedSide,

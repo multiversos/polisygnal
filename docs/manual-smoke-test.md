@@ -337,9 +337,9 @@ If this test fails, stop feature work and treat it as a production regression.
    PolySignal`, `Capas revisadas`, and `Fuentes del analisis`.
 29. Confirm `Probabilidad del mercado` is described as based on the visible
    market price, not as a PolySignal estimate.
-30. Confirm `Estimacion PolySignal` appears only when an estimate already exists
-   in the loaded data. If it is missing, confirm the page says it does not have
-   enough estimation yet.
+30. Confirm `Estimacion PolySignal` shows a pending state unless the conservative
+   gates pass: Polymarket reference, validated Samantha report with accepted
+   estimate, and at least one independent real support.
 31. Confirm a market-price-only match does not show the same value as a
    PolySignal estimate and does not show a `0.0 pts` difference as useful
    analysis.
@@ -381,6 +381,8 @@ If this test fails, stop feature work and treat it as a production regression.
    market is not in local history yet.
 47. Confirm `Decision de PolySignal` follows the 55% threshold:
    YES `>=55%` is clear YES, NO `>=55%` is clear NO, and 45/55 is `Sin decision fuerte`.
+47a. Confirm a valid Samantha report below the 55% threshold can add context but
+   does not create a countable clear decision.
 46. Confirm market price alone never creates a PolySignal predicted side.
 47. Confirm it shows only real visible data: title, event, status, price if
    available, volume/liquidity if available, and last update.

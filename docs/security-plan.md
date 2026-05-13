@@ -270,6 +270,13 @@ Current controls:
 - the UI validates reports before applying them to the local job;
 - suggested estimates are accepted only after a strict evidence gate and remain
   traceable to the imported report.
+- PolySignal estimate gates require all of these before a saved percentage can
+  be marked as real: Polymarket market reference, validated Samantha report with
+  an accepted suggested estimate, and at least one independent support from
+  strong external evidence, Wallet Intelligence, wallet profiles, comparable
+  odds, or an equivalent Kalshi comparison.
+- A validated Samantha report below the 55% clear-decision threshold can remain
+  useful context, but it must not create a countable history prediction.
 
 Camino B controls:
 

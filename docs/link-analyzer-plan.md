@@ -85,6 +85,12 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
   `predicted_side`.
 - Market price probability must never be copied into
   `polysignal_probability_yes` or presented as `Estimacion PolySignal`.
+- `polySignalSignalMixer.ts` now defines the conservative estimate gate for
+  live link analyses. It requires: Polymarket market reference, validated
+  Samantha report with accepted estimate, and at least one independent support
+  from real wallet data, wallet profiles, comparable odds/Kalshi, or strong
+  external evidence. If any gate fails, the UI shows `Estimacion PolySignal
+  pendiente` with blockers instead of filling a percentage.
 - Wallet Intelligence can appear as an auxiliary layer when the read-only
   endpoint returns real sanitized data. It can improve readiness, but cannot
   create a PolySignal prediction by itself.

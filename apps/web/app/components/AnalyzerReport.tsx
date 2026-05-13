@@ -45,7 +45,11 @@ import {
   formatProbability,
   getProbabilityDisplayState,
 } from "../lib/marketProbabilities";
-import { buildConservativePolySignalSignalMix } from "../lib/polySignalSignalMixer";
+import {
+  buildConservativePolySignalEstimate,
+  buildConservativePolySignalSignalMix,
+  type PolySignalEstimateResult,
+} from "../lib/polySignalSignalMixer";
 import {
   getMarketActivityLabel,
   getMarketReviewReason,
@@ -95,7 +99,7 @@ type AnalyzerReportProps = {
   matchScore: number;
   normalizedUrl: string;
   onDeepAnalysisJobChange?: (job: DeepAnalysisJob) => void;
-  onSaveHistory: (item: MarketOverviewItem) => void;
+  onSaveHistory: (item: MarketOverviewItem, estimate?: PolySignalEstimateResult) => void;
   onToggleWatchlist: (item: MarketOverviewItem) => void;
   relatedHistory: AnalysisHistoryItem[];
   saved: boolean;
@@ -318,6 +322,29 @@ function compactWarnings(warnings: string[], limit = 3): string[] {
   return [...new Set(warnings.filter(Boolean))].slice(0, limit);
 }
 
+function estimateConfidenceLabel(confidence: PolySignalEstimateResult["confidence"]): string {
+  if (confidence === "high") {
+    return "Alta";
+  }
+  if (confidence === "medium") {
+    return "Media";
+  }
+  if (confidence === "low") {
+    return "Baja";
+  }
+  return "Sin confianza";
+}
+
+function estimateDecisionLabel(estimate: PolySignalEstimateResult): string {
+  if (!estimate.available) {
+    return "Decision pendiente";
+  }
+  if (estimate.decisionSide === "YES" || estimate.decisionSide === "NO") {
+    return `Decision clara: ${estimate.decisionSide}`;
+  }
+  return "Sin decision fuerte";
+}
+
 function AnalyzerLayerDetails({
   children,
   layer,
@@ -421,12 +448,35 @@ export function AnalyzerReport({
   const samanthaEvidence = samanthaReport ? convertSamanthaReportToEvidence(samanthaReport) : [];
   const samanthaSignals = samanthaReport ? convertSamanthaReportToSignals(samanthaReport) : [];
   const samanthaEstimateAccepted = samanthaReport ? shouldAcceptSuggestedEstimate(samanthaReport) : false;
+  const polySignalEstimate = buildConservativePolySignalEstimate({
+    marketImpliedProbability: probabilityState.market,
+    samanthaReport,
+    walletSignal: walletSummary,
+  });
   const signalMix = buildConservativePolySignalSignalMix({
     externalOddsSignalAvailable: Boolean(samanthaReport?.oddsComparison?.found),
     marketImpliedProbability: probabilityState.market,
+    samanthaReport,
     samanthaResearchSignalCount: samanthaSignals.length,
     walletSignal: walletSummary,
   });
+  const displayedPolySignalProbability = polySignalEstimate.available
+    ? {
+        no: polySignalEstimate.estimateNoProbability,
+        yes: polySignalEstimate.estimateYesProbability,
+      }
+    : probabilityState.polySignal;
+  const displayedPolySignalDetail = polySignalEstimate.available
+    ? polySignalEstimate.explanation
+    : probabilityState.polySignalDetail;
+  const displayedDecisionLabel = polySignalEstimate.available
+    ? estimateDecisionLabel(polySignalEstimate)
+    : analyzerDecision.label;
+  const displayedDecisionDetail = polySignalEstimate.available
+    ? polySignalEstimate.explanation
+    : analyzerResult.decisionReason;
+  const displayedCountsForHistory =
+    polySignalEstimate.countsForHistoryAccuracy || analyzerResult.canCountForAccuracy;
   const samanthaDraftDirectionCounts = samanthaDraftEvidence.reduce(
     (counts, evidence) => ({
       ...counts,
@@ -473,12 +523,12 @@ export function AnalyzerReport({
   const resolutionLayer = findLayer(analyzerResult, "resolution");
   const saveActionLabel = saved
     ? "Guardar nuevo analisis"
-    : analyzerResult.polySignalEstimateAvailable
+    : polySignalEstimate.available || analyzerResult.polySignalEstimateAvailable
       ? "Guardar analisis"
       : "Guardar como seguimiento";
   const nextActionCopy = saved
     ? "Ya esta guardado en Historial. Puedes revisar su estado o guardar una lectura nueva si quieres comparar cambios."
-    : analyzerResult.polySignalEstimateAvailable
+    : polySignalEstimate.available || analyzerResult.polySignalEstimateAvailable
       ? "Guarda esta lectura para medirla cuando el mercado tenga resultado confiable."
       : "No hay estimacion propia suficiente; puedes guardarlo como seguimiento sin convertirlo en prediccion.";
   const jobSummary = deepAnalysisJob ? getJobProgressSummary(deepAnalysisJob) : null;
@@ -518,8 +568,13 @@ export function AnalyzerReport({
     }
     setSamanthaReportResult(result);
     if (deepAnalysisJob) {
+      const nextEstimate = buildConservativePolySignalEstimate({
+        marketImpliedProbability: probabilityState.market,
+        samanthaReport: result.report,
+        walletSignal: walletSummary,
+      });
       const nextJob = markJobSamanthaReportLoaded(deepAnalysisJob, {
-        acceptedEstimate: shouldAcceptSuggestedEstimate(result.report),
+        acceptedEstimate: nextEstimate.countsForHistoryAccuracy,
         kalshiEquivalent: result.report.kalshiComparison?.found === true && result.report.kalshiComparison.equivalent === true,
         oddsFound: result.report.oddsComparison?.found === true,
         reportStatus: result.report.status,
@@ -575,10 +630,15 @@ export function AnalyzerReport({
           return;
         }
         setSamanthaReportResult(reportResult);
+        const nextEstimate = buildConservativePolySignalEstimate({
+          marketImpliedProbability: probabilityState.market,
+          samanthaReport: reportResult.report,
+          walletSignal: walletSummary,
+        });
         nextJob =
           updateDeepAnalysisJob(
             markJobSamanthaReportLoaded(nextJob, {
-              acceptedEstimate: shouldAcceptSuggestedEstimate(reportResult.report),
+              acceptedEstimate: nextEstimate.countsForHistoryAccuracy,
               kalshiEquivalent:
                 reportResult.report.kalshiComparison?.found === true &&
                 reportResult.report.kalshiComparison.equivalent === true,
@@ -712,7 +772,7 @@ export function AnalyzerReport({
           <button
             className={`watchlist-button ${saved ? "" : "active"}`}
             disabled={busy}
-            onClick={() => onSaveHistory(item)}
+            onClick={() => onSaveHistory(item, polySignalEstimate)}
             type="button"
           >
             {saveActionLabel}
@@ -761,30 +821,107 @@ export function AnalyzerReport({
           </div>
           <div className="analyzer-executive-card">
             <span>Estimacion PolySignal</span>
-            {probabilityState.polySignal ? (
+            {displayedPolySignalProbability ? (
               <strong>
-                YES {formatProbability(probabilityState.polySignal.yes)} - NO {formatProbability(probabilityState.polySignal.no)}
+                YES {formatProbability(displayedPolySignalProbability.yes)} - NO {formatProbability(displayedPolySignalProbability.no)}
               </strong>
             ) : (
               <strong>Sin estimacion propia suficiente</strong>
             )}
-            <small>{getEstimateQualityLabel(estimateQuality)}</small>
+            <small>
+              {polySignalEstimate.available
+                ? `Compuertas superadas - confianza ${estimateConfidenceLabel(polySignalEstimate.confidence)}`
+                : getEstimateQualityLabel(estimateQuality)}
+            </small>
           </div>
           <div className="analyzer-executive-card">
             <span>Decision de PolySignal</span>
-            <strong>{analyzerDecision.label}</strong>
-            <small>{analyzerResult.decisionReason}</small>
+            <strong>{displayedDecisionLabel}</strong>
+            <small>{displayedDecisionDetail}</small>
           </div>
           <div className="analyzer-executive-card">
             <span>Cuenta para Historial</span>
-            <strong>{analyzerResult.canCountForAccuracy ? "Si, cuando cierre" : "No, falta estimacion propia"}</strong>
-            <small>{analyzerDecision.note}</small>
+            <strong>{displayedCountsForHistory ? "Si, cuando cierre" : "No, falta estimacion propia"}</strong>
+            <small>
+              {displayedCountsForHistory
+                ? "Cuenta solo si Polymarket confirma resultado final verificable."
+                : analyzerDecision.note}
+            </small>
           </div>
         </div>
         <p className="analyzer-report-note">
           PolySignal separa el precio del mercado de su estimacion propia. Si no hay senales
           independientes suficientes, no genera prediccion.
         </p>
+      </section>
+
+      <section className="samantha-evidence-summary" aria-label="Estimacion PolySignal">
+        <div className="probability-display-heading">
+          <div>
+            <p className="eyebrow">Estimacion PolySignal</p>
+            <h4>
+              {polySignalEstimate.available
+                ? "Porcentaje propio generado con compuertas"
+                : "Estimacion PolySignal pendiente"}
+            </h4>
+          </div>
+          <span>{polySignalEstimate.available ? estimateConfidenceLabel(polySignalEstimate.confidence) : "Pendiente"}</span>
+        </div>
+        {polySignalEstimate.available ? (
+          <>
+            <div className="wallet-report-summary">
+              <div>
+                <span>YES</span>
+                <strong>{formatProbability(polySignalEstimate.estimateYesProbability)}</strong>
+              </div>
+              <div>
+                <span>NO</span>
+                <strong>{formatProbability(polySignalEstimate.estimateNoProbability)}</strong>
+              </div>
+              <div>
+                <span>Decision</span>
+                <strong>{estimateDecisionLabel(polySignalEstimate)}</strong>
+              </div>
+              <div>
+                <span>Soportes</span>
+                <strong>{polySignalEstimate.readiness.independentSupportCount}</strong>
+              </div>
+            </div>
+            <p className="section-note">{polySignalEstimate.explanation}</p>
+            <div className="samantha-evidence-list">
+              {polySignalEstimate.contributions.slice(0, 6).map((contribution) => (
+                <article
+                  className="samantha-evidence-card"
+                  key={`${contribution.source}-${contribution.label}`}
+                >
+                  <span>
+                    {shortDirectionLabel(contribution.direction)} -{" "}
+                    {contribution.usedForEstimate ? "usada" : "referencia"}
+                  </span>
+                  <strong>{contribution.label}</strong>
+                  <p>{contribution.summary}</p>
+                  <small>{contribution.source.replace(/_/g, " ")}</small>
+                </article>
+              ))}
+            </div>
+            <p className="section-note">
+              Esto no es consejo financiero ni garantia. El precio del mercado se mantiene como referencia separada.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="section-note">
+              Todavia no hay suficiente evidencia para generar un porcentaje propio.
+              PolySignal necesita Samantha validada y al menos un soporte independiente real.
+            </p>
+            <div className="wallet-warning-list">
+              {polySignalEstimate.blockers.slice(0, 5).map((entry) => (
+                <span className="warning-chip" key={entry.code}>{entry.label}</span>
+              ))}
+            </div>
+            <p className="section-note">{polySignalEstimate.explanation}</p>
+          </>
+        )}
       </section>
 
       <section className="analyzer-source-strip" aria-label="Fuentes del analisis">
@@ -870,7 +1007,7 @@ export function AnalyzerReport({
             <button
               className="watchlist-button"
               disabled={busy}
-              onClick={() => onSaveHistory(item)}
+              onClick={() => onSaveHistory(item, polySignalEstimate)}
               type="button"
             >
               Guardar y continuar despues
@@ -1144,6 +1281,19 @@ export function AnalyzerReport({
           <p className="section-note">
             Porcentaje PolySignal: {signalMix.reason}
           </p>
+          <div className="data-health-notes">
+            {polySignalEstimate.blockers.slice(0, 5).map((entry) => (
+              <span className="badge muted" key={entry.code}>{entry.label}</span>
+            ))}
+            {polySignalEstimate.contributions
+              .filter((contribution) => contribution.usedForEstimate)
+              .slice(0, 4)
+              .map((contribution) => (
+                <span className="badge external-hint" key={`${contribution.source}-${contribution.label}`}>
+                  {contribution.label}
+                </span>
+              ))}
+          </div>
           {missingEstimateData.length > 0 ? (
             <div className="data-health-notes">
               {missingEstimateData.slice(0, 5).map((reason) => (
@@ -1319,7 +1469,7 @@ export function AnalyzerReport({
           <button
             className={`watchlist-button ${saved ? "" : "active"}`}
             disabled={busy}
-            onClick={() => onSaveHistory(item)}
+            onClick={() => onSaveHistory(item, polySignalEstimate)}
             type="button"
           >
             {saveActionLabel}

@@ -481,7 +481,7 @@ export function markJobSamanthaReportLoaded(
   next = updateDeepAnalysisJobStep(next, "generating_decision", {
     status: input.acceptedEstimate ? "completed" : "blocked",
     summary: input.acceptedEstimate
-      ? "Estimacion sugerida aceptada por las compuertas de validacion."
+      ? "Estimacion PolySignal aceptada por compuertas conservadoras de evidencia."
       : "Decision PolySignal bloqueada: la evidencia no alcanza una prediccion responsable.",
   });
   if (input.acceptedEstimate) {

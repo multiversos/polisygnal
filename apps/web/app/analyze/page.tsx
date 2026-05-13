@@ -77,13 +77,16 @@ import {
   getWalletIntelligenceSummary,
 } from "../lib/walletIntelligence";
 import { getPolymarketWalletIntelligence } from "../lib/polymarketWalletIntelligence";
+import {
+  buildConservativePolySignalEstimate,
+  type PolySignalEstimateResult,
+} from "../lib/polySignalSignalMixer";
 import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMarketInsights";
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { buildSamanthaResearchBrief } from "../lib/samanthaResearchBrief";
 import {
   convertSamanthaReportToSignals,
   parseSamanthaResearchReport,
-  shouldAcceptSuggestedEstimate,
 } from "../lib/samanthaResearchReport";
 import type { SamanthaResearchParseResult } from "../lib/samanthaResearchTypes";
 import {
@@ -398,6 +401,22 @@ function tokenIdForSide(item: MarketOverviewItem, side: "NO" | "YES"): string | 
   return (item.market?.outcomes ?? []).find((outcome) => outcome.side === side)?.token_id ?? undefined;
 }
 
+function confidenceForHistory(estimate?: PolySignalEstimateResult): "Alta" | "Baja" | "Desconocida" | "Media" {
+  if (!estimate?.available) {
+    return "Desconocida";
+  }
+  if (estimate.confidence === "high") {
+    return "Alta";
+  }
+  if (estimate.confidence === "medium") {
+    return "Media";
+  }
+  if (estimate.confidence === "low") {
+    return "Baja";
+  }
+  return "Desconocida";
+}
+
 function jobAwaitsResearch(job?: DeepAnalysisJob | null): boolean {
   return Boolean(
     job &&
@@ -458,15 +477,22 @@ function historyPayloadFromMarket(
   normalizedUrl: string,
   analyzerResult: AnalyzerResult,
   deepJob?: DeepAnalysisJob | null,
+  polySignalEstimate?: PolySignalEstimateResult,
 ) {
   const marketProbabilities = getMarketImpliedProbabilities({
     marketNoPrice: item.latest_snapshot?.no_price,
     marketYesPrice: item.latest_snapshot?.yes_price,
   });
-  const estimateQuality = getEstimateQuality(item);
-  const polySignalProbabilities = getRealPolySignalProbabilities(item);
+  const hasConservativeEstimate = Boolean(polySignalEstimate?.available);
+  const estimateQuality = hasConservativeEstimate ? "real_polysignal_estimate" : getEstimateQuality(item);
+  const polySignalProbabilities = hasConservativeEstimate
+    ? {
+        no: polySignalEstimate?.estimateNoProbability,
+        yes: polySignalEstimate?.estimateYesProbability,
+      }
+    : getRealPolySignalProbabilities(item);
   const confidenceScore =
-    estimateQuality === "real_polysignal_estimate"
+    estimateQuality === "real_polysignal_estimate" && !hasConservativeEstimate
       ? normalizeProbability(item.latest_prediction?.confidence_score)
       : null;
   const reviewReason = getMarketReviewReason(insightInput(item));
@@ -476,7 +502,9 @@ function historyPayloadFromMarket(
     polySignalYesProbability: polySignalProbabilities?.yes,
   });
   const predictionReason =
-    estimateQuality === "market_price_only"
+    hasConservativeEstimate
+      ? polySignalEstimate?.explanation || "Estimacion PolySignal generada con reporte Samantha validado y compuertas conservadoras."
+      : estimateQuality === "market_price_only"
       ? "Solo habia probabilidad del mercado; no se guardo prediccion PolySignal."
       : estimateQuality !== "real_polysignal_estimate"
         ? "Sin estimacion PolySignal suficiente."
@@ -494,7 +522,9 @@ function historyPayloadFromMarket(
       warnings: layer.warnings.slice(0, 4),
     })),
     confidence:
-      confidenceScore === null
+      hasConservativeEstimate
+        ? confidenceForHistory(polySignalEstimate)
+        : confidenceScore === null
         ? ("Desconocida" as const)
         : confidenceScore >= 0.7
           ? ("Alta" as const)
@@ -508,7 +538,9 @@ function historyPayloadFromMarket(
     eventSlug: item.market?.event_slug || undefined,
     estimateQuality,
     evaluationReason:
-      estimateQuality === "market_price_only"
+      hasConservativeEstimate
+        ? polySignalEstimate?.explanation
+        : estimateQuality === "market_price_only"
         ? "Solo habia probabilidad del mercado."
         : estimateQuality === "real_polysignal_estimate"
           ? decision.evaluationReason
@@ -530,12 +562,34 @@ function historyPayloadFromMarket(
     polySignalNoProbability: polySignalProbabilities?.no,
     polySignalYesProbability: polySignalProbabilities?.yes,
     predictedSide: decision.predictedSide,
-    reasons: [analyzerSummary.headline, reviewReason.reason, activity?.detail, predictionReason].filter(
-      (reason): reason is string => Boolean(reason),
-    ),
+    reasons: [
+      analyzerSummary.headline,
+      reviewReason.reason,
+      activity?.detail,
+      predictionReason,
+      ...(polySignalEstimate?.available
+        ? polySignalEstimate.contributions
+            .filter((contribution) => contribution.usedForEstimate)
+            .slice(0, 3)
+            .map((contribution) => `${contribution.label}: ${contribution.summary}`)
+        : polySignalEstimate?.blockers.slice(0, 3).map((entry) => entry.detail) ?? []),
+    ].filter((reason): reason is string => Boolean(reason)),
     nextCheckHint: "Revisar cuando Polymarket confirme el resultado final.",
     noTokenId: tokenIdForSide(item, "NO"),
     result: "pending" as const,
+    polySignalEstimateAvailable: Boolean(polySignalEstimate?.available),
+    polySignalEstimateBlockers: polySignalEstimate?.blockers.map((entry) => entry.label),
+    polySignalEstimateContributions: polySignalEstimate?.contributions
+      .filter((contribution) => contribution.usedForEstimate)
+      .slice(0, 8)
+      .map((contribution) => ({
+        confidence: contribution.confidence,
+        direction: contribution.direction,
+        label: contribution.label,
+        source: contribution.source,
+        summary: contribution.summary,
+      })),
+    polySignalEstimateExplanation: polySignalEstimate?.explanation,
     researchBriefReadyAt: deepJob?.steps.find((step) => step.id === "preparing_samantha_research")?.completedAt,
     researchStatus: deepJob?.status,
     resolutionStatus: "pending" as const,
@@ -1528,7 +1582,14 @@ export default function AnalyzePage() {
           }
           job = persistDeepAnalysisJob(
             markJobSamanthaReportLoaded(job, {
-              acceptedEstimate: shouldAcceptSuggestedEstimate(reportResult.report),
+              acceptedEstimate: buildConservativePolySignalEstimate({
+                marketImpliedProbability: getMarketImpliedProbabilities({
+                  marketNoPrice: input.item.latest_snapshot?.no_price,
+                  marketYesPrice: input.item.latest_snapshot?.yes_price,
+                }),
+                samanthaReport: reportResult.report,
+                walletSignal: input.walletSummary,
+              }).countsForHistoryAccuracy,
               kalshiEquivalent:
                 reportResult.report.kalshiComparison?.found === true &&
                 reportResult.report.kalshiComparison.equivalent === true,
@@ -1848,7 +1909,7 @@ export default function AnalyzePage() {
     }
   }, [persistDeepAnalysisJob, tryAutomaticSamanthaBridge]);
 
-  const handleSaveHistory = useCallback(async (item: MarketOverviewItem) => {
+  const handleSaveHistory = useCallback(async (item: MarketOverviewItem, polySignalEstimate?: PolySignalEstimateResult) => {
     if (state.status !== "result") {
       return;
     }
@@ -1870,7 +1931,13 @@ export default function AnalyzePage() {
         relatedHistory,
         url: state.normalizedUrl,
       });
-      const payload = historyPayloadFromMarket(item, state.normalizedUrl, analyzerResult, deepAnalysisJob);
+      const payload = historyPayloadFromMarket(
+        item,
+        state.normalizedUrl,
+        analyzerResult,
+        deepAnalysisJob,
+        polySignalEstimate,
+      );
       const savedItem = await saveAnalysisHistoryItem(payload);
       setAnalysisHistoryItems((current) => [savedItem, ...current.filter((entry) => entry.id !== savedItem.id)]);
       setSavedHistoryKeys((current) => new Set(current).add(String(item.market?.id ?? payload.id)));

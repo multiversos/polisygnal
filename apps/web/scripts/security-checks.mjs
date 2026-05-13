@@ -426,7 +426,10 @@ async function validateWalletIntelligenceRules() {
     ...loadTsModule("app/lib/polymarketWalletIntelligence.ts"),
   };
   const { buildWalletProfileSummary } = loadTsModule("app/lib/walletProfiles.ts");
-  const { buildConservativePolySignalSignalMix } = loadTsModule("app/lib/polySignalSignalMixer.ts");
+  const {
+    buildConservativePolySignalEstimate,
+    buildConservativePolySignalSignalMix,
+  } = loadTsModule("app/lib/polySignalSignalMixer.ts");
   const { collectIndependentSignals } = loadTsModule("app/lib/estimationSignals.ts");
   const { getPolySignalEstimate } = loadTsModule("app/lib/polySignalEstimateEngine.ts");
   const polymarketWalletRouteSource = readFileSync(
@@ -641,6 +644,75 @@ async function validateWalletIntelligenceRules() {
   assert(!conservativeMix.finalEstimateAvailable, "expected wallet-only signal mix not to create final PolySignal estimate");
   assert(conservativeMix.status === "estimate_pending", "expected incomplete signal mix to stay pending");
 
+  const validSamanthaReport = {
+    completedAt: "2026-05-12T12:00:00.000Z",
+    evidence: [
+      {
+        checkedAt: "2026-05-12T12:00:00.000Z",
+        direction: "YES",
+        id: "official-yes",
+        reliability: "high",
+        sourceName: "Official source",
+        sourceType: "official",
+        sourceUrl: "https://example.com/official",
+        summary: "Official fixture context supports YES.",
+        title: "Official fixture context",
+      },
+      {
+        checkedAt: "2026-05-12T12:05:00.000Z",
+        direction: "YES",
+        id: "news-yes",
+        reliability: "medium",
+        sourceName: "News source",
+        sourceType: "news",
+        sourceUrl: "https://example.com/news",
+        summary: "News fixture context supports YES.",
+        title: "News fixture context",
+      },
+    ],
+    marketUrl: "https://polymarket.com/event/test",
+    status: "completed",
+    suggestedEstimate: {
+      available: true,
+      confidence: "medium",
+      decision: "YES",
+      noProbability: 39,
+      reason: "Two independent fixture sources support YES.",
+      yesProbability: 61,
+    },
+    version: "1.0",
+    warnings: [],
+  };
+  const gatedEstimate = buildConservativePolySignalEstimate({
+    marketImpliedProbability: { no: 0.8, yes: 0.2 },
+    samanthaReport: validSamanthaReport,
+    walletSignal: empty,
+  });
+  assert(gatedEstimate.available, "expected valid Samantha report with strong external evidence to create a conservative estimate");
+  assert(gatedEstimate.estimateYesProbability === 0.61, "expected PolySignal estimate to preserve Samantha validated YES, not market price");
+  assert(gatedEstimate.marketImpliedProbability.yes === 0.2, "expected market price to remain a reference only");
+  assert(gatedEstimate.countsForHistoryAccuracy, "expected clear gated estimate to be countable after resolution");
+  assert(
+    gatedEstimate.contributions.some((contribution) => contribution.source === "market_reference" && !contribution.usedForEstimate),
+    "expected market reference contribution not to be used as estimate",
+  );
+
+  const missingSamanthaEstimate = buildConservativePolySignalEstimate({
+    marketImpliedProbability: { no: 0.4, yes: 0.6 },
+    walletSignal: { ...empty, available: true, analyzedCapitalUsd: 500, confidence: "medium", relevantWalletsCount: 3, signalDirection: "YES" },
+  });
+  assert(!missingSamanthaEstimate.available, "expected no PolySignal estimate without validated Samantha report");
+  assert(
+    missingSamanthaEstimate.blockers.some((entry) => entry.code === "missing_samantha_report"),
+    "expected missing Samantha blocker to stay visible",
+  );
+
+  const noMarketReferenceEstimate = buildConservativePolySignalEstimate({
+    samanthaReport: validSamanthaReport,
+    walletSignal: { ...empty, available: true, analyzedCapitalUsd: 500, confidence: "medium", relevantWalletsCount: 3, signalDirection: "YES" },
+  });
+  assert(!noMarketReferenceEstimate.available, "expected no estimate without market reference from Polymarket");
+
   assert(polymarketWalletRouteSource.includes("https://data-api.polymarket.com"), "wallet route must use Polymarket Data API allowlist");
   assert(polymarketWalletRouteSource.includes("SAFE_PATHS"), "wallet route must constrain upstream paths");
   assert(polymarketWalletRouteSource.includes("credentials: \"omit\""), "wallet route must omit credentials");
@@ -793,6 +865,8 @@ function validateAnalyzerReportSource() {
     "Ver todas las billeteras analizadas",
     "No encontramos datos publicos suficientes de billeteras",
     "Perfil de billeteras",
+    "Estimacion PolySignal pendiente",
+    "Todavia no hay suficiente evidencia para generar un porcentaje propio",
     "Porcentaje PolySignal",
     "PolySignal separa el precio del mercado de su estimacion propia",
   ];
@@ -802,6 +876,7 @@ function validateAnalyzerReportSource() {
   assert(source.includes("buildDeepAnalysisFromPolymarketMarket"), "expected AnalyzerReport to build deep analyzer readiness");
   assert(source.includes("buildSamanthaResearchBrief"), "expected AnalyzerReport to build Samantha research briefs");
   assert(source.includes("buildSamanthaTaskPacket"), "expected AnalyzerReport to build Samantha task packets");
+  assert(source.includes("buildConservativePolySignalEstimate"), "expected AnalyzerReport to use conservative PolySignal estimate gates");
   assert(source.includes("parseSamanthaResearchReport"), "expected AnalyzerReport to validate Samantha reports locally");
   assert(source.includes("handleValidateSamanthaReport"), "expected AnalyzerReport to validate reports before applying");
   assert(source.includes("handleApplySamanthaReport"), "expected AnalyzerReport to apply valid reports explicitly");
@@ -822,6 +897,7 @@ function validateAnalyzerReportSource() {
   assert(!source.includes("win rate 100%"), "AnalyzerReport should not invent win-rate copy");
   assert(!source.includes("ROI 100%"), "AnalyzerReport should not invent ROI copy");
   assert(!source.includes("copy this trader"), "AnalyzerReport should not recommend copy-trading");
+  assert(!source.includes("recomendacion de apuesta"), "AnalyzerReport should not use betting advice copy");
 
   return { sections: requiredCopy.length, wallet_privacy_source_guard: true };
 }
@@ -988,6 +1064,23 @@ function validateSamanthaResearchRules() {
   assert(convertSamanthaReportToEvidence(validReport.report).length === 2, "Samantha report should convert to evidence");
   assert(convertSamanthaReportToSignals(validReport.report).length >= 2, "Samantha report should convert to signals");
   assert(shouldAcceptSuggestedEstimate(validReport.report), "Samantha suggested estimate should pass strict fixture gate");
+
+  const belowThresholdReport = parseSamanthaResearchReport({
+    ...validReport.report,
+    suggestedEstimate: {
+      available: true,
+      confidence: "medium",
+      decision: "YES",
+      noProbability: 47,
+      reason: "Directional fixture below decision threshold.",
+      yesProbability: 53,
+    },
+  });
+  assert(belowThresholdReport.valid, "below-threshold report should still be structurally valid");
+  assert(
+    !shouldAcceptSuggestedEstimate(belowThresholdReport.report),
+    "Samantha estimate below 55% should not become a PolySignal decision",
+  );
 
   const dangerousUrl = parseSamanthaResearchReport({
     completedAt: "2026-05-12T12:00:00.000Z",
