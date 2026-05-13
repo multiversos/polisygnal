@@ -197,6 +197,37 @@ PolySignal interpreta esa respuesta como `samantha_researching` o
 `awaiting_samantha`; el Radar permanece visible y el fallback manual sigue
 disponible. El job no queda `completed`.
 
+Samantha tambien expone consulta local de estado:
+
+```text
+GET http://127.0.0.1:8787/polysignal/research-task/:taskId
+```
+
+PolySignal no llama esa URL desde el cliente. `/analyze` usa el endpoint
+same-origin `POST /api/samantha/research-status`, que recibe solo `taskId` y
+consulta el bridge desde server-side. No acepta `endpoint`, `targetUrl`,
+`callbackUrl` ni destinos enviados por el cliente.
+
+Estados esperados:
+
+- `pending` / `processing`: la investigacion sigue pendiente y el job se
+  mantiene `samantha_researching`.
+- `manual_needed`: Samantha no tiene investigacion automatica suficiente; el job
+  vuelve a `awaiting_samantha` y el fallback manual sigue visible.
+- `completed`: solo se acepta si incluye un reporte validado por PolySignal.
+- `failed_safe`: error seguro; no se genera decision ni precision.
+
+Procesamiento local en Samantha:
+
+```powershell
+npm run polysignal:research:list
+npm run polysignal:research:process -- --task-id=<task-id>
+```
+
+El procesador actual valida de nuevo la tarea encolada y, si no hay proveedor
+real de investigacion externa autorizado, escribe `manual_needed`. No inventa
+evidencia.
+
 Briefs:
 
 - Generados en memoria desde `AnalyzerReport`.

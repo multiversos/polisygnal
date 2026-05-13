@@ -145,6 +145,11 @@ Estado visible verificado:
   PolySignal, validarlo, escribir una cola local sanitizada y responder
   `accepted`/`queued_or_manual`. Esta deshabilitado por defecto y no inventa
   reportes ni ejecuta investigacion automatica si no hay capa real configurada.
+- Samantha ahora tambien expone `GET /polysignal/research-task/:taskId` para
+  consultar estado local (`pending`, `processing`, `manual_needed`, `completed`
+  o `failed_safe`) y un procesador local
+  `npm run polysignal:research:process`. PolySignal consulta esto mediante
+  `/api/samantha/research-status`, sin aceptar destinos enviados por el cliente.
 - El paquete para Samantha incluye brief JSON, instrucciones TXT, schema de
   respuesta, reglas de seguridad e instrucciones de devolucion. Prohibe fuentes
   inventadas, trading, Neon, `.env`, doxxing, secretos, copy-trading y

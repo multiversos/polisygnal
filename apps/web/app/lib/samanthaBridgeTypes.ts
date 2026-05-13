@@ -18,6 +18,8 @@ export type SamanthaBridgeErrorCode =
 export type SamanthaBridgeStatus =
   | "disabled"
   | "fallback_required"
+  | "manual_needed"
+  | "pending"
   | "sending"
   | "sent"
   | "samantha_researching"
@@ -55,7 +57,17 @@ export type SamanthaResearchResponse = {
   accepted?: boolean;
   message?: string;
   report?: SamanthaResearchReport;
-  status?: "accepted" | "queued" | "researching" | "completed" | "partial" | "failed";
+  status?:
+    | "accepted"
+    | "completed"
+    | "failed"
+    | "failed_safe"
+    | "manual_needed"
+    | "partial"
+    | "pending"
+    | "processing"
+    | "queued"
+    | "researching";
   taskId?: string;
   warnings?: string[];
 };
@@ -72,4 +84,8 @@ export type SamanthaBridgeSendResult = {
   taskId?: string;
   validationErrors?: string[];
   warnings: string[];
+};
+
+export type SamanthaBridgeLookupResult = SamanthaBridgeSendResult & {
+  bridgeTaskStatus?: "pending" | "processing" | "completed" | "manual_needed" | "failed_safe";
 };

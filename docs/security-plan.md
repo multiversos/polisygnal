@@ -271,6 +271,12 @@ Samantha-side local endpoint:
   secret-like text, and real-trading instructions;
 - accepted tasks are written as sanitized summaries to a local JSONL queue and
   audit log;
+- task status is exposed through `GET /polysignal/research-task/:taskId` with
+  the same local/token checks. It returns `pending`, `processing`,
+  `manual_needed`, `completed`, or `failed_safe`;
+- PolySignal checks status through its own same-origin
+  `POST /api/samantha/research-status` route, which accepts only `taskId` and
+  rejects client-provided destination fields;
 - Samantha returns `accepted`/`queued_or_manual` unless a future real research
   layer can produce a valid report. It does not fabricate evidence.
 

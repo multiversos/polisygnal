@@ -4,6 +4,7 @@ import {
 import type {
   SamanthaBridgeConfig,
   SamanthaBridgeErrorCode,
+  SamanthaBridgeLookupResult,
   SamanthaBridgeMode,
   SamanthaBridgeSendResult,
   SamanthaBridgeTask,
@@ -35,6 +36,7 @@ const SECRET_MARKERS = [
   "token=",
 ] as const;
 const FULL_WALLET_PATTERN = /0x[a-fA-F0-9]{40}/;
+const TASK_ID_PATTERN = /^[a-zA-Z0-9._:-]{1,160}$/;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -234,10 +236,14 @@ function parseBridgeResponse(value: unknown): SamanthaResearchResponse {
             : undefined,
     status:
       record.status === "accepted" ||
+      record.status === "pending" ||
+      record.status === "processing" ||
       record.status === "queued" ||
       record.status === "researching" ||
       record.status === "completed" ||
       record.status === "partial" ||
+      record.status === "manual_needed" ||
+      record.status === "failed_safe" ||
       record.status === "failed"
         ? record.status
         : undefined,
@@ -246,6 +252,11 @@ function parseBridgeResponse(value: unknown): SamanthaResearchResponse {
       ? record.warnings.filter((item): item is string => typeof item === "string").slice(0, 6)
       : undefined,
   };
+}
+
+function endpointForTaskStatus(endpoint: URL, taskId: string): URL {
+  const base = endpoint.toString().replace(/\/+$/, "");
+  return new URL(`${base}/${encodeURIComponent(taskId)}`);
 }
 
 export async function sendSamanthaResearchTask(task: SamanthaBridgeTask): Promise<SamanthaBridgeSendResult> {
@@ -366,6 +377,148 @@ export async function sendSamanthaResearchTask(task: SamanthaBridgeTask): Promis
       timedOut
         ? "Samantha bridge request timed out."
         : "Samantha bridge request failed safely.",
+      timedOut ? "request_timeout" : "request_failed",
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function lookupSamanthaResearchTask(taskId: string): Promise<SamanthaBridgeLookupResult> {
+  const config = getSamanthaBridgeConfig();
+  if (config.mode !== "automatic") {
+    const errorCode = config.mode === "disabled" ? "bridge_disabled" : "invalid_bridge_config";
+    return fallbackResult(config, config.reason, errorCode);
+  }
+  if (!TASK_ID_PATTERN.test(taskId)) {
+    return {
+      automaticAvailable: true,
+      checkedAt: nowIso(),
+      errorCode: "invalid_request",
+      fallbackRequired: true,
+      mode: config.mode,
+      reason: "Samantha task id did not pass validation.",
+      status: "error",
+      warnings: [],
+    };
+  }
+
+  const endpoint = process.env.SAMANTHA_BRIDGE_URL?.trim() || "";
+  const safeEndpoint = endpointIsSafe(endpoint, config.allowLocalhost);
+  if (!safeEndpoint.safe || !safeEndpoint.url) {
+    return fallbackResult(config, safeEndpoint.reason || "Samantha bridge endpoint is not safe.", "invalid_bridge_config");
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const headers: Record<string, string> = {
+      accept: "application/json",
+    };
+    const token = process.env.SAMANTHA_BRIDGE_TOKEN?.trim();
+    if (token) {
+      headers.authorization = `Bearer ${token}`;
+    }
+    const response = await fetch(endpointForTaskStatus(safeEndpoint.url, taskId).toString(), {
+      cache: "no-store",
+      credentials: "omit",
+      headers,
+      method: "GET",
+      redirect: "error",
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    if (byteLength(text) > config.maxResponseBytes) {
+      return fallbackResult(config, "Samantha bridge response exceeded the safe size limit.", "invalid_response");
+    }
+    if (!response.ok) {
+      return fallbackResult(config, "Samantha bridge did not return a safe task status.", "request_failed");
+    }
+    let parsed: unknown = {};
+    try {
+      parsed = text ? JSON.parse(text) : {};
+    } catch {
+      return fallbackResult(config, "Samantha bridge returned invalid JSON.", "invalid_response");
+    }
+    if (containsUnsafeText(parsed)) {
+      return fallbackResult(config, "Samantha bridge response contained unsafe text.", "invalid_response");
+    }
+    const bridgeResponse = parseBridgeResponse(parsed);
+    if (bridgeResponse.status === "manual_needed") {
+      return {
+        automaticAvailable: true,
+        bridgeTaskStatus: "manual_needed",
+        checkedAt: nowIso(),
+        fallbackRequired: true,
+        mode: config.mode,
+        reason: bridgeResponse.message || "Samantha marked this task as requiring manual research.",
+        status: "manual_needed",
+        taskId: bridgeResponse.taskId || taskId,
+        warnings: bridgeResponse.warnings ?? [],
+      };
+    }
+    if (bridgeResponse.status === "failed_safe" || bridgeResponse.status === "failed") {
+      return {
+        automaticAvailable: true,
+        bridgeTaskStatus: "failed_safe",
+        checkedAt: nowIso(),
+        errorCode: "request_failed",
+        fallbackRequired: true,
+        mode: config.mode,
+        reason: bridgeResponse.message || "Samantha could not complete the task safely.",
+        status: "error",
+        taskId: bridgeResponse.taskId || taskId,
+        warnings: bridgeResponse.warnings ?? [],
+      };
+    }
+    if (bridgeResponse.report) {
+      const reportResult = parseSamanthaResearchReport(bridgeResponse.report);
+      if (!reportResult.valid || !reportResult.report) {
+        return {
+          automaticAvailable: true,
+          bridgeTaskStatus: "completed",
+          checkedAt: nowIso(),
+          errorCode: "report_invalid",
+          fallbackRequired: true,
+          mode: config.mode,
+          reason: "Samantha returned a report, but it failed PolySignal validation.",
+          status: "report_invalid",
+          taskId: bridgeResponse.taskId || taskId,
+          validationErrors: reportResult.errors,
+          warnings: reportResult.warnings,
+        };
+      }
+      return {
+        automaticAvailable: true,
+        bridgeTaskStatus: "completed",
+        checkedAt: nowIso(),
+        fallbackRequired: false,
+        mode: config.mode,
+        reason: "Samantha returned a validated research report.",
+        report: reportResult.report,
+        status: "report_received",
+        taskId: bridgeResponse.taskId || taskId,
+        warnings: reportResult.warnings,
+      };
+    }
+    return {
+      automaticAvailable: true,
+      bridgeTaskStatus: bridgeResponse.status === "processing" ? "processing" : "pending",
+      checkedAt: nowIso(),
+      fallbackRequired: false,
+      mode: config.mode,
+      reason: bridgeResponse.message || "Samantha research is still pending.",
+      status: "samantha_researching",
+      taskId: bridgeResponse.taskId || taskId,
+      warnings: bridgeResponse.warnings ?? [],
+    };
+  } catch (error) {
+    const timedOut = typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
+    return fallbackResult(
+      config,
+      timedOut
+        ? "Samantha bridge status request timed out."
+        : "Samantha bridge status request failed safely.",
       timedOut ? "request_timeout" : "request_failed",
     );
   } finally {

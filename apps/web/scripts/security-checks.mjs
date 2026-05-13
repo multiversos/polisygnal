@@ -711,7 +711,8 @@ function validateAnalyzerReportSource() {
   assert(source.includes("mergeWalletIntelligenceLayer"), "expected AnalyzerReport to merge wallet layer into deep readiness");
   assert(source.includes("getWalletIntelligenceSummary"), "expected AnalyzerReport to summarize wallet intelligence");
   assert(source.includes("getProbabilityDisplayState"), "expected AnalyzerReport to keep market probability separated");
-  assert(!source.includes("fetch("), "AnalyzerReport must not call external services for Samantha");
+  assert(source.includes("/api/samantha/research-status"), "AnalyzerReport should query Samantha status only through same-origin route");
+  assert(!/fetch\(\s*["']https?:\/\//.test(source), "AnalyzerReport must not call external services for Samantha");
   assert(!source.includes("OpenClaw"), "AnalyzerReport must not try to execute OpenClaw");
   for (const copy of requiredCopy) {
     assert(source.includes(copy), `AnalyzerReport missing required copy: ${copy}`);
@@ -747,6 +748,7 @@ function validateSamanthaResearchRules() {
   const bridgeTypesSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridgeTypes.ts"), "utf8");
   const bridgeSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridge.ts"), "utf8");
   const bridgeRouteSource = readFileSync(resolve(appRoot, "app/api/samantha/send-research/route.ts"), "utf8");
+  const bridgeStatusRouteSource = readFileSync(resolve(appRoot, "app/api/samantha/research-status/route.ts"), "utf8");
   const analyzePageSource = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
 
   const brief = buildSamanthaResearchBrief({
@@ -818,6 +820,9 @@ function validateSamanthaResearchRules() {
   assert(bridgeRouteSource.includes("sendSamanthaResearchTask"), "Samantha send route must use the bridge helper");
   assert(!bridgeRouteSource.includes("request.nextUrl"), "Samantha send route must not derive destination from request URL");
   assert(!bridgeRouteSource.includes("rawBody") || !bridgeRouteSource.includes("raw payload"), "Samantha send route must not expose raw payloads");
+  assert(bridgeStatusRouteSource.includes("lookupSamanthaResearchTask"), "Samantha status route must use bridge lookup helper");
+  assert(bridgeStatusRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha status route must reject client-provided destinations");
+  assert(!bridgeStatusRouteSource.includes("SAMANTHA_BRIDGE_TOKEN"), "Samantha status route must not read or expose bridge token directly");
   assert(analyzePageSource.includes("/api/samantha/send-research"), "analyze page must try the safe Samantha bridge route");
   assert(analyzePageSource.includes("markJobSamanthaBridgeFallback"), "analyze page must keep manual fallback when bridge is unavailable");
   assert(analyzePageSource.includes("markJobSendingToSamantha"), "analyze page must mark sending_to_samantha state");

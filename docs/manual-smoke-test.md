@@ -620,13 +620,18 @@ configured.
 3. Analyze a Polymarket link.
 4. Confirm PolySignal sends the task, receives `accepted`, and keeps the job in
    `samantha_researching` or `awaiting_samantha`.
-5. Confirm Radar Analytics remains visible and manual fallback buttons remain
+5. Click `Consultar resultado de Samantha` and confirm a pending response keeps
+   the job waiting, without marking it completed.
+6. Run `npm run polysignal:research:process -- --task-id=<task-id>` in
+   Samantha and confirm PolySignal then reads `manual_needed`, keeps manual
+   fallback visible and does not invent a report.
+7. Confirm Radar Analytics remains visible and manual fallback buttons remain
    available.
-6. Confirm the job is not marked completed until a valid Samantha report is
+8. Confirm the job is not marked completed until a valid Samantha report is
    loaded and passes PolySignal gates.
-7. Confirm Samantha's pending queue contains only a sanitized summary, not raw
+9. Confirm Samantha's pending queue contains only a sanitized summary, not raw
    payloads, secrets or full wallet addresses.
-8. Confirm rejected requests include: missing token, non-Polymarket URL, full
+10. Confirm rejected requests include: missing token, non-Polymarket URL, full
    wallet address, script-like text, oversized payload and trading instruction.
 
 ## Cache Troubleshooting

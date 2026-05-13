@@ -126,6 +126,10 @@ Implemented as a frontend flow plus a same-origin read-only resolver route.
   `POST /polysignal/research-task` si su bridge esta explicitamente habilitado.
   La respuesta actual esperada es `accepted`/`queued_or_manual`; PolySignal no
   marca el analisis como completado hasta recibir un reporte validado.
+- `/analyze` ofrece `Consultar resultado de Samantha` cuando existe `taskId`.
+  La consulta pasa por `/api/samantha/research-status`; si Samantha responde
+  `pending` o `manual_needed`, el job sigue esperando investigacion y el fallback
+  manual permanece disponible.
 - The report closes with `Que puedes hacer ahora`: save the analysis, save as
   follow-up when there is no PolySignal estimate, view history, follow the
   market, open market detail, or analyze another link.

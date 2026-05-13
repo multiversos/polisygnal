@@ -18,7 +18,11 @@ import {
 import {
   getJobProgressSummary,
   jobStepStatusLabel,
+  markJobReceivingSamanthaReport,
+  markJobSamanthaBridgeFallback,
   markJobSamanthaReportLoaded,
+  markJobSamanthaResearching,
+  markJobValidatingSamanthaReport,
   type DeepAnalysisJob,
 } from "../lib/deepAnalysisJob";
 import { updateDeepAnalysisJob } from "../lib/deepAnalysisJobStorage";
@@ -95,6 +99,18 @@ type AnalyzerReportProps = {
   relatedHistory: AnalysisHistoryItem[];
   saved: boolean;
   watchlisted: boolean;
+};
+
+type SamanthaStatusRouteResult = {
+  automaticAvailable?: boolean;
+  bridgeTaskStatus?: string;
+  fallbackRequired?: boolean;
+  reason?: string;
+  report?: unknown;
+  status?: string;
+  taskId?: string;
+  validationErrors?: string[];
+  warnings?: string[];
 };
 
 function toNumber(value: unknown): number | null {
@@ -339,6 +355,7 @@ export function AnalyzerReport({
   const [samanthaReportResult, setSamanthaReportResult] =
     useState<SamanthaResearchParseResult | null>(null);
   const [samanthaActionMessage, setSamanthaActionMessage] = useState("");
+  const [samanthaLookupBusy, setSamanthaLookupBusy] = useState(false);
   const status = getPublicMarketStatus(insightInput(item));
   const reason = getMarketReviewReason(insightInput(item));
   const activity = getMarketActivityLabel(insightInput(item));
@@ -384,6 +401,9 @@ export function AnalyzerReport({
   const samanthaBriefText = useMemo(() => serializeResearchBrief(samanthaBrief), [samanthaBrief]);
   const samanthaTaskPacket = useMemo(() => buildSamanthaTaskPacket(samanthaBrief), [samanthaBrief]);
   const samanthaBriefValidation = useMemo(() => validateResearchBrief(samanthaBrief), [samanthaBrief]);
+  const samanthaBridgeTaskId =
+    deepAnalysisJob?.samanthaBridge?.taskId ??
+    deepAnalysisJob?.samanthaBridge?.bridgeTaskId;
   const samanthaDraftReport = samanthaReportDraftResult?.valid ? samanthaReportDraftResult.report : undefined;
   const samanthaReport = samanthaReportResult?.valid ? samanthaReportResult.report : undefined;
   const samanthaDraftEvidence = samanthaDraftReport ? convertSamanthaReportToEvidence(samanthaDraftReport) : [];
@@ -493,6 +513,99 @@ export function AnalyzerReport({
       onDeepAnalysisJobChange?.(storedJob);
     }
     setSamanthaActionMessage("Reporte aplicado al analisis profundo.");
+  }
+
+  async function handleCheckSamanthaStatus() {
+    if (!samanthaBridgeTaskId || !deepAnalysisJob) {
+      setSamanthaActionMessage("Todavia no hay una tarea automatica de Samantha para consultar.");
+      return;
+    }
+    setSamanthaLookupBusy(true);
+    try {
+      const response = await fetch("/api/samantha/research-status", {
+        body: JSON.stringify({ taskId: samanthaBridgeTaskId }),
+        cache: "no-store",
+        credentials: "omit",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        redirect: "error",
+      });
+      const result = (await response.json().catch(() => ({}))) as SamanthaStatusRouteResult;
+      if (!response.ok) {
+        setSamanthaActionMessage(result.reason || "No pudimos consultar el estado de Samantha.");
+        return;
+      }
+      if (result.report) {
+        let nextJob = updateDeepAnalysisJob(markJobReceivingSamanthaReport(deepAnalysisJob)) ?? markJobReceivingSamanthaReport(deepAnalysisJob);
+        nextJob = updateDeepAnalysisJob(markJobValidatingSamanthaReport(nextJob)) ?? markJobValidatingSamanthaReport(nextJob);
+        const reportResult = parseSamanthaResearchReport(result.report);
+        setSamanthaReportDraftResult(reportResult);
+        if (!reportResult.valid || !reportResult.report) {
+          nextJob =
+            updateDeepAnalysisJob(
+              markJobSamanthaBridgeFallback(nextJob, {
+                automaticAvailable: true,
+                reason:
+                  reportResult.errors[0] ||
+                  "Samantha devolvio un reporte, pero no paso la validacion PolySignal.",
+                warnings: reportResult.errors.slice(0, 4),
+              }),
+            ) ?? nextJob;
+          onDeepAnalysisJobChange?.(nextJob);
+          setSamanthaActionMessage("Samantha devolvio un reporte invalido; sigue disponible el flujo manual.");
+          return;
+        }
+        setSamanthaReportResult(reportResult);
+        nextJob =
+          updateDeepAnalysisJob(
+            markJobSamanthaReportLoaded(nextJob, {
+              acceptedEstimate: shouldAcceptSuggestedEstimate(reportResult.report),
+              kalshiEquivalent:
+                reportResult.report.kalshiComparison?.found === true &&
+                reportResult.report.kalshiComparison.equivalent === true,
+              oddsFound: reportResult.report.oddsComparison?.found === true,
+              reportStatus: reportResult.report.status,
+              signalCount: convertSamanthaReportToSignals(reportResult.report).length,
+            }),
+          ) ?? nextJob;
+        onDeepAnalysisJobChange?.(nextJob);
+        setSamanthaActionMessage("Reporte de Samantha consultado, validado y cargado.");
+        return;
+      }
+      if (result.status === "manual_needed" || result.fallbackRequired) {
+        const nextJob =
+          updateDeepAnalysisJob(
+            markJobSamanthaBridgeFallback(deepAnalysisJob, {
+              automaticAvailable: result.automaticAvailable,
+              reason:
+                result.reason ||
+                "Samantha marco la tarea como pendiente de investigacion manual.",
+              warnings: result.warnings ?? result.validationErrors ?? [],
+            }),
+          ) ?? deepAnalysisJob;
+        onDeepAnalysisJobChange?.(nextJob);
+        setSamanthaActionMessage(result.reason || "Samantha requiere investigacion manual; el fallback sigue disponible.");
+        return;
+      }
+      const nextJob =
+        updateDeepAnalysisJob(
+          markJobSamanthaResearching(deepAnalysisJob, {
+            reason:
+              result.reason ||
+              "Samantha mantiene la tarea en cola; la investigacion sigue pendiente.",
+            taskId: result.taskId || samanthaBridgeTaskId,
+          }),
+        ) ?? deepAnalysisJob;
+      onDeepAnalysisJobChange?.(nextJob);
+      setSamanthaActionMessage(result.reason || "Samantha todavia no devolvio un reporte.");
+    } catch {
+      setSamanthaActionMessage("No pudimos consultar Samantha de forma segura; usa el flujo manual.");
+    } finally {
+      setSamanthaLookupBusy(false);
+    }
   }
 
   async function copyTextToClipboard(text: string, successMessage: string) {
@@ -798,8 +911,23 @@ export function AnalyzerReport({
           >
             Descargar brief JSON
           </button>
+          <button
+            className="watchlist-button"
+            disabled={!samanthaBridgeTaskId || samanthaLookupBusy}
+            onClick={handleCheckSamanthaStatus}
+            type="button"
+          >
+            {samanthaLookupBusy ? "Consultando Samantha" : "Consultar resultado de Samantha"}
+          </button>
           <span>{samanthaBriefValidation.valid ? "Brief validado" : "Brief no disponible"}</span>
         </div>
+        {samanthaBridgeTaskId ? (
+          <p className="section-note">
+            Tarea enviada a Samantha: {samanthaBridgeTaskId}. Si Samantha responde
+            pendiente o manual_needed, el analisis sigue esperando investigacion y
+            el fallback manual permanece disponible.
+          </p>
+        ) : null}
         {samanthaBriefValidation.errors.length > 0 ? (
           <div className="wallet-warning-list">
             {samanthaBriefValidation.errors.map((error) => (

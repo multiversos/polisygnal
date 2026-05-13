@@ -57,9 +57,14 @@ export type DeepAnalysisJob = {
   briefReady?: boolean;
   samanthaBridge?: {
     automaticAvailable?: boolean;
+    bridgeMode?: "automatic" | "local" | "manual_fallback";
+    bridgeStatus?: "accepted" | "queued" | "pending" | "processing" | "manual_needed" | "completed" | "failed_safe";
+    bridgeTaskId?: string;
     fallbackRequired?: boolean;
+    fallbackAvailable?: boolean;
     lastAttemptAt?: string;
     reason?: string;
+    sentToSamanthaAt?: string;
     status:
       | "not_configured"
       | "fallback_manual"
@@ -291,6 +296,7 @@ export function markJobSamanthaBriefReady(job: DeepAnalysisJob): DeepAnalysisJob
 }
 
 export function markJobSendingToSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
+  const timestamp = nowIso();
   const next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
     requiresExternalIntegration: true,
     status: "running",
@@ -301,9 +307,13 @@ export function markJobSendingToSamantha(job: DeepAnalysisJob): DeepAnalysisJob 
     resultReady: false,
     samanthaBridge: {
       automaticAvailable: true,
+      bridgeMode: "automatic",
+      bridgeStatus: "pending",
       fallbackRequired: false,
-      lastAttemptAt: nowIso(),
+      fallbackAvailable: true,
+      lastAttemptAt: timestamp,
       status: "sending",
+      sentToSamanthaAt: timestamp,
     },
     status: "sending_to_samantha",
   };
@@ -323,7 +333,11 @@ export function markJobSamanthaResearching(
     resultReady: false,
     samanthaBridge: {
       automaticAvailable: true,
+      bridgeMode: "automatic",
+      bridgeStatus: "accepted",
+      bridgeTaskId: input.taskId,
       fallbackRequired: false,
+      fallbackAvailable: true,
       lastAttemptAt: nowIso(),
       reason: input.reason,
       status: "researching",
@@ -344,7 +358,10 @@ export function markJobReceivingSamanthaReport(job: DeepAnalysisJob): DeepAnalys
     samanthaBridge: {
       ...next.samanthaBridge,
       automaticAvailable: true,
+      bridgeMode: "automatic",
+      bridgeStatus: "completed",
       fallbackRequired: false,
+      fallbackAvailable: true,
       lastAttemptAt: nowIso(),
       status: "report_received",
     },
@@ -379,7 +396,10 @@ export function markJobSamanthaBridgeFallback(
     ...next,
     samanthaBridge: {
       automaticAvailable: Boolean(input.automaticAvailable),
+      bridgeMode: input.automaticAvailable ? "automatic" : "manual_fallback",
+      bridgeStatus: "manual_needed",
       fallbackRequired: true,
+      fallbackAvailable: true,
       lastAttemptAt: nowIso(),
       reason: input.reason,
       status: input.automaticAvailable ? "failed" : "fallback_manual",
@@ -412,7 +432,10 @@ export function markJobAwaitingSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
     resultReady: false,
     samanthaBridge: next.samanthaBridge ?? {
       automaticAvailable: false,
+      bridgeMode: "manual_fallback",
+      bridgeStatus: "manual_needed",
       fallbackRequired: true,
+      fallbackAvailable: true,
       lastAttemptAt: nowIso(),
       reason: "Samantha automatica no configurada; usa el Task Packet manual.",
       status: "not_configured",

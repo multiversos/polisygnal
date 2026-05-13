@@ -627,7 +627,8 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Cargar reporte al analisis"), "AnalyzerReport missing Samantha report apply action");
   assert(reportSource.includes("parseSamanthaResearchReport"), "AnalyzerReport missing Samantha report validation");
   assert(reportSource.includes("buildSamanthaTaskPacket"), "AnalyzerReport missing Samantha task packet builder");
-  assert(!reportSource.includes("fetch("), "AnalyzerReport must not call external services for Samantha");
+  assert(reportSource.includes("/api/samantha/research-status"), "AnalyzerReport should query Samantha status only through same-origin route");
+  assert(!/fetch\(\s*["']https?:\/\//.test(reportSource), "AnalyzerReport must not call external services for Samantha");
   assert(bridgeSource.includes("SAMANTHA_BRIDGE_ENABLED"), "Samantha bridge helper must use server-side enablement config");
   assert(bridgeSource.includes("credentials: \"omit\""), "Samantha bridge helper must omit credentials");
   assert(bridgeSource.includes("redirect: \"error\""), "Samantha bridge helper must reject redirects");
