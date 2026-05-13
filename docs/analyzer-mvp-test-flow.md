@@ -67,6 +67,15 @@ The product must not invent evidence, must not mark the analysis as completed, a
 5. Confirm a completed report is only produced from the controlled fixture and
    still validates through PolySignal before it affects the estimate gates.
 
+## Samantha Sports Research Test
+
+1. In `N:/samantha`, run `npm run polysignal:sports-research:test`.
+2. Confirm soccer tasks without structured source notes return `manual_needed`.
+3. Confirm unsafe source notes are rejected as `failed_safe`.
+4. Confirm conflicting soccer evidence remains pending instead of forcing an estimate.
+5. Confirm the controlled strong fixture can produce `completed` only after the
+   report contract accepts two aligned source-backed signals.
+
 ## Estimate Gate Test
 
 1. Run `npm.cmd --workspace apps/web run test:estimate-gates`.

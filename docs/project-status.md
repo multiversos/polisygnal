@@ -163,6 +163,11 @@ Estado visible verificado:
   `completed` solo si recibe evidencia estructurada real suficiente y el
   reporte pasa las mismas barreras que PolySignal; sin evidencia autorizada
   sigue devolviendo `manual_needed`.
+- Samantha ahora tiene una primera capa segura de sports research para soccer
+  (`sports-research-contract`, `sports-research-sources` y
+  `sports-research-adapter`). No hace scraping ni busqueda generica; sin
+  evidencia deportiva estructurada devuelve `manual_needed` con fuentes
+  recomendadas para revision manual.
 - El paquete para Samantha incluye brief JSON, instrucciones TXT, schema de
   respuesta, reglas de seguridad e instrucciones de devolucion. Prohibe fuentes
   inventadas, trading, Neon, `.env`, doxxing, secretos, copy-trading y

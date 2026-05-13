@@ -337,6 +337,20 @@ trading/copy-trading, ROI/win rate claims, Reddit/social con confiabilidad alta
 y Kalshi no equivalente como senal fuerte. Si el reporte no tiene al menos dos
 senales reales alineadas para el lado sugerido, queda `manual_needed`.
 
+Samantha tambien tiene una primera capa de sports research para soccer en modo
+conservador:
+
+- `N:/samantha/src/polysignal/sports-research-contract.js`
+- `N:/samantha/src/polysignal/sports-research-sources.js`
+- `N:/samantha/src/polysignal/sports-research-adapter.js`
+
+Esta capa no hace scraping ni busqueda generica. Si no recibe evidencia
+deportiva estructurada desde una fuente permitida/manual, devuelve
+`manual_needed` con checks sugeridos: match center oficial, updates oficiales
+de equipos y noticias deportivas reputadas. Solo puede ayudar a `completed`
+cuando hay al menos dos senales reales alineadas de confiabilidad media/alta y
+el reporte completo sigue pasando las compuertas de PolySignal.
+
 PolySignal sanitiza:
 
 - textos largos
