@@ -231,6 +231,9 @@ Prepared as frontend contracts only.
   `http://127.0.0.1:8787/polysignal/analyze-market`. Recibe contexto
   sanitizado del mercado y Wallet Intelligence, y devuelve `partial` o
   `insufficient_data` sin pedir reportes manuales al usuario.
+- Endpoint publico recomendado despues de deploy:
+  `https://<samantha-bridge-host>/polysignal/analyze-market`, servido por
+  `npm run start:polysignal-bridge` con `SAMANTHA_BRIDGE_TOKEN` obligatorio.
 - La ruta local `http://127.0.0.1:8787/polysignal/research-task` queda como
   compatibilidad de cola/dev para Task Packets.
 - `DeepAnalysisJob` soporta estados de puente:

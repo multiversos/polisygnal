@@ -95,6 +95,24 @@ Configuracion server-side opcional:
 - `SAMANTHA_BRIDGE_MAX_REQUEST_BYTES`
 - `SAMANTHA_BRIDGE_MAX_RESPONSE_BYTES`
 
+Produccion:
+
+- Samantha debe correr como servicio publico HTTPS separado con start command
+  `npm run start:polysignal-bridge`.
+- El servicio expone `GET /health` y `POST /polysignal/analyze-market`.
+- Variables Samantha requeridas:
+  - `NODE_ENV=production`
+  - `POLYSIGNAL_BRIDGE_MODE=true`
+  - `SAMANTHA_BRIDGE_TOKEN=<secret>`
+  - `POLYSIGNAL_ALLOWED_ORIGIN=https://polisygnal-web.vercel.app`
+- Variables Vercel requeridas:
+  - `SAMANTHA_BRIDGE_ENABLED=true`
+  - `SAMANTHA_BRIDGE_URL=https://<samantha-bridge-host>/polysignal/analyze-market`
+  - `SAMANTHA_BRIDGE_TOKEN=<same secret>`
+- Si estas variables no estan configuradas, produccion responde
+  `bridge_disabled` y la UI conserva fallback seguro sin pedir reportes
+  manuales.
+
 Controles:
 
 - no usa variables `NEXT_PUBLIC`;

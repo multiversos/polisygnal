@@ -899,6 +899,7 @@ function validateSamanthaResearchRules() {
   const taskPacketSource = readFileSync(resolve(appRoot, "app/lib/samanthaTaskPacket.ts"), "utf8");
   const bridgeTypesSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridgeTypes.ts"), "utf8");
   const bridgeSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridge.ts"), "utf8");
+  const envExampleSource = readFileSync(resolve(appRoot, ".env.example"), "utf8");
   const bridgeRouteSource = readFileSync(resolve(appRoot, "app/api/samantha/send-research/route.ts"), "utf8");
   const bridgeStatusRouteSource = readFileSync(resolve(appRoot, "app/api/samantha/research-status/route.ts"), "utf8");
   const historySource = readFileSync(resolve(appRoot, "app/history/page.tsx"), "utf8");
@@ -985,6 +986,8 @@ function validateSamanthaResearchRules() {
   assert(bridgeSource.includes("endpointIsSafe"), "Samantha bridge must validate configured endpoint");
   assert(bridgeSource.includes("Private network bridge endpoints are blocked"), "Samantha bridge must block unsafe private endpoints");
   assert(!bridgeSource.includes("NEXT_PUBLIC"), "Samantha bridge must not use client-exposed env vars");
+  assert(envExampleSource.includes("https://<samantha-bridge-host>/polysignal/analyze-market"), "env example must document public HTTPS Samantha bridge URL");
+  assert(envExampleSource.includes("SAMANTHA_BRIDGE_ALLOW_LOCALHOST=false"), "env example must keep localhost disabled by default");
   assert(bridgeRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha send route must reject client-provided destinations");
   assert(bridgeRouteSource.includes("bridgeUrl"), "Samantha send route must block bridgeUrl input");
   assert(bridgeRouteSource.includes("sendSamanthaResearchTask"), "Samantha send route must use the bridge helper");

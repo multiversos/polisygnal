@@ -336,6 +336,20 @@ Samantha-side local endpoints:
 - Samantha returns `accepted`/`queued_or_manual` unless a future real research
   layer can produce a valid report. It does not fabricate evidence.
 
+Deployable public bridge mode:
+
+- Samantha can run `npm run start:polysignal-bridge` as a narrow web service;
+- the public mode exposes only `GET /health` and
+  `POST /polysignal/analyze-market`;
+- production startup requires `SAMANTHA_BRIDGE_TOKEN`;
+- CORS is restricted by `POLYSIGNAL_ALLOWED_ORIGIN`, with localhost allowed
+  only for local/dev;
+- `/polysignal/research-task`, NBA manual evidence, WhatsApp, OpenClaw and
+  browser automation are not exposed by this service mode;
+- Vercel must configure `SAMANTHA_BRIDGE_ENABLED`, `SAMANTHA_BRIDGE_URL` and
+  `SAMANTHA_BRIDGE_TOKEN` server-side. If the config is absent, PolySignal must
+  keep returning a controlled `bridge_disabled` fallback.
+
 History and performance safety:
 
 - `awaiting_samantha` and `ready_to_score` records are pending research states,

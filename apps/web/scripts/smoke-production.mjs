@@ -531,6 +531,7 @@ function validateAnalyzeLoadingPanelSource() {
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
   const linkSource = readFileSync(new URL("../app/lib/polymarketLink.ts", import.meta.url), "utf8");
   const bridgeSource = readFileSync(new URL("../app/lib/samanthaBridge.ts", import.meta.url), "utf8");
+  const envExampleSource = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
   const bridgeRouteSource = readFileSync(new URL("../app/api/samantha/send-research/route.ts", import.meta.url), "utf8");
   const bridgeStatusRouteSource = readFileSync(new URL("../app/api/samantha/research-status/route.ts", import.meta.url), "utf8");
   const walletRouteSource = readFileSync(new URL("../app/api/polymarket-wallet-intelligence/route.ts", import.meta.url), "utf8");
@@ -615,6 +616,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(bridgeSource.includes("SAMANTHA_BRIDGE_ENABLED"), "Samantha bridge helper must use server-side enablement config");
   assert(bridgeSource.includes("buildAnalyzeMarketPayload"), "Samantha bridge helper must send automatic market-analysis payloads");
   assert(bridgeSource.includes('"insufficient_data"'), "Samantha bridge helper must handle insufficient automatic signals");
+  assert(envExampleSource.includes("https://<samantha-bridge-host>/polysignal/analyze-market"), "env example must document public HTTPS Samantha bridge URL");
   assert(bridgeSource.includes("credentials: \"omit\""), "Samantha bridge helper must omit credentials");
   assert(bridgeSource.includes("redirect: \"error\""), "Samantha bridge helper must reject redirects");
   assert(bridgeRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha bridge route must reject client destinations");

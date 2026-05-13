@@ -159,6 +159,16 @@ Estado visible verificado:
   Devuelve `partial` o `insufficient_data` con un reporte compatible cuando hay
   contexto real, sin inventar fuentes externas ni decision. Sigue
   deshabilitado por defecto mediante `POLYSIGNAL_RESEARCH_BRIDGE_ENABLED`.
+- Samantha ahora tambien tiene un modo deployable liviano:
+  `npm run start:polysignal-bridge`. Este modo no inicia WhatsApp/OpenClaw ni
+  navegador local; solo expone `GET /health` y
+  `POST /polysignal/analyze-market`, exige `SAMANTHA_BRIDGE_TOKEN`, limita
+  CORS con `POLYSIGNAL_ALLOWED_ORIGIN` y aplica rate limit basico.
+- Produccion PolySignal todavia necesita que Vercel tenga
+  `SAMANTHA_BRIDGE_ENABLED=true`,
+  `SAMANTHA_BRIDGE_URL=https://<samantha-bridge-host>/polysignal/analyze-market`
+  y `SAMANTHA_BRIDGE_TOKEN` configurados. Sin eso, la ruta responde
+  `bridge_disabled` y queda en lectura parcial/fuente automatica no disponible.
 - Samantha conserva `POST /polysignal/research-task` para recibir el Task
   Packet de PolySignal, validarlo, escribir una cola local sanitizada y
   responder `accepted`/`queued_or_manual`.

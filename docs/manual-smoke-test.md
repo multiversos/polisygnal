@@ -654,6 +654,26 @@ configured.
    `http://127.0.0.1:8787/polysignal/research-task` only when testing queued
    task processing locally.
 
+## Samantha Bridge Public HTTPS
+
+Use this only after Samantha is deployed as a public HTTPS service with
+`npm run start:polysignal-bridge`.
+
+1. Confirm `GET https://<samantha-bridge-host>/health` returns:
+   `{"status":"ok","service":"samantha-polysignal-bridge"}`.
+2. Confirm `POST https://<samantha-bridge-host>/polysignal/analyze-market`
+   rejects missing or invalid token with 401.
+3. Confirm the same POST with the configured token returns `partial` or
+   `insufficient_data`, never a market-price-only PolySignal estimate.
+4. In Vercel, configure server-side only:
+   - `SAMANTHA_BRIDGE_ENABLED=true`
+   - `SAMANTHA_BRIDGE_URL=https://<samantha-bridge-host>/polysignal/analyze-market`
+   - `SAMANTHA_BRIDGE_TOKEN=<secret>`
+5. Redeploy PolySignal if Vercel requires it for env changes.
+6. Confirm `/api/samantha/send-research` no longer returns `bridge_disabled`.
+7. Confirm `/analyze` still hides manual upload/copy/download/schema tools.
+8. Run `npm.cmd --workspace apps/web run smoke:production`.
+
 ## Cache Troubleshooting
 
 If a normal browser shows old data but backend/proxy checks pass:
