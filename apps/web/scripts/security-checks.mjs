@@ -976,6 +976,10 @@ function validateSamanthaResearchRules() {
   assert(bridgeTypesSource.includes('"disabled" | "manual_fallback" | "automatic"'), "Samantha bridge types must model disabled/manual/automatic modes");
   assert(bridgeSource.includes("SAMANTHA_BRIDGE_ENABLED"), "Samantha bridge must read server-side enabled config");
   assert(bridgeSource.includes("SAMANTHA_BRIDGE_URL"), "Samantha bridge must read server-side endpoint config");
+  assert(bridgeSource.includes("buildAnalyzeMarketPayload"), "Samantha bridge must send automatic market-analysis payloads");
+  assert(bridgeSource.includes("polymarketUrl"), "Samantha bridge payload must include the Polymarket URL");
+  assert(bridgeSource.includes("walletIntelligence"), "Samantha bridge payload must include sanitized Wallet Intelligence context");
+  assert(bridgeSource.includes('"insufficient_data"'), "Samantha bridge must understand insufficient_data responses");
   assert(bridgeSource.includes("credentials: \"omit\""), "Samantha bridge fetch must omit credentials");
   assert(bridgeSource.includes("redirect: \"error\""), "Samantha bridge fetch must reject redirects");
   assert(bridgeSource.includes("endpointIsSafe"), "Samantha bridge must validate configured endpoint");

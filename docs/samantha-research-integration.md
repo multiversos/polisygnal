@@ -46,10 +46,17 @@ se stageo.
 
 `N:/samantha` existe como bridge WhatsApp/OpenClaw. La auditoria encontro
 health/webhooks, modo `POLYSIGNAL_ANALYST_MODE`, logs de analista y scripts de
-prueba, pero no habia un endpoint directo y seguro que aceptara el
-`SamanthaTaskPacket` desde PolySignal.
+prueba. Ahora hay dos rutas seguras para PolySignal:
 
-Se agrego en Samantha un endpoint local/dev compatible:
+- `POST /polysignal/analyze-market`: endpoint automatico recomendado. Recibe
+  contexto sanitizado de mercado, precio, volumen/liquidez y Wallet
+  Intelligence. Devuelve `partial` o `insufficient_data` con un reporte
+  compatible cuando hay contexto real suficiente para una lectura parcial. No
+  hace fetch externo ni inventa fuentes.
+- `POST /polysignal/research-task`: ruta compatible para encolar un Task
+  Packet y procesarlo localmente cuando exista evidencia estructurada real.
+
+Ruta local/dev compatible para cola:
 
 - `POST /polysignal/research-task`
 - contrato: `src/polysignal/samantha-task-contract.js`
@@ -81,7 +88,7 @@ Modo por defecto:
 Configuracion server-side opcional:
 
 - `SAMANTHA_BRIDGE_ENABLED`
-- `SAMANTHA_BRIDGE_URL` (local dev: `http://127.0.0.1:8787/polysignal/research-task`)
+- `SAMANTHA_BRIDGE_URL` (local dev recomendado: `http://127.0.0.1:8787/polysignal/analyze-market`)
 - `SAMANTHA_BRIDGE_TOKEN`
 - `SAMANTHA_BRIDGE_ALLOW_LOCALHOST`
 - `SAMANTHA_BRIDGE_TIMEOUT_MS`
@@ -103,24 +110,24 @@ Controles:
 
 ## Integracion con DeepAnalysisJob
 
-El flujo manual de Samantha ahora es una etapa del job local del analizador:
+El flujo publico de Samantha es automatico-or-partial:
 
 1. `/analyze` crea un `DeepAnalysisJob`.
 2. PolySignal lee Polymarket y analiza el mercado seleccionado.
 3. Wallet Intelligence se revisa solo para el mercado seleccionado si hay id
    compatible.
-4. PolySignal genera el brief de Samantha.
+4. PolySignal genera contexto seguro para Samantha.
 5. PolySignal intenta Camino B solo si existe configuracion segura.
-6. Si el bridge no esta configurado, el job queda en `awaiting_samantha` con
-   fallback manual.
+6. Si el bridge no esta configurado, el job queda como lectura parcial/fuente
+   automatica no disponible, sin pedir carga manual.
 7. Si el bridge acepta la tarea, el job puede pasar por
    `sending_to_samantha`, `samantha_researching`,
    `receiving_samantha_report` y `validating_samantha_report`.
-8. El usuario puede copiar o descargar el brief en cualquier momento y usarlo
-   fuera de PolySignal.
-9. El usuario pega el reporte estructurado si Samantha lo devuelve por fuera
-   del puente.
-10. PolySignal valida y sanitiza el reporte.
+8. Si Samantha devuelve `partial`, PolySignal muestra lectura parcial
+   automatica con fuentes usadas y limitaciones.
+9. Si Samantha devuelve `insufficient_data`, PolySignal muestra sin senales
+   suficientes/fuente automatica no disponible.
+10. PolySignal valida y sanitiza cualquier reporte devuelto.
 11. Si el reporte es valido, el paso `awaiting_samantha_report` pasa a
    `completed`.
 12. Si hay senales, `scoring_evidence` se marca `completed`.
@@ -130,7 +137,7 @@ El flujo manual de Samantha ahora es una etapa del job local del analizador:
     prediccion final.
 
 Este estado vive en localStorage y sirve para reabrir el analisis desde
-`/history`. No ejecuta Samantha automaticamente y no escribe en Neon.
+`/history`. No escribe en Neon.
 
 ## Samantha Task Packet
 
@@ -151,7 +158,7 @@ El paquete contiene:
 - `returnInstructions`: instrucciones de devolucion.
 - `taskPacketJson`: paquete completo serializado.
 
-Acciones disponibles en `/analyze`:
+Acciones debug-only disponibles solo si `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`:
 
 - `Copiar tarea para Samantha`
 - `Descargar tarea JSON`
@@ -168,7 +175,7 @@ fuentes inventadas.
 
 ## Rutas seguras
 
-### Endpoint local en Samantha
+### Endpoint automatico local en Samantha
 
 Para usar Camino B en desarrollo local:
 
@@ -178,27 +185,41 @@ Para usar Camino B en desarrollo local:
    - `POLYSIGNAL_RESEARCH_BRIDGE_ALLOW_REMOTE=false`
 2. En PolySignal, configurar solo server-side:
    - `SAMANTHA_BRIDGE_ENABLED=true`
-   - `SAMANTHA_BRIDGE_URL=http://127.0.0.1:8787/polysignal/research-task`
+   - `SAMANTHA_BRIDGE_URL=http://127.0.0.1:8787/polysignal/analyze-market`
    - `SAMANTHA_BRIDGE_TOKEN=<mismo-token-local>`
    - `SAMANTHA_BRIDGE_ALLOW_LOCALHOST=true`
 3. Iniciar Samantha localmente.
 4. Analizar un enlace en `/analyze`.
 
-Respuesta esperada si Samantha acepta la tarea sin investigacion inmediata:
+Respuesta esperada si Samantha solo puede leer mercado y billeteras:
 
 ```json
 {
   "ok": true,
-  "status": "accepted",
-  "taskId": "samantha-task-...",
-  "mode": "queued_or_manual",
-  "message": "Task accepted; research pending"
+  "status": "partial",
+  "summary": "Samantha prepared an automatic partial reading...",
+  "sourcesUsed": ["PolySignal market data", "PolySignal Wallet Intelligence"],
+  "suggestedDecision": { "available": false }
 }
 ```
 
-PolySignal interpreta esa respuesta como `samantha_researching` o
-`awaiting_samantha`; el Radar permanece visible y el fallback manual sigue
-disponible. El job no queda `completed`.
+PolySignal interpreta esa respuesta como lectura automatica parcial. El job no
+queda como prediccion ni `completed` para scoring si no hay suficientes senales
+independientes.
+
+Si Samantha no tiene datos suficientes, responde `insufficient_data`. PolySignal
+lo muestra como `Sin senales suficientes` o `Fuente automatica no disponible`,
+sin pedir JSON, schema, reportes ni evidencia al usuario.
+
+### Endpoint de cola local en Samantha
+
+Samantha conserva:
+
+```text
+POST http://127.0.0.1:8787/polysignal/research-task
+```
+
+Esa ruta es para dev/cola local y no es el flujo publico recomendado.
 
 Samantha tambien expone consulta local de estado:
 

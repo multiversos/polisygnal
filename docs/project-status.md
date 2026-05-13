@@ -140,7 +140,8 @@ Estado visible verificado:
   `samanthaBridgeTypes.ts`, `samanthaBridge.ts` y
   `POST /api/samantha/send-research` permiten enviar el contexto solo si hay
   configuracion server-side segura (`SAMANTHA_BRIDGE_ENABLED` y endpoint
-  allowlisted). Sin configuracion, la ruta responde fuente automatica no
+  allowlisted). El endpoint recomendado en Samantha es
+  `POST /polysignal/analyze-market`. Sin configuracion, la ruta responde fuente automatica no
   disponible y el `DeepAnalysisJob` queda como lectura parcial/pendiente.
 - `/analyze` ya soporta estados operativos del puente:
   `sending_to_samantha`, `samantha_researching`,
@@ -152,11 +153,15 @@ Estado visible verificado:
   `apps/web/app/api/samantha-polysignal-analysis/` con un route viejo que usaba
   backend `/markets/overview`; se retiro del working tree local porque violaba
   la regla Polymarket-first y no se integro a Camino B.
-- `N:/samantha` existe como bridge WhatsApp/OpenClaw. Se agrego un endpoint
-  local/dev `POST /polysignal/research-task` para recibir el Task Packet de
-  PolySignal, validarlo, escribir una cola local sanitizada y responder
-  `accepted`/`queued_or_manual`. Esta deshabilitado por defecto y no inventa
-  reportes ni ejecuta investigacion automatica si no hay capa real configurada.
+- `N:/samantha` existe como bridge WhatsApp/OpenClaw. Ahora expone
+  `POST /polysignal/analyze-market` para recibir contexto sanitizado de
+  mercado, precio, volumen/liquidez y Wallet Intelligence desde PolySignal.
+  Devuelve `partial` o `insufficient_data` con un reporte compatible cuando hay
+  contexto real, sin inventar fuentes externas ni decision. Sigue
+  deshabilitado por defecto mediante `POLYSIGNAL_RESEARCH_BRIDGE_ENABLED`.
+- Samantha conserva `POST /polysignal/research-task` para recibir el Task
+  Packet de PolySignal, validarlo, escribir una cola local sanitizada y
+  responder `accepted`/`queued_or_manual`.
 - Samantha ahora tambien expone `GET /polysignal/research-task/:taskId` para
   consultar estado local (`pending`, `processing`, `manual_needed`, `completed`
   o `failed_safe`) y un procesador local

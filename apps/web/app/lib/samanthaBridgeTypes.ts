@@ -62,6 +62,7 @@ export type SamanthaResearchResponse = {
     | "completed"
     | "failed"
     | "failed_safe"
+    | "insufficient_data"
     | "manual_needed"
     | "partial"
     | "pending"

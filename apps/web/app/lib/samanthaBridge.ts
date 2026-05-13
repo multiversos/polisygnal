@@ -168,7 +168,7 @@ export function getSamanthaBridgeConfig(): SamanthaBridgeConfig {
     timeoutMs,
   };
   if (!enabled) {
-    return configResult("disabled", "Samantha automatic bridge is disabled; manual task packet is available.", base);
+    return configResult("disabled", "Samantha automatic bridge is disabled; automatic source is unavailable.", base);
   }
   const safeEndpoint = endpointIsSafe(endpoint, allowLocalhost);
   if (!safeEndpoint.safe) {
@@ -225,7 +225,12 @@ function parseBridgeResponse(value: unknown): SamanthaResearchResponse {
   const record = value as Record<string, unknown>;
   return {
     accepted: typeof record.accepted === "boolean" ? record.accepted : undefined,
-    message: typeof record.message === "string" ? record.message.slice(0, 280) : undefined,
+    message:
+      typeof record.message === "string"
+        ? record.message.slice(0, 280)
+        : typeof record.summary === "string"
+          ? record.summary.slice(0, 280)
+          : undefined,
     report:
       record.report && typeof record.report === "object"
         ? (record.report as SamanthaResearchResponse["report"])
@@ -242,6 +247,7 @@ function parseBridgeResponse(value: unknown): SamanthaResearchResponse {
       record.status === "researching" ||
       record.status === "completed" ||
       record.status === "partial" ||
+      record.status === "insufficient_data" ||
       record.status === "manual_needed" ||
       record.status === "failed_safe" ||
       record.status === "failed"
@@ -251,6 +257,35 @@ function parseBridgeResponse(value: unknown): SamanthaResearchResponse {
     warnings: Array.isArray(record.warnings)
       ? record.warnings.filter((item): item is string => typeof item === "string").slice(0, 6)
       : undefined,
+  };
+}
+
+function buildAnalyzeMarketPayload(task: SamanthaBridgeTask): Record<string, unknown> {
+  const market = task.brief.market;
+  const marketProbability = task.brief.knownSignals.marketProbability;
+  return {
+    category: market.category ?? market.sport ?? null,
+    eventSlug: market.eventSlug ?? null,
+    liquidity: market.liquidity ?? null,
+    marketId: null,
+    marketProbability:
+      typeof marketProbability?.yes === "number"
+        ? marketProbability.yes
+        : null,
+    marketSlug: market.marketSlug ?? null,
+    polymarketUrl: task.normalizedUrl || market.normalizedUrl || market.url,
+    prices: {
+      outcomes: market.outcomes.map((outcome) => ({
+        label: outcome.label,
+        price: outcome.price,
+        side: outcome.side,
+      })),
+    },
+    question: market.title,
+    source: "polysignal",
+    title: market.title,
+    volume: market.volume ?? null,
+    walletIntelligence: task.brief.knownSignals.walletIntelligence ?? null,
   };
 }
 
@@ -287,11 +322,7 @@ export async function sendSamanthaResearchTask(task: SamanthaBridgeTask): Promis
     return fallbackResult(config, safeEndpoint.reason || "Samantha bridge endpoint is not safe.", "invalid_bridge_config");
   }
 
-  const requestBody = JSON.stringify({
-    requestType: "polysignal_deep_market_research",
-    task,
-    version: "1.0",
-  });
+  const requestBody = JSON.stringify(buildAnalyzeMarketPayload(task));
   if (byteLength(requestBody) > config.maxRequestBytes) {
     return fallbackResult(config, "Samantha bridge request is too large.", "payload_too_large");
   }
@@ -358,6 +389,18 @@ export async function sendSamanthaResearchTask(task: SamanthaBridgeTask): Promis
         status: "report_received",
         taskId: bridgeResponse.taskId,
         warnings: reportResult.warnings,
+      };
+    }
+    if (bridgeResponse.status === "insufficient_data") {
+      return {
+        automaticAvailable: true,
+        checkedAt: nowIso(),
+        fallbackRequired: true,
+        mode: config.mode,
+        reason: bridgeResponse.message || "Samantha did not find enough automatic signals.",
+        status: "fallback_required",
+        taskId: bridgeResponse.taskId,
+        warnings: bridgeResponse.warnings ?? [],
       };
     }
     return {
@@ -444,14 +487,17 @@ export async function lookupSamanthaResearchTask(taskId: string): Promise<Samant
       return fallbackResult(config, "Samantha bridge response contained unsafe text.", "invalid_response");
     }
     const bridgeResponse = parseBridgeResponse(parsed);
-    if (bridgeResponse.status === "manual_needed") {
+    if (bridgeResponse.status === "manual_needed" || bridgeResponse.status === "insufficient_data") {
       return {
         automaticAvailable: true,
         bridgeTaskStatus: "manual_needed",
         checkedAt: nowIso(),
         fallbackRequired: true,
         mode: config.mode,
-        reason: bridgeResponse.message || "Samantha marked this task as requiring manual research.",
+        reason:
+          bridgeResponse.status === "insufficient_data"
+            ? bridgeResponse.message || "Samantha did not find enough automatic signals."
+            : bridgeResponse.message || "Samantha marked this task as requiring more automatic source coverage.",
         status: "manual_needed",
         taskId: bridgeResponse.taskId || taskId,
         warnings: bridgeResponse.warnings ?? [],

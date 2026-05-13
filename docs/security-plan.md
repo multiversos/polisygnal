@@ -309,14 +309,20 @@ Camino B controls:
 - if Samantha returns a report, PolySignal validates it with the same report
   validator before exposing evidence.
 
-Samantha-side local endpoint:
+Samantha-side local endpoints:
 
-- Samantha exposes `POST /polysignal/research-task` only when
+- Samantha exposes `POST /polysignal/analyze-market` only when
   `POLYSIGNAL_RESEARCH_BRIDGE_ENABLED=true`;
+- `analyze-market` accepts only sanitized PolySignal market context, allowed
+  Polymarket URLs, market price/volume/liquidity, and sanitized Wallet
+  Intelligence. It does not fetch arbitrary URLs and returns `partial` or
+  `insufficient_data` unless real independent evidence is available;
+- Samantha also exposes `POST /polysignal/research-task` as a local/dev queue
+  endpoint for Task Packets;
 - the default listener remains local/dev (`127.0.0.1`), and remote requests are
   rejected unless explicitly allowed;
 - a bearer token is required when `POLYSIGNAL_RESEARCH_BRIDGE_TOKEN` is set;
-- the endpoint validates the PolySignal task contract, Polymarket URL, payload
+- the endpoints validate the PolySignal contract, Polymarket URL, payload
   size, dangerous destination keys, script-like text, full wallet addresses,
   secret-like text, and real-trading instructions;
 - accepted tasks are written as sanitized summaries to a local JSONL queue and

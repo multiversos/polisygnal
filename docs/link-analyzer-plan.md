@@ -228,7 +228,11 @@ Prepared as frontend contracts only.
   server-side allowlisted si `SAMANTHA_BRIDGE_ENABLED` y
   `SAMANTHA_BRIDGE_URL` estan configurados.
 - Endpoint local recomendado para Samantha:
-  `http://127.0.0.1:8787/polysignal/research-task`.
+  `http://127.0.0.1:8787/polysignal/analyze-market`. Recibe contexto
+  sanitizado del mercado y Wallet Intelligence, y devuelve `partial` o
+  `insufficient_data` sin pedir reportes manuales al usuario.
+- La ruta local `http://127.0.0.1:8787/polysignal/research-task` queda como
+  compatibilidad de cola/dev para Task Packets.
 - `DeepAnalysisJob` soporta estados de puente:
   `sending_to_samantha`, `samantha_researching`,
   `receiving_samantha_report` y `validating_samantha_report`.

@@ -633,25 +633,26 @@ configured.
    `POLYSIGNAL_RESEARCH_BRIDGE_ENABLED=true` and a local
    `POLYSIGNAL_RESEARCH_BRIDGE_TOKEN`.
 2. In PolySignal server-side config, set
-   `SAMANTHA_BRIDGE_URL=http://127.0.0.1:8787/polysignal/research-task`,
+   `SAMANTHA_BRIDGE_URL=http://127.0.0.1:8787/polysignal/analyze-market`,
    `SAMANTHA_BRIDGE_ENABLED=true`, `SAMANTHA_BRIDGE_ALLOW_LOCALHOST=true`, and
    the matching `SAMANTHA_BRIDGE_TOKEN`.
 3. Analyze a Polymarket link.
-4. Confirm PolySignal sends the task, receives `accepted`, and keeps the job in
-   `samantha_researching` or `awaiting_samantha`.
-5. Click `Actualizar lectura automatica` and confirm a pending response keeps
-   the job waiting, without marking it completed.
-6. Run `npm run polysignal:research:process -- --task-id=<task-id>` in
-   Samantha and confirm PolySignal then reads `manual_needed`, shows source
-   unavailable/partial reading, and does not invent a report.
-7. Confirm Radar Analytics remains visible and public manual report buttons are
+4. Confirm PolySignal sends sanitized market context and Wallet Intelligence to
+   Samantha, receives `partial` or `insufficient_data`, and never treats market
+   price alone as a PolySignal estimate.
+5. If Samantha is unavailable, confirm the UI shows automatic source
+   unavailable/partial reading and does not ask for a manual report.
+6. Confirm Radar Analytics remains visible and public manual report buttons are
    not shown.
-8. Confirm the job is not marked completed until a valid Samantha report is
-   loaded and passes PolySignal gates.
-9. Confirm Samantha's pending queue contains only a sanitized summary, not raw
+7. Confirm the job is not marked completed for scoring until a valid Samantha
+   report passes PolySignal gates.
+8. Confirm Samantha's audit log contains only sanitized metadata, not raw
    payloads, secrets or full wallet addresses.
-10. Confirm rejected requests include: missing token, non-Polymarket URL, full
-   wallet address, script-like text, oversized payload and trading instruction.
+9. Confirm rejected requests include: missing token, non-Polymarket URL,
+   script-like text, oversized payload and trading instruction.
+10. Optional dev queue: point `SAMANTHA_BRIDGE_URL` to
+   `http://127.0.0.1:8787/polysignal/research-task` only when testing queued
+   task processing locally.
 
 ## Cache Troubleshooting
 
