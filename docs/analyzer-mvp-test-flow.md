@@ -75,6 +75,12 @@ The product must not invent evidence, must not mark the analysis as completed, a
 4. Confirm conflicting soccer evidence remains pending instead of forcing an estimate.
 5. Confirm the controlled strong fixture can produce `completed` only after the
    report contract accepts two aligned source-backed signals.
+6. Run `npm run polysignal:nba-research:test`.
+7. Confirm NBA markets can be detected from title/slug and that missing
+   structured NBA source notes return `manual_needed`.
+8. Confirm NBA Official Injury Report notes are accepted only as structured,
+   source-backed evidence and that no injuries, teams, odds or schedule context
+   are invented.
 
 ## Estimate Gate Test
 

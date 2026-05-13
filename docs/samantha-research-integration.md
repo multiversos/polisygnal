@@ -337,12 +337,15 @@ trading/copy-trading, ROI/win rate claims, Reddit/social con confiabilidad alta
 y Kalshi no equivalente como senal fuerte. Si el reporte no tiene al menos dos
 senales reales alineadas para el lado sugerido, queda `manual_needed`.
 
-Samantha tambien tiene una primera capa de sports research para soccer en modo
-conservador:
+Samantha tambien tiene una primera capa de sports research para soccer y NBA en
+modo conservador:
 
 - `N:/samantha/src/polysignal/sports-research-contract.js`
 - `N:/samantha/src/polysignal/sports-research-sources.js`
 - `N:/samantha/src/polysignal/sports-research-adapter.js`
+- `N:/samantha/src/polysignal/nba-research-adapter.js`
+- `N:/samantha/src/polysignal/nba-injury-report-source.js`
+- `N:/samantha/src/polysignal/nba-context-signals.js`
 
 Esta capa no hace scraping ni busqueda generica. Si no recibe evidencia
 deportiva estructurada desde una fuente permitida/manual, devuelve
@@ -350,6 +353,14 @@ deportiva estructurada desde una fuente permitida/manual, devuelve
 de equipos y noticias deportivas reputadas. Solo puede ayudar a `completed`
 cuando hay al menos dos senales reales alineadas de confiabilidad media/alta y
 el reporte completo sigue pasando las compuertas de PolySignal.
+
+Para NBA, Samantha detecta mercados por titulo/slug, intenta extraer equipos,
+fecha y tipo de mercado, y prioriza disponibilidad/lesiones desde NBA Official
+Injury Report como fuente oficial. No hay fetch/parser automatico todavia; sin
+nota estructurada segura devuelve `manual_needed` y recomienda revisar NBA
+Official Injury Report, pagina oficial del juego/calendario, updates oficiales
+de equipos y noticias NBA reputadas. Una sola nota de jugador `questionable` o
+`probable` queda informativa y no fuerza porcentaje.
 
 PolySignal sanitiza:
 
