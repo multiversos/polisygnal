@@ -42,6 +42,7 @@ function fixtureTask() {
       },
       market: {
         category: "sports",
+        conditionId: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
         eventSlug: "fixture-event",
         liquidity: 1000,
         marketSlug: "fixture-market",

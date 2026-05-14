@@ -68,7 +68,7 @@ const LAYER_DEFINITIONS: LayerDefinition[] = [
     label: "Samantha Research",
     missing: ["Noticias", "Fuentes oficiales", "Reddit/social como senal debil"],
     status: "blocked",
-    summary: "Brief listo para investigacion externa manual; no hay busqueda externa activa.",
+    summary: "Investigacion externa profunda pendiente; la lectura usa solo fuentes automaticas disponibles.",
   },
   {
     id: "odds_comparison",

@@ -23,7 +23,7 @@ const FORBIDDEN_CLIENT_KEYS = new Set([
   "targetUrl",
   "urlToFetch",
 ]);
-const FULL_WALLET_PATTERN = /0x[a-fA-F0-9]{40}/;
+const FULL_WALLET_PATTERN = /\b0x[a-fA-F0-9]{40}\b/;
 const SECRET_MARKERS = [
   "api_key",
   "authorization:",

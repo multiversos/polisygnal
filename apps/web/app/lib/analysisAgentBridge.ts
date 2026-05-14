@@ -32,7 +32,7 @@ const SECRET_MARKERS = [
   "secret=",
   "token=",
 ] as const;
-const FULL_WALLET_PATTERN = /0x[a-fA-F0-9]{40}/;
+const FULL_WALLET_PATTERN = /\b0x[a-fA-F0-9]{40}\b/;
 const TASK_ID_PATTERN = /^[a-zA-Z0-9._:-]{1,160}$/;
 
 function nowIso(): string {
