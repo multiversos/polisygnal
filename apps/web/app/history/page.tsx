@@ -62,6 +62,8 @@ type HistoryFilter =
   | "unknown";
 
 type SamanthaStatusRouteResult = {
+  agentId?: string;
+  agentName?: string;
   automaticAvailable?: boolean;
   bridgeTaskStatus?: AnalysisHistoryItem["bridgeStatus"];
   fallbackRequired?: boolean;
@@ -148,16 +150,21 @@ function bridgeStatusForItem(item: AnalysisHistoryItem, job?: DeepAnalysisJob | 
   return item.bridgeStatus ?? job?.samanthaBridge?.bridgeStatus;
 }
 
+function agentNameForItem(item: AnalysisHistoryItem, job?: DeepAnalysisJob | null): string {
+  return item.agentName || job?.analysisAgent?.agentName || "Samantha";
+}
+
 function researchStageLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | null): string {
   const bridgeStatus = bridgeStatusForItem(item, job);
+  const agentName = agentNameForItem(item, job);
   if (bridgeStatus === "accepted" || bridgeStatus === "queued") {
-    return "Samantha recibio la tarea";
+    return `${agentName} recibio la tarea`;
   }
   if (bridgeStatus === "pending" || item.researchStatus === "samantha_researching") {
     return "Pendiente de investigacion";
   }
   if (bridgeStatus === "processing") {
-    return "Samantha procesando";
+    return `${agentName} procesando`;
   }
   if (bridgeStatus === "manual_needed") {
     return "Fuente automatica no disponible";
@@ -185,11 +192,12 @@ function researchStageLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | n
 
 function researchSourceLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | null): string {
   const bridgeMode = item.bridgeMode ?? job?.samanthaBridge?.bridgeMode;
+  const agentName = agentNameForItem(item, job);
   if (item.researchStatus === "ready_to_score" || item.researchStatus === "completed") {
-    return "Samantha validada";
+    return `${agentName} validada`;
   }
   if (bridgeMode === "automatic" || bridgeMode === "local") {
-    return "Samantha automatica";
+    return `${agentName} automatica`;
   }
   if (bridgeMode === "manual_fallback" || item.awaitingResearch) {
     return "Lectura parcial automatica";
@@ -490,15 +498,16 @@ export default function HistoryPage() {
   const handleCheckSamanthaStatus = useCallback(async (item: AnalysisHistoryItem) => {
     const job = item.deepAnalysisJobId ? getDeepAnalysisJob(item.deepAnalysisJobId) : null;
     const taskId = bridgeTaskIdForItem(item, job);
+    const fallbackAgentName = agentNameForItem(item, job);
     if (!taskId) {
-      setResolutionMessage("Este analisis no tiene taskId de Samantha guardado. Reabre el enlace para continuar.");
+      setResolutionMessage(`Este analisis no tiene taskId de ${fallbackAgentName} guardado. Reabre el enlace para continuar.`);
       return;
     }
 
     setBusyItemId(item.id);
     setError(null);
     try {
-      const response = await fetch("/api/samantha/research-status", {
+      const response = await fetch("/api/analysis-agent/research-status", {
         body: JSON.stringify({ taskId }),
         cache: "no-store",
         credentials: "omit",
@@ -510,8 +519,9 @@ export default function HistoryPage() {
         redirect: "error",
       });
       const result = (await response.json().catch(() => ({}))) as SamanthaStatusRouteResult;
+      const agentName = result.agentName || fallbackAgentName;
       if (!response.ok) {
-        setResolutionMessage(result.reason || "No pudimos consultar Samantha para este analisis.");
+        setResolutionMessage(result.reason || `No pudimos consultar ${agentName} para este analisis.`);
         return;
       }
 
@@ -521,43 +531,50 @@ export default function HistoryPage() {
         awaitingResearch: true,
         bridgeStatus: result.bridgeTaskStatus ?? item.bridgeStatus,
         bridgeTaskId: result.taskId || taskId,
+        agentId: result.agentId || item.agentId,
+        agentName,
         lastCheckedAt: checkedAt,
         nextCheckHint: "La investigacion externa sigue pendiente; no cuenta para precision.",
         researchStatus: "awaiting_samantha",
         trackingStatus: "analyzing",
       };
-      let message = result.reason || "Samantha mantiene la tarea pendiente.";
+      let message = result.reason || `${agentName} mantiene la tarea pendiente.`;
 
       if (result.report && !nextJob) {
         patch = {
           ...patch,
           bridgeStatus: "completed",
-          nextCheckHint: "Samantha tiene un reporte; reabre el analizador para validarlo contra el job.",
+          nextCheckHint: `${agentName} tiene un reporte; reabre el analizador para validarlo contra el job.`,
           researchStatus: "ready_to_score",
         };
-        message = "Samantha devolvio un reporte, pero falta el job local para cargarlo. Reanaliza el enlace para reconstruir el contexto.";
+        message = `${agentName} devolvio un reporte, pero falta el job local para cargarlo. Reanaliza el enlace para reconstruir el contexto.`;
       } else if (result.report && nextJob) {
-        nextJob = updateDeepAnalysisJob(markJobReceivingSamanthaReport(nextJob)) ?? markJobReceivingSamanthaReport(nextJob);
+        nextJob = updateDeepAnalysisJob(markJobReceivingSamanthaReport(nextJob, {
+          agentId: result.agentId,
+          agentName,
+        })) ?? markJobReceivingSamanthaReport(nextJob, { agentId: result.agentId, agentName });
         nextJob = updateDeepAnalysisJob(markJobValidatingSamanthaReport(nextJob)) ?? markJobValidatingSamanthaReport(nextJob);
         const reportResult = parseSamanthaResearchReport(result.report);
         if (!reportResult.valid || !reportResult.report) {
           nextJob =
             updateDeepAnalysisJob(
               markJobSamanthaBridgeFallback(nextJob, {
+                agentId: result.agentId,
+                agentName,
                 automaticAvailable: true,
                 reason:
                   reportResult.errors[0] ||
-                  "Samantha devolvio un reporte, pero no paso la validacion PolySignal.",
+                  `${agentName} devolvio un reporte, pero no paso la validacion PolySignal.`,
                 warnings: reportResult.errors.slice(0, 4),
               }),
             ) ?? nextJob;
           patch = {
             ...patch,
             bridgeStatus: "manual_needed",
-            nextCheckHint: "Samantha devolvio un reporte invalido; la lectura queda parcial.",
+            nextCheckHint: `${agentName} devolvio un reporte invalido; la lectura queda parcial.`,
             researchStatus: "awaiting_samantha",
           };
-          message = "Samantha devolvio un reporte invalido; la lectura queda parcial.";
+          message = `${agentName} devolvio un reporte invalido; la lectura queda parcial.`;
         } else {
           const polySignalEstimate = buildConservativePolySignalEstimate({
             marketImpliedProbability: getMarketImpliedProbabilities({
@@ -571,6 +588,8 @@ export default function HistoryPage() {
             updateDeepAnalysisJob(
               markJobSamanthaReportLoaded(nextJob, {
                 acceptedEstimate: polySignalEstimate.countsForHistoryAccuracy,
+                agentId: result.agentId,
+                agentName,
                 kalshiEquivalent:
                   reportResult.report.kalshiComparison?.found === true &&
                   reportResult.report.kalshiComparison.equivalent === true,
@@ -634,17 +653,19 @@ export default function HistoryPage() {
                   ? "no_clear_decision"
                   : "analyzing",
           };
-          message = "Reporte de Samantha consultado, validado y cargado.";
+          message = `Reporte de ${agentName} consultado, validado y cargado.`;
         }
       } else if (result.status === "manual_needed" || result.fallbackRequired) {
         if (nextJob) {
           nextJob =
             updateDeepAnalysisJob(
               markJobSamanthaBridgeFallback(nextJob, {
+                agentId: result.agentId,
+                agentName,
                 automaticAvailable: result.automaticAvailable,
                 reason:
                   result.reason ||
-                  "Samantha no pudo completar todas las fuentes automaticas.",
+                  `${agentName} no pudo completar todas las fuentes automaticas.`,
                 warnings: result.warnings ?? result.validationErrors ?? [],
               }),
             ) ?? nextJob;
@@ -656,19 +677,21 @@ export default function HistoryPage() {
           researchStatus: "awaiting_samantha",
         };
         message =
-          "Samantha no pudo completar todas las fuentes automaticas; la lectura queda parcial.";
+          `${agentName} no pudo completar todas las fuentes automaticas; la lectura queda parcial.`;
       } else {
         if (nextJob) {
           nextJob =
             updateDeepAnalysisJob(
               markJobSamanthaResearching(nextJob, {
+                agentId: result.agentId,
+                agentName,
                 bridgeStatus:
                   result.bridgeTaskStatus === "processing"
                     ? "processing"
                     : result.bridgeTaskStatus === "pending"
                       ? "pending"
                       : undefined,
-                reason: result.reason || "Samantha mantiene la tarea en cola.",
+                reason: result.reason || `${agentName} mantiene la tarea en cola.`,
                 taskId: result.taskId || taskId,
               }),
             ) ?? nextJob;
@@ -676,7 +699,7 @@ export default function HistoryPage() {
         patch = {
           ...patch,
           bridgeStatus: result.bridgeTaskStatus ?? "pending",
-          nextCheckHint: "Samantha recibio la tarea; consulta mas tarde o guarda la lectura parcial.",
+          nextCheckHint: `${agentName} recibio la tarea; consulta mas tarde o guarda la lectura parcial.`,
           researchStatus: "samantha_researching",
         };
       }
@@ -686,7 +709,7 @@ export default function HistoryPage() {
       setUpdatedAt(new Date());
       setResolutionMessage(message);
     } catch {
-      setResolutionMessage("No pudimos consultar Samantha de forma segura. La lectura queda parcial.");
+      setResolutionMessage(`No pudimos consultar ${fallbackAgentName} de forma segura. La lectura queda parcial.`);
     } finally {
       setBusyItemId(null);
     }
@@ -1124,6 +1147,7 @@ export default function HistoryPage() {
               const reanalyzeHref = analyzerHrefForItem(item);
               const lifecycle = getAnalysisLifecycleState(item);
               const deepJob = item.deepAnalysisJobId ? getDeepAnalysisJob(item.deepAnalysisJobId) : null;
+              const agentName = agentNameForItem(item, deepJob);
               const bridgeTaskId = bridgeTaskIdForItem(item, deepJob);
               const researchStage = researchStageLabel(item, deepJob);
               const researchSource = researchSourceLabel(item, deepJob);
@@ -1142,10 +1166,10 @@ export default function HistoryPage() {
                         <span className="badge muted">Pendiente de investigacion</span>
                       ) : null}
                       {item.researchStatus === "sending_to_samantha" ? (
-                        <span className="badge muted">Enviando a Samantha</span>
+                        <span className="badge muted">Enviando a {agentName}</span>
                       ) : null}
                       {item.researchStatus === "samantha_researching" ? (
-                        <span className="badge muted">Samantha investigando</span>
+                        <span className="badge muted">{agentName} investigando</span>
                       ) : null}
                       {item.researchStatus === "receiving_samantha_report" || item.researchStatus === "validating_samantha_report" ? (
                         <span className="badge muted">Validando reporte</span>
@@ -1179,8 +1203,8 @@ export default function HistoryPage() {
                     <span>Seguimiento {lifecycle.label}</span>
                     <span>Investigacion {researchStage}</span>
                     <span>Fuente de investigacion {researchSource}</span>
-                    {bridgeTaskId ? <span>Task Samantha {bridgeTaskId}</span> : null}
-                    {item.sentToSamanthaAt ? <span>Enviado a Samantha {formatDate(item.sentToSamanthaAt)}</span> : null}
+                    {bridgeTaskId ? <span>Task {agentName} {bridgeTaskId}</span> : null}
+                    {item.sentToSamanthaAt ? <span>Enviado a {agentName} {formatDate(item.sentToSamanthaAt)}</span> : null}
                     {item.researchBriefReadyAt ? <span>Brief listo {formatDate(item.researchBriefReadyAt)}</span> : null}
                     <span>Fuente {resolutionSourceLabel(item.resolutionSource)}</span>
                     <span>Verificado {item.verifiedAt ? formatDate(item.verifiedAt) : "pendiente"}</span>

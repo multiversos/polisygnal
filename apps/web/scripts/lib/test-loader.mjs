@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { TextDecoder, TextEncoder } from "node:util";
 import vm from "node:vm";
 
 const require = createRequire(import.meta.url);
@@ -65,6 +66,8 @@ export function loadTsModule(relativePath) {
     require: localRequire,
     Response,
     setTimeout,
+    TextDecoder,
+    TextEncoder,
     URL,
     URLSearchParams,
   });

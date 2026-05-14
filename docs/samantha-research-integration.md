@@ -2,8 +2,12 @@
 
 Fecha de corte: `2026-05-13`.
 
-Samantha es el agente externo de investigacion profunda del usuario. No vive en
-este repo y no debe ejecutarse automaticamente desde PolySignal en esta fase.
+Samantha es el primer proveedor del Analysis Agent Bridge. No vive en este repo.
+PolySignal ya no depende internamente de Samantha como unico agente: la capa
+generica puede apuntar a Samantha, Jarvis u otro servicio compatible sin tocar
+`/analyze`.
+
+Ver tambien: `docs/analysis-agent-bridge.md`.
 
 ## Estado actual
 
@@ -20,21 +24,22 @@ Auditoria local:
 - Ese flujo backend puede crear runs, findings, reports o predictions si se
   ejecuta. No se usa para Samantha en este sprint.
 
-Decision de arquitectura:
+Decision de arquitectura actual:
 
-- Integracion v0 por archivo/texto estructurado manual.
-- Camino B preparado: puente automatico server-side seguro, apagado por
-  defecto y con fallback manual obligatorio cuando no esta configurado.
-- PolySignal genera un `SamanthaResearchBrief`.
-- El usuario lo lleva a Samantha fuera de PolySignal.
-- Samantha devuelve un `SamanthaResearchReport`.
-- El usuario pega el reporte en `/analyze`.
-- PolySignal valida, sanitiza y muestra evidencia.
+- Integracion publica: automatica por Analysis Agent Bridge.
+- Samantha queda como proveedor `samantha` por defecto.
+- Variables genericas `ANALYSIS_AGENT_*` tienen prioridad.
+- Variables `SAMANTHA_BRIDGE_*` siguen funcionando como compatibilidad temporal.
+- Si no hay endpoint publico configurado, PolySignal devuelve fallback seguro
+  `unavailable`/`bridge_disabled` y la UI muestra fuente automatica no
+  disponible.
+- El flujo publico no pide cargar reportes, pegar JSON, copiar schema ni
+  preparar evidencia.
 
 No hay scraping, DB writes ni ejecucion directa de procesos de Samantha desde
 PolySignal. El puente automatico solo puede activarse con configuracion
 server-side explicita y allowlisted; sin esa configuracion el producto queda en
-fallback manual.
+lectura parcial automatica, no en flujo manual publico.
 
 ## Auditoria Camino B
 
@@ -71,6 +76,16 @@ entrega evidencia estructurada real y el reporte pasa un contrato espejo
 compatible con PolySignal; sin esa evidencia sigue devolviendo `manual_needed`.
 
 ## Camino B: puente automatico seguro
+
+Desde el sprint del Analysis Agent Bridge, esta capa vive en:
+
+- `apps/web/app/lib/analysisAgentTypes.ts`
+- `apps/web/app/lib/analysisAgentRegistry.ts`
+- `apps/web/app/lib/analysisAgentBridge.ts`
+- `apps/web/app/api/analysis-agent/send-research/route.ts`
+
+La ruta legacy `apps/web/app/api/samantha/send-research/route.ts` queda como
+alias compatible hacia la ruta generica.
 
 Archivos:
 

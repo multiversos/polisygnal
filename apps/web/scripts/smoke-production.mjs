@@ -530,6 +530,8 @@ function validateAnalyzeLoadingPanelSource() {
   const historySource = readFileSync(new URL("../app/history/page.tsx", import.meta.url), "utf8");
   const analyzePage = readFileSync(new URL("../app/analyze/page.tsx", import.meta.url), "utf8");
   const linkSource = readFileSync(new URL("../app/lib/polymarketLink.ts", import.meta.url), "utf8");
+  const analysisAgentBridgeSource = readFileSync(new URL("../app/lib/analysisAgentBridge.ts", import.meta.url), "utf8");
+  const analysisAgentRegistrySource = readFileSync(new URL("../app/lib/analysisAgentRegistry.ts", import.meta.url), "utf8");
   const bridgeSource = readFileSync(new URL("../app/lib/samanthaBridge.ts", import.meta.url), "utf8");
   const envExampleSource = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
   const bridgeRouteSource = readFileSync(new URL("../app/api/samantha/send-research/route.ts", import.meta.url), "utf8");
@@ -540,7 +542,7 @@ function validateAnalyzeLoadingPanelSource() {
     "Detectando mercado",
     "Cargando datos de Polymarket",
     "Revisando billeteras",
-    "Samantha analizando",
+    "${agentName} analizando",
     "Preparando lectura",
   ];
 
@@ -549,7 +551,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("Esto normalmente toma unos segundos."), "analyze progress panel normal wait copy is missing");
   assert(source.includes("Esta tardando mas de lo normal"), "analyze progress panel slow wait copy is missing");
   assert(source.includes("Parece que esta busqueda se quedo esperando respuesta"), "analyze progress panel stalled copy is missing");
-  assert(source.includes("Samantha sigue analizando fuentes automaticas"), "analyze progress panel Samantha automatic pending copy is missing");
+  assert(source.includes("${agentName} sigue analizando fuentes automaticas"), "analyze progress panel dynamic agent pending copy is missing");
   assert(source.includes("Guardar para continuar luego"), "analyze progress panel save recovery action is missing");
   assert(source.includes("Progreso del analisis"), "analyze loading panel should expose human analysis progress state");
   assert(!source.includes("Deep Analysis Job"), "analyze loading panel should not expose technical job title");
@@ -575,7 +577,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("resolvePolymarketLinkForAnalyze"), "analyze page does not resolve links from Polymarket first");
   assert(analyzePage.includes("getPolymarketWalletIntelligence"), "analyze page should use Polymarket-first wallet intelligence");
   assert(!analyzePage.includes("getWalletIntelligenceForMarket"), "analyze page must not use internal market IDs for wallet lookup");
-  assert(analyzePage.includes("/api/samantha/send-research"), "analyze page does not call the safe Samantha bridge route");
+  assert(analyzePage.includes("/api/analysis-agent/send-research"), "analyze page does not call the safe generic analysis agent route");
   assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page does not keep safe partial state when Samantha bridge is unavailable");
   assert(analyzePage.includes("existingBridgeTaskId"), "analyze page should not duplicate Samantha sends when continuing a job");
   assert(analyzePage.includes("progressIssue"), "analyze page does not keep recovery visible after timeout/error");
@@ -601,7 +603,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Resumen del analisis"), "AnalyzerReport missing executive summary");
   assert(reportSource.includes("Progreso del analisis"), "AnalyzerReport missing human progress copy");
   assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport missing accessible deep job state");
-  assert(reportSource.includes("Samantha automatica"), "AnalyzerReport missing automatic Samantha state");
+  assert(reportSource.includes("{analysisAgentName} automatico"), "AnalyzerReport missing dynamic automatic agent state");
   assert(reportSource.includes("Fuente automatica no disponible"), "AnalyzerReport missing automatic-source unavailable state");
   assert(reportSource.includes("Analisis profundo"), "AnalyzerReport missing deep analysis section");
   assert(reportSource.includes("Capas del motor"), "AnalyzerReport missing deep analyzer layers");
@@ -611,18 +613,20 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Guardar y continuar despues"), "AnalyzerReport missing save-and-continue action");
   assert(reportSource.includes("parseSamanthaResearchReport"), "AnalyzerReport missing Samantha report validation");
   assert(reportSource.includes("buildSamanthaTaskPacket"), "AnalyzerReport missing Samantha task packet builder");
-  assert(reportSource.includes("/api/samantha/research-status"), "AnalyzerReport should query Samantha status only through same-origin route");
-  assert(!/fetch\(\s*["']https?:\/\//.test(reportSource), "AnalyzerReport must not call external services for Samantha");
-  assert(bridgeSource.includes("SAMANTHA_BRIDGE_ENABLED"), "Samantha bridge helper must use server-side enablement config");
-  assert(bridgeSource.includes("buildAnalyzeMarketPayload"), "Samantha bridge helper must send automatic market-analysis payloads");
-  assert(bridgeSource.includes('"insufficient_data"'), "Samantha bridge helper must handle insufficient automatic signals");
+  assert(reportSource.includes("/api/analysis-agent/research-status"), "AnalyzerReport should query agent status only through same-origin route");
+  assert(!/fetch\(\s*["']https?:\/\//.test(reportSource), "AnalyzerReport must not call external services for the analysis agent");
+  assert(analysisAgentRegistrySource.includes("ANALYSIS_AGENT_PROVIDER"), "analysis agent registry must use generic provider config");
+  assert(analysisAgentRegistrySource.includes("SAMANTHA_BRIDGE_ENABLED"), "analysis agent registry must preserve legacy Samantha config");
+  assert(analysisAgentBridgeSource.includes("buildAnalysisAgentMarketPayload"), "analysis agent bridge helper must send automatic market-analysis payloads");
+  assert(analysisAgentBridgeSource.includes('"insufficient_data"'), "analysis agent bridge helper must handle insufficient automatic signals");
   assert(envExampleSource.includes("https://<samantha-bridge-host>/polysignal/analyze-market"), "env example must document public HTTPS Samantha bridge URL");
-  assert(bridgeSource.includes("credentials: \"omit\""), "Samantha bridge helper must omit credentials");
-  assert(bridgeSource.includes("redirect: \"error\""), "Samantha bridge helper must reject redirects");
-  assert(bridgeRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha bridge route must reject client destinations");
+  assert(envExampleSource.includes("ANALYSIS_AGENT_PROVIDER=samantha"), "env example must document generic analysis agent config");
+  assert(analysisAgentBridgeSource.includes("credentials: \"omit\""), "analysis agent bridge helper must omit credentials");
+  assert(analysisAgentBridgeSource.includes("redirect: \"error\""), "analysis agent bridge helper must reject redirects");
+  assert(bridgeSource.includes("sendAnalysisAgentResearchTask"), "legacy Samantha bridge helper must delegate to generic bridge");
+  assert(bridgeRouteSource.includes("../../analysis-agent/send-research/route"), "legacy Samantha send route must alias generic route");
   assert(!bridgeRouteSource.includes("request.nextUrl"), "Samantha bridge route must not act as an open proxy");
-  assert(bridgeStatusRouteSource.includes("lookupSamanthaResearchTask"), "Samantha status route must use bridge lookup helper");
-  assert(bridgeStatusRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha status route must reject client destinations");
+  assert(bridgeStatusRouteSource.includes("../../analysis-agent/research-status/route"), "legacy Samantha status route must alias generic route");
   assert(!bridgeStatusRouteSource.includes("SAMANTHA_BRIDGE_TOKEN"), "Samantha status route must not expose bridge token");
   assert(reportSource.includes("Fuentes del analisis"), "AnalyzerReport missing source block");
   assert(reportSource.includes("Que puedes hacer ahora"), "AnalyzerReport missing next actions");

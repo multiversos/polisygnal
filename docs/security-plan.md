@@ -191,6 +191,13 @@ Before expanding real wallet lookups:
 
 ## Samantha Result Lookup Safety
 
+Nota `2026-05-13`: Samantha ahora es proveedor legacy del `Analysis Agent
+Bridge`. La ruta generica es `/api/analysis-agent/research-status`; la ruta
+`/api/samantha/research-status` queda como alias compatible. Las mismas reglas
+aplican para cualquier agente: no destino arbitrario desde cliente, no
+`NEXT_PUBLIC` para tokens, no full wallets, no secretos, no copy-trading y no
+market price como estimacion PolySignal.
+
 `POST /api/samantha/research-status` lets the browser ask PolySignal to check a
 known Samantha task id. It is not a proxy and does not accept destinations from
 the client.

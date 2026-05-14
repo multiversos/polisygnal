@@ -756,7 +756,7 @@ function validateAnalyzeLoadingPanelSource() {
     "Detectando mercado",
     "Cargando datos de Polymarket",
     "Revisando billeteras",
-    "Samantha analizando",
+    "${agentName} analizando",
     "Preparando lectura",
   ];
 
@@ -766,7 +766,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("Esto normalmente toma unos segundos."), "expected normal wait guidance");
   assert(source.includes("Esta tardando mas de lo normal"), "expected slow wait guidance");
   assert(source.includes("Puedes reintentar o revisar el enlace"), "expected retry guidance");
-  assert(source.includes("Samantha sigue analizando fuentes automaticas"), "expected honest Samantha automatic pending state");
+  assert(source.includes("${agentName} sigue analizando fuentes automaticas"), "expected honest dynamic agent automatic pending state");
   assert(source.includes("Guardar para continuar luego"), "expected save-for-later recovery action");
   assert(source.includes("Progreso del analisis"), "expected loading panel to expose human analysis progress state");
   assert(!source.includes("Deep Analysis Job"), "loading panel should not expose technical Deep Analysis Job title");
@@ -806,8 +806,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes('advancePhase("context")'), "expected /analyze loader to enter context phase");
   assert(analyzePage.includes('advancePhase("readiness")'), "expected /analyze loader to enter readiness phase");
   assert(analyzePage.includes('advancePhase("research")'), "expected /analyze loader to enter research phase");
-  assert(analyzePage.includes('advancePhase("preparing_samantha")'), "expected /analyze loader to prepare Samantha task");
-  assert(analyzePage.includes('advancePhase("sending_samantha")'), "expected /analyze loader to try the safe Samantha bridge");
+  assert(analyzePage.includes('advancePhase("preparing_samantha")'), "expected /analyze loader to prepare analysis agent task");
+  assert(analyzePage.includes('advancePhase("sending_samantha")'), "expected /analyze loader to try the safe analysis agent bridge");
+  assert(analyzePage.includes("/api/analysis-agent/send-research"), "expected /analyze to call the generic analysis agent route");
   assert(analyzePage.includes("progressIssue"), "expected /analyze to keep progress recovery visible after timeout or error");
 
   return { phases: expectedSteps.length, recovery_actions: 4, timeout_guard: true };
@@ -823,7 +824,7 @@ function validateAnalyzerReportSource() {
     "Analisis profundo",
     "Capas del motor",
     "Pendiente de integracion",
-    "Samantha automatica",
+    "{analysisAgentName} automatico",
     "Lectura con fuentes disponibles",
     "Fuente automatica no disponible",
     "Actualizar lectura automatica",
@@ -843,8 +844,8 @@ function validateAnalyzerReportSource() {
   assert(analyzePage.includes("AnalyzerReport"), "expected /analyze to render AnalyzerReport");
   assert(source.includes("buildAnalyzerResult"), "expected AnalyzerReport to use unified analyzer result model");
   assert(source.includes("buildDeepAnalysisFromPolymarketMarket"), "expected AnalyzerReport to build deep analyzer readiness");
-  assert(source.includes("buildSamanthaResearchBrief"), "expected AnalyzerReport to build Samantha research briefs");
-  assert(source.includes("buildSamanthaTaskPacket"), "expected AnalyzerReport to build Samantha task packets");
+  assert(source.includes("buildSamanthaResearchBrief"), "expected AnalyzerReport to build compatible research briefs");
+  assert(source.includes("buildSamanthaTaskPacket"), "expected AnalyzerReport to keep legacy-compatible task packets");
   assert(source.includes("buildConservativePolySignalEstimate"), "expected AnalyzerReport to use conservative PolySignal estimate gates");
   assert(source.includes("parseSamanthaResearchReport"), "expected AnalyzerReport to validate Samantha reports locally");
   assert(source.includes("handleValidateSamanthaReport"), "expected AnalyzerReport to validate reports before applying");
@@ -855,8 +856,8 @@ function validateAnalyzerReportSource() {
   assert(source.includes("mergeWalletIntelligenceLayer"), "expected AnalyzerReport to merge wallet layer into deep readiness");
   assert(source.includes("getWalletIntelligenceSummary"), "expected AnalyzerReport to summarize wallet intelligence");
   assert(source.includes("getProbabilityDisplayState"), "expected AnalyzerReport to keep market probability separated");
-  assert(source.includes("/api/samantha/research-status"), "AnalyzerReport should query Samantha status only through same-origin route");
-  assert(!/fetch\(\s*["']https?:\/\//.test(source), "AnalyzerReport must not call external services for Samantha");
+  assert(source.includes("/api/analysis-agent/research-status"), "AnalyzerReport should query agent status only through same-origin route");
+  assert(!/fetch\(\s*["']https?:\/\//.test(source), "AnalyzerReport must not call external services for the analysis agent");
   assert(!source.includes("OpenClaw"), "AnalyzerReport must not try to execute OpenClaw");
   assert(!source.includes("Deep Analysis Job"), "AnalyzerReport should not expose technical Deep Analysis Job title");
   assert(!source.includes(">OK<"), "AnalyzerReport should not expose OK status chip");
@@ -897,6 +898,10 @@ function validateSamanthaResearchRules() {
   const reportTypes = readFileSync(resolve(appRoot, "app/lib/samanthaResearchTypes.ts"), "utf8");
   const reportSource = readFileSync(resolve(appRoot, "app/lib/samanthaResearchReport.ts"), "utf8");
   const taskPacketSource = readFileSync(resolve(appRoot, "app/lib/samanthaTaskPacket.ts"), "utf8");
+  const analysisAgentTypesSource = readFileSync(resolve(appRoot, "app/lib/analysisAgentTypes.ts"), "utf8");
+  const analysisAgentRegistrySource = readFileSync(resolve(appRoot, "app/lib/analysisAgentRegistry.ts"), "utf8");
+  const analysisAgentBridgeSource = readFileSync(resolve(appRoot, "app/lib/analysisAgentBridge.ts"), "utf8");
+  const analysisAgentRouteSource = readFileSync(resolve(appRoot, "app/api/analysis-agent/send-research/route.ts"), "utf8");
   const bridgeTypesSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridgeTypes.ts"), "utf8");
   const bridgeSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridge.ts"), "utf8");
   const envExampleSource = readFileSync(resolve(appRoot, ".env.example"), "utf8");
@@ -974,32 +979,36 @@ function validateSamanthaResearchRules() {
   assert(!/0x[a-fA-F0-9]{40}/.test(taskPacketText), "Samantha task packet must not include full wallet addresses");
   assert(!taskPacketText.toLowerCase().includes("database_url="), "Samantha task packet must not include secrets");
   assert(!taskPacketSource.includes("fetch("), "Samantha task packet builder must not call external services");
-  assert(bridgeTypesSource.includes('"disabled" | "manual_fallback" | "automatic"'), "Samantha bridge types must model disabled/manual/automatic modes");
-  assert(bridgeSource.includes("SAMANTHA_BRIDGE_ENABLED"), "Samantha bridge must read server-side enabled config");
-  assert(bridgeSource.includes("SAMANTHA_BRIDGE_URL"), "Samantha bridge must read server-side endpoint config");
-  assert(bridgeSource.includes("buildAnalyzeMarketPayload"), "Samantha bridge must send automatic market-analysis payloads");
-  assert(bridgeSource.includes("polymarketUrl"), "Samantha bridge payload must include the Polymarket URL");
-  assert(bridgeSource.includes("walletIntelligence"), "Samantha bridge payload must include sanitized Wallet Intelligence context");
-  assert(bridgeSource.includes('"insufficient_data"'), "Samantha bridge must understand insufficient_data responses");
-  assert(bridgeSource.includes("credentials: \"omit\""), "Samantha bridge fetch must omit credentials");
-  assert(bridgeSource.includes("redirect: \"error\""), "Samantha bridge fetch must reject redirects");
-  assert(bridgeSource.includes("endpointIsSafe"), "Samantha bridge must validate configured endpoint");
-  assert(bridgeSource.includes("Private network bridge endpoints are blocked"), "Samantha bridge must block unsafe private endpoints");
-  assert(!bridgeSource.includes("NEXT_PUBLIC"), "Samantha bridge must not use client-exposed env vars");
+  assert(analysisAgentTypesSource.includes("AnalysisAgentProvider"), "generic analysis agent provider contract is missing");
+  assert(analysisAgentTypesSource.includes("AnalysisAgentRequest"), "generic analysis agent request contract is missing");
+  assert(analysisAgentTypesSource.includes("AnalysisAgentResponse"), "generic analysis agent response contract is missing");
+  assert(analysisAgentRegistrySource.includes("ANALYSIS_AGENT_PROVIDER"), "analysis agent registry must read generic provider env");
+  assert(analysisAgentRegistrySource.includes("SAMANTHA_BRIDGE_ENABLED"), "analysis agent registry must keep legacy Samantha env fallback");
+  assert(analysisAgentRegistrySource.includes("usesGenericEnv"), "analysis agent registry must prioritize generic env");
+  assert(analysisAgentBridgeSource.includes("buildAnalysisAgentMarketPayload"), "analysis agent bridge must send automatic market-analysis payloads");
+  assert(analysisAgentBridgeSource.includes("polymarketUrl"), "analysis agent payload must include the Polymarket URL");
+  assert(analysisAgentBridgeSource.includes("walletIntelligence"), "analysis agent payload must include sanitized Wallet Intelligence context");
+  assert(analysisAgentBridgeSource.includes('"insufficient_data"'), "analysis agent bridge must understand insufficient_data responses");
+  assert(analysisAgentBridgeSource.includes("credentials: \"omit\""), "analysis agent bridge fetch must omit credentials");
+  assert(analysisAgentBridgeSource.includes("redirect: \"error\""), "analysis agent bridge fetch must reject redirects");
+  assert(analysisAgentBridgeSource.includes("analysisAgentEndpointIsSafe"), "analysis agent bridge must validate configured endpoint");
+  assert(analysisAgentBridgeSource.includes("Private network analysis agent endpoints are blocked"), "analysis agent bridge must block unsafe private endpoints");
+  assert(!analysisAgentBridgeSource.includes("NEXT_PUBLIC"), "analysis agent bridge must not use client-exposed env vars");
+  assert(bridgeTypesSource.includes('"disabled" | "manual_fallback" | "automatic"'), "legacy Samantha bridge types must still model disabled/manual/automatic modes");
+  assert(bridgeSource.includes("sendAnalysisAgentResearchTask"), "legacy Samantha bridge must delegate to generic analysis agent bridge");
   assert(envExampleSource.includes("https://<samantha-bridge-host>/polysignal/analyze-market"), "env example must document public HTTPS Samantha bridge URL");
+  assert(envExampleSource.includes("ANALYSIS_AGENT_PROVIDER=samantha"), "env example must document generic analysis agent provider");
+  assert(envExampleSource.includes("ANALYSIS_AGENT_URL=https://<agent-host>/polysignal/analyze-market"), "env example must document generic HTTPS analysis agent URL");
   assert(envExampleSource.includes("SAMANTHA_BRIDGE_ALLOW_LOCALHOST=false"), "env example must keep localhost disabled by default");
-  assert(bridgeRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha send route must reject client-provided destinations");
-  assert(bridgeRouteSource.includes("bridgeUrl"), "Samantha send route must block bridgeUrl input");
-  assert(bridgeRouteSource.includes("sendSamanthaResearchTask"), "Samantha send route must use the bridge helper");
-  assert(!bridgeRouteSource.includes("request.nextUrl"), "Samantha send route must not derive destination from request URL");
-  assert(!bridgeRouteSource.includes("rawBody") || !bridgeRouteSource.includes("raw payload"), "Samantha send route must not expose raw payloads");
-  assert(bridgeStatusRouteSource.includes("lookupSamanthaResearchTask"), "Samantha status route must use bridge lookup helper");
-  assert(bridgeStatusRouteSource.includes("FORBIDDEN_CLIENT_KEYS"), "Samantha status route must reject client-provided destinations");
-  assert(bridgeStatusRouteSource.includes("targetUrl"), "Samantha status route must reject URL destinations from the client");
+  assert(analysisAgentRouteSource.includes("handleAnalysisAgentSendResearch"), "generic send route must use shared handler");
+  assert(analysisAgentRouteSource.includes("analysisAgentJsonResponse"), "generic send route must use safe JSON response helper");
+  assert(bridgeRouteSource.includes("../../analysis-agent/send-research/route"), "legacy Samantha send route must alias generic route");
+  assert(!analysisAgentRouteSource.includes("request.nextUrl"), "analysis agent send route must not derive destination from request URL");
+  assert(bridgeStatusRouteSource.includes("../../analysis-agent/research-status/route"), "legacy Samantha status route must alias generic route");
   assert(!bridgeStatusRouteSource.includes("SAMANTHA_BRIDGE_TOKEN"), "Samantha status route must not read or expose bridge token directly");
   assert(historySource.includes("Actualizar lectura automatica"), "history should expose safe Samantha result lookup");
   assert(historySource.includes("updateAnalysisHistoryItem"), "history should update pending research state without raw payloads");
-  assert(analyzePageSource.includes("/api/samantha/send-research"), "analyze page must try the safe Samantha bridge route");
+  assert(analyzePageSource.includes("/api/analysis-agent/send-research"), "analyze page must try the safe generic analysis agent route");
   assert(analyzePageSource.includes("markJobSamanthaBridgeFallback"), "analyze page must keep safe partial state when bridge is unavailable");
   assert(analyzePageSource.includes("markJobSendingToSamantha"), "analyze page must mark sending_to_samantha state");
   assert(analyzePageSource.includes("setSamanthaAutoReportResult"), "analyze page must pass validated automatic reports to the report UI");
@@ -1509,12 +1518,12 @@ function validateDeepAnalysisJobRules() {
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
   assert(reportSource.includes("Progreso del analisis"), "AnalyzerReport should show human progress copy");
   assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport should expose an accessible job-state label");
-  assert(reportSource.includes("Samantha automatica"), "AnalyzerReport should show automatic Samantha state");
+  assert(reportSource.includes("{analysisAgentName} automatico"), "AnalyzerReport should show dynamic automatic agent state");
   assert(reportSource.includes("Fuente automatica no disponible"), "AnalyzerReport should show unavailable automatic source state");
   assert(reportSource.includes("NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS"), "AnalyzerReport should gate manual tools behind debug flag");
   assert(reportSource.includes("markJobSamanthaReportLoaded"), "AnalyzerReport should merge Samantha report into the job");
   assert(historySource.includes("Continuar analisis"), "history should let users continue pending deep research");
-  assert(historySource.includes("/api/samantha/research-status"), "history should query Samantha status through same-origin route");
+  assert(historySource.includes("/api/samantha/research-status") || historySource.includes("/api/analysis-agent/research-status"), "history should query agent status through same-origin route");
   assert(historySource.includes("manual_needed"), "history should show manual_needed as a continuation state");
   assert(!historySource.includes("Cargar reporte manual"), "history should not expose manual report upload as a public action");
   assert(!historySource.includes("Necesita reporte manual"), "history should not label pending Samantha as manual report needed");

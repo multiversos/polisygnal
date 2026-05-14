@@ -66,11 +66,13 @@ Use these checks after a production deploy. Correct domains:
    response and does not expose backend hostnames, connection strings, or stack
    traces.
 6. Confirm `/internal/data-status` is still not linked from public navigation.
-7. Confirm `POST /api/samantha/send-research` without server-side bridge
-   configuration returns a controlled manual-fallback response, not a stack
+7. Confirm `POST /api/analysis-agent/send-research` without server-side bridge
+   configuration returns a controlled unavailable/fallback response, not a stack
    trace and not a proxy to a user-provided URL.
-8. Confirm `POST /api/samantha/research-status` accepts only a bounded `taskId`
-   body and never accepts client-provided bridge/destination URLs.
+8. Confirm legacy `POST /api/samantha/send-research` still behaves as an alias
+   of the generic agent route.
+9. Confirm `POST /api/analysis-agent/research-status` accepts only a bounded
+   `taskId` body and never accepts client-provided bridge/destination URLs.
 
 ## Local Privacy
 
@@ -93,6 +95,11 @@ Use these checks after a production deploy. Correct domains:
    automatica` when a task id exists. It must not offer manual report upload.
 9. Confirm `manual_needed`, `pending`, `processing`, or `accepted` research
    states do not appear as completed and do not count as precision.
+10. Confirm `/analyze` shows the active Analysis Agent name in progress. With
+    current production config this can still be Samantha; with future Jarvis
+    config it should say Jarvis without changing `/analyze`.
+11. Confirm that agent unavailable states say fuente automatica no disponible or
+    lectura parcial, not cargar reporte, JSON, schema or brief.
 
 ## Visual Polish
 

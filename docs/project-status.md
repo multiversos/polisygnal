@@ -75,6 +75,16 @@ Estado visible verificado:
   Polymarket/Gamma por slug de evento o mercado, y despues el usuario confirma
   un mercado antes de ejecutar el analisis profundo. Esto evita abrir multiples
   fichas completas para mercados relacionados pero incorrectos.
+- `/analyze` ahora llama al agente externo mediante `Analysis Agent Bridge`.
+  Samantha es el primer proveedor, pero la arquitectura permite cambiar a
+  Jarvis, `custom` u otro servicio compatible con variables `ANALYSIS_AGENT_*`
+  sin reescribir `/analyze`. Las rutas legacy `/api/samantha/*` siguen como
+  alias compatibles.
+- Produccion puede seguir mostrando `bridge_disabled`/fuente automatica no
+  disponible hasta que exista un endpoint HTTPS publico de Samantha o de otro
+  agente y Vercel tenga `ANALYSIS_AGENT_ENABLED`, `ANALYSIS_AGENT_URL` y
+  `ANALYSIS_AGENT_TOKEN` configuradas. Esto no debe romper smoke production ni
+  activar flujo manual publico.
 - Regla nueva de arquitectura: los mercados internos de PolySignal no son la
   fuente principal del Analizador de enlaces. Si Polymarket/Gamma no devuelve
   un evento o mercado, `/analyze` muestra un no-match honesto y no busca una

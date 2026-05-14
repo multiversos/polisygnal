@@ -92,6 +92,7 @@ type AnalyzeMarketItem = MarketOverviewItem & {
 };
 
 type AnalyzerReportProps = {
+  analysisAgentName?: string;
   busy: boolean;
   deepAnalysisJob?: DeepAnalysisJob | null;
   initialSamanthaReportResult?: SamanthaResearchParseResult | null;
@@ -107,6 +108,8 @@ type AnalyzerReportProps = {
 };
 
 type SamanthaStatusRouteResult = {
+  agentId?: string;
+  agentName?: string;
   automaticAvailable?: boolean;
   bridgeTaskStatus?: string;
   fallbackRequired?: boolean;
@@ -126,7 +129,7 @@ async function fetchSamanthaStatus(taskId: string): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), SAMANTHA_STATUS_TIMEOUT_MS);
   try {
-    return await fetch("/api/samantha/research-status", {
+    return await fetch("/api/analysis-agent/research-status", {
       body: JSON.stringify({ taskId }),
       cache: "no-store",
       credentials: "omit",
@@ -392,6 +395,7 @@ function AnalyzerLayerDetails({
 }
 
 export function AnalyzerReport({
+  analysisAgentName = "Samantha",
   busy,
   deepAnalysisJob,
   initialSamanthaReportResult,
@@ -480,12 +484,12 @@ export function AnalyzerReport({
         ? "En curso"
         : "Preparando lectura";
   const samanthaAutomaticCopy = samanthaReport
-    ? "Samantha devolvio una lectura estructurada que paso la validacion de PolySignal."
+    ? `${analysisAgentName} devolvio una lectura estructurada que paso la validacion de PolySignal.`
     : samanthaAutomaticUnavailable
-      ? "Samantha no pudo completar todas las fuentes automaticas. PolySignal mantiene una lectura parcial con Polymarket y Wallet Intelligence disponibles."
+      ? `${analysisAgentName} no pudo completar todas las fuentes automaticas. PolySignal mantiene una lectura parcial con Polymarket y Wallet Intelligence disponibles.`
       : samanthaBridgeTaskId
-        ? "Samantha esta trabajando desde el puente automatico seguro. Puedes guardar esta lectura y volver despues."
-        : "PolySignal preparo contexto seguro para Samantha. Si el puente automatico no responde, la lectura queda parcial sin pedir carga manual.";
+        ? `${analysisAgentName} esta trabajando desde el puente automatico seguro. Puedes guardar esta lectura y volver despues.`
+        : `PolySignal preparo contexto seguro para ${analysisAgentName}. Si el puente automatico no responde, la lectura queda parcial sin pedir carga manual.`;
   const samanthaEstimateAccepted = samanthaReport ? shouldAcceptSuggestedEstimate(samanthaReport) : false;
   const polySignalEstimate = buildConservativePolySignalEstimate({
     marketImpliedProbability: probabilityState.market,
@@ -580,18 +584,18 @@ export function AnalyzerReport({
     setSamanthaReportResult(initialSamanthaReportResult.valid ? initialSamanthaReportResult : null);
     setSamanthaActionMessage(
       initialSamanthaReportResult.valid
-        ? "Reporte automatico de Samantha validado y cargado."
-        : "Samantha devolvio un reporte, pero no paso la validacion.",
+        ? `Reporte automatico de ${analysisAgentName} validado y cargado.`
+        : `${analysisAgentName} devolvio un reporte, pero no paso la validacion.`,
     );
-  }, [initialSamanthaReportResult]);
+  }, [analysisAgentName, initialSamanthaReportResult]);
 
   function handleValidateSamanthaReport() {
     const result = parseSamanthaResearchReport(samanthaReportInput);
     setSamanthaReportDraftResult(result);
     setSamanthaActionMessage(
       result.valid
-        ? "Reporte de Samantha valido. Revisa el resumen y aplicalo al analisis."
-        : "El reporte de Samantha no paso la validacion.",
+        ? `Reporte de ${analysisAgentName} valido. Revisa el resumen y aplicalo al analisis.`
+        : `El reporte de ${analysisAgentName} no paso la validacion.`,
     );
   }
 
@@ -602,7 +606,7 @@ export function AnalyzerReport({
         : parseSamanthaResearchReport(samanthaReportInput);
     setSamanthaReportDraftResult(result);
     if (!result.valid || !result.report) {
-      setSamanthaActionMessage("Primero corrige el reporte de Samantha.");
+      setSamanthaActionMessage(`Primero corrige el reporte de ${analysisAgentName}.`);
       return;
     }
     setSamanthaReportResult(result);
@@ -614,6 +618,7 @@ export function AnalyzerReport({
       });
       const nextJob = markJobSamanthaReportLoaded(deepAnalysisJob, {
         acceptedEstimate: nextEstimate.countsForHistoryAccuracy,
+        agentName: analysisAgentName,
         kalshiEquivalent: result.report.kalshiComparison?.found === true && result.report.kalshiComparison.equivalent === true,
         oddsFound: result.report.oddsComparison?.found === true,
         reportStatus: result.report.status,
@@ -627,19 +632,23 @@ export function AnalyzerReport({
 
   async function handleCheckSamanthaStatus() {
     if (!samanthaBridgeTaskId || !deepAnalysisJob) {
-      setSamanthaActionMessage("Todavia no hay una tarea automatica de Samantha para consultar.");
+      setSamanthaActionMessage(`Todavia no hay una tarea automatica de ${analysisAgentName} para consultar.`);
       return;
     }
     setSamanthaLookupBusy(true);
     try {
       const response = await fetchSamanthaStatus(samanthaBridgeTaskId);
       const result = (await response.json().catch(() => ({}))) as SamanthaStatusRouteResult;
+      const resultAgentName = result.agentName || analysisAgentName;
       if (!response.ok) {
-        setSamanthaActionMessage(result.reason || "No pudimos consultar el estado de Samantha.");
+        setSamanthaActionMessage(result.reason || `No pudimos consultar el estado de ${resultAgentName}.`);
         return;
       }
       if (result.report) {
-        let nextJob = updateDeepAnalysisJob(markJobReceivingSamanthaReport(deepAnalysisJob)) ?? markJobReceivingSamanthaReport(deepAnalysisJob);
+        let nextJob = updateDeepAnalysisJob(markJobReceivingSamanthaReport(deepAnalysisJob, {
+          agentId: result.agentId,
+          agentName: resultAgentName,
+        })) ?? markJobReceivingSamanthaReport(deepAnalysisJob, { agentId: result.agentId, agentName: resultAgentName });
         nextJob = updateDeepAnalysisJob(markJobValidatingSamanthaReport(nextJob)) ?? markJobValidatingSamanthaReport(nextJob);
         const reportResult = parseSamanthaResearchReport(result.report);
         setSamanthaReportDraftResult(reportResult);
@@ -647,15 +656,17 @@ export function AnalyzerReport({
           nextJob =
             updateDeepAnalysisJob(
               markJobSamanthaBridgeFallback(nextJob, {
+                agentId: result.agentId,
+                agentName: resultAgentName,
                 automaticAvailable: true,
                 reason:
                   reportResult.errors[0] ||
-                  "Samantha devolvio un reporte, pero no paso la validacion PolySignal.",
+                  `${resultAgentName} devolvio un reporte, pero no paso la validacion PolySignal.`,
                 warnings: reportResult.errors.slice(0, 4),
               }),
             ) ?? nextJob;
           onDeepAnalysisJobChange?.(nextJob);
-          setSamanthaActionMessage("Samantha devolvio un reporte invalido; la lectura queda parcial.");
+          setSamanthaActionMessage(`${resultAgentName} devolvio un reporte invalido; la lectura queda parcial.`);
           return;
         }
         setSamanthaReportResult(reportResult);
@@ -668,6 +679,8 @@ export function AnalyzerReport({
           updateDeepAnalysisJob(
             markJobSamanthaReportLoaded(nextJob, {
               acceptedEstimate: nextEstimate.countsForHistoryAccuracy,
+              agentId: result.agentId,
+              agentName: resultAgentName,
               kalshiEquivalent:
                 reportResult.report.kalshiComparison?.found === true &&
                 reportResult.report.kalshiComparison.equivalent === true,
@@ -677,29 +690,33 @@ export function AnalyzerReport({
             }),
           ) ?? nextJob;
         onDeepAnalysisJobChange?.(nextJob);
-        setSamanthaActionMessage("Reporte de Samantha consultado, validado y cargado.");
+        setSamanthaActionMessage(`Reporte de ${resultAgentName} consultado, validado y cargado.`);
         return;
       }
       if (result.status === "manual_needed" || result.fallbackRequired) {
         const nextJob =
           updateDeepAnalysisJob(
             markJobSamanthaBridgeFallback(deepAnalysisJob, {
+              agentId: result.agentId,
+              agentName: resultAgentName,
               automaticAvailable: result.automaticAvailable,
               reason:
                 result.reason ||
-                "Samantha no pudo completar todas las fuentes automaticas.",
+                `${resultAgentName} no pudo completar todas las fuentes automaticas.`,
               warnings: result.warnings ?? result.validationErrors ?? [],
             }),
           ) ?? deepAnalysisJob;
         onDeepAnalysisJobChange?.(nextJob);
         setSamanthaActionMessage(
-          "Samantha no pudo completar todas las fuentes automaticas; la lectura queda parcial.",
+          `${resultAgentName} no pudo completar todas las fuentes automaticas; la lectura queda parcial.`,
         );
         return;
       }
       const nextJob =
         updateDeepAnalysisJob(
           markJobSamanthaResearching(deepAnalysisJob, {
+            agentId: result.agentId,
+            agentName: resultAgentName,
             bridgeStatus:
               result.bridgeTaskStatus === "processing"
                 ? "processing"
@@ -708,14 +725,14 @@ export function AnalyzerReport({
                   : undefined,
             reason:
               result.reason ||
-              "Samantha mantiene la tarea en cola; la investigacion sigue pendiente.",
+              `${resultAgentName} mantiene la tarea en cola; la investigacion sigue pendiente.`,
             taskId: result.taskId || samanthaBridgeTaskId,
           }),
         ) ?? deepAnalysisJob;
       onDeepAnalysisJobChange?.(nextJob);
-      setSamanthaActionMessage(result.reason || "Samantha todavia no devolvio un reporte.");
+      setSamanthaActionMessage(result.reason || `${resultAgentName} todavia no devolvio un reporte.`);
     } catch {
-      setSamanthaActionMessage("Samantha esta tardando mas de lo normal. Puedes volver a consultar o guardar la lectura parcial.");
+      setSamanthaActionMessage(`${analysisAgentName} esta tardando mas de lo normal. Puedes volver a consultar o guardar la lectura parcial.`);
     } finally {
       setSamanthaLookupBusy(false);
     }
@@ -1050,10 +1067,10 @@ export function AnalyzerReport({
       </section>
 
       {!SHOW_ANALYZER_DEBUG_TOOLS ? (
-        <section className="samantha-research-panel" aria-label="Analisis automatico de Samantha">
+        <section className="samantha-research-panel" aria-label={`Analisis automatico de ${analysisAgentName}`}>
           <div className="probability-display-heading">
             <div>
-              <p className="eyebrow">Samantha automatica</p>
+              <p className="eyebrow">{analysisAgentName} automatico</p>
               <h4>Lectura con fuentes disponibles</h4>
             </div>
             <span>{samanthaAutomaticStatus}</span>
@@ -1069,7 +1086,7 @@ export function AnalyzerReport({
               <strong>{walletSummary.available ? "Revisada" : "No disponible"}</strong>
             </div>
             <div>
-              <span>Samantha</span>
+              <span>{analysisAgentName}</span>
               <strong>{samanthaAutomaticStatus}</strong>
             </div>
             <div>

@@ -61,6 +61,13 @@ export type AnalysisHistoryBridgeStatus =
   | "pending"
   | "processing"
   | "queued";
+export type AnalysisHistoryAgentStatus =
+  | "completed"
+  | "failed_safe"
+  | "insufficient_data"
+  | "partial"
+  | "researching"
+  | "unavailable";
 
 export type AnalysisHistoryAnalyzerLayer = {
   id: string;
@@ -118,6 +125,9 @@ export type AnalysisHistorySignalContribution = {
 export type AnalysisHistoryItem = {
   analyzedAt: string;
   analyzerLayers?: AnalysisHistoryAnalyzerLayer[];
+  agentId?: string;
+  agentName?: string;
+  agentStatus?: AnalysisHistoryAgentStatus;
   awaitingResearch?: boolean;
   bridgeMode?: AnalysisHistoryBridgeMode;
   bridgeStatus?: AnalysisHistoryBridgeStatus;
@@ -405,6 +415,20 @@ function normalizeBridgeStatus(value: unknown): AnalysisHistoryBridgeStatus | un
   return undefined;
 }
 
+function normalizeAgentStatus(value: unknown): AnalysisHistoryAgentStatus | undefined {
+  if (
+    value === "completed" ||
+    value === "failed_safe" ||
+    value === "insufficient_data" ||
+    value === "partial" ||
+    value === "researching" ||
+    value === "unavailable"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
 function normalizeMarketOutcomes(value: unknown): AnalysisHistoryMarketOutcome[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
@@ -656,6 +680,9 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
   return {
     analyzedAt: value.analyzedAt || nowIso(),
     analyzerLayers: normalizeAnalyzerLayers(value.analyzerLayers),
+    agentId: normalizeString(value.agentId, 80),
+    agentName: normalizeString(value.agentName, 80),
+    agentStatus: normalizeAgentStatus(value.agentStatus),
     awaitingResearch: value.awaitingResearch === true,
     bridgeMode: normalizeBridgeMode(value.bridgeMode),
     bridgeStatus: normalizeBridgeStatus(value.bridgeStatus),

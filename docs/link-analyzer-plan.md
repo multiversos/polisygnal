@@ -1,5 +1,18 @@
 # Link Analyzer Roadmap
 
+## Analysis Agent Bridge
+
+Actualizacion `2026-05-13`: despues de resolver un enlace y cargar Wallet
+Intelligence, `/analyze` llama a `/api/analysis-agent/send-research`. Samantha
+queda como proveedor inicial, pero la ruta y el helper son genericos. Para
+cambiar a Jarvis u otro agente se configuran `ANALYSIS_AGENT_PROVIDER`,
+`ANALYSIS_AGENT_ENABLED`, `ANALYSIS_AGENT_URL`, `ANALYSIS_AGENT_TOKEN` y
+`ANALYSIS_AGENT_DISPLAY_NAME`; no se cambia `/analyze`.
+
+Si el agente no esta desplegado o no hay envs en Vercel, la experiencia publica
+mantiene fuente automatica no disponible/lectura parcial y no muestra JSON,
+schema, carga manual ni instrucciones de reporte.
+
 ## Phase 1: Current Local Experience
 
 Implemented as a frontend flow plus a same-origin read-only resolver route.

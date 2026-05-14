@@ -54,6 +54,11 @@ export type DeepAnalysisJob = {
   eventSlug?: string;
   marketSlug?: string;
   steps: DeepAnalysisJobStep[];
+  analysisAgent?: {
+    agentId?: string;
+    agentName?: string;
+    status?: "completed" | "failed_safe" | "insufficient_data" | "partial" | "researching" | "unavailable";
+  };
   briefReady?: boolean;
   samanthaBridge?: {
     automaticAvailable?: boolean;
@@ -284,26 +289,44 @@ export function markJobWalletsAnalyzed(
   });
 }
 
-export function markJobSamanthaBriefReady(job: DeepAnalysisJob): DeepAnalysisJob {
+export function markJobSamanthaBriefReady(
+  job: DeepAnalysisJob,
+  input: { agentId?: string; agentName?: string } = {},
+): DeepAnalysisJob {
+  const agentName = input.agentName || job.analysisAgent?.agentName || "Samantha";
   const next = updateDeepAnalysisJobStep(job, "preparing_samantha_research", {
     status: "completed",
-    summary: "Contexto de Samantha listo para el puente automatico seguro.",
+    summary: `Contexto de ${agentName} listo para el puente automatico seguro.`,
   });
   return {
     ...next,
+    analysisAgent: {
+      agentId: input.agentId ?? next.analysisAgent?.agentId ?? "samantha",
+      agentName,
+      status: next.analysisAgent?.status,
+    },
     briefReady: true,
   };
 }
 
-export function markJobSendingToSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
+export function markJobSendingToSamantha(
+  job: DeepAnalysisJob,
+  input: { agentId?: string; agentName?: string } = {},
+): DeepAnalysisJob {
   const timestamp = nowIso();
+  const agentName = input.agentName || job.analysisAgent?.agentName || "Samantha";
   const next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
     requiresExternalIntegration: true,
     status: "running",
-    summary: "Enviando contexto a Samantha mediante el puente automatico configurado.",
+    summary: `Enviando contexto a ${agentName} mediante el puente automatico configurado.`,
   });
   return {
     ...next,
+    analysisAgent: {
+      agentId: input.agentId ?? next.analysisAgent?.agentId ?? "samantha",
+      agentName,
+      status: "researching",
+    },
     resultReady: false,
     samanthaBridge: {
       automaticAvailable: true,
@@ -321,15 +344,21 @@ export function markJobSendingToSamantha(job: DeepAnalysisJob): DeepAnalysisJob 
 
 export function markJobSamanthaResearching(
   job: DeepAnalysisJob,
-  input: { bridgeStatus?: "accepted" | "pending" | "processing" | "queued"; reason?: string; taskId?: string },
+  input: { agentId?: string; agentName?: string; bridgeStatus?: "accepted" | "pending" | "processing" | "queued"; reason?: string; taskId?: string },
 ): DeepAnalysisJob {
+  const agentName = input.agentName || job.analysisAgent?.agentName || "Samantha";
   const next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
     requiresExternalIntegration: true,
     status: "running",
-    summary: input.reason || "Samantha recibio la tarea y la investigacion externa sigue pendiente.",
+    summary: input.reason || `${agentName} recibio la tarea y la investigacion externa sigue pendiente.`,
   });
   return {
     ...next,
+    analysisAgent: {
+      agentId: input.agentId ?? next.analysisAgent?.agentId ?? "samantha",
+      agentName,
+      status: "researching",
+    },
     resultReady: false,
     samanthaBridge: {
       automaticAvailable: true,
@@ -347,13 +376,22 @@ export function markJobSamanthaResearching(
   };
 }
 
-export function markJobReceivingSamanthaReport(job: DeepAnalysisJob): DeepAnalysisJob {
+export function markJobReceivingSamanthaReport(
+  job: DeepAnalysisJob,
+  input: { agentId?: string; agentName?: string } = {},
+): DeepAnalysisJob {
+  const agentName = input.agentName || job.analysisAgent?.agentName || "Samantha";
   const next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
     status: "running",
-    summary: "Reporte candidato recibido desde Samantha; pendiente de validacion PolySignal.",
+    summary: `Reporte candidato recibido desde ${agentName}; pendiente de validacion PolySignal.`,
   });
   return {
     ...next,
+    analysisAgent: {
+      agentId: input.agentId ?? next.analysisAgent?.agentId ?? "samantha",
+      agentName,
+      status: "partial",
+    },
     resultReady: false,
     samanthaBridge: {
       ...next.samanthaBridge,
@@ -383,17 +421,23 @@ export function markJobValidatingSamanthaReport(job: DeepAnalysisJob): DeepAnaly
 
 export function markJobSamanthaBridgeFallback(
   job: DeepAnalysisJob,
-  input: { automaticAvailable?: boolean; reason: string; warnings?: string[] },
+  input: { agentId?: string; agentName?: string; automaticAvailable?: boolean; reason: string; warnings?: string[] },
 ): DeepAnalysisJob {
+  const agentName = input.agentName || job.analysisAgent?.agentName || "Samantha";
   let next = markJobAwaitingSamantha(job);
   next = updateDeepAnalysisJobStep(next, "awaiting_samantha_report", {
     requiresExternalIntegration: true,
     status: "running",
-    summary: input.reason || "Samantha automatica no esta conectada todavia.",
+    summary: input.reason || `${agentName} automatico no esta conectado todavia.`,
     warnings: input.warnings ?? [],
   });
   return {
     ...next,
+    analysisAgent: {
+      agentId: input.agentId ?? next.analysisAgent?.agentId ?? "samantha",
+      agentName,
+      status: input.automaticAvailable ? "failed_safe" : "unavailable",
+    },
     samanthaBridge: {
       ...next.samanthaBridge,
       automaticAvailable: Boolean(input.automaticAvailable),
@@ -408,7 +452,11 @@ export function markJobSamanthaBridgeFallback(
   };
 }
 
-export function markJobAwaitingSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
+export function markJobAwaitingSamantha(
+  job: DeepAnalysisJob,
+  input: { agentId?: string; agentName?: string } = {},
+): DeepAnalysisJob {
+  const agentName = input.agentName || job.analysisAgent?.agentName || "Samantha";
   let next = updateDeepAnalysisJobStep(job, "profiling_wallets", {
     status: "blocked",
     summary: "Perfil historico de wallets pendiente de fuente estructurada confiable.",
@@ -417,7 +465,7 @@ export function markJobAwaitingSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
   next = updateDeepAnalysisJobStep(next, "awaiting_samantha_report", {
     requiresExternalIntegration: true,
     status: "running",
-    summary: "Esperando respuesta automatica de Samantha o una fuente segura disponible.",
+    summary: `Esperando respuesta automatica de ${agentName} o una fuente segura disponible.`,
   });
   next = updateDeepAnalysisJobStep(next, "checking_odds", {
     status: "blocked",
@@ -429,6 +477,11 @@ export function markJobAwaitingSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
   });
   return {
     ...next,
+    analysisAgent: {
+      agentId: input.agentId ?? next.analysisAgent?.agentId ?? "samantha",
+      agentName,
+      status: "unavailable",
+    },
     briefReady: true,
     resultReady: false,
     samanthaBridge: next.samanthaBridge ?? {
@@ -438,7 +491,7 @@ export function markJobAwaitingSamantha(job: DeepAnalysisJob): DeepAnalysisJob {
       fallbackRequired: true,
       fallbackAvailable: true,
       lastAttemptAt: nowIso(),
-      reason: "Samantha automatica no esta conectada todavia.",
+      reason: `${agentName} automatico no esta conectado todavia.`,
       status: "not_configured",
     },
     status: "awaiting_samantha",
@@ -449,15 +502,18 @@ export function markJobSamanthaReportLoaded(
   job: DeepAnalysisJob,
   input: {
     acceptedEstimate: boolean;
+    agentId?: string;
+    agentName?: string;
     kalshiEquivalent?: boolean;
     oddsFound?: boolean;
     reportStatus?: "completed" | "failed" | "partial";
     signalCount: number;
   },
 ): DeepAnalysisJob {
+  const agentName = input.agentName || job.analysisAgent?.agentName || "Samantha";
   let next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
     status: "completed",
-    summary: "Reporte de Samantha cargado y validado localmente.",
+    summary: `Reporte de ${agentName} cargado y validado localmente.`,
   });
   next = updateDeepAnalysisJobStep(next, "checking_odds", {
     status: input.oddsFound ? "completed" : "blocked",
@@ -489,6 +545,11 @@ export function markJobSamanthaReportLoaded(
   }
   return {
     ...next,
+    analysisAgent: {
+      agentId: input.agentId ?? next.analysisAgent?.agentId ?? "samantha",
+      agentName,
+      status: input.reportStatus === "failed" ? "failed_safe" : input.acceptedEstimate ? "completed" : "partial",
+    },
     resultReady: input.acceptedEstimate,
     samanthaReportLoaded: true,
     status:
@@ -558,19 +619,21 @@ export function getJobProgressSummary(job: DeepAnalysisJob): DeepAnalysisJobSumm
     };
   }
   if (job.status === "sending_to_samantha") {
+    const agentName = job.analysisAgent?.agentName || "Samantha";
     return {
       completedSteps,
-      detail: "PolySignal esta enviando la tarea a Samantha desde el endpoint seguro configurado.",
-      headline: "Enviando a Samantha",
+      detail: `PolySignal esta enviando la tarea a ${agentName} desde el endpoint seguro configurado.`,
+      headline: `Enviando a ${agentName}`,
       nextAction: "Mantener abierto el analisis o guardarlo como lectura parcial si tarda demasiado.",
       totalSteps,
     };
   }
   if (job.status === "samantha_researching") {
+    const agentName = job.analysisAgent?.agentName || "Samantha";
     return {
       completedSteps,
-      detail: job.samanthaBridge?.reason || "Samantha recibio la tarea y la investigacion externa sigue pendiente.",
-      headline: "Samantha investigando",
+      detail: job.samanthaBridge?.reason || `${agentName} recibio la tarea y la investigacion externa sigue pendiente.`,
+      headline: `${agentName} investigando`,
       nextAction: "Esperar respuesta automatica o guardar esta lectura para volver despues.",
       totalSteps,
     };
@@ -585,11 +648,12 @@ export function getJobProgressSummary(job: DeepAnalysisJob): DeepAnalysisJobSumm
     };
   }
   if (job.status === "awaiting_samantha") {
+    const agentName = job.analysisAgent?.agentName || "Samantha";
     return {
       completedSteps,
       detail: job.samanthaBridge?.reason || "PolySignal leyo Polymarket, reviso capas disponibles y preparo el brief externo.",
       headline: "Analisis profundo iniciado",
-      nextAction: "Guardar como lectura parcial o reintentar cuando Samantha automatica este disponible.",
+      nextAction: `Guardar como lectura parcial o reintentar cuando ${agentName} automatico este disponible.`,
       totalSteps,
     };
   }

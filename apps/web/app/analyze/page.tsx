@@ -154,7 +154,9 @@ type SearchState =
       status: "result";
     };
 
-type SamanthaBridgeRouteResult = {
+type AnalysisAgentRouteResult = {
+  agentId?: string;
+  agentName?: string;
   automaticAvailable?: boolean;
   fallbackRequired?: boolean;
   reason?: string;
@@ -165,9 +167,15 @@ type SamanthaBridgeRouteResult = {
   warnings?: string[];
 };
 
+type AnalysisAgentConfigRouteResult = {
+  agentId?: string;
+  agentName?: string;
+  enabled?: boolean;
+};
+
 const LINK_RESOLVE_TIMEOUT_MS = 45_000;
 const WALLET_INTELLIGENCE_TIMEOUT_MS = 45_000;
-const SAMANTHA_BRIDGE_TIMEOUT_MS = 45_000;
+const ANALYSIS_AGENT_TIMEOUT_MS = 45_000;
 
 class AnalyzeRequestTimeoutError extends Error {
   constructor(label: string) {
@@ -621,6 +629,9 @@ function historyPayloadFromMarket(
           : "Sin estimacion PolySignal suficiente.",
     evaluationStatus: decision.evaluationStatus,
     awaitingResearch: jobAwaitsResearch(deepJob),
+    agentId: deepJob?.analysisAgent?.agentId,
+    agentName: deepJob?.analysisAgent?.agentName,
+    agentStatus: deepJob?.analysisAgent?.status,
     bridgeMode: deepJob?.samanthaBridge?.bridgeMode,
     bridgeStatus: deepJob?.samanthaBridge?.bridgeStatus,
     bridgeTaskId: deepJob?.samanthaBridge?.bridgeTaskId ?? deepJob?.samanthaBridge?.taskId,
@@ -1567,6 +1578,7 @@ export default function AnalyzePage() {
   const [savedHistoryKeys, setSavedHistoryKeys] = useState<Set<string>>(new Set());
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
   const [deepAnalysisJob, setDeepAnalysisJob] = useState<DeepAnalysisJob | null>(null);
+  const [analysisAgent, setAnalysisAgent] = useState({ id: "samantha", name: "Samantha" });
   const [samanthaAutoReportResult, setSamanthaAutoReportResult] =
     useState<SamanthaResearchParseResult | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -1584,6 +1596,31 @@ export default function AnalyzePage() {
 
   useEffect(() => {
     void fetchWatchlistItems().then(setWatchlistItems);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    void fetch("/api/analysis-agent/config", {
+      cache: "no-store",
+      credentials: "omit",
+      headers: { Accept: "application/json" },
+      method: "GET",
+      redirect: "error",
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((config: AnalysisAgentConfigRouteResult | null) => {
+        if (!mounted || !config) {
+          return;
+        }
+        setAnalysisAgent({
+          id: config.agentId || "samantha",
+          name: config.agentName || "Samantha",
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -1668,7 +1705,7 @@ export default function AnalyzePage() {
     return stored;
   }, []);
 
-  const tryAutomaticSamanthaBridge = useCallback(
+  const tryAutomaticAnalysisAgentBridge = useCallback(
     async (input: {
       isCurrentRun: () => boolean;
       item: AnalyzeMarketItem;
@@ -1677,11 +1714,14 @@ export default function AnalyzePage() {
       signal: AbortSignal;
       walletSummary: WalletIntelligenceSummary;
     }): Promise<{ job: DeepAnalysisJob; message: string; reportResult: SamanthaResearchParseResult | null }> => {
-      let job = persistDeepAnalysisJob(markJobSendingToSamantha(input.job));
+      let job = persistDeepAnalysisJob(markJobSendingToSamantha(input.job, {
+        agentId: analysisAgent.id,
+        agentName: analysisAgent.name,
+      }));
       if (!input.isCurrentRun()) {
         return {
           job,
-          message: "El analisis cambio antes de enviar a Samantha.",
+          message: `El analisis cambio antes de enviar a ${analysisAgent.name}.`,
           reportResult: null,
         };
       }
@@ -1693,11 +1733,11 @@ export default function AnalyzePage() {
           walletSummary: input.walletSummary,
         });
         const response = await withRequestTimeout(
-          SAMANTHA_BRIDGE_TIMEOUT_MS,
+          ANALYSIS_AGENT_TIMEOUT_MS,
           input.signal,
-          "samantha_bridge_timeout",
+          "analysis_agent_timeout",
           (signal) =>
-            fetch("/api/samantha/send-research", {
+            fetch("/api/analysis-agent/send-research", {
               body: JSON.stringify({
                 brief,
                 deepAnalysisJobId: job.id,
@@ -1714,21 +1754,28 @@ export default function AnalyzePage() {
               signal,
             }),
         );
-        const result = (await response.json().catch(() => ({}))) as SamanthaBridgeRouteResult;
+        const result = (await response.json().catch(() => ({}))) as AnalysisAgentRouteResult;
+        const agentId = result.agentId || analysisAgent.id;
+        const agentName = result.agentName || analysisAgent.name;
+        if (result.agentName && result.agentName !== analysisAgent.name) {
+          setAnalysisAgent({ id: agentId, name: agentName });
+        }
         if (!input.isCurrentRun()) {
           return {
             job,
-            message: "El analisis cambio antes de recibir respuesta de Samantha.",
+            message: `El analisis cambio antes de recibir respuesta de ${agentName}.`,
             reportResult: null,
           };
         }
         if (!response.ok || result.fallbackRequired || result.status === "disabled" || result.status === "fallback_required") {
           const reason =
             !result.reason || /bridge|fallback/i.test(result.reason)
-              ? "Samantha automatica no esta conectada todavia; prepararemos una lectura parcial con las fuentes disponibles."
+              ? `${agentName} automatico no esta conectado todavia; prepararemos una lectura parcial con las fuentes disponibles.`
               : result.reason;
           job = persistDeepAnalysisJob(
             markJobSamanthaBridgeFallback(job, {
+              agentId,
+              agentName,
               automaticAvailable: result.automaticAvailable,
               reason,
               warnings: result.warnings ?? result.validationErrors ?? [],
@@ -1741,15 +1788,17 @@ export default function AnalyzePage() {
           };
         }
         if (result.report) {
-          job = persistDeepAnalysisJob(markJobReceivingSamanthaReport(job));
+          job = persistDeepAnalysisJob(markJobReceivingSamanthaReport(job, { agentId, agentName }));
           job = persistDeepAnalysisJob(markJobValidatingSamanthaReport(job));
           const reportResult = parseSamanthaResearchReport(result.report);
           if (!reportResult.valid || !reportResult.report) {
             const reason =
               reportResult.errors[0] ||
-              "Samantha devolvio un reporte, pero no paso la validacion PolySignal.";
+              `${agentName} devolvio un reporte, pero no paso la validacion PolySignal.`;
             job = persistDeepAnalysisJob(
               markJobSamanthaBridgeFallback(job, {
+                agentId,
+                agentName,
                 automaticAvailable: true,
                 reason,
                 warnings: reportResult.errors.slice(0, 4),
@@ -1771,6 +1820,8 @@ export default function AnalyzePage() {
                 samanthaReport: reportResult.report,
                 walletSignal: input.walletSummary,
               }).countsForHistoryAccuracy,
+              agentId,
+              agentName,
               kalshiEquivalent:
                 reportResult.report.kalshiComparison?.found === true &&
                 reportResult.report.kalshiComparison.equivalent === true,
@@ -1781,34 +1832,38 @@ export default function AnalyzePage() {
           );
           return {
             job,
-            message: "Samantha devolvio un reporte validado; PolySignal actualizo las senales del job.",
+            message: `${agentName} devolvio un reporte validado; PolySignal actualizo las senales del job.`,
             reportResult,
           };
         }
         job = persistDeepAnalysisJob(
           markJobSamanthaResearching(job, {
-            reason: result.reason || "Samantha recibio la tarea; la investigacion sigue pendiente.",
+            agentId,
+            agentName,
+            reason: result.reason || `${agentName} recibio la tarea; la investigacion sigue pendiente.`,
             taskId: result.taskId,
           }),
         );
         return {
           job,
-          message: result.reason || "Samantha recibio la tarea; esperando reporte estructurado.",
+          message: result.reason || `${agentName} recibio la tarea; esperando reporte estructurado.`,
           reportResult: null,
         };
       } catch (error) {
         if (isAnalyzeCancelled(error)) {
           return {
             job,
-            message: "El analisis se cancelo antes de recibir respuesta de Samantha.",
+            message: `El analisis se cancelo antes de recibir respuesta de ${analysisAgent.name}.`,
             reportResult: null,
           };
         }
         const reason = isAnalyzeTimeout(error)
-          ? "Samantha esta tardando mas de lo normal; puedes guardar la lectura parcial o volver a consultar despues."
-          : "Samantha automatica no respondio de forma segura; la lectura queda parcial con las fuentes disponibles.";
+          ? `${analysisAgent.name} esta tardando mas de lo normal; puedes guardar la lectura parcial o volver a consultar despues.`
+          : `${analysisAgent.name} automatico no respondio de forma segura; la lectura queda parcial con las fuentes disponibles.`;
         job = persistDeepAnalysisJob(
           markJobSamanthaBridgeFallback(job, {
+            agentId: analysisAgent.id,
+            agentName: analysisAgent.name,
             automaticAvailable: true,
             reason,
           }),
@@ -1820,7 +1875,7 @@ export default function AnalyzePage() {
         };
       }
     },
-    [persistDeepAnalysisJob],
+    [analysisAgent, persistDeepAnalysisJob],
   );
 
   const runAnalysis = useCallback(async (value = input) => {
@@ -1893,7 +1948,7 @@ export default function AnalyzePage() {
           message:
             matches.length > 1
               ? "Polymarket devolvio este evento con varios mercados. Selecciona uno para analizar."
-              : "Mercado unico detectado. Continuamos automaticamente con Polymarket, Wallet Intelligence y Samantha.",
+              : `Mercado unico detectado. Continuamos automaticamente con Polymarket, Wallet Intelligence y ${analysisAgent.name}.`,
           normalizedUrl,
           status: "needs_selection",
         });
@@ -1963,7 +2018,7 @@ export default function AnalyzePage() {
         }
       }
     }
-  }, [input, persistDeepAnalysisJob]);
+  }, [analysisAgent.name, input, persistDeepAnalysisJob]);
 
   const analyzeSelectedMarket = useCallback(async (match: MatchResult, normalizedUrl: string) => {
     const runId = analysisRunRef.current + 1;
@@ -2048,7 +2103,10 @@ export default function AnalyzePage() {
       if (!(await advancePhase("preparing_samantha"))) {
         return;
       }
-      job = persistDeepAnalysisJob(markJobSamanthaBriefReady(job));
+      job = persistDeepAnalysisJob(markJobSamanthaBriefReady(job, {
+        agentId: analysisAgent.id,
+        agentName: analysisAgent.name,
+      }));
       const existingBridgeTaskId =
         job.samanthaBridge?.bridgeTaskId ?? job.samanthaBridge?.taskId;
       if (
@@ -2074,7 +2132,7 @@ export default function AnalyzePage() {
           match: enrichedMatch,
           message:
             existingBridgeTaskId
-              ? "Analisis profundo restaurado: Samantha ya recibio la tarea y la investigacion sigue pendiente."
+              ? `Analisis profundo restaurado: ${analysisAgent.name} ya recibio la tarea y la investigacion sigue pendiente.`
               : "Analisis profundo restaurado: la investigacion externa sigue pendiente.",
           normalizedUrl,
           status: "result",
@@ -2084,7 +2142,7 @@ export default function AnalyzePage() {
       if (!(await advancePhase("sending_samantha"))) {
         return;
       }
-      const bridgeResult = await tryAutomaticSamanthaBridge({
+      const bridgeResult = await tryAutomaticAnalysisAgentBridge({
         isCurrentRun,
         item: enrichedMatch.item,
         job,
@@ -2116,7 +2174,7 @@ export default function AnalyzePage() {
         match: enrichedMatch,
         message:
           job.status === "completed"
-            ? "Analisis profundo actualizado con reporte de Samantha validado."
+            ? `Analisis profundo actualizado con reporte de ${analysisAgent.name} validado.`
             : `Analisis profundo iniciado: Polymarket leido, Wallet Intelligence revisada y ${bridgeResult.message}`,
         normalizedUrl,
         status: "result",
@@ -2155,7 +2213,7 @@ export default function AnalyzePage() {
         }
       }
     }
-  }, [persistDeepAnalysisJob, tryAutomaticSamanthaBridge]);
+  }, [analysisAgent, persistDeepAnalysisJob, tryAutomaticAnalysisAgentBridge]);
 
   useEffect(() => {
     if (
@@ -2326,6 +2384,7 @@ export default function AnalyzePage() {
 
       {radarVisible ? (
         <AnalyzeLoadingPanel
+          agentName={deepAnalysisJob?.analysisAgent?.agentName || analysisAgent.name}
           canSaveForLater={canSaveProgressForLater}
           elapsedSeconds={progressElapsedSeconds}
           isBusy={loading}
@@ -2391,6 +2450,7 @@ export default function AnalyzePage() {
                   <AnalyzerReport
                     busy={actionBusy}
                     deepAnalysisJob={deepAnalysisJob}
+                    analysisAgentName={deepAnalysisJob?.analysisAgent?.agentName || analysisAgent.name}
                     initialSamanthaReportResult={samanthaAutoReportResult}
                     item={match.item}
                     matchScore={match.score}

@@ -38,6 +38,7 @@ type AnalyzeProgressStep = {
 };
 
 type AnalyzeProgressPanelProps = {
+  agentName?: string;
   canSaveForLater?: boolean;
   elapsedSeconds: number;
   isBusy: boolean;
@@ -51,7 +52,8 @@ type AnalyzeProgressPanelProps = {
   samanthaPending?: boolean;
 };
 
-const ANALYZE_PROGRESS_STEPS: AnalyzeProgressStep[] = [
+function analysisProgressSteps(agentName: string): AnalyzeProgressStep[] {
+  return [
   {
     detail: "Validamos que sea un enlace seguro de Polymarket.",
     id: "reading_link",
@@ -77,9 +79,9 @@ const ANALYZE_PROGRESS_STEPS: AnalyzeProgressStep[] = [
     phases: ["research"],
   },
   {
-    detail: "Samantha usa el puente automatico cuando esta configurado y reporta fuentes no disponibles.",
+    detail: `${agentName} usa el puente automatico cuando esta configurado y reporta fuentes no disponibles.`,
     id: "preparing_samantha",
-    label: "Samantha analizando",
+    label: `${agentName} analizando`,
     phases: ["preparing_samantha", "sending_samantha", "samantha_researching", "awaiting_samantha", "validating_report"],
   },
   {
@@ -88,10 +90,11 @@ const ANALYZE_PROGRESS_STEPS: AnalyzeProgressStep[] = [
     label: "Preparando lectura",
     phases: ["ready_to_score", "preparing"],
   },
-];
+  ];
+}
 
-function activeStepIndex(phase: AnalyzeLoadingPhase): number {
-  const index = ANALYZE_PROGRESS_STEPS.findIndex((step) =>
+function activeStepIndex(phase: AnalyzeLoadingPhase, steps: AnalyzeProgressStep[]): number {
+  const index = steps.findIndex((step) =>
     step.phases.includes(phase),
   );
   return Math.max(index, 0);
@@ -176,6 +179,7 @@ function markerForStatus(status: AnalyzeProgressStepStatus, index: number): stri
 }
 
 export function AnalyzeProgressPanel({
+  agentName = "Samantha",
   canSaveForLater = false,
   elapsedSeconds,
   isBusy,
@@ -192,9 +196,10 @@ export function AnalyzeProgressPanel({
     return null;
   }
 
-  const activeIndex = activeStepIndex(phase);
+  const steps = analysisProgressSteps(agentName);
+  const activeIndex = activeStepIndex(phase, steps);
   const title = samanthaPending
-    ? "Samantha sigue analizando fuentes automaticas"
+    ? `${agentName} sigue analizando fuentes automaticas`
     : issue
       ? "No pudimos completar esta busqueda ahora"
       : "Analisis en progreso";
@@ -225,7 +230,7 @@ export function AnalyzeProgressPanel({
       </div>
 
       <ol className="analyze-progress-steps" aria-label="Etapas del analisis">
-        {ANALYZE_PROGRESS_STEPS.map((step, index) => {
+        {steps.map((step, index) => {
           const status = statusForStep(index, activeIndex, issue, samanthaPending);
           return (
             <li className={`analyze-progress-step ${status}`} key={step.id}>

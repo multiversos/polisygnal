@@ -8,6 +8,7 @@
     "security:checks": "node scripts/security-checks.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
     "start": "next start",
+    "test:analysis-agent-bridge": "node scripts/test-analysis-agent-bridge.mjs",
     "test:estimate-gates": "node scripts/test-estimate-gates.mjs",
     "test:samantha-report-validation": "node scripts/test-samantha-report-validation.mjs"
   },
