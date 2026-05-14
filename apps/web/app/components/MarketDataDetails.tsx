@@ -1,18 +1,12 @@
 "use client";
 
-import type { MarketOverviewItem } from "../lib/marketOverview";
 import {
-  formatProbability as formatPublicProbability,
-  getMarketImpliedProbabilities,
-} from "../lib/marketProbabilities";
-
-type MarketOutcomePrice = {
-  name: string;
-  price: number | null;
-  probability: number | null;
-  side: "NO" | "YES" | "outcome" | "unknown";
-  tokenId: string | null;
-};
+  getDisplayMarketPrices,
+  getMarketOutcomePrices,
+  type MarketOutcomePrice,
+} from "../lib/marketDataDisplay";
+import type { MarketOverviewItem } from "../lib/marketOverview";
+import { formatProbability as formatPublicProbability } from "../lib/marketProbabilities";
 
 type MarketDataDetailsProps = {
   item?: MarketOverviewItem | null;
@@ -47,7 +41,7 @@ function formatPrice(value: unknown): string {
   if (parsed === null) {
     return "No disponible";
   }
-  return new Intl.NumberFormat("es", {
+  return new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 4,
   }).format(parsed);
 }
@@ -89,57 +83,6 @@ function tokenIds(item?: MarketOverviewItem | null): string[] {
     .filter((value): value is string => Boolean(value));
 }
 
-function normalizeOutcomeSide(label: unknown, side: unknown): MarketOutcomePrice["side"] {
-  const sideValue = typeof side === "string" ? side.trim().toUpperCase() : "";
-  if (sideValue === "YES" || sideValue === "NO") {
-    return sideValue;
-  }
-  const labelValue = typeof label === "string" ? label.trim().toLowerCase() : "";
-  if (labelValue === "yes" || labelValue === "si" || labelValue === "sí") {
-    return "YES";
-  }
-  if (labelValue === "no") {
-    return "NO";
-  }
-  if (labelValue) {
-    return "outcome";
-  }
-  return "unknown";
-}
-
-function outcomePrices(item?: MarketOverviewItem | null): MarketOutcomePrice[] {
-  return (item?.market?.outcomes ?? [])
-    .filter((outcome) => outcome.label || (outcome.price !== null && outcome.price !== undefined) || outcome.token_id)
-    .map((outcome, index) => {
-      const price = toNumber(outcome.price);
-      return {
-        name: outcome.label || `Outcome ${index + 1}`,
-        price,
-        probability: price !== null && price >= 0 && price <= 1 ? price : null,
-        side: normalizeOutcomeSide(outcome.label, outcome.side),
-        tokenId: outcome.token_id ?? null,
-      };
-    });
-}
-
-function binaryOutcomePrice(prices: MarketOutcomePrice[], side: "NO" | "YES"): number | null {
-  return prices.find((outcome) => outcome.side === side)?.price ?? null;
-}
-
-function binaryProbabilities(item: MarketOverviewItem | null | undefined, prices: MarketOutcomePrice[]) {
-  const snapshotProbabilities = getMarketImpliedProbabilities({
-    marketNoPrice: item?.latest_snapshot?.no_price,
-    marketYesPrice: item?.latest_snapshot?.yes_price,
-  });
-  if (snapshotProbabilities) {
-    return snapshotProbabilities;
-  }
-  return getMarketImpliedProbabilities({
-    marketNoPrice: binaryOutcomePrice(prices, "NO"),
-    marketYesPrice: binaryOutcomePrice(prices, "YES"),
-  });
-}
-
 function outcomeSideLabel(outcome: MarketOutcomePrice): string {
   if (outcome.side === "YES" || outcome.side === "NO") {
     return outcome.side;
@@ -152,11 +95,7 @@ function outcomeSideLabel(outcome: MarketOutcomePrice): string {
 
 function missingFields(item?: MarketOverviewItem | null): string[] {
   const missing: string[] = [];
-  const probabilities = getMarketImpliedProbabilities({
-    marketNoPrice: item?.latest_snapshot?.no_price,
-    marketYesPrice: item?.latest_snapshot?.yes_price,
-  });
-  if (!probabilities && !(item?.market?.outcomes ?? []).some((outcome) => toNumber(outcome.price) !== null)) {
+  if (getDisplayMarketPrices(item).mode === "unavailable") {
     missing.push("precios de outcomes");
   }
   if (toNumber(item?.latest_snapshot?.volume) === null) {
@@ -183,6 +122,10 @@ function DetailStat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function renderBinaryProbability(yes: MarketOutcomePrice | undefined, no: MarketOutcomePrice | undefined): string {
+  return `YES ${formatPublicProbability(yes?.probability)} / NO ${formatPublicProbability(no?.probability)}`;
+}
+
 export function MarketDataDetails({ item, onClose, open }: MarketDataDetailsProps) {
   if (!open) {
     return null;
@@ -190,17 +133,10 @@ export function MarketDataDetails({ item, onClose, open }: MarketDataDetailsProp
 
   const ids = tokenIds(item);
   const missing = missingFields(item);
-  const outcomes = outcomePrices(item);
-  const impliedProbabilities = binaryProbabilities(item, outcomes);
-  const pricedOutcomes = outcomes.filter((outcome) => outcome.price !== null);
-  const snapshotHasBinaryPrice =
-    toNumber(item?.latest_snapshot?.yes_price) !== null || toNumber(item?.latest_snapshot?.no_price) !== null;
-  const showBinarySummary =
-    Boolean(impliedProbabilities) &&
-    (snapshotHasBinaryPrice ||
-      outcomes.some((outcome) => outcome.side === "YES") ||
-      outcomes.some((outcome) => outcome.side === "NO"));
-  const summaryOutcomes = pricedOutcomes.slice(0, 6);
+  const outcomes = getMarketOutcomePrices(item);
+  const displayPrices = getDisplayMarketPrices(item);
+  const yesSummary = displayPrices.cards.find((card) => card.side === "YES");
+  const noSummary = displayPrices.cards.find((card) => card.side === "NO");
 
   return (
     <div className="market-details-backdrop" role="presentation">
@@ -224,23 +160,31 @@ export function MarketDataDetails({ item, onClose, open }: MarketDataDetailsProp
         </div>
 
         <div className="market-details-summary">
-          {showBinarySummary && impliedProbabilities ? (
+          {displayPrices.mode === "binary" ? (
             <>
-              <DetailStat label="Precio YES" value={formatPrice(binaryOutcomePrice(outcomes, "YES") ?? item?.latest_snapshot?.yes_price)} />
-              <DetailStat label="Precio NO" value={formatPrice(binaryOutcomePrice(outcomes, "NO") ?? item?.latest_snapshot?.no_price)} />
-              <DetailStat
-                label="Probabilidad implicita"
-                value={`YES ${formatPublicProbability(impliedProbabilities.yes)} / NO ${formatPublicProbability(impliedProbabilities.no)}`}
-              />
+              <DetailStat label="Precio YES" value={formatPrice(yesSummary?.price)} />
+              <DetailStat label="Precio NO" value={formatPrice(noSummary?.price)} />
+              <DetailStat label="Probabilidad implicita" value={renderBinaryProbability(yesSummary, noSummary)} />
             </>
-          ) : summaryOutcomes.length > 0 ? (
-            summaryOutcomes.map((outcome) => (
-              <DetailStat
-                key={`${outcome.name}-${outcome.tokenId ?? outcome.side}`}
-                label={outcome.name}
-                value={`Precio ${formatPrice(outcome.price)} · Prob. ${formatPublicProbability(outcome.probability)}`}
-              />
-            ))
+          ) : displayPrices.mode === "outcome" ? (
+            <>
+              {displayPrices.cards.map((outcome) => (
+                <DetailStat
+                  key={`${outcome.name}-${outcome.tokenId ?? outcome.side}`}
+                  label={outcome.name}
+                  value={`Precio ${formatPrice(outcome.price)} - Prob. ${formatPublicProbability(outcome.probability)}`}
+                />
+              ))}
+              {displayPrices.hiddenOutcomeCount > 0 ? (
+                <DetailStat label="Outcomes adicionales" value={`+${displayPrices.hiddenOutcomeCount} outcomes mas`} />
+              ) : null}
+              {displayPrices.leader ? (
+                <DetailStat
+                  label="Lider por precio de mercado"
+                  value={`${displayPrices.leader.label} - ${formatPrice(displayPrices.leader.price)} (${formatPublicProbability(displayPrices.leader.price)})`}
+                />
+              ) : null}
+            </>
           ) : (
             <>
               <DetailStat label="Precio principal" value="No disponible" />
@@ -264,10 +208,11 @@ export function MarketDataDetails({ item, onClose, open }: MarketDataDetailsProp
             <div className="market-details-table" role="list">
               {outcomes.map((outcome, index) => (
                 <article key={`${outcome.name}-${outcome.tokenId ?? index}`} role="listitem">
-                  <span>{outcome.name || "Outcome sin nombre"}</span>
-                  <strong>{outcomeSideLabel(outcome)}</strong>
+                  <span>Outcome</span>
+                  <strong>{outcome.name || "Outcome sin nombre"}</strong>
                   <small>Precio: {formatPrice(outcome.price)}</small>
-                  <small>Probabilidad: {formatPublicProbability(outcome.probability)}</small>
+                  <small>Probabilidad implicita: {formatPublicProbability(outcome.probability)}</small>
+                  {outcome.side === "YES" || outcome.side === "NO" ? <small>Side: {outcomeSideLabel(outcome)}</small> : null}
                   <small>TokenId: {outcome.tokenId || "No disponible"}</small>
                 </article>
               ))}

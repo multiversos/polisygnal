@@ -846,7 +846,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("open={marketDetailsOpen}"), "market data drawer must be closed by default");
   assert(analyzePage.includes("open={walletDetailsOpen}"), "wallet drawer must be closed by default");
   assert(marketDetailsSource.includes("Datos de Polymarket"), "expected market data detail drawer");
-  assert(marketDetailsSource.includes("summaryOutcomes"), "market drawer must summarize real outcome prices, not only YES/NO snapshots");
+  assert(marketDetailsSource.includes("getDisplayMarketPrices"), "market drawer must use a shared display-price helper");
+  assert(marketDetailsSource.includes('displayPrices.mode === "outcome"'), "market drawer must summarize real outcome prices, not only YES/NO snapshots");
+  assert(marketDetailsSource.includes("Lider por precio de mercado"), "market drawer must show the market-price leader for outcome markets");
   assert(marketDetailsSource.includes("Fecha disponible"), "market drawer must avoid inventing event time labels");
   assert(marketDetailsSource.includes("conditionId") || marketDetailsSource.includes("ConditionId"), "market drawer must show conditionId state");
   assert(marketDetailsSource.includes("token_id") || marketDetailsSource.includes("TokenId"), "market drawer must show token ids");
