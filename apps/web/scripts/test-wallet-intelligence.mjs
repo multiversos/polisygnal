@@ -23,6 +23,7 @@ assert(walletDetailsSource.includes("wallet-details-key-grid"), "wallet drawer m
 assert(walletDetailsSource.includes("Ver perfil en Polymarket"), "wallet drawer must expose public profile verification when safe");
 assert(walletDetailsSource.includes("Perfil Polymarket no disponible"), "wallet drawer must handle missing profile URLs honestly");
 assert(walletDetailsSource.includes("Copiar wallet"), "wallet drawer must allow copying the public wallet address");
+assert(walletDetailsSource.includes("Wallet completa no disponible"), "wallet drawer must not pretend short addresses are verifiable full wallets");
 assert(walletDetailsSource.includes("<summary>Ver detalles</summary>"), "technical wallet details must be collapsed by default");
 assert(walletDetailsSource.indexOf("wallet-details-key-grid") < walletDetailsSource.indexOf("<summary>Ver detalles</summary>"), "technical details should appear after compact fields");
 assert(walletDetailsSource.includes("<dt>tokenId</dt>"), "expanded details must include tokenId");

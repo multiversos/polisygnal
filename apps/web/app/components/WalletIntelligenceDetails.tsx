@@ -70,6 +70,10 @@ function formatWalletDisplay(activity: PublicWalletActivity): string {
   return activity.shortAddress || "Wallet no disponible";
 }
 
+function getFullWalletAddress(activity: PublicWalletActivity): string | null {
+  return isPolymarketWalletAddress(activity.walletAddress) ? activity.walletAddress!.trim() : null;
+}
+
 function formatDateTime(value?: string | null): string {
   if (!value) {
     return "Fecha no disponible";
@@ -554,7 +558,10 @@ export function WalletIntelligenceDetails({
           </div>
         ) : filteredActivities.length > 0 ? (
           <div className="wallet-details-list" role="list">
-            {filteredActivities.map((activity) => (
+            {filteredActivities.map((activity) => {
+              const fullWalletAddress = getFullWalletAddress(activity);
+              const profileUrl = buildPolymarketWalletProfileUrl(fullWalletAddress);
+              return (
               <article className="wallet-details-card" key={activity.id} role="listitem">
                 <div className="wallet-details-card-heading">
                   <div>
@@ -567,9 +574,9 @@ export function WalletIntelligenceDetails({
                   </div>
                 </div>
                 <div className="wallet-card-actions">
-                  {buildPolymarketWalletProfileUrl(activity.walletAddress) ? (
+                  {profileUrl ? (
                     <a
-                      href={buildPolymarketWalletProfileUrl(activity.walletAddress) ?? undefined}
+                      href={profileUrl}
                       rel="noopener noreferrer"
                       target="_blank"
                     >
@@ -578,14 +585,20 @@ export function WalletIntelligenceDetails({
                   ) : (
                     <span>Perfil Polymarket no disponible</span>
                   )}
-                  <button disabled={!activity.walletAddress} onClick={() => copyWallet(activity)} type="button">
-                    {copiedActivityId === activity.id ? "Wallet copiada" : "Copiar wallet"}
+                  <button disabled={!fullWalletAddress} onClick={() => copyWallet(activity)} type="button">
+                    {copiedActivityId === activity.id
+                      ? "Wallet copiada"
+                      : fullWalletAddress
+                        ? "Copiar wallet"
+                        : "Wallet completa no disponible"}
                   </button>
                 </div>
                 <p className="wallet-verification-copy">
-                  {buildPolymarketWalletProfileUrl(activity.walletAddress)
+                  {profileUrl
                     ? "Abre el perfil publico de esta wallet para verificar actividad."
-                    : "No se encontro perfil publico directo; puedes verificar manualmente con la direccion."}
+                    : fullWalletAddress
+                      ? "No se encontro perfil publico directo; puedes verificar manualmente con la direccion completa."
+                      : "La fuente no entrego una wallet completa para verificar directamente."}
                 </p>
                 <div className="wallet-details-key-grid">
                   <div><span>Monto USD</span><strong>{formatUsd(activity.amountUsd)}</strong></div>
@@ -626,7 +639,8 @@ export function WalletIntelligenceDetails({
                   </details>
                 ) : null}
               </article>
-            ))}
+            );
+            })}
           </div>
         ) : (
           <div className="wallet-details-empty">

@@ -858,6 +858,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(walletDetailsSource.includes("Ver perfil en Polymarket"), "wallet drawer must expose verified public wallet profile links when available");
   assert(walletDetailsSource.includes("Perfil Polymarket no disponible"), "wallet drawer must not invent profile links");
   assert(walletDetailsSource.includes("Copiar wallet"), "wallet drawer must allow copying public wallet addresses");
+  assert(walletDetailsSource.includes("Wallet completa no disponible"), "wallet drawer must not treat short addresses as verifiable full wallets");
   assert(walletDetailsSource.includes("wallet-details-key-grid"), "wallet drawer must show a compact key-data view");
   assert(walletDetailsSource.includes("<summary>Ver detalles</summary>"), "wallet technical fields must be collapsed by default");
   assert(walletDetailsSource.includes("wallet-technical-details"), "wallet drawer must keep technical raw fields collapsed");
