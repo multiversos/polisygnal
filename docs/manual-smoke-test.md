@@ -399,6 +399,14 @@ If this test fails, stop feature work and treat it as a production regression.
    opens only after the click, may show public full wallet addresses from the
    source, keeps raw technical fields collapsed, and does not show fake ROI or
    win-rate values.
+45e. In `Ver billeteras`, confirm each wallet card is compact by default:
+   wallet, type, outcome/position, amount, price, shares/contracts, position,
+   real PnL/win rate only if present, closed markets and wins/losses if present.
+   `tokenId`, `conditionId`, `marketId`, transaction hash, warnings,
+   limitations and raw useful fields must stay inside collapsed `Ver detalles`.
+45f. Confirm `Ver perfil en Polymarket` appears only for valid full public
+   wallet addresses. If no verified profile URL can be built, confirm the card
+   says `Perfil Polymarket no disponible` and offers `Copiar wallet`.
 45a. In the progress panel, confirm `Cargando datos de Polymarket` shows an
    honest badge such as `Datos cargados`, `Datos basicos`, `Datos limitados`,
    `Fuente no disponible`, or `No respondio`, plus a `Ver datos` or

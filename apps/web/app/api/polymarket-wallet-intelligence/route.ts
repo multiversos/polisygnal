@@ -395,7 +395,7 @@ function toWalletActivity(input: {
       id: `${input.idPrefix}-${input.index}-${position.publicPosition.shortAddress}-${input.amountUsd ?? "na"}`,
       limitations: [
         "Datos publicos de Polymarket Data API; pueden ser parciales o estar sujetos a limite de consulta.",
-        "No identifica personas reales ni recomienda copiar operaciones.",
+        "No identifica personas reales ni convierte actividad publica en una guia operativa.",
       ],
       marketId: input.marketId ?? null,
       outcome: cleanPublicString(input.outcome, 80),
@@ -687,7 +687,7 @@ export async function POST(request: Request): Promise<Response> {
       availableProfiles > 0
         ? "Hay historial cerrado publico para algunas billeteras, aun asi no basta por si solo para una prediccion."
         : "No hay historial publico suficiente para calificar estas billeteras.",
-      "No se recomienda copiar operaciones de wallets.",
+      "La actividad de wallets no es una instruccion operativa.",
     ],
     yesCapitalUsd: bias.yesCapitalUsd,
   };

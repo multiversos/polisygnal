@@ -332,6 +332,22 @@ Camino B controls:
 - if Samantha returns a report, PolySignal validates it with the same report
   validator before exposing evidence.
 
+Wallet Intelligence UI controls:
+
+- `Ver billeteras` may show full public wallet addresses inside the drawer
+  because they come from public Polymarket/Data API activity, but the main
+  analysis summary still avoids full wallet addresses;
+- wallet profile links are built only for strings matching a full `0x` wallet
+  address and use Polymarket's public `/profile/{wallet}` path. Short addresses
+  or malformed values do not become links;
+- compact wallet cards show analysis-useful fields first. `tokenId`,
+  `conditionId`, `marketId`, transaction hashes, warnings, limitations and raw
+  source fields stay behind a collapsed details element;
+- PnL, win rate, closed markets and wins/losses are displayed only when present
+  in public closed-position data. Missing values remain `No disponible`;
+- the drawer must not recommend following/copying wallet behavior and must not
+  infer real-world identity from a public address.
+
 Samantha-side local endpoints:
 
 - Samantha exposes `POST /polysignal/analyze-market` only when

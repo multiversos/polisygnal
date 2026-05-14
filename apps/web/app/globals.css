@@ -8722,7 +8722,8 @@ html:not([data-theme="dark"]) .app-sidebar {
 
 .market-details-summary,
 .wallet-details-summary,
-.wallet-details-grid {
+.wallet-details-grid,
+.wallet-details-key-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
@@ -8730,7 +8731,8 @@ html:not([data-theme="dark"]) .app-sidebar {
 
 .market-details-summary > div,
 .wallet-details-summary > div,
-.wallet-details-grid > div {
+.wallet-details-grid > div,
+.wallet-details-key-grid > div {
   display: grid;
   gap: 5px;
   min-width: 0;
@@ -8742,7 +8744,8 @@ html:not([data-theme="dark"]) .app-sidebar {
 
 .market-details-summary span,
 .wallet-details-summary span,
-.wallet-details-grid span {
+.wallet-details-grid span,
+.wallet-details-key-grid span {
   color: var(--ps-muted, #8ea4bf);
   font-size: 0.74rem;
   font-weight: 800;
@@ -8750,7 +8753,8 @@ html:not([data-theme="dark"]) .app-sidebar {
 
 .market-details-summary strong,
 .wallet-details-summary strong,
-.wallet-details-grid strong {
+.wallet-details-grid strong,
+.wallet-details-key-grid strong {
   overflow-wrap: anywhere;
   color: var(--ps-text, #f8fafc);
   font-size: 0.88rem;
@@ -8873,13 +8877,59 @@ html:not([data-theme="dark"]) .app-sidebar {
   color: var(--ps-text, #f8fafc);
 }
 
-.wallet-side-pill {
+.wallet-card-badges,
+.wallet-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.wallet-card-badges {
+  justify-content: flex-end;
+}
+
+.wallet-card-actions a,
+.wallet-card-actions button {
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid var(--ps-border-cyan, rgba(34, 211, 238, 0.38));
+  border-radius: 999px;
+  color: var(--ps-text, #f8fafc);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-decoration: none;
+  background: rgba(34, 211, 238, 0.1);
+  cursor: pointer;
+}
+
+.wallet-card-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.wallet-card-actions > span,
+.wallet-verification-copy {
+  margin: 0;
+  color: var(--ps-muted, #8ea4bf);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.wallet-side-pill,
+.wallet-type-pill {
   padding: 5px 9px;
   border: 1px solid var(--ps-border, rgba(96, 165, 250, 0.22));
   border-radius: 999px;
   color: var(--ps-muted, #8ea4bf);
   font-size: 0.72rem;
   font-weight: 900;
+}
+
+.wallet-type-pill {
+  color: var(--ps-cyan, #22d3ee);
+  background: rgba(34, 211, 238, 0.09);
 }
 
 .wallet-side-pill.yes {
@@ -8942,7 +8992,8 @@ html:not([data-theme="dark"]) .app-sidebar {
 
   .market-details-summary,
   .wallet-details-summary,
-  .wallet-details-grid {
+  .wallet-details-grid,
+  .wallet-details-key-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -9006,9 +9057,22 @@ html:not([data-theme="dark"]) .app-sidebar {
     display: grid;
   }
 
+  .wallet-card-badges,
+  .wallet-card-actions {
+    justify-content: flex-start;
+  }
+
+  .wallet-card-actions a,
+  .wallet-card-actions button {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
   .market-details-summary,
   .wallet-details-summary,
-  .wallet-details-grid {
+  .wallet-details-grid,
+  .wallet-details-key-grid {
     grid-template-columns: 1fr;
   }
 

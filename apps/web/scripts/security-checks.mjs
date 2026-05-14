@@ -854,7 +854,17 @@ function validateAnalyzeLoadingPanelSource() {
   assert(walletDetailsSource.includes("Billeteras notables"), "wallet drawer must expose notable wallets when the source reports them");
   assert(walletDetailsSource.includes("Hay billeteras relevantes reportadas"), "wallet drawer must explain relevant wallet counts without individual trades");
   assert(walletDetailsSource.includes("walletAddress"), "wallet drawer may render public full wallet addresses by user request");
-  assert(walletDetailsSource.includes("Datos tecnicos"), "wallet drawer must keep technical raw fields collapsed");
+  assert(walletDetailsSource.includes("buildPolymarketWalletProfileUrl"), "wallet drawer must build profile links through the guarded helper");
+  assert(walletDetailsSource.includes("Ver perfil en Polymarket"), "wallet drawer must expose verified public wallet profile links when available");
+  assert(walletDetailsSource.includes("Perfil Polymarket no disponible"), "wallet drawer must not invent profile links");
+  assert(walletDetailsSource.includes("Copiar wallet"), "wallet drawer must allow copying public wallet addresses");
+  assert(walletDetailsSource.includes("wallet-details-key-grid"), "wallet drawer must show a compact key-data view");
+  assert(walletDetailsSource.includes("<summary>Ver detalles</summary>"), "wallet technical fields must be collapsed by default");
+  assert(walletDetailsSource.includes("wallet-technical-details"), "wallet drawer must keep technical raw fields collapsed");
+  assert(walletDetailsSource.includes("<dt>tokenId</dt>"), "wallet technical details must include tokenId when available");
+  assert(walletDetailsSource.includes("<dt>conditionId</dt>"), "wallet technical details must include conditionId when available");
+  assert(walletDetailsSource.includes("<dt>marketId</dt>"), "wallet technical details must include marketId when available");
+  assert(walletDetailsSource.includes("<dt>transactionHash</dt>"), "wallet technical details must include transactionHash when available");
   assert(!walletDetailsSource.includes("<pre"), "wallet drawer must not render raw JSON by default");
   assert(!walletDetailsSource.includes("copy this trader"), "wallet drawer must not recommend copy-trading");
   assert(!walletDetailsSource.includes("esta wallet sabe"), "wallet drawer must not imply a wallet knows something");

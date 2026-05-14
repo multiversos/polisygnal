@@ -76,6 +76,16 @@ Estado visible verificado:
   billeteras, riesgos, limitaciones, fuentes usadas y `Que revisar primero`.
   Si `suggestedDecision.available=false`, no muestra prediccion ni estimate
   propio; explica que el precio de mercado es solo referencia de Polymarket.
+- `Ver billeteras` usa una vista compacta por wallet: direccion publica,
+  tipo de actividad, outcome/posicion, monto, precio, shares/contratos,
+  posicion, PnL/win rate solo si vienen reales, mercados cerrados y wins/losses
+  cuando existen. `tokenId`, `conditionId`, `marketId`, hash de transaccion,
+  warnings, limitations y raw fields utiles quedan en `Ver detalles`, cerrado
+  por defecto.
+- Las wallets con direccion `0x...` valida pueden abrir el perfil publico de
+  Polymarket con `/profile/{wallet}`. Si solo hay short address o la direccion
+  no valida el patron publico, la UI muestra `Perfil Polymarket no disponible`
+  y permite copiar la direccion visible sin inventar enlaces.
 - `/history` conserva metadatos seguros del agente cuando se guarda una lectura:
   `agentName`, `agentStatus`, resumen, senales, riesgos, limitaciones y fuentes
   usadas. Una lectura parcial sin decision no cuenta como prediccion.

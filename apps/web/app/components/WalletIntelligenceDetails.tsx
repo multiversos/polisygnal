@@ -8,6 +8,10 @@ import type {
   WalletIntelligenceSummary,
   WalletMarketPosition,
 } from "../lib/walletIntelligenceTypes";
+import {
+  buildPolymarketWalletProfileUrl,
+  isPolymarketWalletAddress,
+} from "../lib/polymarketWalletProfile";
 
 type WalletDetailsFilter =
   | "all"
@@ -20,9 +24,10 @@ type WalletDetailsFilter =
   | "notable_wallet"
   | "sell"
   | "trade"
-  | "yes";
+  | "yes"
+  | `outcome:${string}`;
 
-type WalletDetailsSort = "amount" | "capital" | "recent";
+type WalletDetailsSort = "amount" | "pnl" | "position" | "recent" | "win_rate";
 
 type WalletIntelligenceDetailsProps = {
   onClose: () => void;
@@ -58,6 +63,13 @@ function formatPercent(value: unknown): string {
   return `${new Intl.NumberFormat("es", { maximumFractionDigits: 1 }).format(value * 100)}%`;
 }
 
+function formatWalletDisplay(activity: PublicWalletActivity): string {
+  if (activity.walletAddress) {
+    return activity.walletAddress;
+  }
+  return activity.shortAddress || "Wallet no disponible";
+}
+
 function formatDateTime(value?: string | null): string {
   if (!value) {
     return "Fecha no disponible";
@@ -85,17 +97,21 @@ function actionLabel(action?: PublicWalletActivityAction): string {
   return "Accion no especificada";
 }
 
-function activityTypeLabel(activity: PublicWalletActivity): string {
+function activityTypeBadge(activity: PublicWalletActivity): string {
   if (activity.activityType === "trade") {
-    return "Operacion";
+    return "Trade";
   }
   if (activity.activityType === "notable_wallet") {
-    return "Billetera notable";
+    return "Notable wallet";
   }
   if (activity.activityType === "position" || activity.action === "position") {
-    return "Posicion";
+    return "Position";
   }
-  return actionLabel(activity.action);
+  return "Actividad";
+}
+
+function sideOrOutcomeLabel(activity: PublicWalletActivity): string {
+  return activity.outcome || (activity.side === "UNKNOWN" ? "unknown" : activity.side);
 }
 
 function biasLabel(summary?: WalletIntelligenceSummary | null): string {
@@ -156,6 +172,10 @@ function searchText(activity: PublicWalletActivity): string {
 }
 
 function matchesFilter(activity: PublicWalletActivity, filter: WalletDetailsFilter, threshold: number): boolean {
+  if (filter.startsWith("outcome:")) {
+    const expected = filter.slice("outcome:".length);
+    return sideOrOutcomeLabel(activity).toLowerCase() === expected;
+  }
   if (filter === "all") {
     return true;
   }
@@ -199,6 +219,17 @@ function sortActivities(activities: PublicWalletActivity[], sort: WalletDetailsS
   return [...activities].sort((left, right) => {
     if (sort === "recent") {
       return new Date(right.timestamp ?? 0).getTime() - new Date(left.timestamp ?? 0).getTime();
+    }
+    if (sort === "pnl") {
+      const rightPnl = right.realizedPnl ?? right.unrealizedPnl ?? Number.NEGATIVE_INFINITY;
+      const leftPnl = left.realizedPnl ?? left.unrealizedPnl ?? Number.NEGATIVE_INFINITY;
+      return rightPnl - leftPnl;
+    }
+    if (sort === "win_rate") {
+      return (right.winRate ?? Number.NEGATIVE_INFINITY) - (left.winRate ?? Number.NEGATIVE_INFINITY);
+    }
+    if (sort === "position") {
+      return (right.positionSize ?? right.shares ?? 0) - (left.positionSize ?? left.shares ?? 0);
     }
     return (right.amountUsd ?? 0) - (left.amountUsd ?? 0);
   });
@@ -257,7 +288,57 @@ function mergeActivities(summary?: WalletIntelligenceSummary | null): PublicWall
   (summary.largeTrades ?? []).forEach((position, index) => append(activityFromPosition(position, index, "trade")));
   (summary.largePositions ?? []).forEach((position, index) => append(activityFromPosition(position, index, "position")));
   (summary.notableWallets ?? []).forEach((position, index) => append(activityFromPosition(position, index, "notable_wallet")));
-  return items;
+  return dedupeActivities(items);
+}
+
+function activityKey(activity: PublicWalletActivity): string {
+  const walletIdentity = activity.shortAddress || activity.walletAddress || "wallet";
+  return [
+    activity.activityType ?? "unknown",
+    walletIdentity,
+    sideOrOutcomeLabel(activity),
+    activity.amountUsd ?? "na",
+    activity.tokenId ?? "token",
+    activity.transactionHash ?? "tx",
+  ].join(":");
+}
+
+function activityCompleteness(activity: PublicWalletActivity): number {
+  return [
+    isPolymarketWalletAddress(activity.walletAddress),
+    activity.rawSourceFields,
+    activity.tokenId,
+    activity.conditionId,
+    activity.transactionHash,
+    activity.timestamp,
+    typeof activity.realizedPnl === "number" || typeof activity.unrealizedPnl === "number",
+    typeof activity.winRate === "number",
+  ].filter(Boolean).length;
+}
+
+function dedupeActivities(activities: PublicWalletActivity[]): PublicWalletActivity[] {
+  const byKey = new Map<string, PublicWalletActivity>();
+  for (const activity of activities) {
+    const key = activityKey(activity);
+    const existing = byKey.get(key);
+    if (!existing || activityCompleteness(activity) > activityCompleteness(existing)) {
+      byKey.set(key, activity);
+    }
+  }
+  return [...byKey.values()];
+}
+
+function hasTechnicalDetails(activity: PublicWalletActivity): boolean {
+  return Boolean(
+    activity.tokenId ||
+      activity.conditionId ||
+      activity.marketId ||
+      activity.transactionHash ||
+      activity.source ||
+      activity.warnings.length > 0 ||
+      activity.limitations.length > 0 ||
+      activity.rawSourceFields,
+  );
 }
 
 export function WalletIntelligenceDetails({
@@ -266,6 +347,7 @@ export function WalletIntelligenceDetails({
   open,
   summary,
 }: WalletIntelligenceDetailsProps) {
+  const [copiedActivityId, setCopiedActivityId] = useState<string | null>(null);
   const [filter, setFilter] = useState<WalletDetailsFilter>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<WalletDetailsSort>("amount");
@@ -283,6 +365,23 @@ export function WalletIntelligenceDetails({
   const notableCount =
     activities.filter((activity) => activity.activityType === "notable_wallet").length ||
     (summary?.notableWallets ?? []).length;
+  const pnlCount = activities.filter(
+    (activity) => typeof activity.realizedPnl === "number" || typeof activity.unrealizedPnl === "number",
+  ).length;
+  const historyCount = activities.filter(
+    (activity) =>
+      typeof activity.winRate === "number" ||
+      typeof activity.closedMarkets === "number" ||
+      typeof activity.wins === "number" ||
+      typeof activity.losses === "number",
+  ).length;
+  const outcomeFilters = useMemo(
+    () =>
+      [...new Set(activities.map((activity) => sideOrOutcomeLabel(activity)).filter((label) => label && label !== "unknown"))]
+        .filter((label) => label !== "YES" && label !== "NO")
+        .slice(0, 6),
+    [activities],
+  );
   const filteredActivities = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return sortActivities(
@@ -298,6 +397,19 @@ export function WalletIntelligenceDetails({
   const hasBelowThreshold = activities.some(
     (activity) => typeof activity.amountUsd === "number" && activity.amountUsd < threshold,
   );
+  const copyWallet = async (activity: PublicWalletActivity) => {
+    const wallet = activity.walletAddress;
+    if (!wallet) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(wallet);
+      setCopiedActivityId(activity.id);
+      window.setTimeout(() => setCopiedActivityId((current) => (current === activity.id ? null : current)), 1400);
+    } catch {
+      setCopiedActivityId(null);
+    }
+  };
 
   if (!open) {
     return null;
@@ -339,6 +451,14 @@ export function WalletIntelligenceDetails({
           <div>
             <span>Billeteras notables</span>
             <strong>{notableCount}</strong>
+          </div>
+          <div>
+            <span>Con PnL real</span>
+            <strong>{pnlCount > 0 ? pnlCount : "No disponible"}</strong>
+          </div>
+          <div>
+            <span>Con historial</span>
+            <strong>{historyCount > 0 ? historyCount : "No disponible"}</strong>
           </div>
           <div>
             <span>Capital observado</span>
@@ -393,6 +513,16 @@ export function WalletIntelligenceDetails({
               {label}
             </button>
           ))}
+          {outcomeFilters.map((outcome) => (
+            <button
+              className={filter === `outcome:${outcome.toLowerCase()}` ? "active" : ""}
+              key={outcome}
+              onClick={() => setFilter(`outcome:${outcome.toLowerCase()}`)}
+              type="button"
+            >
+              {outcome}
+            </button>
+          ))}
           {hasBelowThreshold ? (
             <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")} type="button">
               Mostrar todas
@@ -409,8 +539,10 @@ export function WalletIntelligenceDetails({
           />
           <select onChange={(event) => setSort(event.target.value as WalletDetailsSort)} value={sort}>
             <option value="amount">Monto USD descendente</option>
+            <option value="pnl">PnL descendente</option>
+            <option value="win_rate">Win rate descendente</option>
             <option value="recent">Mas reciente</option>
-            <option value="capital">Capital observado</option>
+            <option value="position">Shares/posicion</option>
           </select>
         </div>
 
@@ -427,42 +559,64 @@ export function WalletIntelligenceDetails({
                 <div className="wallet-details-card-heading">
                   <div>
                     <span>{activity.shortAddress || "wallet publica"}</span>
-                    <strong>{activity.walletAddress || "Wallet no disponible"}</strong>
+                    <strong>{formatWalletDisplay(activity)}</strong>
                   </div>
-                  <span className={`wallet-side-pill ${activity.side.toLowerCase()}`}>{activity.side}</span>
+                  <div className="wallet-card-badges">
+                    <span className="wallet-type-pill">{activityTypeBadge(activity)}</span>
+                    <span className={`wallet-side-pill ${activity.side.toLowerCase()}`}>{sideOrOutcomeLabel(activity)}</span>
+                  </div>
                 </div>
-                <div className="wallet-details-grid">
-                  <div><span>Tipo</span><strong>{activityTypeLabel(activity)}</strong></div>
-                  <div><span>Accion</span><strong>{actionLabel(activity.action)}</strong></div>
-                  <div><span>Outcome</span><strong>{activity.outcome || activity.side || "unknown"}</strong></div>
+                <div className="wallet-card-actions">
+                  {buildPolymarketWalletProfileUrl(activity.walletAddress) ? (
+                    <a
+                      href={buildPolymarketWalletProfileUrl(activity.walletAddress) ?? undefined}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      Ver perfil en Polymarket
+                    </a>
+                  ) : (
+                    <span>Perfil Polymarket no disponible</span>
+                  )}
+                  <button disabled={!activity.walletAddress} onClick={() => copyWallet(activity)} type="button">
+                    {copiedActivityId === activity.id ? "Wallet copiada" : "Copiar wallet"}
+                  </button>
+                </div>
+                <p className="wallet-verification-copy">
+                  {buildPolymarketWalletProfileUrl(activity.walletAddress)
+                    ? "Abre el perfil publico de esta wallet para verificar actividad."
+                    : "No se encontro perfil publico directo; puedes verificar manualmente con la direccion."}
+                </p>
+                <div className="wallet-details-key-grid">
                   <div><span>Monto USD</span><strong>{formatUsd(activity.amountUsd)}</strong></div>
+                  <div><span>Outcome/posicion</span><strong>{sideOrOutcomeLabel(activity)}</strong></div>
+                  <div><span>Accion</span><strong>{actionLabel(activity.action)}</strong></div>
                   <div><span>Precio</span><strong>{formatNumber(activity.price)}</strong></div>
                   <div><span>Shares/contratos</span><strong>{formatNumber(activity.shares)}</strong></div>
                   <div><span>Posicion actual</span><strong>{formatNumber(activity.positionSize)}</strong></div>
-                  <div><span>TokenId</span><strong>{activity.tokenId || "No disponible"}</strong></div>
-                  <div><span>ConditionId</span><strong>{activity.conditionId || "No disponible"}</strong></div>
-                  <div><span>MarketId</span><strong>{activity.marketId || "No disponible"}</strong></div>
-                  <div><span>Transaction hash</span><strong>{activity.transactionHash || "No disponible"}</strong></div>
-                  <div><span>Fecha</span><strong>{formatDateTime(activity.timestamp)}</strong></div>
                   <div><span>Realized PnL</span><strong>{formatUsd(activity.realizedPnl)}</strong></div>
                   <div><span>Unrealized PnL</span><strong>{formatUsd(activity.unrealizedPnl)}</strong></div>
                   <div><span>Win rate</span><strong>{formatPercent(activity.winRate)}</strong></div>
                   <div><span>Mercados cerrados</span><strong>{formatNumber(activity.closedMarkets)}</strong></div>
                   <div><span>Wins/Losses</span><strong>{activity.wins ?? "No disponible"} / {activity.losses ?? "No disponible"}</strong></div>
-                  <div><span>Fuente</span><strong>{activity.source || "Fuente publica no especificada"}</strong></div>
+                  <div><span>Fecha</span><strong>{formatDateTime(activity.timestamp)}</strong></div>
                 </div>
-                {(activity.warnings.length > 0 || activity.limitations.length > 0) ? (
-                  <div className="wallet-details-notes">
-                    {[...activity.warnings, ...activity.limitations].slice(0, 6).map((note) => (
-                      <span className="warning-chip" key={note}>{note}</span>
-                    ))}
-                  </div>
-                ) : null}
-                {activity.rawSourceFields ? (
+                {hasTechnicalDetails(activity) ? (
                   <details className="wallet-technical-details">
-                    <summary>Datos tecnicos</summary>
+                    <summary>Ver detalles</summary>
                     <dl>
-                      {Object.entries(activity.rawSourceFields).map(([key, value]) => (
+                      <div><dt>tokenId</dt><dd>{detailValue(activity.tokenId)}</dd></div>
+                      <div><dt>conditionId</dt><dd>{detailValue(activity.conditionId)}</dd></div>
+                      <div><dt>marketId</dt><dd>{detailValue(activity.marketId)}</dd></div>
+                      <div><dt>transactionHash</dt><dd>{detailValue(activity.transactionHash)}</dd></div>
+                      <div><dt>source</dt><dd>{activity.source || "Fuente publica no especificada"}</dd></div>
+                      {[...activity.warnings, ...activity.limitations].slice(0, 8).map((note, index) => (
+                        <div key={`note-${index}`}>
+                          <dt>{index < activity.warnings.length ? "warning" : "limitation"}</dt>
+                          <dd>{note}</dd>
+                        </div>
+                      ))}
+                      {Object.entries(activity.rawSourceFields ?? {}).map(([key, value]) => (
                         <div key={key}>
                           <dt>{key}</dt>
                           <dd>{detailValue(value)}</dd>
