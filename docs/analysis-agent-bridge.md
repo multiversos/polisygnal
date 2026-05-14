@@ -212,4 +212,21 @@ suficientes para decision o estimate propio. No es error del sistema ni debe
 contar como prediccion. `report_received` puede contener un reporte `partial`;
 eso solo confirma que el contrato paso validacion.
 
+## Presentacion en `/analyze`
+
+`AnalyzerReport` separa lectura automatica y estimacion PolySignal:
+
+- `partial` se muestra como `Lectura parcial automatica`.
+- `insufficient_data` o reporte `failed` se muestra como `Sin senales suficientes`.
+- `completed` solo se muestra cuando el agente lo devuelve realmente.
+- `suggestedDecision.available=false` o una sugerencia que no pasa compuertas
+  conserva el texto `No hay estimacion propia de PolySignal para este mercado`.
+- Las senales del reporte se muestran como tarjetas con label, direccion,
+  confianza y fuente real.
+- Riesgos, limitaciones, fuentes usadas y `Que revisar primero` se muestran en
+  secciones separadas para evitar que el precio de mercado parezca una
+  prediccion.
+- El resumen de mercado y el resumen de billeteras pueden abrir los drawers
+  `Ver datos` y `Ver billeteras`; esos drawers no se abren automaticamente.
+
 La UI publica sigue sin carga manual, JSON, schema, brief ni reportes manuales.

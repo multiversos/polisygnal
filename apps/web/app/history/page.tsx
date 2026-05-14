@@ -1253,6 +1253,23 @@ export default function HistoryPage() {
                       ))}
                     </div>
                   ) : null}
+                  {item.agentSummary ? (
+                    <p className="section-note">
+                      {agentName}: {item.agentSummary}
+                    </p>
+                  ) : null}
+                  {item.agentKeySignals && item.agentKeySignals.length > 0 ? (
+                    <div className="data-health-notes">
+                      {item.agentKeySignals.slice(0, 4).map((signal) => (
+                        <span className="badge external-hint" key={`${item.id}-${signal.source}-${signal.label}`}>
+                          {signal.label}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {item.agentLimitations && item.agentLimitations.length > 0 ? (
+                    <p className="section-note">{item.agentLimitations.slice(0, 2).join(" ")}</p>
+                  ) : null}
                   {item.reasons && item.reasons.length > 0 ? (
                     <p className="section-note">{item.reasons.slice(0, 2).join(" ")}</p>
                   ) : (

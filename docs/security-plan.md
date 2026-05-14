@@ -65,6 +65,18 @@ external evidence, copy schemas, download task packets, or inspect raw JSON. If
 Samantha or another source is unavailable, the UI must say the automatic source
 is unavailable or show a partial reading.
 
+The final `/analyze` report must keep three ideas separate:
+
+- market price/probability is a Polymarket reference, not a PolySignal estimate;
+- Samantha/agent `partial` output is context, not a completed prediction;
+- `suggestedDecision.available=false` means no prediction should be shown or
+  counted in history.
+
+The report may show agent key signals, risks, limitations and sources, but only
+from sanitized structured output or derived unavailable-state explanations. It
+must not invent ROI, win rate, PnL, odds, news, injuries, wallet actions or
+external signals.
+
 Accepted links:
 
 - `https://polymarket.com/event/...`

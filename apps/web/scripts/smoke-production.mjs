@@ -657,10 +657,16 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport missing accessible deep job state");
   assert(reportSource.includes("{analysisAgentName} automatico"), "AnalyzerReport missing dynamic automatic agent state");
   assert(reportSource.includes("Fuente automatica no disponible"), "AnalyzerReport missing automatic-source unavailable state");
+  assert(reportSource.includes("Lectura parcial automatica"), "AnalyzerReport should label partial automatic readings");
+  assert(reportSource.includes("Senales principales"), "AnalyzerReport should expose agent key signals");
+  assert(reportSource.includes("Riesgos"), "AnalyzerReport should expose agent risks");
+  assert(reportSource.includes("Limitaciones"), "AnalyzerReport should expose agent limitations");
+  assert(reportSource.includes("Que revisar primero"), "AnalyzerReport should explain what to review first");
+  assert(reportSource.includes("No hay estimacion propia de PolySignal"), "AnalyzerReport should not show market price as PolySignal estimate");
   assert(reportSource.includes("Analisis profundo"), "AnalyzerReport missing deep analysis section");
   assert(reportSource.includes("Capas del motor"), "AnalyzerReport missing deep analyzer layers");
   assert(reportSource.includes("Pendiente de integracion"), "AnalyzerReport should label future layers as pending");
-  assert(reportSource.includes("Lectura con fuentes disponibles"), "AnalyzerReport missing public Samantha reading workflow");
+  assert(reportSource.includes("Lectura rapida de"), "AnalyzerReport missing public agent reading workflow");
   assert(reportSource.includes("NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS"), "AnalyzerReport should gate manual debug tools");
   assert(reportSource.includes("Guardar y continuar despues"), "AnalyzerReport missing save-and-continue action");
   assert(reportSource.includes("parseSamanthaResearchReport"), "AnalyzerReport missing Samantha report validation");

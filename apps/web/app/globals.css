@@ -9783,6 +9783,110 @@ html:not([data-theme="dark"]) .app-sidebar {
     var(--surface-muted);
 }
 
+.samantha-report-status {
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--foreground);
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.samantha-report-status.completed {
+  border-color: color-mix(in srgb, #34d399 38%, var(--line));
+  background: color-mix(in srgb, #34d399 10%, transparent);
+}
+
+.samantha-report-status.insufficient,
+.samantha-report-status.partial {
+  border-color: color-mix(in srgb, #facc15 34%, var(--line));
+  background: color-mix(in srgb, #facc15 8%, transparent);
+}
+
+.samantha-report-status.unavailable {
+  border-color: color-mix(in srgb, #f87171 34%, var(--line));
+  background: color-mix(in srgb, #f87171 8%, transparent);
+}
+
+.samantha-report-hero {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.samantha-report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.samantha-report-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.samantha-report-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+.samantha-report-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.samantha-report-section-heading span,
+.samantha-report-section > span,
+.samantha-report-section-heading em {
+  color: var(--muted-strong);
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.samantha-report-section strong {
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.samantha-report-section p,
+.samantha-report-section small {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.samantha-report-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.samantha-report-list li {
+  padding-left: 2px;
+}
+
 .samantha-action-row {
   display: flex;
   flex-wrap: wrap;
@@ -10149,6 +10253,11 @@ html:not([data-theme="dark"]) .app-sidebar {
     grid-template-columns: 1fr;
   }
 
+  .samantha-report-grid,
+  .samantha-report-grid.three {
+    grid-template-columns: 1fr;
+  }
+
   .analyzer-report-actions {
     justify-content: flex-start;
     max-width: none;
@@ -10230,6 +10339,8 @@ html:not([data-theme="dark"]) .app-sidebar {
   .deep-job-preview ol,
   .deep-job-step-list,
   .analyzer-deep-layer-grid,
+  .samantha-report-grid,
+  .samantha-report-grid.three,
   .analyzer-start-steps,
   .wallet-report-summary,
   .wallet-report-row {

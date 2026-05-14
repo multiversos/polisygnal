@@ -127,7 +127,12 @@ export type AnalysisHistoryItem = {
   analyzerLayers?: AnalysisHistoryAnalyzerLayer[];
   agentId?: string;
   agentName?: string;
+  agentKeySignals?: AnalysisHistorySignalContribution[];
+  agentLimitations?: string[];
+  agentRisks?: string[];
+  agentSourcesUsed?: string[];
   agentStatus?: AnalysisHistoryAgentStatus;
+  agentSummary?: string;
   awaitingResearch?: boolean;
   bridgeMode?: AnalysisHistoryBridgeMode;
   bridgeStatus?: AnalysisHistoryBridgeStatus;
@@ -681,8 +686,13 @@ function normalizeItem(value: Partial<AnalysisHistoryItem>): AnalysisHistoryItem
     analyzedAt: value.analyzedAt || nowIso(),
     analyzerLayers: normalizeAnalyzerLayers(value.analyzerLayers),
     agentId: normalizeString(value.agentId, 80),
+    agentKeySignals: normalizeSignalContributions(value.agentKeySignals),
+    agentLimitations: normalizeStringList(value.agentLimitations, 8),
     agentName: normalizeString(value.agentName, 80),
+    agentRisks: normalizeStringList(value.agentRisks, 8),
+    agentSourcesUsed: normalizeStringList(value.agentSourcesUsed, 10),
     agentStatus: normalizeAgentStatus(value.agentStatus),
+    agentSummary: normalizeString(value.agentSummary, 700),
     awaitingResearch: value.awaitingResearch === true,
     bridgeMode: normalizeBridgeMode(value.bridgeMode),
     bridgeStatus: normalizeBridgeStatus(value.bridgeStatus),

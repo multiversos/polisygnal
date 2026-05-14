@@ -98,6 +98,7 @@ import { getMarketActivityLabel, getMarketReviewReason } from "../lib/publicMark
 import { getPublicMarketStatus } from "../lib/publicMarketStatus";
 import { buildSamanthaResearchBrief } from "../lib/samanthaResearchBrief";
 import {
+  convertSamanthaReportToEvidence,
   convertSamanthaReportToSignals,
   parseSamanthaResearchReport,
 } from "../lib/samanthaResearchReport";
@@ -724,6 +725,7 @@ function historyPayloadFromMarket(
   analyzerResult: AnalyzerResult,
   deepJob?: DeepAnalysisJob | null,
   polySignalEstimate?: PolySignalEstimateResult,
+  samanthaReportResult?: SamanthaResearchParseResult | null,
 ) {
   const marketProbabilities = getMarketImpliedProbabilities({
     marketNoPrice: item.latest_snapshot?.no_price,
@@ -758,6 +760,25 @@ function historyPayloadFromMarket(
           ? decision.evaluationReason
           : "Prediccion clara guardada solo cuando la estimacion PolySignal supera 55%.";
   const analyzerSummary = getAnalyzerSummary(analyzerResult);
+  const samanthaReport = samanthaReportResult?.valid ? samanthaReportResult.report : undefined;
+  const samanthaEvidence = samanthaReport ? convertSamanthaReportToEvidence(samanthaReport) : [];
+  const agentSourcesUsed = [
+    deepJob?.analysisAgent?.agentName,
+    "Polymarket",
+    safeWalletSummaryForHistory(item)?.available ? "Wallet Intelligence" : null,
+    ...samanthaEvidence.map((evidence) => evidence.sourceName),
+    samanthaReport?.oddsComparison?.found ? "Odds externas" : null,
+    samanthaReport?.kalshiComparison?.found ? "Kalshi" : null,
+  ].filter((source): source is string => Boolean(source));
+  const agentLimitations = [
+    samanthaReport?.status === "partial"
+      ? "Lectura parcial: faltan senales independientes suficientes."
+      : null,
+    samanthaReport?.status === "failed" ? "Sin senales suficientes." : null,
+    !polySignalEstimate?.available
+      ? "No hay estimacion propia de PolySignal para este mercado."
+      : null,
+  ].filter((entry): entry is string => Boolean(entry));
   return {
     analyzedAt: new Date().toISOString(),
     analyzerLayers: analyzerResult.layers.map((layer) => ({
@@ -795,7 +816,23 @@ function historyPayloadFromMarket(
     awaitingResearch: jobAwaitsResearch(deepJob),
     agentId: deepJob?.analysisAgent?.agentId,
     agentName: deepJob?.analysisAgent?.agentName,
+    agentKeySignals: samanthaEvidence.slice(0, 8).map((evidence) => ({
+      confidence: evidence.reliability,
+      direction: evidence.direction,
+      label: evidence.title,
+      source: evidence.sourceName,
+      summary: evidence.summary,
+    })),
+    agentLimitations,
+    agentRisks: [
+      ...(samanthaReport?.warnings ?? []),
+      ...(!polySignalEstimate?.available
+        ? ["No hay senales independientes suficientes para una estimacion propia."]
+        : []),
+    ],
+    agentSourcesUsed: [...new Set(agentSourcesUsed)].slice(0, 10),
     agentStatus: deepJob?.analysisAgent?.status,
+    agentSummary: samanthaEvidence[0]?.summary,
     bridgeMode: deepJob?.samanthaBridge?.bridgeMode,
     bridgeStatus: deepJob?.samanthaBridge?.bridgeStatus,
     bridgeTaskId: deepJob?.samanthaBridge?.bridgeTaskId ?? deepJob?.samanthaBridge?.taskId,
@@ -816,6 +853,9 @@ function historyPayloadFromMarket(
       reviewReason.reason,
       activity?.detail,
       predictionReason,
+      ...samanthaEvidence
+        .slice(0, 2)
+        .map((evidence) => `${evidence.title}: ${evidence.summary}`),
       ...(polySignalEstimate?.available
         ? polySignalEstimate.contributions
             .filter((contribution) => contribution.usedForEstimate)
@@ -2535,6 +2575,7 @@ export default function AnalyzePage() {
         analyzerResult,
         deepAnalysisJob,
         polySignalEstimate,
+        samanthaAutoReportResult,
       );
       const savedItem = await saveAnalysisHistoryItem(payload);
       setAnalysisHistoryItems((current) => [savedItem, ...current.filter((entry) => entry.id !== savedItem.id)]);
@@ -2545,7 +2586,7 @@ export default function AnalyzePage() {
     } finally {
       setActionBusy(false);
     }
-  }, [analysisHistoryItems, deepAnalysisJob, state]);
+  }, [analysisHistoryItems, deepAnalysisJob, samanthaAutoReportResult, state]);
 
   const handleSaveCurrentAnalysis = useCallback(() => {
     if (state.status !== "result") {
@@ -2758,6 +2799,8 @@ export default function AnalyzePage() {
                     matchScore={match.score}
                     normalizedUrl={analyzedNormalizedUrl}
                     onDeepAnalysisJobChange={persistDeepAnalysisJob}
+                    onOpenMarketDetails={() => setMarketDetailsOpen(true)}
+                    onOpenWalletDetails={() => setWalletDetailsOpen(true)}
                     onSaveHistory={handleSaveHistory}
                     onToggleWatchlist={handleToggleWatchlist}
                     relatedHistory={relatedHistory}

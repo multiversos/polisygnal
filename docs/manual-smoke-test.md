@@ -633,18 +633,26 @@ Use these quick checks when reviewing public pages:
 ## Samantha Automatic Workflow
 
 1. Open `/analyze` and analyze a Polymarket link.
-2. Confirm the selected report shows `Samantha automatica` and
-   `Lectura con fuentes disponibles`.
-3. Confirm the public flow does not show manual upload/copy/download/schema
+2. Confirm the selected report shows `Samantha automatica` and a clear
+   `Lectura rapida de Samantha` section.
+3. Confirm `report_received` with a partial report appears as
+   `Lectura parcial automatica`, not as a completed prediction.
+4. Confirm the final report shows `Senales principales`, `Riesgos`,
+   `Limitaciones`, `Que revisar primero`, and source badges when Samantha
+   returns them.
+5. Confirm the market summary and wallet summary in the report use real
+   Polymarket/Wallet Intelligence values and offer `Ver datos` / `Ver
+   billeteras` without opening drawers automatically.
+6. Confirm the public flow does not show manual upload/copy/download/schema
    controls by default.
-4. Confirm unavailable sources appear as `Fuente automatica no disponible` or
+7. Confirm unavailable sources appear as `Fuente automatica no disponible` or
    partial reading, not as a request for user evidence.
-5. Confirm no full wallet addresses appear outside the explicit `Ver billeteras`
+8. Confirm no full wallet addresses appear outside the explicit `Ver billeteras`
    drawer, and confirm no secrets, raw payloads, fake ROI/win rate, copy-trading
    language, fake odds, fake news, fake injuries, or betting advice appear.
-6. Confirm no prediction is created unless validated Samantha output and the
+9. Confirm no prediction is created unless validated Samantha output and the
    conservative PolySignal gates pass.
-7. Local debug-only manual report tooling may exist behind
+10. Local debug-only manual report tooling may exist behind
    `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`; it is not part of the public
    production flow.
 
