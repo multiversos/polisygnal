@@ -194,8 +194,9 @@ Before expanding real wallet lookups:
 
 ## Samantha Result Lookup Safety
 
-Nota `2026-05-13`: Samantha ahora es proveedor legacy del `Analysis Agent
-Bridge`. La ruta generica es `/api/analysis-agent/research-status`; la ruta
+Nota `2026-05-14`: Samantha ahora es proveedor del `Analysis Agent Bridge` en
+produccion mediante `ANALYSIS_AGENT_*`. La ruta generica es
+`/api/analysis-agent/research-status`; la ruta
 `/api/samantha/research-status` queda como alias compatible. Las mismas reglas
 aplican para cualquier agente: no destino arbitrario desde cliente, no
 `NEXT_PUBLIC` para tokens, no full wallets, no secretos, no copy-trading y no
@@ -212,7 +213,7 @@ Controls:
 - rejects fields such as `bridgeUrl`, `targetUrl`, `endpoint`, `destination`,
   `webhookUrl`, and similar client-provided destinations;
 - reads Samantha bridge URL/token only through server-side configuration in
-  `samanthaBridge.ts`;
+  the generic analysis agent registry/bridge helpers;
 - uses `credentials: "omit"`, `redirect: "error"`, short timeout and response
   size limits;
 - validates any completed report through the existing Samantha report validator
@@ -349,6 +350,7 @@ Samantha-side local endpoints:
 Deployable public bridge mode:
 
 - Samantha can run `npm run start:polysignal-bridge` as a narrow web service;
+- current Render host is `https://samantha-polysignal-bridge.onrender.com`;
 - the public mode exposes only `GET /health` and
   `POST /polysignal/analyze-market`;
 - production startup requires `SAMANTHA_BRIDGE_TOKEN`;
@@ -356,9 +358,17 @@ Deployable public bridge mode:
   only for local/dev;
 - `/polysignal/research-task`, NBA manual evidence, WhatsApp, OpenClaw and
   browser automation are not exposed by this service mode;
-- Vercel must configure `SAMANTHA_BRIDGE_ENABLED`, `SAMANTHA_BRIDGE_URL` and
-  `SAMANTHA_BRIDGE_TOKEN` server-side. If the config is absent, PolySignal must
-  keep returning a controlled `bridge_disabled` fallback.
+- Vercel should configure `ANALYSIS_AGENT_PROVIDER`,
+  `ANALYSIS_AGENT_ENABLED`, `ANALYSIS_AGENT_URL`, `ANALYSIS_AGENT_TOKEN`,
+  `ANALYSIS_AGENT_DISPLAY_NAME` and `ANALYSIS_AGENT_ALLOW_LOCALHOST`
+  server-side. Legacy `SAMANTHA_BRIDGE_*` remains compatible but is not the
+  preferred production path;
+- `/api/analysis-agent/diagnostics` and `/internal/data-status` expose only
+  sanitized diagnostics: provider, enabled, endpoint host, health status and
+  expected state. They must never return credentials, headers, raw payloads or
+  secrets;
+- if the config is absent or Render is unavailable after retry, PolySignal must
+  keep returning a controlled unavailable/partial fallback.
 
 History and performance safety:
 

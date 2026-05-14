@@ -49,6 +49,7 @@ type MarketsOverviewResponse = {
 };
 
 type PageState = {
+  agentDiagnostic: AnalysisAgentDiagnostic | null;
   error: string | null;
   items: MarketOverviewItem[];
   loadedPages: number;
@@ -56,6 +57,23 @@ type PageState = {
   proxyStatus: "checking" | "error" | "ok";
   totalCount: number;
   updatedAt: Date | null;
+};
+
+type AnalysisAgentDiagnostic = {
+  agentId?: string;
+  agentName?: string;
+  bridgeEnabled?: boolean;
+  endpointConfigured?: boolean;
+  endpointHost?: string | null;
+  expectedState?: "Connected" | "Disabled" | "Misconfigured" | "Unavailable";
+  health?: {
+    checkedAt?: string;
+    httpStatus?: number | null;
+    message?: string;
+    status?: "error" | "ok" | "skipped";
+  };
+  message?: string;
+  usesGenericEnv?: boolean;
 };
 
 const PAGE_SIZE = 50;
@@ -132,8 +150,24 @@ async function fetchSoccerOverview(): Promise<{
   return { items, loadedPages, totalCount };
 }
 
+async function fetchAnalysisAgentDiagnostic(): Promise<AnalysisAgentDiagnostic | null> {
+  try {
+    const response = await fetch("/api/analysis-agent/diagnostics", {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as AnalysisAgentDiagnostic;
+  } catch {
+    return null;
+  }
+}
+
 export default function InternalDataStatusPage() {
   const [state, setState] = useState<PageState>({
+    agentDiagnostic: null,
     error: null,
     items: [],
     loadedPages: 0,
@@ -146,8 +180,12 @@ export default function InternalDataStatusPage() {
   const load = useCallback(async () => {
     setState((current) => ({ ...current, error: null, loading: true, proxyStatus: "checking" }));
     try {
-      const payload = await fetchSoccerOverview();
+      const [payload, agentDiagnostic] = await Promise.all([
+        fetchSoccerOverview(),
+        fetchAnalysisAgentDiagnostic(),
+      ]);
       setState({
+        agentDiagnostic,
         error: null,
         items: payload.items,
         loadedPages: payload.loadedPages,
@@ -373,6 +411,64 @@ export default function InternalDataStatusPage() {
             <span>Sin evidencia externa</span>
             <strong>{externalResearchReadiness.missingExternalEvidence}</strong>
             <p>No hay fuentes externas verificadas disponibles todavia.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading compact">
+          <div>
+            <p className="eyebrow">Analysis Agent Bridge</p>
+            <h2>{state.agentDiagnostic?.message ?? "Agente pendiente de diagnostico"}</h2>
+            <p>
+              Diagnostico interno read-only del puente entre PolySignal y el agente
+              analizador. Muestra solo estado y dominio configurado, nunca credenciales.
+            </p>
+          </div>
+        </div>
+        <div className="internal-status-grid">
+          <article className="internal-status-card">
+            <span>Provider activo</span>
+            <strong>{state.agentDiagnostic?.agentName ?? "No disponible"}</strong>
+            <p>{state.agentDiagnostic?.agentId ?? "Sin identificador visible."}</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Bridge enabled</span>
+            <strong>{state.agentDiagnostic?.bridgeEnabled ? "Si" : "No"}</strong>
+            <p>
+              {state.agentDiagnostic?.usesGenericEnv
+                ? "Usa variables ANALYSIS_AGENT_*."
+                : "Usa compatibilidad legacy o no hay configuracion generica."}
+            </p>
+          </article>
+          <article className="internal-status-card">
+            <span>Bridge URL configurada</span>
+            <strong>{state.agentDiagnostic?.endpointConfigured ? "Si" : "No"}</strong>
+            <p>{state.agentDiagnostic?.endpointHost ?? "Dominio no disponible."}</p>
+          </article>
+          <article className="internal-status-card">
+            <span>Ultimo health check</span>
+            <strong>
+              {state.agentDiagnostic?.health?.status === "ok"
+                ? "OK"
+                : state.agentDiagnostic?.health?.status === "error"
+                  ? "Error"
+                  : "Pendiente"}
+            </strong>
+            <p>
+              {state.agentDiagnostic?.health?.httpStatus
+                ? `HTTP ${state.agentDiagnostic.health.httpStatus}`
+                : state.agentDiagnostic?.health?.message ?? "Sin consulta reciente."}
+            </p>
+          </article>
+          <article className="internal-status-card">
+            <span>Estado esperado</span>
+            <strong>{state.agentDiagnostic?.expectedState ?? "Unavailable"}</strong>
+            <p>
+              {state.agentDiagnostic?.expectedState === "Connected"
+                ? "Samantha puede responder lecturas automaticas."
+                : "La UI conserva lectura parcial sin flujo manual publico."}
+            </p>
           </article>
         </div>
       </section>

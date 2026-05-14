@@ -1,6 +1,6 @@
 # Analysis Agent Bridge
 
-Fecha de corte: `2026-05-13`.
+Fecha de corte: `2026-05-14`.
 
 PolySignal ya no acopla `/analyze` a Samantha como unico proveedor. El flujo
 publico es:
@@ -11,6 +11,37 @@ El usuario pega un enlace de Polymarket. PolySignal resuelve el mercado, carga
 datos read-only de Polymarket/Gamma, ejecuta Wallet Intelligence y llama al
 agente analizador activo. Si el agente no esta conectado, la UI muestra fuente
 automatica no disponible y mantiene una lectura parcial segura.
+
+## Estado production
+
+Samantha es el proveedor activo en produccion:
+
+```text
+ANALYSIS_AGENT_PROVIDER=samantha
+ANALYSIS_AGENT_ENABLED=true
+ANALYSIS_AGENT_URL=https://samantha-polysignal-bridge.onrender.com/polysignal/analyze-market
+ANALYSIS_AGENT_DISPLAY_NAME=Samantha
+ANALYSIS_AGENT_ALLOW_LOCALHOST=false
+```
+
+`ANALYSIS_AGENT_TOKEN` existe solo como secreto server-side en Vercel y no debe
+imprimirse, commitearse ni exponerse en respuestas. Samantha Bridge corre en
+Render como `https://samantha-polysignal-bridge.onrender.com`; su health publico
+seguro es `GET /health`.
+
+Diagnostico interno:
+
+- `GET /api/analysis-agent/config`: estado publico sanitizado de la config.
+- `GET /api/analysis-agent/diagnostics`: estado interno read-only con provider,
+  dominio, enabled, ultimo health check y estado esperado. No devuelve token,
+  headers, payload crudo ni secretos.
+- `/internal/data-status`: muestra esos datos en una tarjeta interna oculta de
+  la navegacion publica.
+
+Si Render esta dormido, `smoke:production` permite retry razonable. Si el
+servicio no responde despues del retry, PolySignal debe mostrar lectura parcial
+o fuente automatica no disponible, nunca `JSON`, schema, stack trace ni carga
+manual publica.
 
 ## Archivos
 
@@ -145,9 +176,16 @@ Estados aceptados:
 
 ## Estados publicos
 
+- `report_received`: el agente devolvio un reporte estructurado y PolySignal lo
+  valido antes de mostrarlo.
 - `unavailable`: fuente automatica no disponible.
 - `partial`: lectura parcial automatica.
 - `insufficient_data`: sin senales suficientes.
 - `failed_safe`: error seguro sin detalles tecnicos.
+
+`insufficient_data` significa que Samantha no encontro senales reales
+suficientes para decision o estimate propio. No es error del sistema ni debe
+contar como prediccion. `report_received` puede contener un reporte `partial`;
+eso solo confirma que el contrato paso validacion.
 
 La UI publica sigue sin carga manual, JSON, schema, brief ni reportes manuales.

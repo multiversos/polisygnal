@@ -672,23 +672,44 @@ configured.
 
 ## Samantha Bridge Public HTTPS
 
-Use this only after Samantha is deployed as a public HTTPS service with
-`npm run start:polysignal-bridge`.
+Samantha Bridge esta desplegado en Render:
 
-1. Confirm `GET https://<samantha-bridge-host>/health` returns:
+```text
+https://samantha-polysignal-bridge.onrender.com
+```
+
+Use este checklist para validar que PolySignal sigue conectado sin exponer
+secretos.
+
+1. Confirm `GET https://samantha-polysignal-bridge.onrender.com/health` returns:
    `{"status":"ok","service":"samantha-polysignal-bridge"}`.
-2. Confirm `POST https://<samantha-bridge-host>/polysignal/analyze-market`
-   rejects missing or invalid token with 401.
-3. Confirm the same POST with the configured token returns `partial` or
-   `insufficient_data`, never a market-price-only PolySignal estimate.
-4. In Vercel, configure server-side only:
-   - `SAMANTHA_BRIDGE_ENABLED=true`
-   - `SAMANTHA_BRIDGE_URL=https://<samantha-bridge-host>/polysignal/analyze-market`
-   - `SAMANTHA_BRIDGE_TOKEN=<secret>`
-5. Redeploy PolySignal if Vercel requires it for env changes.
-6. Confirm `/api/samantha/send-research` no longer returns `bridge_disabled`.
-7. Confirm `/analyze` still hides manual upload/copy/download/schema tools.
-8. Run `npm.cmd --workspace apps/web run smoke:production`.
+2. Confirm `POST https://samantha-polysignal-bridge.onrender.com/polysignal/analyze-market`
+   rejects missing or invalid credentials with 401.
+3. Confirm a valid request through PolySignal
+   `POST /api/analysis-agent/send-research` returns `report_received`,
+   `partial` or `insufficient_data`, never a market-price-only PolySignal
+   estimate.
+4. In Vercel, keep these server-side variables configured:
+   - `ANALYSIS_AGENT_PROVIDER=samantha`
+   - `ANALYSIS_AGENT_ENABLED=true`
+   - `ANALYSIS_AGENT_URL=https://samantha-polysignal-bridge.onrender.com/polysignal/analyze-market`
+   - `ANALYSIS_AGENT_TOKEN=<secret>`
+   - `ANALYSIS_AGENT_DISPLAY_NAME=Samantha`
+   - `ANALYSIS_AGENT_ALLOW_LOCALHOST=false`
+5. To rotate credentials, update the Render secret and the Vercel
+   `ANALYSIS_AGENT_TOKEN` with the same new value, then redeploy PolySignal if
+   Vercel requires it. Do not commit or print the value.
+6. Confirm `/api/analysis-agent/config` reports `enabled=true` and
+   `endpointConfigured=true`.
+7. Open `/internal/data-status` and confirm the Analysis Agent Bridge card shows
+   `Samantha Bridge conectado`, the Render domain, and no credentials.
+8. Confirm `/api/samantha/send-research` and `/api/analysis-agent/send-research`
+   no longer return `bridge_disabled`.
+9. Confirm `/analyze` still hides manual upload/copy/download/schema tools.
+10. If Render is waking from sleep, retry health once or twice before treating
+   it as an outage. The UI should fall back to partial automatic reading, not
+   raw errors.
+11. Run `npm.cmd --workspace apps/web run smoke:production`.
 
 ## Cache Troubleshooting
 

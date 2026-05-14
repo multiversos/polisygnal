@@ -9,6 +9,9 @@ const execFileAsync = promisify(execFile);
 const FRONTEND_BASE_URL = (
   process.env.POLYSIGNAL_SMOKE_FRONTEND_URL || "https://polisygnal-web.vercel.app"
 ).replace(/\/$/, "");
+const SAMANTHA_BRIDGE_HEALTH_URL =
+  process.env.POLYSIGNAL_SMOKE_SAMANTHA_HEALTH_URL ||
+  "https://samantha-polysignal-bridge.onrender.com/health";
 const MIN_SOCCER_MARKETS = Number(process.env.POLYSIGNAL_SMOKE_MIN_SOCCER_MARKETS || 75);
 const MIN_SOCCER_MATCH_CARDS = Number(process.env.POLYSIGNAL_SMOKE_MIN_SOCCER_MATCH_CARDS || 20);
 const EXPECTED_COMMIT = process.env.POLYSIGNAL_SMOKE_EXPECTED_COMMIT || "";
@@ -290,6 +293,40 @@ async function fetchJson(path) {
     }
     console.warn(`${path} retrying after transient failure on attempt ${attempt}/${attempts}`);
     await sleep(1600 * attempt);
+  }
+  throw lastError;
+}
+
+async function fetchExternalJsonWithRetry(url, label) {
+  const attempts = 5;
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      const text = await response.text();
+      let body;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = { raw: text.slice(0, 200) };
+      }
+      if (response.ok) {
+        if (attempt > 1) {
+          console.warn(`${label} passed on retry ${attempt}/${attempts}`);
+        }
+        return { body, status: response.status };
+      }
+      lastError = new Error(`${label} returned HTTP ${response.status}: ${JSON.stringify(body)}`);
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < attempts) {
+      console.warn(`${label} retrying after transient failure on attempt ${attempt}/${attempts}`);
+      await sleep(1800 * attempt);
+    }
   }
   throw lastError;
 }
@@ -756,6 +793,15 @@ function validateInternalDataStatusPage(dom) {
   assertTextIncludes(text, "Investigacion externa", "internal external research readiness");
   assertTextIncludes(text, "Con evidencia externa real", "internal external research readiness");
   assertTextIncludes(text, "Sin evidencia externa", "internal external research readiness");
+  assertTextIncludes(text, "Analysis Agent Bridge", "internal analysis agent diagnostics");
+  assertTextIncludes(text, "Provider activo", "internal analysis agent diagnostics");
+  assertTextIncludes(text, "Bridge URL configurada", "internal analysis agent diagnostics");
+  assertTextIncludes(text, "Ultimo health check", "internal analysis agent diagnostics");
+  assertTextIncludesOneOf(
+    text,
+    ["Samantha Bridge conectado", "Agente no disponible", "Agente configurado"],
+    "internal analysis agent health state",
+  );
   assertTextIncludes(text, "Inteligencia de billeteras", "internal wallet intelligence readiness");
   assertTextIncludesOneOf(
     text,
@@ -778,6 +824,58 @@ function validateInternalDataStatusPage(dom) {
 async function main() {
   const buildInfo = await fetchJson(BUILD_INFO_PATH);
   validateBuildInfo(buildInfo);
+  const samanthaBridgeHealth = await fetchExternalJsonWithRetry(
+    SAMANTHA_BRIDGE_HEALTH_URL,
+    "Samantha Bridge health",
+  );
+  assert(
+    samanthaBridgeHealth.body?.status === "ok" &&
+      samanthaBridgeHealth.body?.service === "samantha-polysignal-bridge",
+    "Samantha Bridge health did not return the expected safe status",
+  );
+  const analysisAgentConfig = await fetchJson("/api/analysis-agent/config");
+  assert(analysisAgentConfig.body?.agentName, "analysis agent config did not return an agent name");
+  assert(analysisAgentConfig.body?.enabled === true, "analysis agent config is not enabled in production");
+  assert(
+    analysisAgentConfig.body?.endpointConfigured === true,
+    "analysis agent config does not have an endpoint configured",
+  );
+  const analysisAgentSmoke = await postJsonAllowFailure("/api/analysis-agent/send-research", {
+    marketItem: {
+      evidence_summary: { evidence_count: 0, news_evidence_count: 0, odds_evidence_count: 0 },
+      latest_snapshot: {
+        captured_at: new Date().toISOString(),
+        liquidity: 500,
+        no_price: 0.99,
+        volume: 1000,
+        yes_price: 0.01,
+      },
+      market: {
+        active: true,
+        closed: false,
+        event_slug: "smoke-analysis-agent-event",
+        event_title: "Smoke analysis agent event",
+        id: 987654,
+        market_slug: "smoke-analysis-agent-market",
+        question: "Smoke analysis agent market?",
+        sport_type: "politics",
+      },
+    },
+    normalizedUrl: "https://polymarket.com/market/smoke-analysis-agent-market",
+    url: "https://polymarket.com/market/smoke-analysis-agent-market",
+  });
+  assert(analysisAgentSmoke.status === 200, `analysis agent smoke returned HTTP ${analysisAgentSmoke.status}`);
+  assert(analysisAgentSmoke.body?.automaticAvailable === true, "analysis agent smoke was not automatic");
+  assert(analysisAgentSmoke.body?.errorCode !== "bridge_disabled", "analysis agent smoke returned bridge_disabled");
+  assert(
+    ["agent_researching", "fallback_required", "report_received"].includes(analysisAgentSmoke.body?.status),
+    `analysis agent smoke returned unexpected status ${analysisAgentSmoke.body?.status}`,
+  );
+  assertTextExcludes(
+    JSON.stringify(analysisAgentSmoke.body),
+    ["DATABASE_URL", "SECRET", "TOKEN", "API_KEY", "copy-trading", "ROI 100%", "win rate 100%"],
+    "analysis agent smoke response",
+  );
   const analyzeLoadingPanel = validateAnalyzeLoadingPanelSource();
   const securityHeaders = validateSecurityHeaders(await fetchPage(HOME_PATH), "home headers");
   const overview = await fetchJson(PROXY_PATH);
@@ -1335,6 +1433,15 @@ async function main() {
           env: buildInfo.body.env,
           api_host: buildInfo.body.api_host,
           proxy: buildInfo.body.proxy,
+        },
+        samantha_bridge_health: {
+          status: samanthaBridgeHealth.status,
+          service: samanthaBridgeHealth.body.service,
+        },
+        analysis_agent: {
+          agent: analysisAgentConfig.body.agentName,
+          endpoint_configured: analysisAgentConfig.body.endpointConfigured,
+          status: analysisAgentSmoke.body.status,
         },
         security: securityHeaders,
         proxy: {

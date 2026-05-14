@@ -1,6 +1,6 @@
 # Samantha Research Integration
 
-Fecha de corte: `2026-05-13`.
+Fecha de corte: `2026-05-14`.
 
 Samantha es el primer proveedor del Analysis Agent Bridge. No vive en este repo.
 PolySignal ya no depende internamente de Samantha como unico agente: la capa
@@ -30,9 +30,9 @@ Decision de arquitectura actual:
 - Samantha queda como proveedor `samantha` por defecto.
 - Variables genericas `ANALYSIS_AGENT_*` tienen prioridad.
 - Variables `SAMANTHA_BRIDGE_*` siguen funcionando como compatibilidad temporal.
-- Si no hay endpoint publico configurado, PolySignal devuelve fallback seguro
-  `unavailable`/`bridge_disabled` y la UI muestra fuente automatica no
-  disponible.
+- En produccion, Samantha Bridge ya esta desplegado en Render y PolySignal usa
+  `ANALYSIS_AGENT_*` server-side. Si el endpoint se cae o Render tarda en
+  despertar, PolySignal conserva fallback seguro `unavailable`/lectura parcial.
 - El flujo publico no pide cargar reportes, pegar JSON, copiar schema ni
   preparar evidencia.
 
@@ -112,21 +112,27 @@ Configuracion server-side opcional:
 
 Produccion:
 
-- Samantha debe correr como servicio publico HTTPS separado con start command
+- Samantha corre como servicio publico HTTPS separado con start command
   `npm run start:polysignal-bridge`.
 - El servicio expone `GET /health` y `POST /polysignal/analyze-market`.
+- URL actual: `https://samantha-polysignal-bridge.onrender.com`.
 - Variables Samantha requeridas:
   - `NODE_ENV=production`
   - `POLYSIGNAL_BRIDGE_MODE=true`
   - `SAMANTHA_BRIDGE_TOKEN=<secret>`
   - `POLYSIGNAL_ALLOWED_ORIGIN=https://polisygnal-web.vercel.app`
-- Variables Vercel requeridas:
-  - `SAMANTHA_BRIDGE_ENABLED=true`
-  - `SAMANTHA_BRIDGE_URL=https://<samantha-bridge-host>/polysignal/analyze-market`
-  - `SAMANTHA_BRIDGE_TOKEN=<same secret>`
-- Si estas variables no estan configuradas, produccion responde
-  `bridge_disabled` y la UI conserva fallback seguro sin pedir reportes
-  manuales.
+- Variables Vercel recomendadas:
+  - `ANALYSIS_AGENT_PROVIDER=samantha`
+  - `ANALYSIS_AGENT_ENABLED=true`
+  - `ANALYSIS_AGENT_URL=https://samantha-polysignal-bridge.onrender.com/polysignal/analyze-market`
+  - `ANALYSIS_AGENT_TOKEN=<same secret>`
+  - `ANALYSIS_AGENT_DISPLAY_NAME=Samantha`
+  - `ANALYSIS_AGENT_ALLOW_LOCALHOST=false`
+- Las variables `SAMANTHA_BRIDGE_*` siguen como compatibilidad legacy, pero no
+  son el camino preferido.
+- Si estas variables no estan configuradas, produccion puede responder
+  `bridge_disabled`; con la configuracion actual el flujo validado devuelve
+  `report_received` o una lectura parcial segura sin pedir reportes manuales.
 
 Controles:
 
@@ -140,6 +146,18 @@ Controles:
 - devuelve solo acuse/reporte normalizado, nunca payload crudo ni tokens;
 - si Samantha devuelve reporte, PolySignal vuelve a validarlo con
   `parseSamanthaResearchReport` antes de aceptarlo.
+
+Diagnostico:
+
+- `GET https://samantha-polysignal-bridge.onrender.com/health` debe devolver
+  status OK.
+- `POST /api/analysis-agent/send-research` usa el secreto server-side en Vercel
+  y permite probar el camino valido sin leer ni imprimir el valor.
+- `/internal/data-status` muestra provider activo, dominio configurado, enabled,
+  ultimo health check y estado esperado. No muestra token, headers ni payloads.
+- Para rotar el secreto, cambiar el valor en Render y en Vercel con el mismo
+  nuevo valor y redeploy si Vercel lo requiere. No cambiar codigo ni docs con
+  el secreto real.
 
 ## Integracion con DeepAnalysisJob
 

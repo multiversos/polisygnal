@@ -2,12 +2,12 @@
 
 ## Snapshot
 
-- fecha de corte: `2026-05-13`
+- fecha de corte: `2026-05-14`
 - etapa: `visible_product_mvp`
-- foco actual: `/analyze` como centro del producto, con arquitectura Deep Analyzer read-only preparada y sin auth ni escrituras
+- foco actual: `/analyze` como centro del producto, con Analysis Agent Bridge conectado a Samantha Bridge en modo read-only
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production reportado antes de este sprint: `f7b9513`
+- ultimo deploy production validado: `2a3be56`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -80,11 +80,14 @@ Estado visible verificado:
   Jarvis, `custom` u otro servicio compatible con variables `ANALYSIS_AGENT_*`
   sin reescribir `/analyze`. Las rutas legacy `/api/samantha/*` siguen como
   alias compatibles.
-- Produccion puede seguir mostrando `bridge_disabled`/fuente automatica no
-  disponible hasta que exista un endpoint HTTPS publico de Samantha o de otro
-  agente y Vercel tenga `ANALYSIS_AGENT_ENABLED`, `ANALYSIS_AGENT_URL` y
-  `ANALYSIS_AGENT_TOKEN` configuradas. Esto no debe romper smoke production ni
-  activar flujo manual publico.
+- Produccion ya usa Samantha Bridge como proveedor `samantha` por medio de
+  variables `ANALYSIS_AGENT_*` server-side en Vercel. El endpoint publico es
+  `https://samantha-polysignal-bridge.onrender.com/polysignal/analyze-market`;
+  `/health` devuelve OK y `/api/analysis-agent/send-research` ya no devuelve
+  `bridge_disabled` en el flujo validado.
+- Si Render esta dormido o tarda en despertar, la UI debe conservar lectura
+  parcial/fuente automatica no disponible sin mostrar stack traces, JSON,
+  schema ni flujo manual publico.
 - Regla nueva de arquitectura: los mercados internos de PolySignal no son la
   fuente principal del Analizador de enlaces. Si Polymarket/Gamma no devuelve
   un evento o mercado, `/analyze` muestra un no-match honesto y no busca una
@@ -174,11 +177,20 @@ Estado visible verificado:
   navegador local; solo expone `GET /health` y
   `POST /polysignal/analyze-market`, exige `SAMANTHA_BRIDGE_TOKEN`, limita
   CORS con `POLYSIGNAL_ALLOWED_ORIGIN` y aplica rate limit basico.
-- Produccion PolySignal todavia necesita que Vercel tenga
-  `SAMANTHA_BRIDGE_ENABLED=true`,
-  `SAMANTHA_BRIDGE_URL=https://<samantha-bridge-host>/polysignal/analyze-market`
-  y `SAMANTHA_BRIDGE_TOKEN` configurados. Sin eso, la ruta responde
-  `bridge_disabled` y queda en lectura parcial/fuente automatica no disponible.
+- Samantha Bridge esta desplegado en Render como
+  `https://samantha-polysignal-bridge.onrender.com`. Render requiere
+  `NODE_ENV=production`, `POLYSIGNAL_BRIDGE_MODE=true`,
+  `POLYSIGNAL_ALLOWED_ORIGIN=https://polisygnal-web.vercel.app` y
+  `SAMANTHA_BRIDGE_TOKEN` como secreto.
+- Produccion PolySignal usa las variables genericas server-side
+  `ANALYSIS_AGENT_PROVIDER=samantha`, `ANALYSIS_AGENT_ENABLED=true`,
+  `ANALYSIS_AGENT_URL`, `ANALYSIS_AGENT_TOKEN`,
+  `ANALYSIS_AGENT_DISPLAY_NAME=Samantha` y
+  `ANALYSIS_AGENT_ALLOW_LOCALHOST=false`. Las variables `SAMANTHA_BRIDGE_*`
+  quedan solo como compatibilidad legacy.
+- `/internal/data-status` muestra diagnostico read-only del Analysis Agent
+  Bridge: provider activo, dominio configurado, enabled, ultimo health check y
+  estado esperado. Nunca muestra token, headers ni payload crudo.
 - Samantha conserva `POST /polysignal/research-task` para recibir el Task
   Packet de PolySignal, validarlo, escribir una cola local sanitizada y
   responder `accepted`/`queued_or_manual`.
