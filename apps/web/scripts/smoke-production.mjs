@@ -525,6 +525,8 @@ function validateMarketDetailPage(dom, label) {
 
 function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(new URL("../app/components/AnalyzeLoadingPanel.tsx", import.meta.url), "utf8");
+  const marketDetailsSource = readFileSync(new URL("../app/components/MarketDataDetails.tsx", import.meta.url), "utf8");
+  const walletDetailsSource = readFileSync(new URL("../app/components/WalletIntelligenceDetails.tsx", import.meta.url), "utf8");
   const reportSource = readFileSync(new URL("../app/components/AnalyzerReport.tsx", import.meta.url), "utf8");
   const homeSource = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   const historySource = readFileSync(new URL("../app/history/page.tsx", import.meta.url), "utf8");
@@ -554,6 +556,15 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("${agentName} sigue analizando fuentes automaticas"), "analyze progress panel dynamic agent pending copy is missing");
   assert(source.includes("Guardar para continuar luego"), "analyze progress panel save recovery action is missing");
   assert(source.includes("Progreso del analisis"), "analyze loading panel should expose human analysis progress state");
+  assert(source.includes("stepActions"), "analyze progress panel should support explicit detail buttons");
+  assert(analyzePage.includes("Ver datos"), "analyze page should expose market data detail button copy");
+  assert(analyzePage.includes("Ver billeteras"), "analyze page should expose wallet detail button copy");
+  assert(analyzePage.includes("open={marketDetailsOpen}"), "market detail drawer should be closed by default");
+  assert(analyzePage.includes("open={walletDetailsOpen}"), "wallet detail drawer should be closed by default");
+  assert(marketDetailsSource.includes("Datos de Polymarket"), "market data detail drawer is missing");
+  assert(walletDetailsSource.includes("Billeteras analizadas"), "wallet detail drawer is missing");
+  assert(walletDetailsSource.includes("Datos tecnicos"), "wallet technical fields should be collapsed");
+  assert(!walletDetailsSource.includes("<pre"), "wallet details should not render raw JSON by default");
   assert(!source.includes("Deep Analysis Job"), "analyze loading panel should not expose technical job title");
   assert(!source.includes("Leyendo Polymarket"), "analyze loading panel should use human Polymarket read copy");
   assert(!source.includes("Esperando reporte de Samantha"), "analyze loading panel should not ask for manual Samantha reports");

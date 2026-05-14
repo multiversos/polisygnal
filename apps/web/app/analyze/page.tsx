@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   AnalyzeLoadingPanel,
-  type AnalyzeProgressIssue,
   type AnalyzeLoadingPhase,
+  type AnalyzeProgressIssue,
+  type AnalyzeProgressStepOverrides,
 } from "../components/AnalyzeLoadingPanel";
 import { AnalyzeHero } from "../components/analyze/AnalyzeHero";
 import { AnalyzeSteps } from "../components/analyze/AnalyzeSteps";
@@ -15,6 +16,8 @@ import {
 } from "../components/analyze/AnalysisPreview";
 import { AnalyzerReport } from "../components/AnalyzerReport";
 import { MainNavigation } from "../components/MainNavigation";
+import { MarketDataDetails } from "../components/MarketDataDetails";
+import { WalletIntelligenceDetails } from "../components/WalletIntelligenceDetails";
 import { getPolySignalDecision } from "../lib/analysisDecision";
 import {
   getPolymarketUrlValidationMessage,
@@ -83,7 +86,10 @@ import {
   getWalletSignalSummary,
   getWalletIntelligenceSummary,
 } from "../lib/walletIntelligence";
-import { getPolymarketWalletIntelligence } from "../lib/polymarketWalletIntelligence";
+import {
+  getPolymarketWalletIntelligence,
+  unavailablePolymarketWalletIntelligenceSummary,
+} from "../lib/polymarketWalletIntelligence";
 import {
   buildConservativePolySignalEstimate,
   type PolySignalEstimateResult,
@@ -312,6 +318,156 @@ function insightInput(item: MarketOverviewItem) {
     liquidity: item.latest_snapshot?.liquidity,
     updatedAt: latestUpdate(item),
     volume: item.latest_snapshot?.volume,
+  };
+}
+
+function hasOutcomePrice(item: MarketOverviewItem): boolean {
+  return Boolean(
+    item.market?.outcomes?.some((outcome) => toNumber(outcome.price) !== null),
+  );
+}
+
+function buildMarketDataProgress(item: MarketOverviewItem): AnalyzeProgressStepOverrides["loading_polymarket"] {
+  const priceAvailable = Boolean(
+    getMarketImpliedProbabilities({
+      marketNoPrice: item.latest_snapshot?.no_price,
+      marketYesPrice: item.latest_snapshot?.yes_price,
+    }),
+  ) || hasOutcomePrice(item);
+  const volume = toNumber(item.latest_snapshot?.volume);
+  const liquidity = toNumber(item.latest_snapshot?.liquidity);
+  const stateKnown = item.market?.active !== undefined || item.market?.closed !== undefined;
+  const hasMarketData = priceAvailable || volume !== null || liquidity !== null || stateKnown;
+  if (priceAvailable || volume !== null || liquidity !== null) {
+    return {
+      detail: "Polymarket devolvio datos estructurados para este mercado seleccionado.",
+      status: "completed_with_data",
+      statusLabel: "Datos cargados",
+      summary: [
+        priceAvailable ? "precio visible" : null,
+        volume !== null ? `volumen ${formatMetric(volume)}` : null,
+        liquidity !== null ? `liquidez ${formatMetric(liquidity)}` : null,
+      ].filter(Boolean).join(" · "),
+    };
+  }
+  if (hasMarketData || item.market?.question || item.market?.market_slug) {
+    return {
+      detail: "Tenemos metadata del mercado, pero precio, volumen o liquidez son limitados.",
+      status: "warning",
+      statusLabel: "Datos basicos cargados",
+      summary: "Titulo, slug o estado disponible; sin datos suficientes para tratarlo como analisis completo.",
+    };
+  }
+  return {
+    detail: "No hay precio, volumen, liquidez ni estado suficientes para este mercado.",
+    status: "warning",
+    statusLabel: "Sin datos suficientes",
+    summary: "PolySignal no inventa datos de mercado faltantes.",
+  };
+}
+
+function buildWalletProgress(summary: WalletIntelligenceSummary): AnalyzeProgressStepOverrides["reviewing_wallets"] {
+  if (summary.queryStatus === "timeout") {
+    return {
+      detail: summary.reason,
+      status: "unavailable",
+      statusLabel: "No respondio a tiempo",
+      summary: "Wallet Intelligence no se usa como senal fuerte en esta lectura.",
+    };
+  }
+  if (summary.queryStatus === "error" || summary.queryStatus === "unavailable" || summary.source === "unavailable") {
+    return {
+      detail: summary.reason,
+      status: "unavailable",
+      statusLabel: "Fuente no disponible",
+      summary: "No se pudo consultar actividad publica de billeteras para este mercado.",
+    };
+  }
+  if (summary.available && summary.relevantWalletsCount > 0) {
+    return {
+      detail: "La consulta termino y encontro actividad publica sobre el umbral configurado.",
+      status: "completed_with_data",
+      statusLabel: "Actividad encontrada",
+      summary: `${summary.relevantWalletsCount} billetera(s) relevante(s), capital observado ${formatUsd(summary.analyzedCapitalUsd)}.`,
+    };
+  }
+  return {
+    detail: summary.reason || "La consulta termino sin actividad publica relevante sobre el umbral.",
+    status: "completed_empty",
+    statusLabel: "Sin actividad relevante",
+    summary: "La fuente respondio, pero no encontro wallets utiles para una senal auxiliar.",
+  };
+}
+
+function walletDetailsButtonLabel(summary?: WalletIntelligenceSummary | null): string {
+  if (!summary) {
+    return "Consultando...";
+  }
+  if (summary.available && summary.relevantWalletsCount > 0) {
+    return "Ver billeteras";
+  }
+  if (summary.queryStatus === "empty" || summary.source === "polymarket_data") {
+    return "Ver detalle";
+  }
+  if (summary.queryStatus === "timeout" || summary.queryStatus === "error" || summary.queryStatus === "unavailable") {
+    return "Ver estado";
+  }
+  return "Ver detalle";
+}
+
+function marketDetailsButtonLabel(item?: MarketOverviewItem | null): string {
+  if (!item) {
+    return "Ver estado";
+  }
+  const progress = buildMarketDataProgress(item);
+  return progress?.status === "completed_with_data" || progress?.statusLabel === "Datos cargados"
+    ? "Ver datos"
+    : "Ver estado";
+}
+
+function buildAgentProgress(input: {
+  agentName: string;
+  job?: DeepAnalysisJob | null;
+  message?: string;
+}): AnalyzeProgressStepOverrides["preparing_samantha"] {
+  const status = input.job?.analysisAgent?.status;
+  if (status === "completed") {
+    return {
+      detail: `${input.agentName} devolvio una lectura validada por PolySignal.`,
+      status: "completed_with_data",
+      statusLabel: "Lectura validada",
+      summary: "Solo cuenta como decision si las compuertas de evidencia pasan.",
+    };
+  }
+  if (status === "partial") {
+    return {
+      detail: input.message || `${input.agentName} devolvio datos parciales o insuficientes para decision.`,
+      status: "warning",
+      statusLabel: "Lectura parcial preparada",
+      summary: "No hay estimacion propia si las senales no alcanzan.",
+    };
+  }
+  if (status === "failed_safe") {
+    return {
+      detail: input.message || `${input.agentName} no pudo completar todas las fuentes automaticas.`,
+      status: "failed_safe",
+      statusLabel: "Fallo seguro",
+      summary: "PolySignal conserva una lectura parcial sin mostrar errores tecnicos.",
+    };
+  }
+  if (status === "unavailable") {
+    return {
+      detail: input.message || `${input.agentName} automatico no esta conectado todavia.`,
+      status: "unavailable",
+      statusLabel: "Agente no conectado",
+      summary: "PolySignal muestra una lectura parcial con las fuentes disponibles.",
+    };
+  }
+  return {
+    detail: `${input.agentName} revisa fuentes automaticas disponibles y responde sin inventar evidencia.`,
+    status: "running",
+    statusLabel: `${input.agentName} analizando`,
+    summary: "Esperando respuesta del agente analizador.",
   };
 }
 
@@ -1586,6 +1742,11 @@ export default function AnalyzePage() {
   const [progressStartedAt, setProgressStartedAt] = useState<number | null>(null);
   const [progressElapsedSeconds, setProgressElapsedSeconds] = useState(0);
   const [progressIssue, setProgressIssue] = useState<AnalyzeProgressIssue>(null);
+  const [progressStepOverrides, setProgressStepOverrides] = useState<AnalyzeProgressStepOverrides>({});
+  const [marketDetailsItem, setMarketDetailsItem] = useState<MarketOverviewItem | null>(null);
+  const [marketDetailsOpen, setMarketDetailsOpen] = useState(false);
+  const [walletDetailsSummary, setWalletDetailsSummary] = useState<WalletIntelligenceSummary | null>(null);
+  const [walletDetailsOpen, setWalletDetailsOpen] = useState(false);
   const [lastWorkingUrl, setLastWorkingUrl] = useState("");
   const analysisRunRef = useRef(0);
   const analysisAbortRef = useRef<AbortController | null>(null);
@@ -1899,6 +2060,11 @@ export default function AnalyzePage() {
     setActionMessage(null);
     setSamanthaAutoReportResult(null);
     setProgressIssue(null);
+    setProgressStepOverrides({});
+    setMarketDetailsItem(null);
+    setMarketDetailsOpen(false);
+    setWalletDetailsSummary(null);
+    setWalletDetailsOpen(false);
     if (!validation.ok || !validation.normalizedUrl) {
       setProgressStartedAt(null);
       if (analysisAbortRef.current === runController) {
@@ -1909,6 +2075,14 @@ export default function AnalyzePage() {
     }
     const normalizedUrl = validation.normalizedUrl;
     setLastWorkingUrl(normalizedUrl);
+    setProgressStepOverrides({
+      reading_link: {
+        detail: "El enlace es de Polymarket y paso validacion local.",
+        status: "completed_with_data",
+        statusLabel: "Validado",
+        summary: "Listo para consultar Polymarket.",
+      },
+    });
     let job = persistDeepAnalysisJob(
       getLatestDeepAnalysisJobForUrl(normalizedUrl) ??
         createDeepAnalysisJob(normalizedUrl),
@@ -1952,6 +2126,21 @@ export default function AnalyzePage() {
           normalizedUrl,
           status: "needs_selection",
         });
+        setProgressStepOverrides((current) => ({
+          ...current,
+          detecting_market: {
+            detail:
+              matches.length > 1
+                ? "Polymarket devolvio varias opciones reales para este evento."
+                : "Polymarket devolvio un mercado unico para este enlace.",
+            status: "completed_with_data",
+            statusLabel: matches.length > 1 ? "Opciones encontradas" : "Mercado detectado",
+            summary:
+              matches.length > 1
+                ? `${matches.length} opciones requieren seleccion.`
+                : "Se continuara automaticamente con el mercado detectado.",
+          },
+        }));
         setProgressStartedAt(null);
       } else if (resolved.status === "unsupported") {
         persistDeepAnalysisJob(
@@ -2040,6 +2229,31 @@ export default function AnalyzePage() {
     setSamanthaAutoReportResult(null);
     setProgressIssue(null);
     setLastWorkingUrl(normalizedUrl);
+    setMarketDetailsItem(match.item);
+    setMarketDetailsOpen(false);
+    setWalletDetailsSummary(null);
+    setWalletDetailsOpen(false);
+    setProgressStepOverrides({
+      detecting_market: {
+        detail: "El mercado seleccionado viene de la respuesta real de Polymarket/Gamma.",
+        status: "completed_with_data",
+        statusLabel: "Mercado detectado",
+        summary: marketTitle(match.item),
+      },
+      loading_polymarket: buildMarketDataProgress(match.item),
+      reading_link: {
+        detail: "El enlace es de Polymarket y paso validacion local.",
+        status: "completed_with_data",
+        statusLabel: "Validado",
+        summary: "Listo para analizar el mercado seleccionado.",
+      },
+      reviewing_wallets: {
+        detail: "Esperando consulta read-only de actividad publica de billeteras.",
+        status: "pending",
+        statusLabel: "Pendiente",
+        summary: "No se marca como revisada hasta que la fuente responda.",
+      },
+    });
     let job =
       getLatestDeepAnalysisJobForUrl(normalizedUrl) ??
       createDeepAnalysisJob(normalizedUrl);
@@ -2075,21 +2289,64 @@ export default function AnalyzePage() {
       getEstimateReadinessScore(match.item);
       getPolySignalEstimate(match.item);
       job = persistDeepAnalysisJob(markJobMarketAnalyzed(job));
+      setProgressStepOverrides((current) => ({
+        ...current,
+        loading_polymarket: buildMarketDataProgress(match.item),
+      }));
 
       if (!(await advancePhase("research"))) {
         return;
       }
       getResearchCoverage(match.item, []);
-      const enrichedMatch = await withRequestTimeout(
-        WALLET_INTELLIGENCE_TIMEOUT_MS,
-        runController.signal,
-        "wallet_intelligence_timeout",
-        (signal) => enrichMatchWithWalletIntelligence(match, normalizedUrl, signal),
-      );
+      setProgressStepOverrides((current) => ({
+        ...current,
+        reviewing_wallets: {
+          detail: "Consultando actividad publica de billeteras para el mercado seleccionado.",
+          status: "running",
+          statusLabel: "Consultando billeteras",
+          summary: "Todavia no hay resultado de Wallet Intelligence.",
+        },
+      }));
+      let enrichedMatch = match;
+      let walletSummary: WalletIntelligenceSummary;
+      try {
+        enrichedMatch = await withRequestTimeout(
+          WALLET_INTELLIGENCE_TIMEOUT_MS,
+          runController.signal,
+          "wallet_intelligence_timeout",
+          (signal) => enrichMatchWithWalletIntelligence(match, normalizedUrl, signal),
+        );
+        walletSummary = getWalletIntelligenceSummary(enrichedMatch.item);
+      } catch (error) {
+        if (isAnalyzeCancelled(error)) {
+          return;
+        }
+        walletSummary = unavailablePolymarketWalletIntelligenceSummary(
+          isAnalyzeTimeout(error)
+            ? "Wallet Intelligence no respondio a tiempo para este mercado."
+            : "Wallet Intelligence no pudo completar la consulta para este mercado.",
+          undefined,
+          isAnalyzeTimeout(error) ? "timeout" : "error",
+        );
+        enrichedMatch = {
+          ...match,
+          item: {
+            ...match.item,
+            walletIntelligence: {
+              positions: [],
+              summary: walletSummary,
+            },
+          },
+        };
+      }
       if (!isCurrentRun()) {
         return;
       }
-      const walletSummary = getWalletIntelligenceSummary(enrichedMatch.item);
+      setProgressStepOverrides((current) => ({
+        ...current,
+        reviewing_wallets: buildWalletProgress(walletSummary),
+      }));
+      setWalletDetailsSummary(walletSummary);
       job = persistDeepAnalysisJob(
         markJobWalletsAnalyzed(job, {
           available: walletSummary.available,
@@ -2103,6 +2360,10 @@ export default function AnalyzePage() {
       if (!(await advancePhase("preparing_samantha"))) {
         return;
       }
+      setProgressStepOverrides((current) => ({
+        ...current,
+        preparing_samantha: buildAgentProgress({ agentName: analysisAgent.name, job }),
+      }));
       job = persistDeepAnalysisJob(markJobSamanthaBriefReady(job, {
         agentId: analysisAgent.id,
         agentName: analysisAgent.name,
@@ -2142,6 +2403,10 @@ export default function AnalyzePage() {
       if (!(await advancePhase("sending_samantha"))) {
         return;
       }
+      setProgressStepOverrides((current) => ({
+        ...current,
+        preparing_samantha: buildAgentProgress({ agentName: analysisAgent.name, job }),
+      }));
       const bridgeResult = await tryAutomaticAnalysisAgentBridge({
         isCurrentRun,
         item: enrichedMatch.item,
@@ -2155,6 +2420,14 @@ export default function AnalyzePage() {
       }
       job = bridgeResult.job;
       setSamanthaAutoReportResult(bridgeResult.reportResult);
+      setProgressStepOverrides((current) => ({
+        ...current,
+        preparing_samantha: buildAgentProgress({
+          agentName: job.analysisAgent?.agentName || analysisAgent.name,
+          job,
+          message: bridgeResult.message,
+        }),
+      }));
       if (job.status === "awaiting_samantha" && !(await advancePhase("awaiting_samantha"))) {
         return;
       }
@@ -2321,6 +2594,11 @@ export default function AnalyzePage() {
     setLoadingPhase("validating");
     setProgressIssue(null);
     setProgressStartedAt(null);
+    setProgressStepOverrides({});
+    setMarketDetailsItem(null);
+    setMarketDetailsOpen(false);
+    setWalletDetailsSummary(null);
+    setWalletDetailsOpen(false);
     setLastWorkingUrl("");
     setActionMessage(null);
     setSamanthaAutoReportResult(null);
@@ -2336,6 +2614,9 @@ export default function AnalyzePage() {
     setLoadingPhase("validating");
     setProgressIssue(null);
     setProgressStartedAt(null);
+    setProgressStepOverrides({});
+    setMarketDetailsOpen(false);
+    setWalletDetailsOpen(false);
     setActionMessage(null);
     setSamanthaAutoReportResult(null);
   }, []);
@@ -2395,6 +2676,19 @@ export default function AnalyzePage() {
           onRetry={handleProgressRetry}
           onSaveForLater={handleSaveCurrentAnalysis}
           phase={radarPhase}
+          stepActions={{
+            loading_polymarket: {
+              disabled: !marketDetailsItem,
+              label: marketDetailsButtonLabel(marketDetailsItem),
+              onClick: () => setMarketDetailsOpen(true),
+            },
+            reviewing_wallets: {
+              disabled: !walletDetailsSummary,
+              label: walletDetailsButtonLabel(walletDetailsSummary),
+              onClick: () => setWalletDetailsOpen(true),
+            },
+          }}
+          stepOverrides={progressStepOverrides}
           samanthaPending={samanthaProgressPending}
         />
       ) : null}
@@ -2484,6 +2778,20 @@ export default function AnalyzePage() {
           </span>
         </section>
       ) : null}
+      <MarketDataDetails
+        item={marketDetailsItem}
+        onClose={() => setMarketDetailsOpen(false)}
+        open={marketDetailsOpen}
+      />
+      <WalletIntelligenceDetails
+        onClose={() => setWalletDetailsOpen(false)}
+        onRetry={() => {
+          setWalletDetailsOpen(false);
+          handleProgressRetry();
+        }}
+        open={walletDetailsOpen}
+        summary={walletDetailsSummary}
+      />
     </main>
   );
 }

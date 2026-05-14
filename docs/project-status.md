@@ -271,8 +271,18 @@ Estado visible verificado:
   Polymarket Data API en modo read-only; no usa mercados internos como fuente
   primaria. La UI resume capital observado, sesgo YES/NO/Neutral, perfiles
   basicos solo si hay historial cerrado real, confianza y advertencias como
-  senal auxiliar, no como prediccion final. Si faltan datos, muestra estado
-  normal de no disponibilidad.
+  senal auxiliar, no como prediccion final. El detalle de billeteras vive
+  detras del boton `Ver billeteras` y puede mostrar direcciones publicas
+  completas solo por accion explicita del usuario; no aparece en la vista
+  principal ni se manda como payload crudo al agente. Si faltan datos, muestra
+  estado normal de no disponibilidad.
+- El progreso de `/analyze` distingue estados reales por fuente: el paso de
+  Polymarket puede quedar en `Datos cargados`, `Datos basicos`,
+  `Datos limitados`, `Fuente no disponible` o `No respondio`; el paso de
+  billeteras distingue `Actividad encontrada`, `Sin actividad relevante`,
+  `Fuente no disponible` y timeout. Los paneles `Ver datos` y
+  `Ver billeteras` no se abren automaticamente; solo aparecen por clic/tap y
+  mantienen los datos tecnicos colapsados.
 - El guardado desde `/analyze` usa el resultado unificado para conservar en
   Historial un resumen local de capas y wallet summary agregado. No guarda
   payloads crudos ni direcciones completas.

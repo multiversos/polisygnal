@@ -167,8 +167,11 @@ Current constraints:
   not use `/markets/overview`, `/sports/soccer`, or internal sports markets as
   fallback.
 - Wallet summaries use a `100 USD` relevance threshold.
-- Full wallet addresses must not be shown by default; public UI renders
-  shortened addresses only.
+- Full wallet addresses must not be shown by default in the main analyzer view.
+  The explicit `Ver billeteras` detail drawer may render full public wallet
+  addresses returned by the allowlisted source, because the user requested full
+  public wallet detail there. Agent payloads, summaries, logs and saved history
+  still use sanitized summaries and must not store raw complete wallet lists.
 - Public wallet data must never be mapped to real-world identities.
 - No ROI, win rate, or wallet history is shown unless computed from reliable
   structured resolved-position data.
@@ -177,7 +180,7 @@ Current constraints:
 - Public copy must describe wallet data as activity from public wallets, not as
   identity, insider knowledge, guaranteed edge, or copy-trading advice.
 - Lookup failures return a generic unavailable state and must not expose raw
-  payloads, backend details, or complete wallet lists.
+  payloads, backend details, or complete wallet lists by default.
 
 Before expanding real wallet lookups:
 

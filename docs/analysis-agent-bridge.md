@@ -135,8 +135,11 @@ Estados aceptados:
 - Se bloquean endpoints con credenciales, fragmentos, IPs privadas y puertos no
   allowlisted.
 - El token se envia server-side y nunca vuelve al cliente.
-- Respuestas con full wallet addresses, secretos, instrucciones de apuesta o
-  copy-trading fallan seguro.
+- Respuestas del agente con full wallet addresses, secretos, instrucciones de
+  apuesta o copy-trading fallan seguro. El drawer local `Ver billeteras` es
+  una excepcion separada: puede mostrar direcciones publicas completas si
+  vienen de la fuente allowlisted, pero esos detalles no se envian como payload
+  crudo al agente ni se guardan como lista completa.
 - El precio de mercado no se convierte en estimacion PolySignal.
 - Si `suggestedDecision.available=false`, no se crea prediccion.
 

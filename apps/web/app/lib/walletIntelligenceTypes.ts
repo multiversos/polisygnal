@@ -13,6 +13,13 @@ export type WalletSignalDirection = "NEUTRAL" | WalletSide;
 
 export type WalletReliability = "high" | "low" | "medium" | "unknown";
 
+export type WalletIntelligenceQueryStatus =
+  | "empty"
+  | "error"
+  | "found"
+  | "timeout"
+  | "unavailable";
+
 export type WalletMarketPosition = {
   averageEntryPrice?: number;
   currentValueUsd?: number;
@@ -23,6 +30,36 @@ export type WalletMarketPosition = {
   amountUsd?: number;
   unrealizedPnlUsd?: number;
   walletAddress: string;
+};
+
+export type PublicWalletActivityAction = "buy" | "position" | "sell" | "unknown";
+
+export type PublicWalletActivity = {
+  action: PublicWalletActivityAction;
+  amountUsd?: number | null;
+  closedMarkets?: number | null;
+  conditionId?: string | null;
+  id: string;
+  limitations: string[];
+  losses?: number | null;
+  marketId?: string | null;
+  outcome?: string | null;
+  positionSize?: number | null;
+  price?: number | null;
+  rawSourceFields?: Record<string, string | number | boolean | null>;
+  realizedPnl?: number | null;
+  shares?: number | null;
+  shortAddress?: string | null;
+  side: "NO" | "UNKNOWN" | "YES";
+  source: string;
+  timestamp?: string | null;
+  tokenId?: string | null;
+  transactionHash?: string | null;
+  unrealizedPnl?: number | null;
+  walletAddress?: string | null;
+  warnings: string[];
+  winRate?: number | null;
+  wins?: number | null;
 };
 
 export type WalletPerformanceProfile = {
@@ -59,14 +96,18 @@ export type WalletProfileSummary = {
 
 export type WalletIntelligenceSummary = {
   analyzedCapitalUsd?: number;
+  allActivitiesCount?: number;
   available: boolean;
   checkedAt?: string;
   confidence: "high" | "low" | "medium" | "none";
+  limitations?: string[];
   largePositions?: WalletMarketPosition[];
   largeTrades?: WalletMarketPosition[];
   notableWallets?: WalletMarketPosition[];
   noCapitalUsd?: number;
   profileSummaries?: WalletProfileSummary[];
+  publicActivities?: PublicWalletActivity[];
+  queryStatus?: WalletIntelligenceQueryStatus;
   reason: string;
   relevantWalletsCount: number;
   signalDirection: WalletSignalDirection;

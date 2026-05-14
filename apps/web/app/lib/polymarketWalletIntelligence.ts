@@ -12,10 +12,15 @@ export type PolymarketWalletIntelligenceInput = {
   tokenIds?: Array<string | null | undefined> | null;
 };
 
-function unavailableSummary(reason: string, thresholdUsd = WALLET_INTELLIGENCE_THRESHOLD_USD): WalletIntelligenceSummary {
+export function unavailablePolymarketWalletIntelligenceSummary(
+  reason: string,
+  thresholdUsd = WALLET_INTELLIGENCE_THRESHOLD_USD,
+  queryStatus: WalletIntelligenceSummary["queryStatus"] = "unavailable",
+): WalletIntelligenceSummary {
   return {
     ...getWalletIntelligenceSummary(null, thresholdUsd),
     checkedAt: new Date().toISOString(),
+    queryStatus,
     reason,
     source: "unavailable",
     warnings: [
@@ -54,7 +59,11 @@ export async function getPolymarketWalletIntelligence(
 ): Promise<WalletIntelligenceSummary> {
   const conditionId = cleanIdentifier(input.conditionId);
   if (!conditionId) {
-    return unavailableSummary("No disponible: el mercado no trae conditionId publico compatible.", thresholdUsd);
+    return unavailablePolymarketWalletIntelligenceSummary(
+      "No disponible: el mercado no trae conditionId publico compatible.",
+      thresholdUsd,
+      "unavailable",
+    );
   }
 
   try {
@@ -79,14 +88,29 @@ export async function getPolymarketWalletIntelligence(
     });
     const text = await response.text();
     if (!response.ok || text.length > 256_000) {
-      return unavailableSummary("No pudimos consultar datos publicos de billeteras para este mercado.", thresholdUsd);
+      return unavailablePolymarketWalletIntelligenceSummary(
+        "No pudimos consultar datos publicos de billeteras para este mercado.",
+        thresholdUsd,
+        "error",
+      );
     }
     const summary = JSON.parse(text) as WalletIntelligenceSummary;
     if (!summary || typeof summary !== "object") {
-      return unavailableSummary("No pudimos consultar datos publicos de billeteras para este mercado.", thresholdUsd);
+      return unavailablePolymarketWalletIntelligenceSummary(
+        "No pudimos consultar datos publicos de billeteras para este mercado.",
+        thresholdUsd,
+        "error",
+      );
     }
     return {
       ...summary,
+      queryStatus:
+        summary.queryStatus ??
+        (summary.available && summary.relevantWalletsCount > 0
+          ? "found"
+          : summary.source === "polymarket_data"
+            ? "empty"
+            : "unavailable"),
       source: summary.source ?? (summary.available ? "polymarket_data" : "unavailable"),
       thresholdUsd: summary.thresholdUsd ?? thresholdUsd,
       warnings: summary.warnings ?? [],
@@ -95,6 +119,10 @@ export async function getPolymarketWalletIntelligence(
     if (options?.signal?.aborted) {
       throw error;
     }
-    return unavailableSummary("No pudimos consultar datos publicos de billeteras para este mercado.", thresholdUsd);
+    return unavailablePolymarketWalletIntelligenceSummary(
+      "No pudimos consultar datos publicos de billeteras para este mercado.",
+      thresholdUsd,
+      "error",
+    );
   }
 }

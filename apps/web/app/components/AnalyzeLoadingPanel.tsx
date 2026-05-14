@@ -20,9 +20,15 @@ export type AnalyzeProgressIssue = "error" | "timeout" | null;
 type AnalyzeProgressStepStatus =
   | "attention"
   | "completed"
+  | "completed_empty"
+  | "completed_with_data"
   | "error"
+  | "failed_safe"
   | "pending"
-  | "running";
+  | "running"
+  | "skipped"
+  | "unavailable"
+  | "warning";
 
 type AnalyzeProgressStep = {
   detail: string;
@@ -37,6 +43,23 @@ type AnalyzeProgressStep = {
   phases: AnalyzeLoadingPhase[];
 };
 
+export type AnalyzeProgressStepOverride = {
+  detail?: string;
+  status: AnalyzeProgressStepStatus;
+  statusLabel?: string;
+  summary?: string;
+};
+
+export type AnalyzeProgressStepOverrides = Partial<Record<AnalyzeProgressStep["id"], AnalyzeProgressStepOverride>>;
+
+type AnalyzeProgressStepAction = {
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+};
+
+export type AnalyzeProgressStepActions = Partial<Record<AnalyzeProgressStep["id"], AnalyzeProgressStepAction>>;
+
 type AnalyzeProgressPanelProps = {
   agentName?: string;
   canSaveForLater?: boolean;
@@ -49,54 +72,54 @@ type AnalyzeProgressPanelProps = {
   onRetry: () => void;
   onSaveForLater?: () => void;
   phase: AnalyzeLoadingPhase;
+  stepActions?: AnalyzeProgressStepActions;
+  stepOverrides?: AnalyzeProgressStepOverrides;
   samanthaPending?: boolean;
 };
 
 function analysisProgressSteps(agentName: string): AnalyzeProgressStep[] {
   return [
-  {
-    detail: "Validamos que sea un enlace seguro de Polymarket.",
-    id: "reading_link",
-    label: "Leyendo enlace",
-    phases: ["validating"],
-  },
-  {
-    detail: "Detectamos si el enlace apunta a un mercado unico o a un evento con varias opciones.",
-    id: "detecting_market",
-    label: "Detectando mercado",
-    phases: ["matching"],
-  },
-  {
-    detail: "Leemos precio, volumen, liquidez y estado desde fuentes publicas de Polymarket.",
-    id: "loading_polymarket",
-    label: "Cargando datos de Polymarket",
-    phases: ["context", "readiness"],
-  },
-  {
-    detail: "Revisamos actividad publica disponible sin mostrar direcciones completas.",
-    id: "reviewing_wallets",
-    label: "Revisando billeteras",
-    phases: ["research"],
-  },
-  {
-    detail: `${agentName} usa el puente automatico cuando esta configurado y reporta fuentes no disponibles.`,
-    id: "preparing_samantha",
-    label: `${agentName} analizando`,
-    phases: ["preparing_samantha", "sending_samantha", "samantha_researching", "awaiting_samantha", "validating_report"],
-  },
-  {
-    detail: "Preparamos una lectura completa o parcial con las fuentes reales disponibles.",
-    id: "ready",
-    label: "Preparando lectura",
-    phases: ["ready_to_score", "preparing"],
-  },
+    {
+      detail: "Validamos que sea un enlace seguro de Polymarket.",
+      id: "reading_link",
+      label: "Leyendo enlace",
+      phases: ["validating"],
+    },
+    {
+      detail: "Detectamos si el enlace apunta a un mercado unico o a un evento con varias opciones.",
+      id: "detecting_market",
+      label: "Detectando mercado",
+      phases: ["matching"],
+    },
+    {
+      detail: "Leemos precio, volumen, liquidez y estado desde fuentes publicas de Polymarket.",
+      id: "loading_polymarket",
+      label: "Cargando datos de Polymarket",
+      phases: ["context", "readiness"],
+    },
+    {
+      detail: "Revisamos actividad publica disponible sin mostrar direcciones completas.",
+      id: "reviewing_wallets",
+      label: "Revisando billeteras",
+      phases: ["research"],
+    },
+    {
+      detail: `${agentName} usa el puente automatico cuando esta configurado y reporta fuentes no disponibles.`,
+      id: "preparing_samantha",
+      label: `${agentName} analizando`,
+      phases: ["preparing_samantha", "sending_samantha", "samantha_researching", "awaiting_samantha", "validating_report"],
+    },
+    {
+      detail: "Preparamos una lectura completa o parcial con las fuentes reales disponibles.",
+      id: "ready",
+      label: "Preparando lectura",
+      phases: ["ready_to_score", "preparing"],
+    },
   ];
 }
 
 function activeStepIndex(phase: AnalyzeLoadingPhase, steps: AnalyzeProgressStep[]): number {
-  const index = steps.findIndex((step) =>
-    step.phases.includes(phase),
-  );
+  const index = steps.findIndex((step) => step.phases.includes(phase));
   return Math.max(index, 0);
 }
 
@@ -129,11 +152,16 @@ function elapsedHint(seconds: number, issue: AnalyzeProgressIssue): string {
 }
 
 function statusForStep(
+  step: AnalyzeProgressStep,
   index: number,
   activeIndex: number,
   issue: AnalyzeProgressIssue,
   samanthaPending: boolean,
+  override?: AnalyzeProgressStepOverride,
 ): AnalyzeProgressStepStatus {
+  if (override) {
+    return override.status;
+  }
   if (issue && index === activeIndex) {
     return issue === "timeout" ? "attention" : "error";
   }
@@ -141,7 +169,19 @@ function statusForStep(
     return "attention";
   }
   if (index < activeIndex) {
-    return "completed";
+    if (step.id === "reading_link" || step.id === "detecting_market") {
+      return "completed_with_data";
+    }
+    if (step.id === "loading_polymarket") {
+      return "warning";
+    }
+    if (step.id === "reviewing_wallets") {
+      return "pending";
+    }
+    if (step.id === "preparing_samantha") {
+      return "running";
+    }
+    return "warning";
   }
   if (index === activeIndex) {
     return "running";
@@ -149,30 +189,48 @@ function statusForStep(
   return "pending";
 }
 
-function statusLabel(status: AnalyzeProgressStepStatus): string {
-  if (status === "completed") {
+function statusLabel(status: AnalyzeProgressStepStatus, override?: AnalyzeProgressStepOverride): string {
+  if (override?.statusLabel) {
+    return override.statusLabel;
+  }
+  if (status === "completed" || status === "completed_with_data") {
     return "Completado";
+  }
+  if (status === "completed_empty") {
+    return "Sin datos relevantes";
   }
   if (status === "running") {
     return "En curso";
   }
-  if (status === "attention") {
+  if (status === "attention" || status === "warning") {
     return "Necesita atencion";
   }
-  if (status === "error") {
-    return "Error";
+  if (status === "unavailable") {
+    return "Fuente no disponible";
+  }
+  if (status === "skipped") {
+    return "No aplica";
+  }
+  if (status === "error" || status === "failed_safe") {
+    return "No se pudo completar";
   }
   return "Pendiente";
 }
 
 function markerForStatus(status: AnalyzeProgressStepStatus, index: number): string {
-  if (status === "completed") {
+  if (status === "completed" || status === "completed_with_data") {
     return "✓";
   }
-  if (status === "attention") {
+  if (
+    status === "attention" ||
+    status === "completed_empty" ||
+    status === "skipped" ||
+    status === "unavailable" ||
+    status === "warning"
+  ) {
     return "!";
   }
-  if (status === "error") {
+  if (status === "error" || status === "failed_safe") {
     return "×";
   }
   return String(index + 1);
@@ -190,6 +248,8 @@ export function AnalyzeProgressPanel({
   onRetry,
   onSaveForLater,
   phase,
+  stepActions,
+  stepOverrides,
   samanthaPending = false,
 }: AnalyzeProgressPanelProps) {
   if (!isVisible) {
@@ -208,6 +268,9 @@ export function AnalyzeProgressPanel({
     : "PolySignal avanza por etapas reales. No usamos porcentajes falsos ni asumimos evidencia que no existe.";
   const showRecovery =
     Boolean(issue) || elapsedSeconds >= 45 || samanthaPending || !isBusy;
+  const reviewedSources = steps
+    .map((step) => ({ step, override: stepOverrides?.[step.id] }))
+    .filter(({ override }) => Boolean(override?.summary || override?.statusLabel));
 
   return (
     <section
@@ -231,7 +294,9 @@ export function AnalyzeProgressPanel({
 
       <ol className="analyze-progress-steps" aria-label="Etapas del analisis">
         {steps.map((step, index) => {
-          const status = statusForStep(index, activeIndex, issue, samanthaPending);
+          const override = stepOverrides?.[step.id];
+          const action = stepActions?.[step.id];
+          const status = statusForStep(step, index, activeIndex, issue, samanthaPending, override);
           return (
             <li className={`analyze-progress-step ${status}`} key={step.id}>
               <span className="analyze-progress-step-marker" aria-hidden="true">
@@ -239,13 +304,39 @@ export function AnalyzeProgressPanel({
               </span>
               <span className="analyze-progress-step-copy">
                 <strong>{step.label}</strong>
-                <small>{step.detail}</small>
+                <small>{override?.detail ?? step.detail}</small>
+                {override?.summary ? <em>{override.summary}</em> : null}
               </span>
-              <span className="analyze-progress-step-status">{statusLabel(status)}</span>
+              <span className="analyze-progress-step-controls">
+                <span className="analyze-progress-step-status">{statusLabel(status, override)}</span>
+                {action ? (
+                  <button
+                    disabled={action.disabled}
+                    onClick={action.onClick}
+                    type="button"
+                  >
+                    {action.label}
+                  </button>
+                ) : null}
+              </span>
             </li>
           );
         })}
       </ol>
+
+      {reviewedSources.length > 0 ? (
+        <div className="analyze-progress-sources" aria-label="Fuentes revisadas">
+          <strong>Fuentes revisadas</strong>
+          <ul>
+            {reviewedSources.map(({ step, override }) => (
+              <li key={step.id}>
+                <span>{step.label}</span>
+                <small>{override?.statusLabel ?? statusLabel(override?.status ?? "pending")}</small>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {jobSteps && jobSteps.length > 0 ? (
         <div className="analyze-progress-job" aria-label="Estado local del analisis">

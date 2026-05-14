@@ -239,10 +239,17 @@ export function getWalletIntelligenceSummary(
 ): WalletIntelligenceSummary {
   const input = market ?? {};
   const savedSummary = input.walletIntelligence?.summary ?? input.wallet_intelligence?.summary;
-  if (savedSummary?.available) {
+  if (savedSummary) {
     return {
       ...savedSummary,
-      source: savedSummary.source ?? "local",
+      queryStatus:
+        savedSummary.queryStatus ??
+        (savedSummary.available && savedSummary.relevantWalletsCount > 0
+          ? "found"
+          : savedSummary.source === "polymarket_data"
+            ? "empty"
+            : "unavailable"),
+      source: savedSummary.source ?? (savedSummary.available ? "local" : "unavailable"),
       thresholdUsd: savedSummary.thresholdUsd ?? thresholdUsd,
       topWallets: filterRelevantWallets(savedSummary.topWallets, savedSummary.thresholdUsd ?? thresholdUsd),
       warnings: savedSummary.warnings ?? [],
@@ -256,6 +263,7 @@ export function getWalletIntelligenceSummary(
     return {
       available: false,
       confidence: "none",
+      queryStatus: "empty",
       reason: "Aun no hay datos de billeteras suficientes para este mercado.",
       relevantWalletsCount: 0,
       signalDirection: "UNKNOWN",
@@ -286,6 +294,7 @@ export function getWalletIntelligenceSummary(
     confidence: bias.confidence === "none" ? "low" : bias.confidence,
     noCapitalUsd: bias.noCapitalUsd,
     profileSummaries,
+    queryStatus: "found",
     reason:
       "Hay posiciones publicas por encima del umbral. Esta lectura requiere validacion antes de usarse como senal de estimacion.",
     relevantWalletsCount: bias.relevantWalletsCount,

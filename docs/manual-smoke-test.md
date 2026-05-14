@@ -381,9 +381,9 @@ If this test fails, stop feature work and treat it as a production regression.
    are loaded.
 38. Confirm `Inteligencia de billeteras` is visible as a compact auxiliary
    layer.
-39. If wallet data exists, confirm it shows only shortened wallet addresses,
-   threshold `$100+`, capital observed, YES/NO/Neutral bias, confidence, and
-   auxiliary-signal copy.
+39. If wallet data exists, confirm the main view shows threshold `$100+`,
+   capital observed, YES/NO/Neutral bias, confidence, auxiliary-signal copy,
+   and a `Ver billeteras` button.
 40. Confirm wallet lookup uses the resolved Polymarket `conditionId`/token IDs
    for the selected market, not an internal sports market fallback.
 41. If no wallet data exists, confirm it says `No encontramos datos publicos
@@ -391,13 +391,22 @@ If this test fails, stop feature work and treat it as a production regression.
    result.
 42. Confirm wallet profile copy says there is not enough public history unless
    closed-position history is actually present.
-43. Confirm it does not show fake wallets, full wallet addresses, ROI, win rate,
-   or copied-trader advice.
+43. Confirm it does not show fake wallets, fake ROI, fake win rate, or
+   copied-trader advice.
 44. Confirm it says public wallet activity is not mapped to real people and that
    the signal is auxiliary, not a prediction or recommendation.
-45. Open `Ver todas las billeteras analizadas` when wallet data exists and
-   confirm the drilldown stays compact, uses shortened addresses only, and does
-   not show fake ROI or win-rate values.
+45. Open `Ver billeteras` when wallet data exists and confirm the drilldown
+   opens only after the click, may show public full wallet addresses from the
+   source, keeps raw technical fields collapsed, and does not show fake ROI or
+   win-rate values.
+45a. In the progress panel, confirm `Cargando datos de Polymarket` shows an
+   honest badge such as `Datos cargados`, `Datos basicos`, `Datos limitados`,
+   `Fuente no disponible`, or `No respondio`, plus a `Ver datos` or
+   `Ver estado` button.
+45b. Confirm the market data drawer is not open by default and opens only after
+   clicking `Ver datos` or `Ver estado`; it should show only real fields such as
+   YES/NO price, probability, volume, liquidity, conditionId, token IDs,
+   eventSlug, marketSlug, warnings and limitations.
 46. Confirm `Historial relacionado` is visible. If the market was analyzed
    before, it should show the latest local record; otherwise it should say the
    market is not in local history yet.
@@ -458,8 +467,8 @@ If this test fails, stop feature work and treat it as a production regression.
 11. Confirm empty evidence states say external verified sources are not
    available yet instead of showing demo findings.
 12. Confirm it shows `Billeteras relevantes`.
-13. Confirm the wallet section uses shortened addresses only when real public
-    data exists, and otherwise says wallet data is not available yet.
+13. Confirm the wallet section uses a compact summary when real public data
+    exists, and otherwise says wallet data is not available yet.
 14. Confirm it shows capital observed, YES/NO/Neutral bias and confidence only
     from real read-only data.
 15. Confirm it does not show fake wallet ROI/win-rate values and does not

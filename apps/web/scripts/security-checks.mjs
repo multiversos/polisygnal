@@ -751,6 +751,8 @@ async function validateWalletIntelligenceRules() {
 function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(resolve(appRoot, "app/components/AnalyzeLoadingPanel.tsx"), "utf8");
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
+  const marketDetailsSource = readFileSync(resolve(appRoot, "app/components/MarketDataDetails.tsx"), "utf8");
+  const walletDetailsSource = readFileSync(resolve(appRoot, "app/components/WalletIntelligenceDetails.tsx"), "utf8");
   const expectedSteps = [
     "Leyendo enlace",
     "Detectando mercado",
@@ -769,6 +771,24 @@ function validateAnalyzeLoadingPanelSource() {
   assert(source.includes("${agentName} sigue analizando fuentes automaticas"), "expected honest dynamic agent automatic pending state");
   assert(source.includes("Guardar para continuar luego"), "expected save-for-later recovery action");
   assert(source.includes("Progreso del analisis"), "expected loading panel to expose human analysis progress state");
+  assert(source.includes("stepActions"), "expected progress panel to support explicit detail buttons");
+  assert(source.includes("Ver billeteras") || analyzePage.includes("Ver billeteras"), "expected wallet detail button copy");
+  assert(analyzePage.includes("Ver datos"), "expected market data detail button copy");
+  assert(analyzePage.includes("setMarketDetailsOpen(true)"), "market data drawer must open only from click");
+  assert(analyzePage.includes("setWalletDetailsOpen(true)"), "wallet drawer must open only from click");
+  assert(analyzePage.includes("open={marketDetailsOpen}"), "market data drawer must be closed by default");
+  assert(analyzePage.includes("open={walletDetailsOpen}"), "wallet drawer must be closed by default");
+  assert(marketDetailsSource.includes("Datos de Polymarket"), "expected market data detail drawer");
+  assert(marketDetailsSource.includes("conditionId") || marketDetailsSource.includes("ConditionId"), "market drawer must show conditionId state");
+  assert(marketDetailsSource.includes("token_id") || marketDetailsSource.includes("TokenId"), "market drawer must show token ids");
+  assert(walletDetailsSource.includes("Billeteras analizadas"), "expected wallet detail drawer");
+  assert(walletDetailsSource.includes("walletAddress"), "wallet drawer may render public full wallet addresses by user request");
+  assert(walletDetailsSource.includes("Datos tecnicos"), "wallet drawer must keep technical raw fields collapsed");
+  assert(!walletDetailsSource.includes("<pre"), "wallet drawer must not render raw JSON by default");
+  assert(!walletDetailsSource.includes("copy this trader"), "wallet drawer must not recommend copy-trading");
+  assert(!walletDetailsSource.includes("esta wallet sabe"), "wallet drawer must not imply a wallet knows something");
+  assert(!walletDetailsSource.includes("ROI 100%"), "wallet drawer must not invent ROI copy");
+  assert(!walletDetailsSource.includes("win rate 100%"), "wallet drawer must not invent win-rate copy");
   assert(!source.includes("Deep Analysis Job"), "loading panel should not expose technical Deep Analysis Job title");
   assert(!source.includes("Leyendo Polymarket"), "loading panel should use human Polymarket read copy");
   assert(!source.includes("Analizando mercado seleccionado"), "loading panel should use human market review copy");
