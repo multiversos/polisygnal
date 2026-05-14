@@ -604,7 +604,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(walletDetailsSource.includes("Billeteras analizadas"), "wallet detail drawer is missing");
   assert(walletDetailsSource.includes("Billeteras notables"), "wallet detail drawer should expose notable wallets");
   assert(walletDetailsSource.includes("Hay billeteras relevantes reportadas"), "wallet detail drawer should explain relevant-wallet-only states");
-  assert(walletDetailsSource.includes("Datos tecnicos"), "wallet technical fields should be collapsed");
+  assert(walletDetailsSource.includes("wallet-technical-details"), "wallet technical fields should be collapsed");
   assert(!walletDetailsSource.includes("<pre"), "wallet details should not render raw JSON by default");
   assert(!source.includes("Deep Analysis Job"), "analyze loading panel should not expose technical job title");
   assert(!source.includes("Leyendo Polymarket"), "analyze loading panel should use human Polymarket read copy");
@@ -694,7 +694,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(walletDetailsSource.includes("Perfil Polymarket no disponible"), "wallet drawer must not invent wallet profile links");
   assert(walletDetailsSource.includes("Copiar wallet"), "wallet drawer must allow copying wallet addresses");
   assert(walletDetailsSource.includes("wallet-details-key-grid"), "wallet drawer must keep a compact key-data view");
-  assert(walletDetailsSource.includes("<summary>Ver detalles</summary>"), "wallet technical details must stay collapsed by default");
+  assert(walletDetailsSource.includes("Ver detalles"), "wallet technical details must stay collapsed by default");
   assert(reportSource.includes("No encontramos datos publicos suficientes de billeteras"), "AnalyzerReport missing honest wallet unavailable state");
   assert(reportSource.includes("Perfil de billeteras"), "AnalyzerReport missing wallet profile summary");
   assert(reportSource.includes("Porcentaje PolySignal"), "AnalyzerReport missing conservative signal mix copy");
