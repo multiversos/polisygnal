@@ -112,17 +112,41 @@ Request:
 ```json
 {
   "polymarketUrl": "https://polymarket.com/...",
-  "marketId": null,
+  "marketId": "0xconditionId-or-null",
   "marketSlug": "market-slug",
   "eventSlug": "event-slug",
   "title": "Market title",
   "question": "Market question",
   "category": "sports",
   "marketProbability": 0.54,
-  "prices": { "outcomes": [] },
+  "prices": {
+    "outcomes": [
+      { "label": "Pistons", "price": 0.39, "side": "UNKNOWN", "tokenId": "public-token-id" },
+      { "label": "Cavaliers", "price": 0.62, "side": "UNKNOWN", "tokenId": "public-token-id" }
+    ]
+  },
   "volume": 2000,
   "liquidity": 1000,
-  "walletIntelligence": null,
+  "walletIntelligence": {
+    "available": true,
+    "observedCapitalUsd": 42000,
+    "yesCapitalUsd": 0,
+    "noCapitalUsd": 0,
+    "neutralCapitalUsd": 42000,
+    "largeTradesCount": 5,
+    "largePositionsCount": 10,
+    "notableWalletCount": 53,
+    "observedActivities": [
+      {
+        "type": "position",
+        "shortAddress": "0xe7a2...ae70",
+        "outcome": "Cavaliers",
+        "amountUsd": 35829.07,
+        "price": 0.61,
+        "source": "polymarket_data_api"
+      }
+    ]
+  },
   "source": "polysignal"
 }
 ```

@@ -6,6 +6,7 @@ import type {
   PublicWalletActivity,
   PublicWalletActivityAction,
   WalletIntelligenceSummary,
+  WalletMarketPosition,
 } from "../lib/walletIntelligenceTypes";
 
 type WalletDetailsFilter =
@@ -16,7 +17,9 @@ type WalletDetailsFilter =
   | "over_threshold"
   | "pnl"
   | "position"
+  | "notable_wallet"
   | "sell"
+  | "trade"
   | "yes";
 
 type WalletDetailsSort = "amount" | "capital" | "recent";
@@ -80,6 +83,19 @@ function actionLabel(action?: PublicWalletActivityAction): string {
     return "Posicion";
   }
   return "Accion no especificada";
+}
+
+function activityTypeLabel(activity: PublicWalletActivity): string {
+  if (activity.activityType === "trade") {
+    return "Operacion";
+  }
+  if (activity.activityType === "notable_wallet") {
+    return "Billetera notable";
+  }
+  if (activity.activityType === "position" || activity.action === "position") {
+    return "Posicion";
+  }
+  return actionLabel(activity.action);
 }
 
 function biasLabel(summary?: WalletIntelligenceSummary | null): string {
@@ -149,8 +165,21 @@ function matchesFilter(activity: PublicWalletActivity, filter: WalletDetailsFilt
   if (filter === "no") {
     return activity.side === "NO";
   }
-  if (filter === "buy" || filter === "sell" || filter === "position") {
+  if (filter === "position") {
+    return activity.activityType === "position" || (activity.action === "position" && activity.activityType !== "notable_wallet");
+  }
+  if (filter === "buy" || filter === "sell") {
     return activity.action === filter;
+  }
+  if (filter === "trade") {
+    return (
+      (activity.activityType === "trade" || activity.action === "buy" || activity.action === "sell") &&
+      typeof activity.amountUsd === "number" &&
+      activity.amountUsd >= threshold
+    );
+  }
+  if (filter === "notable_wallet") {
+    return activity.activityType === "notable_wallet";
   }
   if (filter === "over_threshold") {
     return typeof activity.amountUsd === "number" && activity.amountUsd >= threshold;
@@ -182,6 +211,55 @@ function detailValue(value?: string | number | boolean | null): string {
   return String(value);
 }
 
+function activityFromPosition(
+  position: WalletMarketPosition,
+  index: number,
+  activityType: PublicWalletActivity["activityType"],
+): PublicWalletActivity {
+  return {
+    action: activityType === "trade" ? "unknown" : "position",
+    activityType,
+    amountUsd: position.amountUsd ?? null,
+    conditionId: position.marketId ?? null,
+    id: `${activityType}-${index}-${position.shortAddress || position.walletAddress || "wallet"}-${position.amountUsd ?? "na"}`,
+    limitations: [
+      activityType === "notable_wallet"
+        ? "La fuente reporto esta billetera como relevante, pero puede no entregar operaciones individuales."
+        : "La fuente entrego una posicion estructurada; algunos campos pueden no estar disponibles.",
+    ],
+    marketId: position.marketId ?? null,
+    outcome: position.side === "YES" || position.side === "NO" ? position.side : null,
+    positionSize: null,
+    price: position.averageEntryPrice ?? null,
+    shortAddress: position.shortAddress || null,
+    side: position.side === "YES" || position.side === "NO" ? position.side : "UNKNOWN",
+    source: "polymarket_data_api",
+    timestamp: position.lastActivityAt ?? null,
+    unrealizedPnl: position.unrealizedPnlUsd ?? null,
+    walletAddress: position.walletAddress || position.shortAddress || null,
+    warnings: ["Actividad publica observada; no es una decision ni una recomendacion."],
+  };
+}
+
+function mergeActivities(summary?: WalletIntelligenceSummary | null): PublicWalletActivity[] {
+  if (!summary) {
+    return [];
+  }
+  const items: PublicWalletActivity[] = [...(summary.publicActivities ?? [])];
+  const seen = new Set(items.map((item) => item.id));
+  const append = (activity: PublicWalletActivity) => {
+    if (seen.has(activity.id)) {
+      return;
+    }
+    seen.add(activity.id);
+    items.push(activity);
+  };
+  (summary.largeTrades ?? []).forEach((position, index) => append(activityFromPosition(position, index, "trade")));
+  (summary.largePositions ?? []).forEach((position, index) => append(activityFromPosition(position, index, "position")));
+  (summary.notableWallets ?? []).forEach((position, index) => append(activityFromPosition(position, index, "notable_wallet")));
+  return items;
+}
+
 export function WalletIntelligenceDetails({
   onClose,
   onRetry,
@@ -191,8 +269,20 @@ export function WalletIntelligenceDetails({
   const [filter, setFilter] = useState<WalletDetailsFilter>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<WalletDetailsSort>("amount");
-  const activities = summary?.publicActivities ?? [];
+  const activities = useMemo(() => mergeActivities(summary), [summary]);
   const threshold = summary?.thresholdUsd ?? 100;
+  const overThresholdTradeCount = activities.filter(
+    (activity) =>
+      (activity.activityType === "trade" || activity.action === "buy" || activity.action === "sell") &&
+      typeof activity.amountUsd === "number" &&
+      activity.amountUsd >= threshold,
+  ).length;
+  const positionCount = activities.filter(
+    (activity) => activity.activityType === "position" || activity.action === "position",
+  ).length;
+  const notableCount =
+    activities.filter((activity) => activity.activityType === "notable_wallet").length ||
+    (summary?.notableWallets ?? []).length;
   const filteredActivities = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return sortActivities(
@@ -239,6 +329,18 @@ export function WalletIntelligenceDetails({
             <strong>{summary?.relevantWalletsCount ?? 0}</strong>
           </div>
           <div>
+            <span>Operaciones &gt; ${threshold}</span>
+            <strong>{overThresholdTradeCount}</strong>
+          </div>
+          <div>
+            <span>Posiciones relevantes</span>
+            <strong>{positionCount}</strong>
+          </div>
+          <div>
+            <span>Billeteras notables</span>
+            <strong>{notableCount}</strong>
+          </div>
+          <div>
             <span>Capital observado</span>
             <strong>{formatUsd(summary?.analyzedCapitalUsd)}</strong>
           </div>
@@ -249,6 +351,10 @@ export function WalletIntelligenceDetails({
           <div>
             <span>Capital NO</span>
             <strong>{formatUsd(summary?.noCapitalUsd)}</strong>
+          </div>
+          <div>
+            <span>Capital outcome/neutral</span>
+            <strong>{formatUsd(summary?.neutralCapitalUsd)}</strong>
           </div>
           <div>
             <span>Sesgo agregado</span>
@@ -267,11 +373,13 @@ export function WalletIntelligenceDetails({
         <div className="wallet-details-controls">
           {[
             ["all", "Todas"],
+            ["trade", "Operaciones > $100"],
+            ["position", "Posiciones"],
+            ["notable_wallet", "Billeteras notables"],
             ["yes", "YES"],
             ["no", "NO"],
             ["buy", "Compras"],
             ["sell", "Ventas"],
-            ["position", "Posiciones"],
             ["over_threshold", "> $100"],
             ["pnl", "Con PnL"],
             ["history", "Con historial"],
@@ -324,6 +432,7 @@ export function WalletIntelligenceDetails({
                   <span className={`wallet-side-pill ${activity.side.toLowerCase()}`}>{activity.side}</span>
                 </div>
                 <div className="wallet-details-grid">
+                  <div><span>Tipo</span><strong>{activityTypeLabel(activity)}</strong></div>
                   <div><span>Accion</span><strong>{actionLabel(activity.action)}</strong></div>
                   <div><span>Outcome</span><strong>{activity.outcome || activity.side || "unknown"}</strong></div>
                   <div><span>Monto USD</span><strong>{formatUsd(activity.amountUsd)}</strong></div>
@@ -370,11 +479,14 @@ export function WalletIntelligenceDetails({
             <strong>
               {summary?.queryStatus === "unavailable" || summary?.queryStatus === "error"
                 ? "Wallet Intelligence no esta disponible para este mercado en este momento."
-                : "No encontramos operaciones publicas mayores a $100 para este mercado."}
+                : summary && summary.relevantWalletsCount > 0
+                  ? "Hay billeteras relevantes reportadas por la fuente, pero no se entregaron operaciones individuales mayores a $100 para este filtro."
+                  : "No encontramos operaciones publicas mayores a $100 para este mercado."}
             </strong>
             <p>
-              Esto no significa que no existan operaciones; puede que la fuente no tenga datos suficientes
-              o que esten fuera del limite consultado.
+              {summary && summary.relevantWalletsCount > 0
+                ? `La fuente reporto ${summary.relevantWalletsCount} billetera(s) relevante(s). Revisa Todas, Posiciones o Billeteras notables para ver cualquier dato parcial disponible.`
+                : "Esto no significa que no existan operaciones; puede que la fuente no tenga datos suficientes o que esten fuera del limite consultado."}
             </p>
           </div>
         )}

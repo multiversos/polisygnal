@@ -335,7 +335,7 @@ export function buildAnalysisAgentMarketPayload(task: AnalysisAgentTask): Analys
     category: market.category ?? market.sport ?? null,
     eventSlug: market.eventSlug ?? null,
     liquidity: market.liquidity ?? null,
-    marketId: null,
+    marketId: market.conditionId ?? null,
     marketProbability:
       typeof marketProbability?.yes === "number"
         ? marketProbability.yes
@@ -347,6 +347,7 @@ export function buildAnalysisAgentMarketPayload(task: AnalysisAgentTask): Analys
         label: outcome.label,
         price: outcome.price,
         side: outcome.side,
+        tokenId: outcome.tokenId,
       })),
     },
     question: market.title,

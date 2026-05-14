@@ -20,6 +20,8 @@ export type WalletIntelligenceQueryStatus =
   | "timeout"
   | "unavailable";
 
+export type PublicWalletActivityType = "notable_wallet" | "position" | "trade" | "unknown";
+
 export type WalletMarketPosition = {
   averageEntryPrice?: number;
   currentValueUsd?: number;
@@ -36,12 +38,14 @@ export type PublicWalletActivityAction = "buy" | "position" | "sell" | "unknown"
 
 export type PublicWalletActivity = {
   action: PublicWalletActivityAction;
+  activityType?: PublicWalletActivityType;
   amountUsd?: number | null;
   closedMarkets?: number | null;
   conditionId?: string | null;
   id: string;
   limitations: string[];
   losses?: number | null;
+  marketsObserved?: number | null;
   marketId?: string | null;
   outcome?: string | null;
   positionSize?: number | null;
@@ -105,6 +109,7 @@ export type WalletIntelligenceSummary = {
   largeTrades?: WalletMarketPosition[];
   notableWallets?: WalletMarketPosition[];
   noCapitalUsd?: number;
+  neutralCapitalUsd?: number;
   profileSummaries?: WalletProfileSummary[];
   publicActivities?: PublicWalletActivity[];
   queryStatus?: WalletIntelligenceQueryStatus;

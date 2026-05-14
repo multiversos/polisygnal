@@ -26,7 +26,7 @@ export function unavailablePolymarketWalletIntelligenceSummary(
     warnings: [
       "No encontramos datos publicos suficientes de billeteras para este mercado.",
       "Este analisis no usara wallets como senal fuerte.",
-      "No se muestran direcciones completas.",
+      "Las direcciones completas solo se muestran en el detalle cuando la fuente publica las entrega.",
     ],
   };
 }

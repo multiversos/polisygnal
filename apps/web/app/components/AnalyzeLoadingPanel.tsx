@@ -98,7 +98,7 @@ function analysisProgressSteps(agentName: string): AnalyzeProgressStep[] {
       phases: ["context", "readiness"],
     },
     {
-      detail: "Revisamos actividad publica disponible sin mostrar direcciones completas.",
+      detail: "Revisamos actividad publica disponible sin identificar personas reales.",
       id: "reviewing_wallets",
       label: "Revisando billeteras",
       phases: ["research"],

@@ -201,7 +201,7 @@ function unavailableSummary(reason: string, thresholdUsd = WALLET_INTELLIGENCE_T
     warnings: [
       "No encontramos datos publicos suficientes de billeteras para este mercado.",
       "Este analisis no usara wallets como senal fuerte.",
-      "No se muestran direcciones completas.",
+      "Las direcciones completas solo se muestran en el detalle de billeteras cuando la fuente publica las entrega.",
     ],
   };
 }
@@ -352,6 +352,7 @@ function toPublicPosition(input: {
 
 function toWalletActivity(input: {
   action: PublicWalletActivityAction;
+  activityType: PublicWalletActivity["activityType"];
   amountUsd?: number;
   fullWallet?: unknown;
   idPrefix: string;
@@ -388,6 +389,7 @@ function toWalletActivity(input: {
     fullWallet: position.fullWallet,
     publicActivity: {
       action: input.action,
+      activityType: input.activityType,
       amountUsd: input.amountUsd ?? null,
       conditionId: input.marketId ?? null,
       id: `${input.idPrefix}-${input.index}-${position.publicPosition.shortAddress}-${input.amountUsd ?? "na"}`,
@@ -442,6 +444,7 @@ function buildTradePositions(trades: PublicTrade[], marketId?: string): Internal
     .map((trade, index) =>
       toWalletActivity({
         action: normalizeAction(trade.side ?? trade.type ?? trade.action, "unknown"),
+        activityType: "trade",
         amountUsd: tradeAmountUsd(trade),
         fullWallet: trade.proxyWallet,
         idPrefix: "trade",
@@ -464,6 +467,7 @@ function buildMarketPositions(positions: PublicPosition[], marketId?: string): I
     .map((position, index) =>
       toWalletActivity({
         action: "position",
+        activityType: "position",
         amountUsd: positionAmountUsd(position),
         fullWallet: position.proxyWallet,
         idPrefix: "position",
@@ -494,6 +498,14 @@ function uniqueByWalletAndSide(items: InternalWalletActivity[]): InternalWalletA
     result.push(item);
   }
   return result;
+}
+
+function capitalFor(items: WalletMarketPosition[]): number {
+  return items.reduce((total, item) => total + (typeof item.amountUsd === "number" ? item.amountUsd : 0), 0);
+}
+
+function neutralCapitalFor(items: WalletMarketPosition[]): number {
+  return capitalFor(items.filter((item) => item.side !== "YES" && item.side !== "NO"));
 }
 
 async function loadClosedPositionsForProfiles(wallets: InternalWalletActivity[]): Promise<WalletIntelligenceSummary["profileSummaries"]> {
@@ -621,13 +633,16 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
   if (relevant.length === 0) {
+    const visibleActivities = combined.map((item) => item.publicActivity).slice(0, MAX_LIMIT);
     return jsonResponse({
       ...unavailableSummary("No encontramos datos publicos suficientes de billeteras para este mercado.", thresholdUsd),
       checkedAt: new Date().toISOString(),
       queryStatus: "empty",
       source: "polymarket_data",
       allActivitiesCount: combined.length,
-      publicActivities: combined.map((item) => item.publicActivity).slice(0, MAX_LIMIT),
+      largePositions: largePositions.map((item) => item.publicPosition).slice(0, 10),
+      largeTrades: largeTrades.map((item) => item.publicPosition).slice(0, 10),
+      publicActivities: visibleActivities,
       warnings: [
         "Este analisis no usara wallets como senal fuerte.",
         tokenIds.length > 0 ? "Token ids detectados, pero sin actividad publica suficiente sobre el umbral." : "Token ids no disponibles o sin actividad suficiente.",
@@ -642,9 +657,11 @@ export async function POST(request: Request): Promise<Response> {
     relevantActivities.map((item) => item.publicActivity),
     profileSummaries,
   );
+  const observedCapitalUsd = capitalFor(relevant);
+  const neutralCapitalUsd = neutralCapitalFor(relevant);
 
   const summary: WalletIntelligenceSummary = {
-    analyzedCapitalUsd: bias.yesCapitalUsd + bias.noCapitalUsd,
+    analyzedCapitalUsd: observedCapitalUsd,
     allActivitiesCount: combined.length,
     available: true,
     checkedAt: new Date().toISOString(),
@@ -652,6 +669,7 @@ export async function POST(request: Request): Promise<Response> {
     largePositions: filterRelevantWallets(largePositions.map((item) => item.publicPosition), thresholdUsd).slice(0, 10),
     largeTrades: filterRelevantWallets(largeTrades.map((item) => item.publicPosition), thresholdUsd).slice(0, 10),
     noCapitalUsd: bias.noCapitalUsd,
+    neutralCapitalUsd,
     notableWallets: relevant.slice(0, 5),
     profileSummaries,
     publicActivities,
@@ -664,7 +682,7 @@ export async function POST(request: Request): Promise<Response> {
     thresholdUsd,
     topWallets: relevant.slice(0, 5),
     warnings: [
-      "No se muestran direcciones completas.",
+      "Las direcciones completas solo se muestran dentro del detalle de billeteras porque son datos publicos de wallet.",
       "No se identifica a personas reales detras de wallets publicas.",
       availableProfiles > 0
         ? "Hay historial cerrado publico para algunas billeteras, aun asi no basta por si solo para una prediccion."

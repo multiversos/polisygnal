@@ -690,6 +690,9 @@ The link analyzer is the main product flow and must stay Polymarket-first.
 - If the source cannot return the market, show a no-match state instead of a
   cross-sport fallback.
 - Store local history summaries only after the user chooses to save.
-- Do not store raw resolver payloads or full wallet addresses.
+- Do not store raw resolver payloads or complete wallet lists. Full public
+  wallet addresses may appear only inside the explicit `Ver billeteras` drawer
+  when the allowlisted source returns them; saved history and agent payloads
+  keep sanitized summaries.
 - Do not count pending, cancelled, unknown or no-clear-decision records as
   failures.

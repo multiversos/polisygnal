@@ -7,7 +7,7 @@
 - foco actual: `/analyze` como centro del producto, con Analysis Agent Bridge conectado a Samantha Bridge en modo read-only
 - frontend: https://polisygnal-web.vercel.app
 - backend: https://polisygnal.onrender.com
-- ultimo deploy production validado: `2a3be56`
+- ultimo deploy production validado: confirmar en `/api/build-info`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
 
@@ -121,10 +121,10 @@ Estado visible verificado:
   Gamma sin market id local compatible, queda no disponible de forma honesta; no
   se busca otro mercado interno.
 - Wallet Intelligence en el reporte muestra capital observado, sesgo
-  YES/NO/Neutral, confianza, umbral `100 USD+` y direcciones abreviadas solo
-  cuando existen datos reales. El detalle queda detras de `Ver todas las
-  billeteras analizadas` y no muestra direcciones completas, ROI/win rate
-  inventados ni copy-trading.
+  YES/NO/Neutral/outcome, confianza, umbral `100 USD+` y resumen compacto
+  cuando existen datos reales. El detalle queda detras de `Ver billeteras` y
+  puede mostrar direcciones publicas completas solo por clic explicito del
+  usuario; no muestra ROI/win rate inventados ni copy-trading.
 - `/analyze` muestra probabilidad del mercado basada en precio visible cuando
   existe y solo muestra estimacion PolySignal si el dato real esta disponible.
 - `/analyze` ahora prepara la direccion de producto "solo analisis profundo":
@@ -295,6 +295,15 @@ Estado visible verificado:
   `Fuente no disponible` y timeout. Los paneles `Ver datos` y
   `Ver billeteras` no se abren automaticamente; solo aparecen por clic/tap y
   mantienen los datos tecnicos colapsados.
+- El detalle `Ver datos` ahora usa outcomes flexibles. En mercados binarios
+  muestra YES/NO; en mercados por equipo/opcion muestra los nombres reales
+  como Pistons/Cavaliers, precio, probabilidad y token ID sin degradarlos a
+  `Precio YES/NO: No disponible`.
+- El detalle `Ver billeteras` combina operaciones, posiciones relevantes,
+  billeteras notables y resumen de concentracion cuando la fuente los entrega.
+  Si la fuente reporta billeteras relevantes pero no operaciones individuales
+  mayores a `100 USD`, lo explica y muestra cualquier posicion/notable
+  disponible en vez de dejar una lista vacia contradictoria.
 - El guardado desde `/analyze` usa el resultado unificado para conservar en
   Historial un resumen local de capas y wallet summary agregado. No guarda
   payloads crudos ni direcciones completas.

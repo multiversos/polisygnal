@@ -25,8 +25,23 @@ export type SamanthaResearchBrief = {
     walletIntelligence?: {
       available: boolean;
       bias?: SamanthaDirection;
+      largePositionsCount?: number;
+      largeTradesCount?: number;
+      neutralCapitalUsd?: number;
       notableWalletCount?: number;
+      observedActivities?: Array<{
+        action?: string;
+        amountUsd?: number;
+        outcome?: string;
+        price?: number;
+        side?: SamanthaDirection;
+        source?: string;
+        shortAddress?: string;
+        tokenId?: string;
+        type?: string;
+      }>;
       observedCapitalUsd?: number;
+      noCapitalUsd?: number;
       profileSummary?: Array<{
         confidence: "high" | "low" | "medium" | "unknown";
         profileAvailable: boolean;
@@ -37,10 +52,12 @@ export type SamanthaResearchBrief = {
       }>;
       walletSignalAvailable?: boolean;
       warnings?: string[];
+      yesCapitalUsd?: number;
     };
   };
   market: {
     category?: string;
+    conditionId?: string;
     eventDate?: string;
     eventSlug?: string;
     league?: string;
@@ -51,6 +68,7 @@ export type SamanthaResearchBrief = {
       label: string;
       price?: number;
       side?: "DRAW" | "NO" | "UNKNOWN" | "YES";
+      tokenId?: string;
     }>;
     sport?: string;
     title: string;

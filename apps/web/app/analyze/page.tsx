@@ -384,11 +384,14 @@ function buildWalletProgress(summary: WalletIntelligenceSummary): AnalyzeProgres
     };
   }
   if (summary.available && summary.relevantWalletsCount > 0) {
+    const observedCapital = toNumber(summary.analyzedCapitalUsd);
     return {
       detail: "La consulta termino y encontro actividad publica sobre el umbral configurado.",
       status: "completed_with_data",
       statusLabel: "Actividad encontrada",
-      summary: `${summary.relevantWalletsCount} billetera(s) relevante(s), capital observado ${formatUsd(summary.analyzedCapitalUsd)}.`,
+      summary: observedCapital !== null
+        ? `${summary.relevantWalletsCount} billetera(s) relevante(s), capital observado ${formatUsd(observedCapital)}.`
+        : `${summary.relevantWalletsCount} billetera(s) relevante(s); la fuente no entrego capital observado agregado.`,
     };
   }
   return {
@@ -588,9 +591,14 @@ function safeWalletSummaryForHistory(item: MarketOverviewItem) {
   const summary = getWalletIntelligenceSummary(item);
   return {
     analyzedCapitalUsd: summary.analyzedCapitalUsd,
+    allActivitiesCount: summary.allActivitiesCount,
     available: summary.available,
     checkedAt: summary.checkedAt,
     confidence: summary.confidence,
+    largePositionsCount: summary.largePositions?.length,
+    largeTradesCount: summary.largeTrades?.length,
+    neutralCapitalUsd: summary.neutralCapitalUsd,
+    notableWalletsCount: summary.notableWallets?.length,
     noCapitalUsd: summary.noCapitalUsd,
     profileSummaries: (summary.profileSummaries ?? []).slice(0, 5).map((profile) => ({
       commonSideBias: profile.commonSideBias,

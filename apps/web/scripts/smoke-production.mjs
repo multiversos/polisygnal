@@ -599,7 +599,11 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("open={marketDetailsOpen}"), "market detail drawer should be closed by default");
   assert(analyzePage.includes("open={walletDetailsOpen}"), "wallet detail drawer should be closed by default");
   assert(marketDetailsSource.includes("Datos de Polymarket"), "market data detail drawer is missing");
+  assert(marketDetailsSource.includes("summaryOutcomes"), "market data drawer should summarize real outcome prices");
+  assert(marketDetailsSource.includes("Fecha disponible"), "market data drawer should not invent event time labels");
   assert(walletDetailsSource.includes("Billeteras analizadas"), "wallet detail drawer is missing");
+  assert(walletDetailsSource.includes("Billeteras notables"), "wallet detail drawer should expose notable wallets");
+  assert(walletDetailsSource.includes("Hay billeteras relevantes reportadas"), "wallet detail drawer should explain relevant-wallet-only states");
   assert(walletDetailsSource.includes("Datos tecnicos"), "wallet technical fields should be collapsed");
   assert(!walletDetailsSource.includes("<pre"), "wallet details should not render raw JSON by default");
   assert(!source.includes("Deep Analysis Job"), "analyze loading panel should not expose technical job title");

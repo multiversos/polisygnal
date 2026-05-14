@@ -407,6 +407,14 @@ If this test fails, stop feature work and treat it as a production regression.
    clicking `Ver datos` or `Ver estado`; it should show only real fields such as
    YES/NO price, probability, volume, liquidity, conditionId, token IDs,
    eventSlug, marketSlug, warnings and limitations.
+45c. For non-binary/team-outcome markets such as
+   `https://polymarket.com/es/sports/nba/nba-det-cle-2026-05-15`, confirm
+   `Ver datos` promotes real outcome prices such as Pistons/Cavaliers to the
+   summary instead of showing `Precio YES` and `Precio NO` as unavailable.
+45d. In `Ver billeteras`, confirm the drawer can show operations, positions and
+   notable wallets separately. If the source reports relevant wallets but no
+   individual operations over `$100`, the drawer must explain that state and
+   show any positions/notables available instead of an empty contradiction.
 46. Confirm `Historial relacionado` is visible. If the market was analyzed
    before, it should show the latest local record; otherwise it should say the
    market is not in local history yet.
@@ -631,9 +639,9 @@ Use these quick checks when reviewing public pages:
    controls by default.
 4. Confirm unavailable sources appear as `Fuente automatica no disponible` or
    partial reading, not as a request for user evidence.
-5. Confirm no full wallet addresses, secrets, raw payloads, fake ROI/win rate,
-   copy-trading language, fake odds, fake news, fake injuries, or betting advice
-   appear.
+5. Confirm no full wallet addresses appear outside the explicit `Ver billeteras`
+   drawer, and confirm no secrets, raw payloads, fake ROI/win rate, copy-trading
+   language, fake odds, fake news, fake injuries, or betting advice appear.
 6. Confirm no prediction is created unless validated Samantha output and the
    conservative PolySignal gates pass.
 7. Local debug-only manual report tooling may exist behind

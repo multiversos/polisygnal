@@ -609,6 +609,73 @@ async function validateWalletIntelligenceRules() {
     assert(calls.at(-1).init?.credentials === "omit", "expected live wallet adapter not to send credentials");
     assert(calls.at(-1).init?.redirect === "error", "expected live wallet adapter to reject redirects");
     assert(!JSON.stringify(external).includes(fullWallet), "live wallet adapter leaked a full wallet address");
+
+    const walletRoute = loadTsModule("app/api/polymarket-wallet-intelligence/route.ts");
+    globalThis.fetch = async (url) => {
+      const target = String(url);
+      if (target.includes("/trades")) {
+        return new Response(
+          JSON.stringify([
+            {
+              asset: "pistons-token",
+              outcome: "Pistons",
+              price: "0.39",
+              proxyWallet: secondWallet,
+              size: "400",
+              timestamp: "2026-05-14T20:00:00Z",
+              transactionHash: "0xtradehash",
+            },
+          ]),
+          { headers: { "Content-Type": "application/json" }, status: 200 },
+        );
+      }
+      if (target.includes("/v1/market-positions")) {
+        return new Response(
+          JSON.stringify([
+            {
+              positions: [
+                {
+                  avgPrice: "0.61",
+                  currentValue: "1500",
+                  currPrice: "0.62",
+                  outcome: "Cavaliers",
+                  proxyWallet: fullWallet,
+                  size: "2400",
+                  tokenId: "cavaliers-token",
+                  totalPnl: "12.5",
+                },
+              ],
+            },
+          ]),
+          { headers: { "Content-Type": "application/json" }, status: 200 },
+        );
+      }
+      if (target.includes("/closed-positions")) {
+        return new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" }, status: 200 });
+      }
+      return new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" }, status: 200 });
+    };
+    const routeResult = await walletRoute.POST(
+      new Request("https://example.test/api/polymarket-wallet-intelligence", {
+        body: JSON.stringify({
+          conditionId: "0xabc123",
+          marketUrl: "https://polymarket.com/event/nba-det-cle-2026-05-15",
+          minUsd: 100,
+          tokenIds: ["pistons-token", "cavaliers-token"],
+        }),
+        method: "POST",
+      }),
+    );
+    assert(routeResult.status === 200, `expected wallet route fixture to return 200, got ${routeResult.status}`);
+    const routeBody = await routeResult.json();
+    assert(routeBody.available, "expected wallet route fixture to be available");
+    assert(routeBody.relevantWalletsCount === 2, `expected two relevant public wallet rows, got ${routeBody.relevantWalletsCount}`);
+    assert(routeBody.analyzedCapitalUsd > 1600, "expected observed capital to include non-YES/NO outcomes");
+    assert(routeBody.neutralCapitalUsd > 1600, "expected outcome/neutral capital for team outcomes");
+    assert(routeBody.publicActivities.some((activity) => activity.walletAddress === fullWallet), "expected drawer payload to keep full public wallet address");
+    assert(routeBody.publicActivities.some((activity) => activity.activityType === "position" && activity.outcome === "Cavaliers"), "expected positions to be visible as activities");
+    assert(routeBody.publicActivities.some((activity) => activity.activityType === "trade" && activity.outcome === "Pistons"), "expected trades to be visible as activities");
+    assert(!JSON.stringify(routeBody).includes("raw_payload_should_not_leak"), "wallet route leaked raw fields");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -745,7 +812,7 @@ async function validateWalletIntelligenceRules() {
     "expected wallet data alone not to create a PolySignal estimate",
   );
 
-  return { cases: 43, threshold_usd: WALLET_INTELLIGENCE_THRESHOLD_USD };
+  return { cases: 55, threshold_usd: WALLET_INTELLIGENCE_THRESHOLD_USD };
 }
 
 function validateAnalyzeLoadingPanelSource() {
@@ -779,9 +846,13 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("open={marketDetailsOpen}"), "market data drawer must be closed by default");
   assert(analyzePage.includes("open={walletDetailsOpen}"), "wallet drawer must be closed by default");
   assert(marketDetailsSource.includes("Datos de Polymarket"), "expected market data detail drawer");
+  assert(marketDetailsSource.includes("summaryOutcomes"), "market drawer must summarize real outcome prices, not only YES/NO snapshots");
+  assert(marketDetailsSource.includes("Fecha disponible"), "market drawer must avoid inventing event time labels");
   assert(marketDetailsSource.includes("conditionId") || marketDetailsSource.includes("ConditionId"), "market drawer must show conditionId state");
   assert(marketDetailsSource.includes("token_id") || marketDetailsSource.includes("TokenId"), "market drawer must show token ids");
   assert(walletDetailsSource.includes("Billeteras analizadas"), "expected wallet detail drawer");
+  assert(walletDetailsSource.includes("Billeteras notables"), "wallet drawer must expose notable wallets when the source reports them");
+  assert(walletDetailsSource.includes("Hay billeteras relevantes reportadas"), "wallet drawer must explain relevant wallet counts without individual trades");
   assert(walletDetailsSource.includes("walletAddress"), "wallet drawer may render public full wallet addresses by user request");
   assert(walletDetailsSource.includes("Datos tecnicos"), "wallet drawer must keep technical raw fields collapsed");
   assert(!walletDetailsSource.includes("<pre"), "wallet drawer must not render raw JSON by default");

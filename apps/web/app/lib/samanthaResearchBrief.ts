@@ -67,6 +67,13 @@ function normalizeWalletBias(value: WalletIntelligenceSummary["signalDirection"]
   return "UNKNOWN";
 }
 
+function normalizeSignalDirection(value: unknown): SamanthaDirection {
+  if (value === "YES" || value === "NO" || value === "NEUTRAL") {
+    return value;
+  }
+  return "UNKNOWN";
+}
+
 function uniqueGoals(goals: SamanthaResearchGoal[]): SamanthaResearchGoal[] {
   return [...new Set(goals)];
 }
@@ -142,6 +149,7 @@ export function buildSamanthaResearchBrief(input: BuildSamanthaResearchBriefInpu
       label: cleanText(outcome.label),
       price: toNumber(outcome.price),
       side: normalizeSide(outcome.side),
+      tokenId: cleanText(outcome.token_id),
     }));
 
   const brief: SamanthaResearchBrief = {
@@ -167,8 +175,23 @@ export function buildSamanthaResearchBrief(input: BuildSamanthaResearchBriefInpu
       walletIntelligence: {
         available: Boolean(input.walletSummary?.available),
         bias: input.walletSummary ? normalizeWalletBias(input.walletSummary.signalDirection) : "UNKNOWN",
+        largePositionsCount: input.walletSummary?.largePositions?.length,
+        largeTradesCount: input.walletSummary?.largeTrades?.length,
+        neutralCapitalUsd: input.walletSummary?.neutralCapitalUsd,
         notableWalletCount: input.walletSummary?.relevantWalletsCount,
+        observedActivities: (input.walletSummary?.publicActivities ?? []).slice(0, 10).map((activity) => ({
+          action: cleanText(activity.action),
+          amountUsd: toNumber(activity.amountUsd),
+          outcome: cleanText(activity.outcome),
+          price: toNumber(activity.price),
+          shortAddress: cleanText(activity.shortAddress),
+          side: normalizeSignalDirection(activity.side),
+          source: cleanText(activity.source),
+          tokenId: cleanText(activity.tokenId),
+          type: cleanText(activity.activityType),
+        })),
         observedCapitalUsd: input.walletSummary?.analyzedCapitalUsd,
+        noCapitalUsd: input.walletSummary?.noCapitalUsd,
         profileSummary: (input.walletSummary?.profileSummaries ?? []).slice(0, 5).map((profile) => ({
           confidence: profile.confidence,
           profileAvailable: profile.profileAvailable,
@@ -184,10 +207,12 @@ export function buildSamanthaResearchBrief(input: BuildSamanthaResearchBriefInpu
         })),
         walletSignalAvailable: Boolean(input.walletSummary?.available && input.walletSummary.relevantWalletsCount > 0),
         warnings: walletReading.warnings,
+        yesCapitalUsd: input.walletSummary?.yesCapitalUsd,
       },
     },
     market: {
       category: cleanText(market.market_type || market.sport_type) || undefined,
+      conditionId: market.condition_id ?? undefined,
       eventDate: market.close_time ?? market.end_date ?? undefined,
       eventSlug: market.event_slug ?? undefined,
       league: market.sport_type ?? undefined,
