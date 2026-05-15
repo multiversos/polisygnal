@@ -407,7 +407,7 @@ If this test fails, stop feature work and treat it as a production regression.
    limitations and raw useful fields must stay inside collapsed `Datos tecnicos`.
 45f. Confirm `Ver perfil en Polymarket` appears only for valid full public
    wallet addresses. If no verified profile URL can be built, confirm the card
-   says `Perfil Polymarket no disponible` and offers `Copiar wallet`.
+   says `Perfil Polymarket no disponible` and offers `Copiar direccion`.
 45g. Confirm `Historial de esta wallet` is collapsed by default. It may show
    closed markets, wins/losses, real win rate, real PnL and market rows only if
    the public source delivered them. Otherwise it says history is unavailable.
@@ -415,7 +415,7 @@ If this test fails, stop feature work and treat it as a production regression.
    closedMarkets is at least 50, and either real PnL or observed capital is
    available. No 1/1 or 2/2 profile should be saved as highlighted.
 45i. Open `/profiles` after analyzing a market with eligible wallets. Confirm
-   it loads, says `DB persistente + fallback local` or a clear local fallback
+   it loads, says `Registro persistente` or a clear local fallback
    state, shows saved public profiles, links to Polymarket profiles, and warns
    that history is not copy-trading or a guarantee.
 45i-1. If a profile came from the persistent registry, confirm the remove action
@@ -424,8 +424,10 @@ If this test fails, stop feature work and treat it as a production regression.
 45i-2. If the backend is unavailable, confirm `/profiles` falls back to
    localStorage v1 and says `Mostrando perfiles guardados en este navegador`.
 45i-3. If local profiles exist, confirm eligible entries sync to the persistent
-   registry and show `Sincronizado` or a pending/error sync state without losing
+   registry and show `Persistente` or a pending/error sync state without losing
    the local copy.
+45i-4. If filters or search hide all visible profiles, confirm `/profiles`
+   shows `No hay perfiles con este filtro` and a `Limpiar filtros` action.
 45j. In `/profiles`, click `Actualizar` on one saved profile. Confirm the
    card shows `Actualizando...`, then `Actualizado`, `Actualizacion parcial`,
    or `No se pudo actualizar`. The profile must not be deleted on failure.

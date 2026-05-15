@@ -660,9 +660,9 @@ export function WalletIntelligenceDetails({
                   )}
                   <button disabled={!fullWalletAddress} onClick={() => copyWallet(activity)} type="button">
                     {copiedActivityId === activity.id
-                      ? "Wallet copiada"
+                      ? "Direccion copiada"
                       : fullWalletAddress
-                        ? "Copiar wallet"
+                        ? "Copiar direccion"
                         : "Wallet completa no disponible"}
                   </button>
                   {isHighlightedProfile ? (

@@ -48,6 +48,11 @@ Without auth, removing a persistent profile means hiding it locally in this
 browser. Global delete/admin workflows require future authentication and
 ownership/admin checks.
 
+The UI labels persistent registry rows as `Persistente`, local-only rows as
+`Solo local`, and uses `Ocultar en este navegador` for global registry profiles.
+Copy actions use `Copiar direccion` so the page stays framed as verification of
+public data rather than copy-trading.
+
 ## API
 
 Backend:

@@ -210,7 +210,7 @@ function refreshStatusCopy(status?: HighlightedProfileRefreshStatus, stale?: boo
 
 function syncStatusCopy(profile: HighlightedWalletProfile): string {
   if (profile.syncStatus === "synced") {
-    return "Sincronizado";
+    return "Persistente";
   }
   if (profile.syncStatus === "pending") {
     return "Pendiente de sincronizar";
@@ -471,8 +471,8 @@ export default function ProfilesPage() {
         <div>
           <p className="eyebrow">Wallet Intelligence</p>
           <h1>Perfiles</h1>
-          <p>Billeteras publicas detectadas con historial fuerte en Polymarket.</p>
-          <p>No es recomendacion de copy-trading; solo organiza datos publicos verificables.</p>
+          <p>Billeteras publicas destacadas detectadas por PolySignal.</p>
+          <p>Datos publicos de Polymarket. No es recomendacion de copy-trading.</p>
         </div>
         <div className="profiles-hero-actions">
           <span className="badge external-hint">
@@ -594,7 +594,7 @@ export default function ProfilesPage() {
                     {isRefreshing ? "Actualizando..." : "Actualizar"}
                   </button>
                   <button onClick={() => copyWallet(profile)} type="button">
-                    {copiedId === profile.id ? "Wallet copiada" : "Copiar wallet"}
+                    {copiedId === profile.id ? "Direccion copiada" : "Copiar direccion"}
                   </button>
                   <button onClick={() => removeProfile(profile)} type="button">
                     {profile.syncStatus === "synced" || profile.persistentId ? "Ocultar en este navegador" : "Quitar perfil"}
@@ -667,16 +667,30 @@ export default function ProfilesPage() {
         </section>
       ) : (
         <section className="profiles-empty">
-          <strong>No hay perfiles destacados guardados todavia.</strong>
-          <p>
-            Los perfiles destacados apareceran cuando analices mercados con wallets publicas que cumplan los criterios.
-            PolySignal solo guardara wallets con winRate real, al menos 50 mercados cerrados y PnL real o capital
-            observado relevante.
-          </p>
-          <p>
-            Perfiles v2 usa un registro persistente de datos publicos y conserva localStorage como respaldo si la
-            sincronizacion no esta disponible o quedan perfiles pendientes.
-          </p>
+          {profiles.length > 0 ? (
+            <>
+              <strong>No hay perfiles con este filtro.</strong>
+              <p>
+                Ajusta la busqueda o vuelve a todos los perfiles para revisar las billeteras publicas guardadas.
+              </p>
+              <button onClick={() => { setFilter("all"); setQuery(""); }} type="button">
+                Limpiar filtros
+              </button>
+            </>
+          ) : (
+            <>
+              <strong>No hay perfiles destacados guardados todavia.</strong>
+              <p>
+                Los perfiles destacados apareceran cuando analices mercados con wallets publicas que cumplan los criterios.
+                PolySignal solo guardara wallets con winRate real, al menos 50 mercados cerrados y PnL real o capital
+                observado relevante.
+              </p>
+              <p>
+                Perfiles v2 usa un registro persistente de datos publicos y conserva localStorage como respaldo si la
+                sincronizacion no esta disponible o quedan perfiles pendientes.
+              </p>
+            </>
+          )}
         </section>
       )}
     </main>

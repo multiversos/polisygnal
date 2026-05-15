@@ -706,7 +706,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Ver todas las billeteras analizadas"), "AnalyzerReport missing wallet drilldown");
   assert(walletDetailsSource.includes("Ver perfil en Polymarket"), "wallet drawer must expose profile verification when a safe URL exists");
   assert(walletDetailsSource.includes("Perfil Polymarket no disponible"), "wallet drawer must not invent wallet profile links");
-  assert(walletDetailsSource.includes("Copiar wallet"), "wallet drawer must allow copying wallet addresses");
+  assert(walletDetailsSource.includes("Copiar direccion"), "wallet drawer must allow copying wallet addresses with safe wording");
   assert(walletDetailsSource.includes("Wallet completa no disponible"), "wallet drawer must not treat short addresses as verifiable wallets");
   assert(walletDetailsSource.includes("wallet-details-key-grid"), "wallet drawer must keep a compact key-data view");
   assert(walletDetailsSource.includes("Datos tecnicos"), "wallet technical details must stay collapsed by default");
@@ -1086,7 +1086,7 @@ async function main() {
   const profilesDom = await dumpDom(urlFor(PROFILES_PATH));
   const profilesRender = validatePublicProductPage(profilesDom, "profiles", ["Perfiles"]);
   const profilesText = visibleText(profilesDom);
-  assertTextIncludes(profilesText, "Billeteras publicas detectadas", "profiles public heading");
+  assertTextIncludes(profilesText, "Billeteras publicas destacadas", "profiles public heading");
   assertTextIncludesOneOf(
     profilesText,
     ["Registro persistente", "Sincronizacion parcial", "Guardado local por ahora", "Cargando perfiles"],

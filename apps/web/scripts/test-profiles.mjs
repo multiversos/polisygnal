@@ -66,18 +66,24 @@ assert(
 );
 
 assert(appShellSource.includes('label: "Perfiles"'), "sidebar must include Perfiles");
-assert(profilesSource.includes("Billeteras publicas detectadas con historial fuerte en Polymarket."), "/profiles must explain the section");
+assert(profilesSource.includes("Billeteras publicas destacadas detectadas por PolySignal."), "/profiles must explain the section");
 assert(profilesSource.includes("Registro persistente"), "/profiles must document persistent profile storage");
+assert(profilesSource.includes("Persistente"), "/profiles must distinguish persistent profiles");
+assert(profilesSource.includes("Solo local"), "/profiles must distinguish local-only profiles");
 assert(profilesSource.includes("Actualizar todos"), "/profiles must expose bulk refresh");
 assert(profilesSource.includes("Actualizar"), "/profiles must expose per-profile refresh");
 assert(profilesSource.includes("/api/profiles/refresh-wallet"), "/profiles refresh must use the safe same-origin route");
 assert(profilesSource.includes("fetchPersistentHighlightedProfiles"), "/profiles must load profiles from persistent backend");
 assert(profilesSource.includes("syncLocalHighlightedProfilesToBackend"), "/profiles must migrate local profiles to backend");
 assert(profilesSource.includes("Ocultar en este navegador"), "/profiles must hide global DB profiles locally without deleting global records");
+assert(profilesSource.includes("No hay perfiles con este filtro."), "/profiles must show a filtered empty state");
+assert(profilesSource.includes("Limpiar filtros"), "/profiles must let users clear empty filters");
 assert(profilesSource.includes("Ya no cumple criterio"), "/profiles must show stale profiles that no longer pass current gates");
 assert(profilesSource.includes("Actualizando"), "/profiles must show refresh progress");
 assert(profilesSource.includes("Historial pasado no garantiza resultados futuros."), "/profiles must warn about historical performance");
 assert(profilesSource.includes("No es recomendacion de copy-trading."), "/profiles must avoid copy-trading framing");
+assert(profilesSource.includes("Copiar direccion"), "/profiles must copy addresses without copy-trading wording");
+assert(!profilesSource.includes("Copiar wallet"), "/profiles must avoid copy-trading-adjacent wallet copy wording");
 assert(profilesSource.includes("removeHighlightedProfile"), "/profiles must allow removing saved profiles");
 assert(highlightedProfilesSource.includes("lastUpdatedAt"), "highlighted profile storage must track lastUpdatedAt");
 assert(highlightedProfilesSource.includes("refreshStatus"), "highlighted profile storage must track refreshStatus");
@@ -96,6 +102,7 @@ assert(refreshRouteSource.includes("SAFE_DATA_PATHS"), "refresh route must only 
 assert(refreshRouteSource.includes("SAFE_GAMMA_PATHS"), "refresh route must only use allowlisted Gamma API paths");
 assert(!refreshRouteSource.includes("new URL(input"), "refresh route must not accept arbitrary URLs");
 assert(!refreshRouteSource.includes("localhost"), "refresh route must not call localhost");
+assert(walletDetailsSource.includes("Copiar direccion"), "wallet drawer must copy public addresses with safe wording");
 assert(walletDetailsSource.includes("Guardar perfil"), "wallet drawer must expose explicit profile save action");
 assert(walletDetailsSource.includes("Guardado en Perfiles"), "wallet drawer must show saved state");
 assert(analyzePageSource.includes("saveHighlightedProfilesFromWalletSummary"), "/analyze must auto-save eligible highlighted profiles");

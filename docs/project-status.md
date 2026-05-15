@@ -90,7 +90,7 @@ Estado visible verificado:
 - Las wallets con direccion `0x...` valida pueden abrir el perfil publico de
   Polymarket con `/profile/{wallet}`. Si solo hay short address o la direccion
   no valida el patron publico, la UI muestra `Perfil Polymarket no disponible`
-  y permite copiar la direccion visible sin inventar enlaces.
+  y permite `Copiar direccion` sin inventar enlaces ni sugerir copy-trading.
 - `/profiles` esta disponible como `Perfiles` v2. Lee un registro global
   persistente de wallets publicas destacadas y conserva localStorage v1 como
   fallback/migracion. La regla exige `winRate >= 80%`, `closedMarkets >= 50` y
@@ -107,6 +107,10 @@ Estado visible verificado:
   fuente falla, el perfil no se borra; queda con estado `failed` o `partial`.
   Si deja de cumplir el criterio, se marca `Ya no cumple criterio` para que el
   usuario lo quite manualmente.
+- `/profiles` distingue `Persistente` de `Solo local`, usa `Ocultar en este
+  navegador` para perfiles del registro global y muestra `No hay perfiles con
+  este filtro` con accion `Limpiar filtros` cuando la busqueda o los filtros no
+  tienen coincidencias.
 - Perfiles persistentes usan backend FastAPI en `/profiles/highlighted` y tabla
   `highlighted_wallet_profiles`. El frontend escribe mediante
   `/api/profiles/highlighted`, una ruta same-origin allowlisted que valida wallet

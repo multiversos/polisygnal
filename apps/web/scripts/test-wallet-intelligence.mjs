@@ -22,7 +22,7 @@ assert(!buildPolymarketWalletProfileUrl("https://evil.example/0xe1e7036279433715
 assert(walletDetailsSource.includes("wallet-details-key-grid"), "wallet drawer must have compact key-data grid");
 assert(walletDetailsSource.includes("Ver perfil en Polymarket"), "wallet drawer must expose public profile verification when safe");
 assert(walletDetailsSource.includes("Perfil Polymarket no disponible"), "wallet drawer must handle missing profile URLs honestly");
-assert(walletDetailsSource.includes("Copiar wallet"), "wallet drawer must allow copying the public wallet address");
+assert(walletDetailsSource.includes("Copiar direccion"), "wallet drawer must allow copying the public wallet address");
 assert(walletDetailsSource.includes("Wallet completa no disponible"), "wallet drawer must not pretend short addresses are verifiable full wallets");
 assert(walletDetailsSource.includes("Perfil destacado"), "wallet drawer must show highlighted profile badges when criteria pass");
 assert(walletDetailsSource.includes("Guardar perfil"), "wallet drawer must allow eligible profiles to be saved");

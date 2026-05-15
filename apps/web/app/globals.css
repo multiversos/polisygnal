@@ -9342,6 +9342,20 @@ html:not([data-theme="dark"]) .app-sidebar {
   color: var(--ps-text, #f8fafc);
 }
 
+.profiles-empty button {
+  width: fit-content;
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 1px solid var(--ps-border-cyan, rgba(34, 211, 238, 0.38));
+  border-radius: 999px;
+  color: var(--ps-cyan, #22d3ee);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+  background: rgba(34, 211, 238, 0.1);
+}
+
 @media (max-width: 980px) {
   .analyze-progress-header {
     grid-template-columns: 1fr;
@@ -9474,7 +9488,8 @@ html:not([data-theme="dark"]) .app-sidebar {
   .profiles-controls button,
   .profiles-controls input,
   .profile-card-actions a,
-  .profile-card-actions button {
+  .profile-card-actions button,
+  .profiles-empty button {
     width: 100%;
     text-align: center;
   }
