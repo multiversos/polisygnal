@@ -126,3 +126,32 @@ npm.cmd --workspace apps/web run smoke:production
 - No hay scheduler persistente.
 - La lectura depende de disponibilidad publica de Polymarket Data API.
 - El historial real de posiciones cerradas queda para un sprint posterior.
+
+## Copy Trading tiempo real - ruta tecnica
+
+Fase actual:
+
+- Auto-refresh frontend cada 5s.
+- Demo tick manual.
+- Lectura publica por backend/proxy.
+
+Fase siguiente:
+
+- Backend polling cada 2-3s para wallets activas.
+- Cola de deteccion con dedupe.
+- Estado por wallet.
+
+Fase avanzada:
+
+- WebSocket de mercado de Polymarket para precios y orderbook de markets detectados.
+- Usar WebSocket para precio actual, spread y slippage.
+- Las credenciales y user channel deben quedarse server-side.
+- No exponer API credentials en frontend.
+
+Fase real:
+
+- ordenes FAK/FOK;
+- limites;
+- auditoria;
+- emergency stop;
+- modo real sigue bloqueado hasta sprint especifico.

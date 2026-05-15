@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCopyTradingDashboardData, runCopyTradingDemoTick } from "../../lib/copyTrading";
 import type { CopyTradingDashboardData, CopyTradingTickSummary } from "../../lib/copyTradingTypes";
 import { AddCopyWalletForm } from "./AddCopyWalletForm";
@@ -12,6 +12,8 @@ import { CopyTradingMetrics } from "./CopyTradingMetrics";
 import { CopyWalletsTable } from "./CopyWalletsTable";
 import { ExecutionWalletCard } from "./ExecutionWalletCard";
 
+const AUTO_REFRESH_INTERVAL_MS = 5_000;
+
 export function CopyTradingDashboard() {
   const [data, setData] = useState<CopyTradingDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -19,22 +21,101 @@ export function CopyTradingDashboard() {
   const [notice, setNotice] = useState<string | null>(null);
   const [tickSummary, setTickSummary] = useState<CopyTradingTickSummary | null>(null);
   const [runningTick, setRunningTick] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [pageVisible, setPageVisible] = useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [lastUpdatedLabel, setLastUpdatedLabel] = useState("Sin datos todavia");
+  const isRefreshingRef = useRef(false);
 
-  const refresh = useCallback(async () => {
-    setError(null);
+  const refresh = useCallback(async (options?: { isBackground?: boolean }) => {
+    if (isRefreshingRef.current) {
+      return false;
+    }
+    isRefreshingRef.current = true;
+    setRefreshing(true);
+    if (!options?.isBackground) {
+      setError(null);
+    }
     try {
       const nextData = await getCopyTradingDashboardData();
       setData(nextData);
+      setLastUpdatedAt(new Date());
+      if (options?.isBackground) {
+        setError(null);
+      }
+      return true;
     } catch {
-      setError("Backend no disponible. El modo demo queda en espera.");
+      setError("No pudimos actualizar Copy Trading ahora. Seguiremos intentando.");
+      return false;
     } finally {
+      isRefreshingRef.current = false;
+      setRefreshing(false);
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    function updateVisibility() {
+      setPageVisible(document.visibilityState === "visible");
+    }
+
+    updateVisibility();
+    document.addEventListener("visibilitychange", updateVisibility);
+    return () => document.removeEventListener("visibilitychange", updateVisibility);
+  }, []);
+
+  useEffect(() => {
+    if (!autoRefreshEnabled) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      if (!pageVisible || isRefreshingRef.current) {
+        return;
+      }
+      void refresh({ isBackground: true });
+    }, AUTO_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [autoRefreshEnabled, pageVisible, refresh]);
+
+  useEffect(() => {
+    function updateLastUpdatedLabel() {
+      if (!lastUpdatedAt) {
+        setLastUpdatedLabel("Sin datos todavia");
+        return;
+      }
+      const ageSeconds = Math.max(0, Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000));
+      if (ageSeconds < 60) {
+        setLastUpdatedLabel(`Hace ${ageSeconds}s`);
+        return;
+      }
+      const ageMinutes = Math.floor(ageSeconds / 60);
+      if (ageMinutes < 60) {
+        setLastUpdatedLabel(`Hace ${ageMinutes}m`);
+        return;
+      }
+      const ageHours = Math.floor(ageMinutes / 60);
+      setLastUpdatedLabel(`Hace ${ageHours}h`);
+    }
+
+    updateLastUpdatedLabel();
+    const timerId = window.setInterval(updateLastUpdatedLabel, 1_000);
+    return () => window.clearInterval(timerId);
+  }, [lastUpdatedAt]);
+
+  const autoRefreshStatus = useMemo(() => {
+    if (!autoRefreshEnabled) {
+      return "Pausado";
+    }
+    if (!pageVisible) {
+      return "Pausado en pestana oculta";
+    }
+    return "Cada 5s";
+  }, [autoRefreshEnabled, pageVisible]);
 
   async function handleDemoTick() {
     if (!loading && (data?.wallets.length ?? 0) === 0) {
@@ -58,6 +139,11 @@ export function CopyTradingDashboard() {
     }
   }
 
+  async function handleManualRefresh() {
+    setNotice(null);
+    await refresh();
+  }
+
   return (
     <main className="copy-trading-page">
       <CopyTradingHeader status={data?.status ?? null} />
@@ -67,10 +153,33 @@ export function CopyTradingDashboard() {
         <div className="copy-control-copy">
           <span>Modo demo funcional</span>
           <strong>Escanea wallets seguidas y simula copias con monto fijo.</strong>
+          <div className="copy-status-strip">
+            <span className="copy-badge">Ultima actualizacion {lastUpdatedLabel}</span>
+            <span className={`copy-badge ${autoRefreshEnabled && pageVisible ? "success" : "locked"}`}>
+              Auto-refresh {autoRefreshStatus}
+            </span>
+          </div>
         </div>
-        <button className="copy-primary-button" disabled={runningTick || loading} onClick={handleDemoTick} type="button">
-          {runningTick ? "Ejecutando..." : "Ejecutar demo tick"}
-        </button>
+        <div className="copy-action-row">
+          <button
+            className="copy-primary-button"
+            disabled={loading || refreshing}
+            onClick={handleManualRefresh}
+            type="button"
+          >
+            {refreshing ? "Actualizando..." : "Refrescar ahora"}
+          </button>
+          <button
+            disabled={runningTick || loading}
+            onClick={() => setAutoRefreshEnabled((current) => !current)}
+            type="button"
+          >
+            {autoRefreshEnabled ? "Pausar auto" : "Reanudar auto"}
+          </button>
+          <button className="copy-primary-button" disabled={runningTick || loading} onClick={handleDemoTick} type="button">
+            {runningTick ? "Ejecutando..." : "Ejecutar demo tick"}
+          </button>
+        </div>
       </section>
 
       {tickSummary ? (
@@ -90,7 +199,12 @@ export function CopyTradingDashboard() {
       {loading ? <div className="copy-empty-state">Cargando modulo Copiar Wallets...</div> : null}
 
       <div className="copy-dashboard-grid">
-        <AddCopyWalletForm onCreated={refresh} wallets={data?.wallets ?? []} />
+        <AddCopyWalletForm
+          onCreated={async () => {
+            await refresh();
+          }}
+          wallets={data?.wallets ?? []}
+        />
         <ExecutionWalletCard />
         <section className="copy-panel copy-real-lock">
           <div className="copy-panel-heading">
@@ -109,7 +223,12 @@ export function CopyTradingDashboard() {
         </section>
       </div>
 
-      <CopyWalletsTable onChanged={refresh} wallets={data?.wallets ?? []} />
+      <CopyWalletsTable
+        onChanged={async () => {
+          await refresh();
+        }}
+        wallets={data?.wallets ?? []}
+      />
 
       <div className="copy-dashboard-grid three">
         <CopyTradesTable trades={data?.trades ?? []} />

@@ -2627,6 +2627,11 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["$1", "$5", "$10", "$20", "Personalizado", "Monto personalizado USD"]) {
     assert(copyAmountSelector.includes(text), `copy amount selector missing preset/custom text: ${text}`);
   }
+  for (const text of ["Ultima actualizacion", "Auto-refresh", "Refrescar ahora", "Pausar auto"]) {
+    assert(copyTradingDashboard.includes(text), `copy trading auto-refresh controls missing text: ${text}`);
+  }
+  assert(copyTradingDashboard.includes("visibilityState"), "copy trading auto-refresh should respect hidden tabs");
+  assert(copyTradingDashboard.includes("isRefreshingRef"), "copy trading auto-refresh should avoid overlapping refresh requests");
   assert(copyOrdersTable.includes("formatCopyOrderReason"), "copy orders should translate technical reasons");
   assert(
     copyOrdersTable.includes("Historico: fuera de la ventana de copia.")
