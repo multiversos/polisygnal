@@ -10,6 +10,7 @@
 - ultimo deploy production validado: confirmar en `/api/build-info`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
+- rama `feat/copy-trading-wallets`: modulo inicial `Copiar Wallets` en `/copy-trading`, modo demo read-only y modo real bloqueado
 
 No usar estos dominios incorrectos:
 
@@ -37,6 +38,15 @@ Endpoints backend sanos:
 - `/markets/overview`
 - `/markets/overview?sport_type=soccer&limit=50`
 - `/markets/overview?sport_type=soccer&limit=50&offset=50`
+
+Checkpoint Copy Trading:
+
+- `/copy-trading` agrega una pestana publica `Copiar Wallets`.
+- Endpoints backend nuevos bajo `/copy-trading/*` para status, wallets, trades, orders, events, scan y demo tick.
+- Demo tick lee actividad publica de wallets, deduplica trades y crea ordenes simuladas con monto fijo por wallet.
+- Montos soportados: `$1`, `$5`, `$10`, `$20` y `Personalizado`.
+- Modo real queda preparado pero bloqueado con `real_trading_not_configured`; no firma ni envia ordenes.
+- Migracion preparada: `apps/api/alembic/versions/0017_copy_trading_wallets.py`. No aplicar contra produccion sin autorizacion explicita.
 
 Estado visible verificado:
 

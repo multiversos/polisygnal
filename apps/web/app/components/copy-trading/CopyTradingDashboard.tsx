@@ -1,0 +1,103 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { getCopyTradingDashboardData, runCopyTradingDemoTick } from "../../lib/copyTrading";
+import type { CopyTradingDashboardData, CopyTradingTickSummary } from "../../lib/copyTradingTypes";
+import { AddCopyWalletForm } from "./AddCopyWalletForm";
+import { CopyBotEvents } from "./CopyBotEvents";
+import { CopyOrdersTable } from "./CopyOrdersTable";
+import { CopyTradesTable } from "./CopyTradesTable";
+import { CopyTradingHeader } from "./CopyTradingHeader";
+import { CopyTradingMetrics } from "./CopyTradingMetrics";
+import { CopyWalletsTable } from "./CopyWalletsTable";
+
+export function CopyTradingDashboard() {
+  const [data, setData] = useState<CopyTradingDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tickSummary, setTickSummary] = useState<CopyTradingTickSummary | null>(null);
+  const [runningTick, setRunningTick] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setError(null);
+    try {
+      const nextData = await getCopyTradingDashboardData();
+      setData(nextData);
+    } catch {
+      setError("Backend no disponible. El modo demo queda en espera.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  async function handleDemoTick() {
+    setRunningTick(true);
+    setError(null);
+    try {
+      const summary = await runCopyTradingDemoTick();
+      setTickSummary(summary);
+      await refresh();
+    } catch {
+      setError("No pudimos ejecutar el tick demo ahora.");
+    } finally {
+      setRunningTick(false);
+    }
+  }
+
+  return (
+    <main className="copy-trading-page">
+      <CopyTradingHeader status={data?.status ?? null} />
+      <CopyTradingMetrics status={data?.status ?? null} />
+
+      <section className="copy-control-bar" aria-label="Controles del modo demo">
+        <div>
+          <span>Modo demo funcional</span>
+          <strong>Escanea wallets seguidas y simula copias con monto fijo.</strong>
+        </div>
+        <button className="copy-primary-button" disabled={runningTick || loading} onClick={handleDemoTick} type="button">
+          {runningTick ? "Ejecutando..." : "Ejecutar demo tick"}
+        </button>
+      </section>
+
+      {tickSummary ? (
+        <section className="copy-tick-summary" aria-label="Resultado del ultimo demo tick">
+          <span>Wallets escaneadas {tickSummary.wallets_scanned}</span>
+          <span>Trades nuevos {tickSummary.new_trades}</span>
+          <span>Simuladas {tickSummary.orders_simulated}</span>
+          <span>Saltadas {tickSummary.orders_skipped}</span>
+        </section>
+      ) : null}
+
+      {error ? <div className="copy-error-state">{error}</div> : null}
+      {loading ? <div className="copy-empty-state">Cargando modulo Copiar Wallets...</div> : null}
+
+      <div className="copy-dashboard-grid">
+        <AddCopyWalletForm onCreated={refresh} />
+        <section className="copy-panel copy-real-lock">
+          <div className="copy-panel-heading">
+            <span>Modo real</span>
+            <strong>Real no conectado</strong>
+          </div>
+          <p>Preparado para proximo sprint. Bloqueado hasta configurar credenciales.</p>
+          <div className="copy-lock-list">
+            <span>Sin clave privada</span>
+            <span>Sin firma de ordenes</span>
+            <span>Sin envio a CLOB</span>
+          </div>
+        </section>
+      </div>
+
+      <CopyWalletsTable onChanged={refresh} wallets={data?.wallets ?? []} />
+
+      <div className="copy-dashboard-grid three">
+        <CopyTradesTable trades={data?.trades ?? []} />
+        <CopyOrdersTable orders={data?.orders ?? []} />
+        <CopyBotEvents events={data?.events ?? []} />
+      </div>
+    </main>
+  );
+}

@@ -26,6 +26,7 @@ const SAFE_PROXY_GET_PREFIXES = [
   "/alerts",
   "/backtesting",
   "/briefing",
+  "/copy-trading",
   "/dashboard",
   "/data-health",
   "/decisions",
