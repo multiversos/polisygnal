@@ -52,3 +52,5 @@ apps/web/app/api/samantha-polysignal-analysis/
 # SQLite databases
 *.sqlite3
 *.db
+
+.vercel
