@@ -60,6 +60,35 @@ export type SamanthaResearchBrief = {
       warnings?: string[];
       yesCapitalUsd?: number;
     };
+    sportsContext?: {
+      eventDate?: string;
+      independentStatus?: "available" | "insufficient" | "not_connected" | "partial" | "timeout" | "unavailable";
+      injuries?: {
+        available: boolean;
+        sourceName?: string | null;
+        summary?: string | null;
+      };
+      isHomeAwayReliable?: boolean;
+      league?: string;
+      limitations?: string[];
+      marketCloseTime?: string;
+      participants?: string[];
+      recentForm?: {
+        available: boolean;
+        sourceName?: string | null;
+        summary?: string | null;
+      };
+      scheduleContext?: {
+        available: boolean;
+        backToBackAway?: boolean | null;
+        backToBackHome?: boolean | null;
+        restDaysAway?: number | null;
+        restDaysHome?: number | null;
+        sourceName?: string | null;
+      };
+      sport?: string;
+      warnings?: string[];
+    };
   };
   market: {
     category?: string;

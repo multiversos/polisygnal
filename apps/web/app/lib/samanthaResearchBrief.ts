@@ -5,6 +5,7 @@ import type {
   SamanthaResearchBrief,
   SamanthaResearchGoal,
 } from "./samanthaResearchTypes";
+import { buildSportsContextEvidence } from "./sportsContext";
 import { getWalletSignalSummary } from "./walletIntelligence";
 import type { WalletIntelligenceSummary } from "./walletIntelligenceTypes";
 
@@ -142,6 +143,7 @@ export function buildSamanthaResearchBrief(input: BuildSamanthaResearchBriefInpu
   const snapshot = item.latest_snapshot ?? {};
   const walletReading = getWalletSignalSummary(input.walletSummary);
   const marketProbability = getMarketProbabilityPair(item);
+  const sportsContext = buildSportsContextEvidence(item);
   const outcomes = (market.outcomes ?? [])
     .filter((outcome) => cleanText(outcome.label))
     .slice(0, 12)
@@ -220,6 +222,38 @@ export function buildSamanthaResearchBrief(input: BuildSamanthaResearchBriefInpu
         warnings: walletReading.warnings,
         yesCapitalUsd: input.walletSummary?.yesCapitalUsd,
       },
+      sportsContext:
+        sportsContext.sport !== "unknown"
+          ? {
+              eventDate: sportsContext.eventDate ?? undefined,
+              independentStatus: sportsContext.status,
+              injuries: {
+                available: sportsContext.injuries.available,
+                sourceName: sportsContext.injuries.sourceName ?? null,
+                summary: sportsContext.injuries.summary ?? null,
+              },
+              isHomeAwayReliable: sportsContext.isHomeAwayReliable,
+              league: sportsContext.league ?? undefined,
+              limitations: sportsContext.limitations,
+              marketCloseTime: sportsContext.marketCloseTime ?? undefined,
+              participants: sportsContext.participants,
+              recentForm: {
+                available: sportsContext.recentForm.available,
+                sourceName: sportsContext.recentForm.sourceName ?? null,
+                summary: sportsContext.recentForm.summary ?? null,
+              },
+              scheduleContext: {
+                available: sportsContext.scheduleContext.available,
+                backToBackAway: sportsContext.scheduleContext.backToBackAway,
+                backToBackHome: sportsContext.scheduleContext.backToBackHome,
+                restDaysAway: sportsContext.scheduleContext.restDaysAway,
+                restDaysHome: sportsContext.scheduleContext.restDaysHome,
+                sourceName: sportsContext.scheduleContext.sourceName ?? null,
+              },
+              sport: sportsContext.sport,
+              warnings: sportsContext.warnings,
+            }
+          : undefined,
     },
     market: {
       category: cleanText(market.market_type || market.sport_type) || undefined,

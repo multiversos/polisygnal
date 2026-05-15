@@ -1,6 +1,7 @@
 import { getDisplayMarketPrices } from "./marketDataDisplay";
 import type { MarketOverviewItem } from "./marketOverview";
 import type { SamanthaResearchReport } from "./samanthaResearchTypes";
+import { buildSportsContextEvidence } from "./sportsContext";
 import type { WalletIntelligenceSummary } from "./walletIntelligenceTypes";
 
 export type IndependentEvidenceStatus =
@@ -18,6 +19,8 @@ export type IndependentEvidenceCategory =
   | "external_odds"
   | "sports_context"
   | "injuries"
+  | "recent_form"
+  | "schedule_context"
   | "news"
   | "historical_comparable"
   | "samantha_research"
@@ -369,6 +372,7 @@ function buildExternalOddsEvidence(input: BuildIndependentEvidenceSummaryInput):
 }
 
 function buildContextEvidence(item: MarketOverviewItem): IndependentEvidenceItem {
+  const sportsContext = buildSportsContextEvidence(item);
   const vertical = marketVertical(item);
   const title = item.market?.event_title || item.market?.question || null;
   const outcomes = item.market?.outcomes?.filter((outcome) => Boolean(outcome?.label)).length ?? 0;
@@ -382,24 +386,35 @@ function buildContextEvidence(item: MarketOverviewItem): IndependentEvidenceItem
         : "Contexto del evento";
   return {
     category: "sports_context",
-    checkedAt: latestCheckedAt(item),
+    checkedAt: sportsContext.checkedAt || latestCheckedAt(item),
     confidence: hasContext ? "low" : "unknown",
     direction: "neutral",
     id: "event_context",
-    isIndependent: false,
+    isIndependent: sportsContext.status === "available",
     label,
     limitations: [
-      vertical === "sports"
-        ? "Equipos y fecha ayudan a orientar la revision, pero no reemplazan lesiones, forma ni fuentes externas."
-        : "El contexto del evento ayuda a organizar la revision, pero no crea una estimacion por si solo.",
+      ...(vertical === "sports"
+        ? sportsContext.limitations
+        : ["El contexto del evento ayuda a organizar la revision, pero no crea una estimacion por si solo."]),
     ],
-    sourceName: "Polymarket",
+    sourceName: vertical === "sports" ? "Polymarket/Gamma" : "Polymarket",
     sourceUrl: null,
-    status: hasContext ? "partial" : "unavailable",
+    status:
+      vertical === "sports"
+        ? sportsContext.status === "partial"
+          ? "partial"
+          : sportsContext.status === "available"
+            ? "available"
+            : sportsContext.status === "insufficient"
+              ? "insufficient"
+              : "unavailable"
+        : hasContext
+          ? "partial"
+          : "unavailable",
     summary:
       vertical === "sports"
-        ? hasContext
-          ? "Equipos/outcomes y fecha visibles; faltan lesiones, forma reciente o comparables externos."
+        ? sportsContext.participants.length >= 2
+          ? `Equipos y fecha detectados desde Polymarket: ${sportsContext.participants.join(" vs ")}, ${sportsContext.eventDate ?? "sin fecha"}. ${sportsContext.isHomeAwayReliable ? "Local/visitante confirmado." : "Local/visitante no confirmado por fuente externa."}`
           : "No hay suficiente contexto deportivo estructurado."
         : vertical === "politics"
           ? hasContext
@@ -440,6 +455,76 @@ function buildNewsEvidence(item: MarketOverviewItem): IndependentEvidenceItem {
   };
 }
 
+function buildSportsInjuriesEvidence(item: MarketOverviewItem): IndependentEvidenceItem | null {
+  if (marketVertical(item) !== "sports") {
+    return null;
+  }
+  const sportsContext = buildSportsContextEvidence(item);
+  return {
+    category: "injuries",
+    checkedAt: sportsContext.checkedAt,
+    confidence: "unknown",
+    direction: "unknown",
+    id: "sports_injuries",
+    isIndependent: sportsContext.injuries.available,
+    label: "Lesiones/disponibilidad",
+    limitations: ["No hay fuente de lesiones conectada todavia."],
+    sourceName: sportsContext.injuries.sourceName,
+    sourceUrl: null,
+    status: sportsContext.injuries.available ? "available" : "not_connected",
+    summary:
+      sportsContext.injuries.summary ||
+      "No hay fuente de lesiones conectada todavia.",
+  };
+}
+
+function buildSportsRecentFormEvidence(item: MarketOverviewItem): IndependentEvidenceItem | null {
+  if (marketVertical(item) !== "sports") {
+    return null;
+  }
+  const sportsContext = buildSportsContextEvidence(item);
+  return {
+    category: "recent_form",
+    checkedAt: sportsContext.checkedAt,
+    confidence: "unknown",
+    direction: "unknown",
+    id: "sports_recent_form",
+    isIndependent: sportsContext.recentForm.available,
+    label: "Forma reciente",
+    limitations: ["No hay forma reciente conectada todavia."],
+    sourceName: sportsContext.recentForm.sourceName,
+    sourceUrl: null,
+    status: sportsContext.recentForm.available ? "available" : "not_connected",
+    summary:
+      sportsContext.recentForm.summary ||
+      "No hay forma reciente conectada todavia.",
+  };
+}
+
+function buildSportsScheduleEvidence(item: MarketOverviewItem): IndependentEvidenceItem | null {
+  if (marketVertical(item) !== "sports") {
+    return null;
+  }
+  const sportsContext = buildSportsContextEvidence(item);
+  return {
+    category: "schedule_context",
+    checkedAt: sportsContext.checkedAt,
+    confidence: "unknown",
+    direction: "neutral",
+    id: "sports_schedule_context",
+    isIndependent: sportsContext.scheduleContext.available,
+    label: "Calendario/descanso",
+    limitations: ["No hay calendario/descanso conectado todavia."],
+    sourceName: sportsContext.scheduleContext.sourceName,
+    sourceUrl: null,
+    status: sportsContext.scheduleContext.available ? "available" : "not_connected",
+    summary:
+      sportsContext.scheduleContext.available
+        ? "Contexto de calendario/descanso disponible."
+        : "No hay calendario/descanso conectado todavia.",
+  };
+}
+
 function buildHistoricalEvidence(item: MarketOverviewItem, walletSummary: WalletIntelligenceSummary): IndependentEvidenceItem {
   const evidenceCount =
     toNumber(item.evidence_summary?.evidence_count) ?? 0 +
@@ -475,7 +560,14 @@ function buildHistoricalEvidence(item: MarketOverviewItem, walletSummary: Wallet
 
 function requiredLabelsForVertical(vertical: MarketVertical): string[] {
   if (vertical === "sports") {
-    return ["Samantha Research", "Odds externas", "Noticias/lesiones", "Contexto deportivo/evento"];
+    return [
+      "Samantha Research",
+      "Odds externas",
+      "Contexto deportivo/evento",
+      "Lesiones/disponibilidad",
+      "Forma reciente",
+      "Calendario/descanso",
+    ];
   }
   if (vertical === "politics") {
     return ["Samantha Research", "Odds/mercados comparables", "Noticias/encuestas"];
@@ -491,10 +583,13 @@ export function buildIndependentEvidenceSummary(
     buildWalletEvidence(input.walletSummary),
     buildExternalOddsEvidence(input),
     buildContextEvidence(input.item),
+    buildSportsInjuriesEvidence(input.item),
+    buildSportsRecentFormEvidence(input.item),
+    buildSportsScheduleEvidence(input.item),
     buildNewsEvidence(input.item),
     buildHistoricalEvidence(input.item, input.walletSummary),
     buildSamanthaEvidence(input),
-  ];
+  ].filter((item): item is IndependentEvidenceItem => Boolean(item));
   const availableIndependentCount = items.filter(
     (item) => item.isIndependent && item.status === "available",
   ).length;

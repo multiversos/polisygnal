@@ -358,6 +358,22 @@ export function buildAnalysisAgentMarketPayload(task: AnalysisAgentTask): Analys
     },
     question: market.title,
     source: "polysignal",
+    sportsContext: task.brief.knownSignals.sportsContext
+      ? {
+          eventDate: task.brief.knownSignals.sportsContext.eventDate ?? null,
+          independentStatus: task.brief.knownSignals.sportsContext.independentStatus ?? null,
+          injuries: task.brief.knownSignals.sportsContext.injuries ?? null,
+          isHomeAwayReliable: task.brief.knownSignals.sportsContext.isHomeAwayReliable ?? false,
+          league: task.brief.knownSignals.sportsContext.league ?? null,
+          limitations: task.brief.knownSignals.sportsContext.limitations ?? [],
+          marketCloseTime: task.brief.knownSignals.sportsContext.marketCloseTime ?? null,
+          participants: task.brief.knownSignals.sportsContext.participants ?? [],
+          recentForm: task.brief.knownSignals.sportsContext.recentForm ?? null,
+          scheduleContext: task.brief.knownSignals.sportsContext.scheduleContext ?? null,
+          sport: task.brief.knownSignals.sportsContext.sport ?? null,
+          warnings: task.brief.knownSignals.sportsContext.warnings ?? [],
+        }
+      : null,
     title: market.title,
     volume: market.volume ?? null,
     walletIntelligence: task.brief.knownSignals.walletIntelligence ?? null,

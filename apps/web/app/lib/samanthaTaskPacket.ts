@@ -115,6 +115,12 @@ export function buildSamanthaInstructionsText(brief: SamanthaResearchBrief): str
     brief.market.eventSlug ? `- Event slug: ${brief.market.eventSlug}` : "- Event slug: unavailable",
     brief.market.marketSlug ? `- Market slug: ${brief.market.marketSlug}` : "- Market slug: unavailable",
     brief.market.eventDate ? `- Event/close date: ${brief.market.eventDate}` : "- Event/close date: unavailable",
+    brief.knownSignals.sportsContext?.participants?.length
+      ? `- Participants detected: ${brief.knownSignals.sportsContext.participants.join(" vs ")}`
+      : "- Participants detected: unavailable",
+    brief.knownSignals.sportsContext
+      ? `- Sports context status: ${brief.knownSignals.sportsContext.independentStatus ?? "unknown"}`
+      : "- Sports context status: unavailable",
     "",
     "Outcomes:",
     outcomes || "- Outcomes unavailable",

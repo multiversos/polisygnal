@@ -86,6 +86,7 @@ export type AnalysisAgentRequest = {
   prices: object | null;
   question: string | null;
   source: "polysignal";
+  sportsContext: object | null;
   title: string;
   volume: number | null;
   walletIntelligence: object | null;
