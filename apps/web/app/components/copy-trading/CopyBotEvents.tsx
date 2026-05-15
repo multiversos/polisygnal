@@ -52,6 +52,12 @@ function groupCopyBotEvents(events: CopyBotEvent[]): GroupedCopyBotEvent[] {
 
 function normalizeCopyBotEvent(event: CopyBotEvent): CopyBotEvent {
   if (event.event_type === "demo_order_skipped" && event.metadata?.reason === "trade_too_old") {
+    if (event.metadata?.freshness_status === "recent_outside_window") {
+      return {
+        ...event,
+        message: "Trades recientes llegaron fuera de la ventana de copia.",
+      };
+    }
     return {
       ...event,
       message: "Trades historicos detectados fuera de la ventana de copia.",
@@ -62,5 +68,7 @@ function normalizeCopyBotEvent(event: CopyBotEvent): CopyBotEvent {
 
 function eventGroupKey(event: Pick<CopyBotEvent, "event_type" | "level" | "message" | "metadata">): string {
   const reason = typeof event.metadata?.reason === "string" ? event.metadata.reason : "";
-  return `${event.level}|${event.event_type}|${event.message}|${reason}`;
+  const freshnessStatus =
+    typeof event.metadata?.freshness_status === "string" ? event.metadata.freshness_status : "";
+  return `${event.level}|${event.event_type}|${event.message}|${reason}|${freshnessStatus}`;
 }

@@ -8,14 +8,17 @@ from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.copy_trading import CopyBotEvent, CopyDetectedTrade, CopyOrder, CopyWallet
 from app.schemas.copy_trading import (
     COPY_AMOUNT_PRESETS,
     CopyTradingStatusResponse,
     CopyWalletCreate,
+    CopyWalletRead,
     CopyWalletUpdate,
+    CopyDetectedTradeRead,
+    CopyOrderRead,
 )
 
 DIRECT_WALLET_PATTERN = re.compile(r"0[xX][a-fA-F0-9]{40}")
@@ -44,6 +47,15 @@ class DuplicateCopyWalletError(CopyTradingError):
 class ResolvedCopyWalletInput:
     proxy_wallet: str
     profile_url: str | None
+
+
+@dataclass(slots=True)
+class CopyTradeFreshness:
+    status: str
+    label: str
+    age_seconds: int | None
+    copy_window_seconds: int | None
+    is_live_candidate: bool
 
 
 def resolve_copy_wallet_input(value: str) -> ResolvedCopyWalletInput:
@@ -184,12 +196,22 @@ def delete_copy_wallet(db: Session, wallet_id: str) -> None:
 
 
 def list_copy_trades(db: Session, *, limit: int = 50) -> list[CopyDetectedTrade]:
-    stmt = select(CopyDetectedTrade).order_by(CopyDetectedTrade.detected_at.desc()).limit(limit)
+    stmt = (
+        select(CopyDetectedTrade)
+        .options(joinedload(CopyDetectedTrade.wallet))
+        .order_by(CopyDetectedTrade.detected_at.desc())
+        .limit(limit)
+    )
     return list(db.scalars(stmt).all())
 
 
 def list_copy_orders(db: Session, *, limit: int = 50) -> list[CopyOrder]:
-    stmt = select(CopyOrder).order_by(CopyOrder.created_at.desc()).limit(limit)
+    stmt = (
+        select(CopyOrder)
+        .options(joinedload(CopyOrder.wallet), joinedload(CopyOrder.detected_trade))
+        .order_by(CopyOrder.created_at.desc())
+        .limit(limit)
+    )
     return list(db.scalars(stmt).all())
 
 
@@ -330,6 +352,195 @@ def build_copy_trading_status(db: Session) -> CopyTradingStatusResponse:
     )
 
 
+def classify_trade_freshness(
+    *,
+    source_timestamp: datetime | None,
+    copy_window_seconds: int | None,
+    reference_time: datetime | None = None,
+) -> CopyTradeFreshness:
+    if source_timestamp is None:
+        return CopyTradeFreshness(
+            status="unknown_time",
+            label="Sin hora confiable",
+            age_seconds=None,
+            copy_window_seconds=copy_window_seconds,
+            is_live_candidate=False,
+        )
+
+    current_time = _normalize_datetime(reference_time or datetime.now(tz=UTC))
+    source_time = _normalize_datetime(source_timestamp)
+    age_seconds = max(0, int((current_time - source_time).total_seconds()))
+    if copy_window_seconds is None:
+        return CopyTradeFreshness(
+            status="unknown_time",
+            label="Sin hora confiable",
+            age_seconds=age_seconds,
+            copy_window_seconds=None,
+            is_live_candidate=False,
+        )
+    if age_seconds <= copy_window_seconds:
+        return CopyTradeFreshness(
+            status="live_candidate",
+            label="Copiable ahora",
+            age_seconds=age_seconds,
+            copy_window_seconds=copy_window_seconds,
+            is_live_candidate=True,
+        )
+    if age_seconds <= _historical_cutoff_seconds(copy_window_seconds):
+        return CopyTradeFreshness(
+            status="recent_outside_window",
+            label="Fuera de ventana",
+            age_seconds=age_seconds,
+            copy_window_seconds=copy_window_seconds,
+            is_live_candidate=False,
+        )
+    return CopyTradeFreshness(
+        status="historical",
+        label="Historico",
+        age_seconds=age_seconds,
+        copy_window_seconds=copy_window_seconds,
+        is_live_candidate=False,
+    )
+
+
+def build_copy_wallet_read(
+    wallet: CopyWallet,
+    *,
+    now: datetime | None = None,
+    detected_trades: list[CopyDetectedTrade] | None = None,
+) -> CopyWalletRead:
+    current_time = _normalize_datetime(now or datetime.now(tz=UTC))
+    trades = list(detected_trades or wallet.detected_trades)
+    recent_trades = 0
+    historical_trades = 0
+    live_candidates = 0
+    last_trade_freshness_status = None
+    last_trade_freshness_label = None
+
+    for trade in trades:
+        freshness = classify_trade_freshness(
+            source_timestamp=trade.source_timestamp,
+            copy_window_seconds=wallet.max_delay_seconds,
+            reference_time=current_time,
+        )
+        if freshness.status == "historical":
+            historical_trades += 1
+        elif freshness.status in {"live_candidate", "recent_outside_window"}:
+            recent_trades += 1
+        if freshness.status == "live_candidate":
+            live_candidates += 1
+
+    if trades:
+        latest_trade = max(trades, key=lambda trade: _trade_sort_time(trade))
+        latest_freshness = classify_trade_freshness(
+            source_timestamp=latest_trade.source_timestamp,
+            copy_window_seconds=wallet.max_delay_seconds,
+            reference_time=current_time,
+        )
+        last_trade_freshness_status = latest_freshness.status
+        last_trade_freshness_label = latest_freshness.label
+
+    return CopyWalletRead(
+        id=wallet.id,
+        label=wallet.label,
+        profile_url=wallet.profile_url,
+        proxy_wallet=wallet.proxy_wallet,
+        enabled=wallet.enabled,
+        mode=wallet.mode,
+        real_trading_enabled=wallet.real_trading_enabled,
+        copy_buys=wallet.copy_buys,
+        copy_sells=wallet.copy_sells,
+        copy_amount_mode=wallet.copy_amount_mode,
+        copy_amount_usd=wallet.copy_amount_usd,
+        max_trade_usd=wallet.max_trade_usd,
+        max_daily_usd=wallet.max_daily_usd,
+        max_slippage_bps=wallet.max_slippage_bps,
+        max_delay_seconds=wallet.max_delay_seconds,
+        copy_window_seconds=wallet.max_delay_seconds,
+        sports_only=wallet.sports_only,
+        last_scan_at=wallet.last_scan_at,
+        last_trade_at=wallet.last_trade_at,
+        recent_trades=recent_trades,
+        historical_trades=historical_trades,
+        live_candidates=live_candidates,
+        last_trade_freshness_status=last_trade_freshness_status,
+        last_trade_freshness_label=last_trade_freshness_label,
+        created_at=wallet.created_at,
+        updated_at=wallet.updated_at,
+    )
+
+
+def build_copy_trade_read(
+    trade: CopyDetectedTrade,
+    *,
+    copy_window_seconds: int | None,
+    now: datetime | None = None,
+) -> CopyDetectedTradeRead:
+    freshness = classify_trade_freshness(
+        source_timestamp=trade.source_timestamp,
+        copy_window_seconds=copy_window_seconds,
+        reference_time=now,
+    )
+    return CopyDetectedTradeRead(
+        id=trade.id,
+        wallet_id=trade.wallet_id,
+        source_transaction_hash=trade.source_transaction_hash,
+        dedupe_key=trade.dedupe_key,
+        source_proxy_wallet=trade.source_proxy_wallet,
+        condition_id=trade.condition_id,
+        asset=trade.asset,
+        outcome=trade.outcome,
+        market_title=trade.market_title,
+        market_slug=trade.market_slug,
+        side=trade.side,
+        source_price=trade.source_price,
+        source_size=trade.source_size,
+        source_amount_usd=trade.source_amount_usd,
+        source_timestamp=trade.source_timestamp,
+        detected_at=trade.detected_at,
+        age_seconds=freshness.age_seconds,
+        freshness_status=freshness.status,
+        freshness_label=freshness.label,
+        copy_window_seconds=freshness.copy_window_seconds,
+        is_live_candidate=freshness.is_live_candidate,
+    )
+
+
+def build_copy_order_read(
+    order: CopyOrder,
+    *,
+    copy_window_seconds: int | None,
+    source_timestamp: datetime | None,
+    now: datetime | None = None,
+) -> CopyOrderRead:
+    freshness = classify_trade_freshness(
+        source_timestamp=source_timestamp,
+        copy_window_seconds=copy_window_seconds,
+        reference_time=now,
+    ) if source_timestamp is not None or copy_window_seconds is not None else None
+
+    return CopyOrderRead(
+        id=order.id,
+        wallet_id=order.wallet_id,
+        detected_trade_id=order.detected_trade_id,
+        mode=order.mode,
+        action=order.action,
+        status=order.status,
+        reason=order.reason,
+        intended_amount_usd=order.intended_amount_usd,
+        intended_size=order.intended_size,
+        limit_price=order.limit_price,
+        simulated_price=order.simulated_price,
+        filled_price=order.filled_price,
+        filled_size=order.filled_size,
+        polymarket_order_id=order.polymarket_order_id,
+        freshness_status=freshness.status if freshness else None,
+        freshness_label=freshness.label if freshness else None,
+        created_at=order.created_at,
+        updated_at=order.updated_at,
+    )
+
+
 def _validate_copy_amount(copy_amount_mode: str, amount: Decimal) -> None:
     if amount <= 0:
         raise InvalidCopyWalletInputError("El monto por trade debe ser positivo.")
@@ -349,3 +560,17 @@ def _safe_profile_url(raw_value: str) -> str | None:
     if parsed.netloc.lower() not in {"polymarket.com", "www.polymarket.com"}:
         return None
     return raw_value[:1024]
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _historical_cutoff_seconds(copy_window_seconds: int) -> int:
+    return max(copy_window_seconds * 3, 60)
+
+
+def _trade_sort_time(trade: CopyDetectedTrade) -> datetime:
+    return _normalize_datetime(trade.source_timestamp or trade.detected_at)

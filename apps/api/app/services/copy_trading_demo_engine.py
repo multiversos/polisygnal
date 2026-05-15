@@ -14,6 +14,7 @@ from app.schemas.copy_trading import CopyTradingTickResponse
 from app.services.copy_trading_risk_rules import CopyTradeForRules, evaluate_demo_trade
 from app.services.copy_trading_service import (
     add_copy_event,
+    classify_trade_freshness,
     create_copy_order,
     create_detected_trade,
     get_copy_wallet,
@@ -146,6 +147,11 @@ def _scan_wallet(
     response.trades_detected += len(raw_trades)
     for raw_trade in raw_trades:
         normalized = normalize_public_trade(raw_trade, wallet.proxy_wallet)
+        freshness = classify_trade_freshness(
+            source_timestamp=normalized.timestamp,
+            copy_window_seconds=wallet.max_delay_seconds,
+            reference_time=current_time,
+        )
         if normalized.side not in {"buy", "sell"}:
             intent = evaluate_demo_trade(
                 wallet,
@@ -186,6 +192,7 @@ def _scan_wallet(
         if trade is None:
             continue
         response.new_trades += 1
+        _record_trade_freshness(response, freshness.status)
 
         intent = evaluate_demo_trade(
             wallet,
@@ -231,16 +238,26 @@ def _scan_wallet(
                 level="warning",
                 event_type="demo_order_skipped",
                 message="Trade detectado pero no copiado por reglas de seguridad.",
-                metadata={"reason": order.reason or "unknown"},
+                metadata={
+                    "reason": order.reason or "unknown",
+                    "freshness_status": freshness.status,
+                },
             )
     touch_wallet_scan(db, wallet, now=current_time)
+
+
+def _record_trade_freshness(response: CopyTradingTickResponse, status: str) -> None:
+    if status == "live_candidate":
+        response.live_candidates += 1
+    elif status == "recent_outside_window":
+        response.recent_outside_window += 1
+    elif status == "historical":
+        response.historical_trades += 1
 
 
 def _record_skipped_reason(response: CopyTradingTickResponse, reason: str | None) -> None:
     safe_reason = reason or "unknown"
     response.skipped_reasons[safe_reason] = response.skipped_reasons.get(safe_reason, 0) + 1
-    if safe_reason == "trade_too_old":
-        response.historical_trades += 1
 
 
 def _record_scan_error(

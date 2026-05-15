@@ -77,6 +77,8 @@ export function CopyTradingDashboard() {
         <section className="copy-tick-summary" aria-label="Resultado del ultimo demo tick">
           <span>Wallets escaneadas {tickSummary.wallets_scanned}</span>
           <span>Trades nuevos {tickSummary.new_trades}</span>
+          <span>Copiables {tickSummary.live_candidates}</span>
+          <span>Fuera de ventana {tickSummary.recent_outside_window}</span>
           <span>Historicos {tickSummary.historical_trades}</span>
           <span>Simuladas {tickSummary.orders_simulated}</span>
           <span>Saltadas {tickSummary.orders_skipped}</span>
@@ -123,13 +125,19 @@ function getDemoTickMessage(summary: CopyTradingTickSummary): string {
     return "Agrega una wallet para ejecutar el demo.";
   }
   if (summary.errors.length > 0) {
-    return "Escaneo completado con avisos. No se pudo leer actividad publica de una o mas wallets.";
+    return `Escaneo completado con avisos. ${summary.errors.length} wallet${summary.errors.length === 1 ? "" : "s"} no respondieron.`;
   }
   if (summary.new_trades === 0) {
     return "Escaneo completado. No se detectaron trades nuevos.";
   }
-  if (summary.historical_trades > 0 && summary.orders_simulated === 0) {
-    return `Escaneo completado. Se detectaron ${summary.historical_trades} trades historicos. No se simularon porque ocurrieron fuera de la ventana de copia en vivo.`;
+  if (summary.live_candidates > 0) {
+    return `Escaneo completado. ${summary.live_candidates} trades copiables, ${summary.orders_simulated} simulaciones creadas, ${summary.historical_trades} historicos.`;
   }
-  return `Escaneo completado. Trades nuevos ${summary.new_trades}, simuladas ${summary.orders_simulated}, saltadas ${summary.orders_skipped}.`;
+  if (summary.recent_outside_window > 0 && summary.historical_trades === 0) {
+    return `Escaneo completado. Se detectaron ${summary.recent_outside_window} trades recientes, pero llegaron fuera de la ventana de copia en vivo.`;
+  }
+  if (summary.historical_trades > 0 && summary.orders_simulated === 0) {
+    return `Escaneo completado. Se detectaron ${summary.historical_trades} trades historicos. No hubo trades dentro de la ventana de copia en vivo.`;
+  }
+  return `Escaneo completado. Trades nuevos ${summary.new_trades}, simuladas ${summary.orders_simulated}, fuera de ventana ${summary.recent_outside_window}, saltadas ${summary.orders_skipped}.`;
 }

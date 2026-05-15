@@ -2601,10 +2601,16 @@ function validateAnalyzerFirstProductSource() {
     assert(copyAmountSelector.includes(text), `copy amount selector missing preset/custom text: ${text}`);
   }
   assert(copyOrdersTable.includes("formatCopyOrderReason"), "copy orders should translate technical reasons");
-  assert(copyOrdersTable.includes("Trade historico: fuera de la ventana de copia."), "historical copy orders need humane copy");
+  assert(
+    copyOrdersTable.includes("Historico: fuera de la ventana de copia.")
+      || copyOrdersTable.includes("Trade historico: fuera de la ventana de copia."),
+    "historical copy orders need humane copy",
+  );
+  assert(copyOrdersTable.includes("Trade reciente, pero llego tarde para esta ventana."), "recent late trades need humane copy");
   assert(copyOrdersTable.includes("Historico"), "historical copy orders need a visible status label");
   assert(copyBotEvents.includes("groupCopyBotEvents"), "copy bot events should group repeated audit messages");
   assert(copyBotEvents.includes("Trades historicos detectados fuera de la ventana de copia."), "historical audit events need humane copy");
+  assert(copyTradingDashboard.includes("live_candidates"), "demo tick summary should expose live readiness counts");
   assert(copyTradingDashboard.includes("historical_trades"), "demo tick summary should expose historical trade counts");
   assertTextExcludes(
     `${copyTradingSource}\n${copyAmountSelector}\n${copyOrdersTable}\n${copyBotEvents}`,
