@@ -4,6 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
+import {
+  getUnreadProfileAlertCount,
+  PROFILE_ALERTS_STORAGE_EVENT,
+} from "../lib/profileAlerts";
+
 type ThemePreference = "light" | "dark";
 type NavIconName =
   | "dashboard"
@@ -77,11 +82,25 @@ function isActivePath(pathname: string, href: string): boolean {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [theme, setTheme] = useState<ThemePreference>("dark");
+  const [profileAlertCount, setProfileAlertCount] = useState(0);
 
   useEffect(() => {
     const resolvedTheme = resolveThemePreference();
     setTheme(resolvedTheme);
     applyThemePreference(resolvedTheme);
+  }, []);
+
+  useEffect(() => {
+    const refreshAlertCount = () => {
+      setProfileAlertCount(getUnreadProfileAlertCount());
+    };
+    refreshAlertCount();
+    window.addEventListener(PROFILE_ALERTS_STORAGE_EVENT, refreshAlertCount);
+    window.addEventListener("storage", refreshAlertCount);
+    return () => {
+      window.removeEventListener(PROFILE_ALERTS_STORAGE_EVENT, refreshAlertCount);
+      window.removeEventListener("storage", refreshAlertCount);
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -117,7 +136,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <NavIcon name={item.icon} />
               <span>{item.label}</span>
-              {item.primary ? <em>Principal</em> : null}
+              {item.href === "/alerts" && profileAlertCount > 0 ? (
+                <em className="app-nav-alert-count">{profileAlertCount}</em>
+              ) : item.primary ? (
+                <em>Principal</em>
+              ) : null}
             </Link>
           ))}
         </nav>

@@ -68,3 +68,21 @@ Frontend same-origin proxy:
 
 The frontend route only calls fixed backend paths and validates wallet shape
 before forwarding writes. It does not accept arbitrary URLs.
+
+## Profile Alerts v1
+
+Profile alerts are local, browser-scoped monitoring records built from public
+Wallet Intelligence data during `/analyze`.
+
+- Profiles remain persistent in the global backend registry.
+- Alerts stay in `localStorage` because PolySignal has no auth or owner_id yet.
+- An alert can be created when a highlighted profile is detected in a newly
+  analyzed market, appears with relevant public position/capital data, or has a
+  high real win rate with enough closed markets.
+- Alerts dedupe by type, wallet, market, outcome and a 24 hour window.
+- `/alerts` shows profile alerts with mark-read and delete controls.
+- `/profiles` shows recent local alerts for each profile when available.
+
+Alerts are not recommendations, copy-trading instructions, or guarantees. A
+future multi-device alert system needs auth, owner_id, and notification
+preferences before storing user-specific alert state in the backend.

@@ -85,8 +85,8 @@ Use these checks after a production deploy. Correct domains:
    does not sync between devices yet.
 4. Confirm `/watchlist` offers `Vaciar Mi lista` and requires browser
    confirmation before clearing.
-5. Open `/alerts` and confirm it explains that markets followed in Mi lista are
-   read from this browser.
+5. Open `/alerts` and confirm it explains that profile alerts are stored in
+   this browser and are not recommendations.
 6. Open `/analyze` and confirm it explains that saved analyses go to the local
    history in this browser.
 7. Confirm none of these pages claim that accounts, cloud sync, or customer
@@ -491,10 +491,21 @@ If this test fails, stop feature work and treat it as a production regression.
 1. Open `https://polisygnal-web.vercel.app/alerts`.
 2. Confirm it shows Alertas in simple language.
 3. Confirm it shows `Última actualización` and an `Actualizar` button.
-4. Confirm it explains that alerts are basic reminders connected to markets
-   the user follows.
-5. If there are no important alerts, confirm it says so clearly and offers a
-   CTA to Mercados deportivos.
+4. Confirm it includes `Alertas de perfiles` and explains they are local
+   monitoring records for highlighted public profiles detected during analysis.
+5. If there are no profile alerts, confirm it says `No hay alertas todavia` and
+   links back to `/analyze`.
+6. Analyze a market with Wallet Intelligence and existing highlighted profiles.
+   Confirm a compact `Alertas de perfiles` section can appear in `/analyze`
+   without opening wallet drawers automatically.
+7. Confirm repeated analysis of the same wallet, market and outcome does not
+   create duplicate alerts within 24 hours.
+8. Confirm `/alerts` supports `Marcar como leida` and `Eliminar alerta`.
+9. Confirm the sidebar alert counter increases for unread profile alerts.
+10. Confirm alert copy says `Ver perfil publico`, `Ver mercado`, or `Revisar
+    datos`; it must not say to follow, copy, buy, sell, or bet with a wallet.
+11. If there are no saved analysis alerts, confirm the saved-analysis section
+    has a clear empty state.
 
 ## Market Detail
 
@@ -602,8 +613,8 @@ Use these quick checks when reviewing public pages:
     and `Actualizar resultados`.
 11. Open `/performance` and confirm accuracy is not invented when there are no
     resolved clear predictions.
-12. Open `/alerts` and confirm it references saved analyses, not a generic
-    sports watchlist.
+12. Open `/alerts` and confirm it references profile alerts and saved analyses,
+    not a generic sports watchlist.
 13. Open `/sports` directly and confirm it is marked as a legacy view.
 14. Confirm pending, cancelled, unknown and no-clear-decision items are not
     counted as misses.

@@ -91,8 +91,19 @@ import {
   getPolymarketWalletIntelligence,
   unavailablePolymarketWalletIntelligenceSummary,
 } from "../lib/polymarketWalletIntelligence";
-import { saveHighlightedProfilesFromWalletSummary } from "../lib/highlightedProfiles";
-import { syncLocalHighlightedProfilesToBackend } from "../lib/persistentHighlightedProfiles";
+import {
+  getHighlightedProfiles,
+  saveHighlightedProfilesFromWalletSummary,
+} from "../lib/highlightedProfiles";
+import {
+  fetchPersistentHighlightedProfiles,
+  mergePersistentAndLocalProfiles,
+  syncLocalHighlightedProfilesToBackend,
+} from "../lib/persistentHighlightedProfiles";
+import {
+  saveProfileAlertsFromWalletSummary,
+  type ProfileAlert,
+} from "../lib/profileAlerts";
 import {
   buildConservativePolySignalEstimate,
   type PolySignalEstimateResult,
@@ -273,6 +284,17 @@ function formatUsd(value: unknown): string {
     currency: "USD",
     maximumFractionDigits: parsed >= 100 ? 0 : 2,
     style: "currency",
+  }).format(parsed);
+}
+
+function formatPercentValue(value: unknown): string {
+  const parsed = toNumber(value);
+  if (parsed === null) {
+    return "sin dato";
+  }
+  return new Intl.NumberFormat("es", {
+    maximumFractionDigits: 1,
+    style: "percent",
   }).format(parsed);
 }
 
@@ -1267,6 +1289,102 @@ function WalletIntelligenceBlock({ item }: { item: MarketOverviewItem }) {
   );
 }
 
+function profileAlertTypeLabel(type: ProfileAlert["type"]): string {
+  if (type === "high_winrate_profile_seen") {
+    return "Perfil con winRate alto volvio a aparecer";
+  }
+  if (type === "large_position_detected") {
+    return "Wallet destacada con posición relevante";
+  }
+  if (type === "new_market_activity") {
+    return "Nueva actividad publica relevante";
+  }
+  if (type === "profile_refresh_change") {
+    return "Cambio al actualizar perfil";
+  }
+  return "Perfil destacado detectado";
+}
+
+function ProfileAlertsBlock({
+  alerts,
+  onOpenWalletDetails,
+}: {
+  alerts: ProfileAlert[];
+  onOpenWalletDetails: () => void;
+}) {
+  if (alerts.length === 0) {
+    return null;
+  }
+  return (
+    <section className="profile-alerts-panel" aria-label="Alertas de perfiles">
+      <div className="panel-heading compact">
+        <div>
+          <p className="eyebrow">Alertas de perfiles</p>
+          <h3>Perfiles destacados en este análisis</h3>
+          <p>
+            Coincidencias con perfiles públicos destacados detectadas en Wallet Intelligence.
+            No son recomendaciones de operacion.
+          </p>
+        </div>
+        <a className="analysis-link secondary" href="/alerts">
+          Ver alertas
+        </a>
+      </div>
+      <div className="profile-alerts-list compact">
+        {alerts.slice(0, 4).map((alert) => (
+          <article className={`profile-alert-card ${alert.severity}`} key={alert.id}>
+            <div className="profile-alert-card-header">
+              <span className="profile-avatar" aria-hidden="true">
+                {alert.profileImageUrl ? <img alt="" src={alert.profileImageUrl} /> : alert.shortAddress.slice(2, 3).toUpperCase()}
+              </span>
+              <div>
+                <strong>{profileAlertTypeLabel(alert.type)}</strong>
+                <span>{alert.pseudonym || alert.shortAddress}</span>
+              </div>
+              <span className={`badge ${alert.severity === "important" ? "external-hint" : "muted"}`}>
+                {alert.severity === "important" ? "Importante" : alert.severity === "watch" ? "Observar" : "Info"}
+              </span>
+            </div>
+            <p>{alert.reason}</p>
+            <div className="profile-alert-metrics">
+              <span>Outcome {alert.outcome || "No disponible"}</span>
+              <span>Monto {formatUsd(alert.amountUsd)}</span>
+              <span>Posicion {alert.positionSize !== null ? formatMetric(alert.positionSize) : "sin dato"}</span>
+              <span>Win rate {formatPercentValue(alert.winRate)}</span>
+              <span>Cerrados {alert.closedMarkets ?? "sin dato"}</span>
+            </div>
+            <div className="profile-alert-actions">
+              {alert.profileUrl ? (
+                <a href={alert.profileUrl} rel="noopener noreferrer" target="_blank">
+                  Ver perfil público
+                </a>
+              ) : null}
+              {alert.marketUrl ? (
+                <a href={alert.marketUrl} rel="noopener noreferrer" target="_blank">
+                  Ver mercado
+                </a>
+              ) : null}
+              <button onClick={onOpenWalletDetails} type="button">
+                Ver billeteras
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function mergeProfileAlertsForRun(existing: ProfileAlert[], created: ProfileAlert[]): ProfileAlert[] {
+  const byId = new Map<string, ProfileAlert>();
+  for (const alert of [...created, ...existing]) {
+    byId.set(alert.id, alert);
+  }
+  return [...byId.values()]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 8);
+}
+
 function analyzerStatusLabel(status: AnalyzerResult["layers"][number]["status"]): string {
   if (status === "available") {
     return "Disponible";
@@ -1924,6 +2042,7 @@ export default function AnalyzePage() {
   const [marketDetailsOpen, setMarketDetailsOpen] = useState(false);
   const [walletDetailsSummary, setWalletDetailsSummary] = useState<WalletIntelligenceSummary | null>(null);
   const [walletDetailsOpen, setWalletDetailsOpen] = useState(false);
+  const [profileAlerts, setProfileAlerts] = useState<ProfileAlert[]>([]);
   const [lastWorkingUrl, setLastWorkingUrl] = useState("");
   const analysisRunRef = useRef(0);
   const analysisAbortRef = useRef<AbortController | null>(null);
@@ -2242,6 +2361,7 @@ export default function AnalyzePage() {
     setMarketDetailsOpen(false);
     setWalletDetailsSummary(null);
     setWalletDetailsOpen(false);
+    setProfileAlerts([]);
     if (!validation.ok || !validation.normalizedUrl) {
       setProgressStartedAt(null);
       if (analysisAbortRef.current === runController) {
@@ -2410,6 +2530,7 @@ export default function AnalyzePage() {
     setMarketDetailsOpen(false);
     setWalletDetailsSummary(null);
     setWalletDetailsOpen(false);
+    setProfileAlerts([]);
     setProgressStepOverrides({
       detecting_market: {
         detail: "El mercado seleccionado viene de la respuesta real de Polymarket/Gamma.",
@@ -2519,16 +2640,50 @@ export default function AnalyzePage() {
       if (!isCurrentRun()) {
         return;
       }
-      const highlightedProfiles = saveHighlightedProfilesFromWalletSummary(walletSummary, {
+      const profileContext = {
         observedCapitalUsd: walletSummary.analyzedCapitalUsd ?? null,
         source: "Polymarket Data API / Wallet Intelligence",
         sourceMarketSlug: enrichedMatch.item.market?.market_slug ?? null,
         sourceMarketTitle: marketTitle(enrichedMatch.item),
         sourceMarketUrl: normalizedUrl,
-      });
+      };
+      const highlightedProfiles = saveHighlightedProfilesFromWalletSummary(walletSummary, profileContext);
       if (highlightedProfiles.saved.length > 0) {
         void syncLocalHighlightedProfilesToBackend(highlightedProfiles.saved);
       }
+      const profileAlertResult = saveProfileAlertsFromWalletSummary(
+        walletSummary,
+        {
+          marketSlug: profileContext.sourceMarketSlug,
+          marketTitle: profileContext.sourceMarketTitle,
+          marketUrl: profileContext.sourceMarketUrl,
+          observedCapitalUsd: profileContext.observedCapitalUsd,
+          source: "analyze",
+        },
+        getHighlightedProfiles(),
+      );
+      setProfileAlerts(profileAlertResult.created);
+      void fetchPersistentHighlightedProfiles()
+        .then((persistentProfiles) => {
+          if (!isCurrentRun()) {
+            return;
+          }
+          const persistentAlertResult = saveProfileAlertsFromWalletSummary(
+            walletSummary,
+            {
+              marketSlug: profileContext.sourceMarketSlug,
+              marketTitle: profileContext.sourceMarketTitle,
+              marketUrl: profileContext.sourceMarketUrl,
+              observedCapitalUsd: profileContext.observedCapitalUsd,
+              source: "analyze",
+            },
+            mergePersistentAndLocalProfiles(persistentProfiles.profiles, getHighlightedProfiles()),
+          );
+          if (persistentAlertResult.created.length > 0) {
+            setProfileAlerts((current) => mergeProfileAlertsForRun(current, persistentAlertResult.created));
+          }
+        })
+        .catch(() => undefined);
       walletSummary = buildWalletExpandedSummary(enrichedMatch.item, walletSummary, highlightedProfiles.saved.length);
       enrichedMatch = {
         ...enrichedMatch,
@@ -2826,6 +2981,7 @@ export default function AnalyzePage() {
     setMarketDetailsOpen(false);
     setWalletDetailsSummary(null);
     setWalletDetailsOpen(false);
+    setProfileAlerts([]);
     setLastWorkingUrl("");
     setActionMessage(null);
     setSamanthaAutoReportResult(null);
@@ -2844,6 +3000,7 @@ export default function AnalyzePage() {
     setProgressStepOverrides({});
     setMarketDetailsOpen(false);
     setWalletDetailsOpen(false);
+    setProfileAlerts([]);
     setActionMessage(null);
     setSamanthaAutoReportResult(null);
   }, []);
@@ -2969,6 +3126,10 @@ export default function AnalyzePage() {
                       <span className="badge" key={reason}>{reason}</span>
                     ))}
                   </div>
+                  <ProfileAlertsBlock
+                    alerts={profileAlerts}
+                    onOpenWalletDetails={() => setWalletDetailsOpen(true)}
+                  />
                   <AnalyzerReport
                     busy={actionBusy}
                     deepAnalysisJob={deepAnalysisJob}

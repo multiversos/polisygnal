@@ -26,6 +26,11 @@ import {
   buildPolymarketWalletProfileUrl,
   isPolymarketWalletAddress,
 } from "../lib/polymarketWalletProfile";
+import {
+  getProfileAlerts,
+  PROFILE_ALERTS_STORAGE_EVENT,
+  type ProfileAlert,
+} from "../lib/profileAlerts";
 import type { WalletPublicMarketHistoryItem } from "../lib/walletIntelligenceTypes";
 
 type ProfileFilter = "all" | "pnl" | "recent" | "win80" | "win90";
@@ -260,6 +265,7 @@ export default function ProfilesPage() {
   const [bulkProgress, setBulkProgress] = useState<BulkRefreshProgress | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<ProfileFilter>("all");
+  const [profileAlerts, setProfileAlerts] = useState<ProfileAlert[]>([]);
   const [profiles, setProfiles] = useState<HighlightedWalletProfile[]>([]);
   const [query, setQuery] = useState("");
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
@@ -324,6 +330,17 @@ export default function ProfilesPage() {
     return () => {
       cancelled = true;
       window.removeEventListener(HIGHLIGHTED_PROFILES_STORAGE_EVENT, syncProfiles);
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadProfileAlerts = () => setProfileAlerts(getProfileAlerts());
+    loadProfileAlerts();
+    window.addEventListener(PROFILE_ALERTS_STORAGE_EVENT, loadProfileAlerts);
+    window.addEventListener("storage", loadProfileAlerts);
+    return () => {
+      window.removeEventListener(PROFILE_ALERTS_STORAGE_EVENT, loadProfileAlerts);
+      window.removeEventListener("storage", loadProfileAlerts);
     };
   }, []);
 
@@ -574,6 +591,9 @@ export default function ProfilesPage() {
             const isRefreshing = refreshingIds.has(profile.id);
             const canRefresh = isPolymarketWalletAddress(profile.walletAddress);
             const refreshStatus = isRefreshing ? "refreshing" : profile.refreshStatus;
+            const relatedAlerts = profileAlerts
+              .filter((alert) => alert.walletAddress.toLowerCase() === profile.walletAddress.toLowerCase())
+              .slice(0, 3);
             return (
               <article className="profile-card" key={profile.id}>
                 <div className="profile-card-heading">
@@ -663,6 +683,18 @@ export default function ProfilesPage() {
                       ))
                     ) : (
                       <p>No hay mercados relacionados guardados.</p>
+                    )}
+                  </div>
+                  <div className="profile-detail-section">
+                    <strong>Alertas recientes</strong>
+                    {relatedAlerts.length > 0 ? (
+                      relatedAlerts.map((alert) => (
+                        <p key={alert.id}>
+                          {alert.marketTitle} - {alert.reason} - {formatDate(alert.createdAt)}
+                        </p>
+                      ))
+                    ) : (
+                      <p>Sin alertas recientes para este perfil.</p>
                     )}
                   </div>
                   <div className="profile-detail-section">

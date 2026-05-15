@@ -385,6 +385,13 @@ Wallet Intelligence UI controls:
   browser. It must not delete the global public registry row. User-specific
   profile saves and global deletion/admin workflows require a future auth and
   ownership model.
+- Highlighted profile alerts v1 are localStorage-only because there is no
+  user-specific auth/owner_id model. They store compact public monitoring data
+  only: wallet address, profile URL, market title/slug/url, outcome, amount,
+  position size, real win rate/closed markets when present, reason, severity
+  and read state. They dedupe repeated wallet/market/outcome alerts within
+  24 hours, do not store raw payloads or secrets, and must never frame activity
+  as copy-trading, betting advice, identity attribution, or guaranteed edge.
 
 Samantha-side local endpoints:
 

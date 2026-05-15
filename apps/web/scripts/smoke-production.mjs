@@ -991,11 +991,17 @@ async function main() {
   assertTextIncludes(alertsText, "Actualizar", "alerts update button");
   assertTextIncludesOneOf(alertsText, UPDATE_TEXT, "alerts update timestamp");
   assertTextIncludes(alertsText, "Seguimiento de analisis guardados", "alerts analyzer history focus");
-  assertTextIncludes(alertsText, "Analisis en seguimiento", "alerts saved analyses");
+  assertTextIncludes(alertsText, "Alertas de perfiles", "alerts profile section");
+  assertTextIncludesOneOf(alertsText, ["Pendientes de resolucion", "Pendientes de resolución"], "alerts saved analyses");
   assertTextIncludesOneOf(
     alertsText,
-    ["sin seguimiento automatico", "servicio persistente", "Historial"],
+    ["Alertas locales", "este navegador", "Historial"],
     "alerts local tracking copy",
+  );
+  assertTextIncludesOneOf(
+    alertsText,
+    ["No hay alertas todavia", "No hay alertas todavía", "Todas las alertas", "Perfil destacado detectado"],
+    "alerts profile state",
   );
   assertTextIncludesOneOf(
     alertsText,

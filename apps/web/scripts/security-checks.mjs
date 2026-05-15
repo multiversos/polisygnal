@@ -2447,6 +2447,7 @@ function validateAnalyzerFirstProductSource() {
   const shell = readFileSync(resolve(appRoot, "app/components/AppShell.tsx"), "utf8");
   const home = readFileSync(resolve(appRoot, "app/page.tsx"), "utf8");
   const alerts = readFileSync(resolve(appRoot, "app/alerts/page.tsx"), "utf8");
+  const profileAlerts = readFileSync(resolve(appRoot, "app/lib/profileAlerts.ts"), "utf8");
   const performance = readFileSync(resolve(appRoot, "app/performance/page.tsx"), "utf8");
   const methodology = readFileSync(resolve(appRoot, "app/methodology/page.tsx"), "utf8");
   const legacySports = readFileSync(resolve(appRoot, "app/sports/page.tsx"), "utf8");
@@ -2475,6 +2476,16 @@ function validateAnalyzerFirstProductSource() {
   assert(home.includes("mide si PolySignal acierta"), "home should explain analyzer-first performance loop");
   assert(home.includes("Ver rendimiento"), "home should link to performance");
   assert(alerts.includes("Seguimiento de analisis guardados"), "alerts should focus on saved analyses");
+  assert(alerts.includes("Alertas de perfiles"), "alerts should expose highlighted profile alerts");
+  assert(alerts.includes("Marcar como leída") || alerts.includes("Marcar como leida"), "profile alerts should be markable as read");
+  assert(shell.includes("getUnreadProfileAlertCount"), "sidebar should show unread profile alert counts");
+  assert(profileAlerts.includes("PROFILE_ALERT_DEDUPE_WINDOW_MS"), "profile alerts should dedupe repeat detections");
+  assert(profileAlerts.includes("safePolymarketUrl"), "profile alerts should avoid arbitrary external links");
+  assertTextExcludes(
+    `${profileAlerts}\n${alerts}`,
+    ["sigue esta wallet", "copia esta wallet", "copia esta operacion", "apuesta igual"],
+    "highlighted profile alert copy",
+  );
   assert(!alerts.includes("fetchWatchlistItems"), "alerts should not depend on sports watchlist");
   assert(performance.includes("aciertos y fallos medibles"), "performance should document honest accuracy denominator");
   assert(performance.includes("Pendientes de investigacion"), "performance should separate Samantha/research-pending analyses");

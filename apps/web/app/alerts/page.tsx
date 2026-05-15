@@ -8,6 +8,13 @@ import {
   type AnalysisHistoryItem,
 } from "../lib/analysisHistory";
 import { getAnalysisLifecycleState } from "../lib/analysisLifecycle";
+import {
+  deleteProfileAlert,
+  getProfileAlerts,
+  markProfileAlertRead,
+  PROFILE_ALERTS_STORAGE_EVENT,
+  type ProfileAlert,
+} from "../lib/profileAlerts";
 import { formatLastUpdated } from "../lib/useAutoRefresh";
 
 function formatDate(value?: string): string {
@@ -34,8 +41,56 @@ function analyzerHrefForItem(item: AnalysisHistoryItem): string | null {
   return `/analyze?${params.toString()}`;
 }
 
+function formatUsd(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "No disponible";
+  }
+  return new Intl.NumberFormat("es", {
+    currency: "USD",
+    maximumFractionDigits: value >= 100 ? 0 : 2,
+    style: "currency",
+  }).format(value);
+}
+
+function formatPercent(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "No disponible";
+  }
+  return new Intl.NumberFormat("es", {
+    maximumFractionDigits: 1,
+    style: "percent",
+  }).format(value);
+}
+
+function profileAlertTypeLabel(type: ProfileAlert["type"]): string {
+  if (type === "high_winrate_profile_seen") {
+    return "Perfil con winRate alto volvio a aparecer";
+  }
+  if (type === "large_position_detected") {
+    return "Actividad publica relevante";
+  }
+  if (type === "new_market_activity") {
+    return "Nueva actividad publica";
+  }
+  if (type === "profile_refresh_change") {
+    return "Cambio en actualizacion";
+  }
+  return "Perfil destacado detectado";
+}
+
+function profileAlertSeverityLabel(severity: ProfileAlert["severity"]): string {
+  if (severity === "important") {
+    return "Importante";
+  }
+  if (severity === "watch") {
+    return "Observar";
+  }
+  return "Info";
+}
+
 export default function AlertsPage() {
   const [items, setItems] = useState<AnalysisHistoryItem[]>([]);
+  const [profileAlerts, setProfileAlerts] = useState<ProfileAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,9 +108,14 @@ export default function AlertsPage() {
     }
   }, []);
 
+  const loadProfileAlerts = useCallback(() => {
+    setProfileAlerts(getProfileAlerts());
+  }, []);
+
   useEffect(() => {
     void loadHistory();
-  }, [loadHistory]);
+    loadProfileAlerts();
+  }, [loadHistory, loadProfileAlerts]);
 
   useEffect(() => {
     const syncHistory = () => {
@@ -69,6 +129,15 @@ export default function AlertsPage() {
     };
   }, [loadHistory]);
 
+  useEffect(() => {
+    window.addEventListener(PROFILE_ALERTS_STORAGE_EVENT, loadProfileAlerts);
+    window.addEventListener("storage", loadProfileAlerts);
+    return () => {
+      window.removeEventListener(PROFILE_ALERTS_STORAGE_EVENT, loadProfileAlerts);
+      window.removeEventListener("storage", loadProfileAlerts);
+    };
+  }, [loadProfileAlerts]);
+
   const pendingItems = useMemo(() => {
     return items
       .filter((item) => item.result === "pending" || item.status === "open")
@@ -79,16 +148,27 @@ export default function AlertsPage() {
       .filter((item) => item.result === "unknown" || item.status === "unknown")
       .slice(0, 5);
   }, [items]);
+  const unreadProfileAlerts = useMemo(() => {
+    return profileAlerts.filter((alert) => !alert.read);
+  }, [profileAlerts]);
+
+  const handleMarkProfileAlertRead = (alertId: string) => {
+    setProfileAlerts(markProfileAlertRead(alertId));
+  };
+
+  const handleDeleteProfileAlert = (alertId: string) => {
+    setProfileAlerts(deleteProfileAlert(alertId));
+  };
 
   return (
     <main className="dashboard-shell alerts-page">
       <header className="topbar">
         <div>
           <p className="eyebrow">Alertas</p>
-          <h1>Seguimiento de analisis guardados</h1>
+          <h1>Seguimiento de analisis guardados y perfiles</h1>
           <p className="subtitle">
-            Alertas enfocadas en lecturas guardadas: pendientes de resolucion,
-            revisiones necesarias y enlaces que conviene volver a analizar.
+            Alertas enfocadas en perfiles destacados detectados y lecturas guardadas:
+            actividad publica, pendientes de resolucion y enlaces que conviene revisar.
           </p>
         </div>
         <div className="topbar-actions">
@@ -106,10 +186,10 @@ export default function AlertsPage() {
       </header>
 
       <section className="safety-strip">
-        <strong>Sin seguimiento automatico en segundo plano:</strong>
+        <strong>Alertas locales de monitoreo:</strong>
         <span>
-          Mientras no haya cuenta o servicio persistente, la revision ocurre cuando
-          abres PolySignal y actualizas resultados desde Historial.
+          Las alertas de perfiles viven en este navegador. No son recomendaciones
+          ni instrucciones de operacion.
         </span>
       </section>
 
@@ -122,9 +202,9 @@ export default function AlertsPage() {
 
       <section className="metric-grid" aria-label="Resumen de alertas">
         <article className="metric-card">
-          <span>Analisis guardados</span>
-          <strong>{loading ? "..." : items.length}</strong>
-          <p>Registros locales</p>
+          <span>Alertas de perfiles</span>
+          <strong>{profileAlerts.length}</strong>
+          <p>{unreadProfileAlerts.length} sin leer</p>
         </article>
         <article className="metric-card">
           <span>Pendientes</span>
@@ -136,13 +216,99 @@ export default function AlertsPage() {
           <strong>{loading ? "..." : unknownItems.length}</strong>
           <p>No se pudieron verificar</p>
         </article>
+        <article className="metric-card">
+          <span>Analisis guardados</span>
+          <strong>{loading ? "..." : items.length}</strong>
+          <p>Registros locales</p>
+        </article>
       </section>
 
       <section className="dashboard-panel">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Pendientes</p>
-            <h2>Analisis en seguimiento</h2>
+            <p className="eyebrow">Alertas de perfiles</p>
+            <h2>Actividad de perfiles destacados</h2>
+            <p>Se generan cuando Wallet Intelligence detecta una wallet publica destacada en un mercado analizado.</p>
+          </div>
+        </div>
+
+        {profileAlerts.length === 0 ? (
+          <div className="empty-state compact">
+            <strong>No hay alertas todavia.</strong>
+            <p>Cuando un perfil destacado aparezca en un mercado analizado, lo veras aqui.</p>
+            <a className="analysis-link" href="/analyze">
+              Analizar enlace
+            </a>
+          </div>
+        ) : unreadProfileAlerts.length === 0 ? (
+          <div className="empty-state compact">
+            <strong>Todas las alertas están revisadas.</strong>
+            <p>Puedes conservarlas como bitacora local o eliminarlas cuando ya no las necesites.</p>
+          </div>
+        ) : null}
+
+        {profileAlerts.length > 0 ? (
+          <div className="profile-alerts-list">
+            {profileAlerts.map((alert) => (
+              <article className={`profile-alert-card ${alert.severity} ${alert.read ? "read" : "unread"}`} key={alert.id}>
+                <div className="profile-alert-card-header">
+                  <span className="profile-avatar" aria-hidden="true">
+                    {alert.profileImageUrl ? <img alt="" src={alert.profileImageUrl} /> : alert.shortAddress.slice(2, 3).toUpperCase()}
+                  </span>
+                  <div>
+                    <strong>{profileAlertTypeLabel(alert.type)}</strong>
+                    <span>{alert.pseudonym || alert.shortAddress}</span>
+                  </div>
+                  <div className="profile-card-status">
+                    <span className={`badge ${alert.severity === "important" ? "external-hint" : "muted"}`}>
+                      {profileAlertSeverityLabel(alert.severity)}
+                    </span>
+                    <span className={alert.read ? "badge muted" : "badge external-hint"}>
+                      {alert.read ? "Leida" : "Nueva"}
+                    </span>
+                  </div>
+                </div>
+                <h3>{alert.marketTitle}</h3>
+                <p className="section-note">{alert.reason}</p>
+                <div className="profile-alert-metrics">
+                  <span>Outcome {alert.outcome || "No disponible"}</span>
+                  <span>Monto {formatUsd(alert.amountUsd)}</span>
+                  <span>Posicion {alert.positionSize !== null ? alert.positionSize : "No disponible"}</span>
+                  <span>Win rate {formatPercent(alert.winRate)}</span>
+                  <span>Cerrados {alert.closedMarkets ?? "No disponible"}</span>
+                  <span>{formatDate(alert.createdAt)}</span>
+                </div>
+                <div className="profile-alert-actions">
+                  {alert.profileUrl ? (
+                    <a href={alert.profileUrl} rel="noopener noreferrer" target="_blank">
+                      Ver perfil público
+                    </a>
+                  ) : null}
+                  {alert.marketUrl ? (
+                    <a href={alert.marketUrl} rel="noopener noreferrer" target="_blank">
+                      Ver mercado
+                    </a>
+                  ) : null}
+                  {!alert.read ? (
+                    <button onClick={() => handleMarkProfileAlertRead(alert.id)} type="button">
+                      Marcar como leida
+                    </button>
+                  ) : null}
+                  <button onClick={() => handleDeleteProfileAlert(alert.id)} type="button">
+                    Eliminar alerta
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="dashboard-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Alertas de analisis guardados</p>
+            <h2>Pendientes de resolución</h2>
             <p>Usa Historial para buscar resultados finales disponibles.</p>
           </div>
           <a className="analysis-link secondary" href="/history">

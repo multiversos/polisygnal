@@ -121,6 +121,14 @@ Estado visible verificado:
   navegador` para perfiles del registro global y muestra `No hay perfiles con
   este filtro` con accion `Limpiar filtros` cuando la busqueda o los filtros no
   tienen coincidencias.
+- Alertas de Perfiles Destacados v1 esta activa como monitoreo local. Cuando
+  `/analyze` detecta una wallet publica que coincide con un perfil destacado o
+  tiene actividad publica relevante, crea una alerta deduplicada en
+  localStorage. `/analyze` muestra una seccion compacta `Alertas de perfiles`,
+  `/alerts` permite marcar como leida o eliminar la alerta, el sidebar muestra
+  contador de no leidas y `/profiles` enseña alertas recientes del perfil. No
+  son recomendaciones ni copy-trading; la persistencia multi-dispositivo de
+  alertas requiere auth/owner_id futuro.
 - Perfiles persistentes usan backend FastAPI en `/profiles/highlighted` y tabla
   `highlighted_wallet_profiles`. El frontend escribe mediante
   `/api/profiles/highlighted`, una ruta same-origin allowlisted que valida wallet
@@ -529,8 +537,9 @@ Estado actual:
 - Perfiles destacados ahora tienen registro global persistente para wallets
   publicas calificadas; localStorage queda como fallback/migracion y para
   ocultar perfiles en este navegador.
-- Alertas ahora se enfocan en analisis guardados y no en una lista generica de
-  mercados.
+- Alertas ahora se enfocan en analisis guardados y alertas locales de perfiles
+  destacados; no son un sistema global de notificaciones ni una lista generica
+  de mercados.
 - Analizar enlace es el flujo principal del producto y resuelve enlaces desde
   Polymarket/Gamma/CLOB en modo read-only.
 - Historial puede guardar lecturas del analizador, verificar resultados cuando
