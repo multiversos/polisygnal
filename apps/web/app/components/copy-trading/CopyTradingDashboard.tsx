@@ -87,7 +87,7 @@ export function CopyTradingDashboard() {
       {loading ? <div className="copy-empty-state">Cargando modulo Copiar Wallets...</div> : null}
 
       <div className="copy-dashboard-grid">
-        <AddCopyWalletForm onCreated={refresh} />
+        <AddCopyWalletForm onCreated={refresh} wallets={data?.wallets ?? []} />
         <ExecutionWalletCard />
         <section className="copy-panel copy-real-lock">
           <div className="copy-panel-heading">

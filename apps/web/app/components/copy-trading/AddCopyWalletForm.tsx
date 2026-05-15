@@ -4,11 +4,12 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { ApiRequestError } from "../../lib/api";
 import { createCopyWallet } from "../../lib/copyTrading";
-import type { CopyAmountMode, CopyWalletCreateInput } from "../../lib/copyTradingTypes";
+import type { CopyAmountMode, CopyWallet, CopyWalletCreateInput } from "../../lib/copyTradingTypes";
 import { CopyAmountSelector } from "./CopyAmountSelector";
 
 type AddCopyWalletFormProps = {
   onCreated: () => Promise<void> | void;
+  wallets: CopyWallet[];
 };
 
 const EMPTY_WALLET_MESSAGE = "Ingresa una wallet o perfil publico de Polymarket.";
@@ -19,10 +20,10 @@ const PROFILE_NOT_RECOGNIZED_MESSAGE =
 const SAVE_WALLET_ERROR_MESSAGE = "No pudimos guardar esta wallet. Intenta nuevamente.";
 
 type WalletInputValidation =
-  | { ok: true; value: string }
+  | { normalizedWallet: string | null; ok: true; value: string }
   | { ok: false; message: string };
 
-export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
+export function AddCopyWalletForm({ onCreated, wallets }: AddCopyWalletFormProps) {
   const [walletInput, setWalletInput] = useState("");
   const [label, setLabel] = useState("");
   const [amountMode, setAmountMode] = useState<CopyAmountMode>("preset");
@@ -40,6 +41,13 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
     const walletValidation = validateWalletTargetInput(walletInput);
     if (walletValidation.ok === false) {
       setFormError(walletValidation.message);
+      return;
+    }
+    if (
+      walletValidation.normalizedWallet &&
+      wallets.some((wallet) => wallet.proxy_wallet.toLowerCase() === walletValidation.normalizedWallet)
+    ) {
+      setFormError("Esta wallet ya esta en seguimiento.");
       return;
     }
     if (amountError) {
@@ -167,7 +175,7 @@ function validateWalletTargetInput(input: string): WalletInputValidation {
     if (!/^0x[0-9a-fA-F]+$/.test(value)) {
       return { ok: false, message: WALLET_HEX_MESSAGE };
     }
-    return { ok: true, value: value.toLowerCase() };
+    return { normalizedWallet: value.toLowerCase(), ok: true, value: value.toLowerCase() };
   }
 
   if (/^https?:\/\//i.test(value)) {
@@ -177,7 +185,7 @@ function validateWalletTargetInput(input: string): WalletInputValidation {
       const isPolymarket = host === "polymarket.com" || host === "www.polymarket.com";
       const embeddedWallet = value.match(/0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/);
       if (isPolymarket && embeddedWallet) {
-        return { ok: true, value };
+        return { normalizedWallet: embeddedWallet[0].toLowerCase(), ok: true, value };
       }
     } catch {
       // Fall through to the friendly profile error.

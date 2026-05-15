@@ -22,6 +22,7 @@ from app.services.copy_trading_service import (
 )
 
 WALLET = "0x1111111111111111111111111111111111111111"
+WALLET_B = "0x2222222222222222222222222222222222222222"
 
 
 class FakeTradeReader:
@@ -30,6 +31,28 @@ class FakeTradeReader:
 
     def get_trades_for_user(self, wallet: str, *, limit: int = 50, offset: int = 0) -> list[dict[str, object]]:
         return self.trades[:limit]
+
+
+class TrackingTradeReader:
+    def __init__(self, trades_by_wallet: dict[str, list[dict[str, object]]]) -> None:
+        self.trades_by_wallet = trades_by_wallet
+        self.wallets_seen: list[str] = []
+
+    def get_trades_for_user(self, wallet: str, *, limit: int = 50, offset: int = 0) -> list[dict[str, object]]:
+        self.wallets_seen.append(wallet)
+        return self.trades_by_wallet.get(wallet, [])[:limit]
+
+
+class FailingForOneWalletReader:
+    def __init__(self, failing_wallet: str) -> None:
+        self.failing_wallet = failing_wallet
+        self.wallets_seen: list[str] = []
+
+    def get_trades_for_user(self, wallet: str, *, limit: int = 50, offset: int = 0) -> list[dict[str, object]]:
+        self.wallets_seen.append(wallet)
+        if wallet == self.failing_wallet:
+            raise RuntimeError("upstream unavailable")
+        return []
 
 
 def test_valid_wallet_normalizes_direct_0x() -> None:
@@ -72,6 +95,31 @@ def test_post_wallet_with_valid_0x_creates_wallet(client: TestClient) -> None:
     assert response.json()["proxy_wallet"] == WALLET
 
 
+def test_post_wallet_allows_multiple_different_wallets(client: TestClient) -> None:
+    base_payload = {
+        "mode": "demo",
+        "copy_amount_mode": "preset",
+        "copy_amount_usd": "5",
+        "copy_buys": True,
+        "copy_sells": True,
+    }
+
+    first = client.post(
+        "/copy-trading/wallets",
+        json={**base_payload, "label": "qa-a", "wallet_input": WALLET},
+    )
+    second = client.post(
+        "/copy-trading/wallets",
+        json={**base_payload, "label": "qa-b", "wallet_input": WALLET_B},
+    )
+    wallets = client.get("/copy-trading/wallets")
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert wallets.status_code == 200
+    assert {wallet["proxy_wallet"] for wallet in wallets.json()["wallets"]} == {WALLET, WALLET_B}
+
+
 def test_post_wallet_invalid_returns_clear_error(client: TestClient) -> None:
     response = client.post(
         "/copy-trading/wallets",
@@ -92,6 +140,33 @@ def test_duplicate_wallet_is_rejected_cleanly(db_session: Session) -> None:
 
     with pytest.raises(DuplicateCopyWalletError, match="ya esta en seguimiento"):
         create_copy_wallet(db_session, CopyWalletCreate(wallet_input=WALLET))
+
+
+def test_duplicate_wallet_is_case_and_space_insensitive(db_session: Session) -> None:
+    create_copy_wallet(db_session, CopyWalletCreate(wallet_input=WALLET))
+
+    with pytest.raises(DuplicateCopyWalletError, match="ya esta en seguimiento"):
+        create_copy_wallet(db_session, CopyWalletCreate(wallet_input=f"  {WALLET.upper()}  "))
+
+
+def test_duplicate_wallet_request_does_not_block_next_different_wallet(client: TestClient) -> None:
+    base_payload = {
+        "mode": "demo",
+        "copy_amount_mode": "preset",
+        "copy_amount_usd": "5",
+        "copy_buys": True,
+        "copy_sells": True,
+    }
+
+    first = client.post("/copy-trading/wallets", json={**base_payload, "wallet_input": WALLET})
+    duplicate = client.post("/copy-trading/wallets", json={**base_payload, "wallet_input": WALLET.upper()})
+    second = client.post("/copy-trading/wallets", json={**base_payload, "wallet_input": WALLET_B})
+
+    assert first.status_code == 201
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "Esta wallet ya esta en seguimiento."
+    assert second.status_code == 201
+    assert second.json()["proxy_wallet"] == WALLET_B
 
 
 def test_buy_trade_normalizes() -> None:
@@ -244,6 +319,32 @@ def test_demo_tick_with_wallet_without_trades_returns_clean_summary(db_session: 
     assert response.trades_detected == 0
     assert response.new_trades == 0
     assert response.errors == []
+
+
+def test_demo_tick_scans_multiple_wallets_without_trades(db_session: Session) -> None:
+    first = _create_wallet(db_session, suffix="11")
+    second = _create_wallet(db_session, suffix="22")
+    reader = TrackingTradeReader({})
+
+    response = run_demo_tick(db_session, data_client=reader, now=_now())
+
+    assert response.wallets_scanned == 2
+    assert response.trades_detected == 0
+    assert response.new_trades == 0
+    assert response.errors == []
+    assert set(reader.wallets_seen) == {first.proxy_wallet, second.proxy_wallet}
+
+
+def test_demo_tick_continues_when_one_wallet_scan_fails(db_session: Session) -> None:
+    first = _create_wallet(db_session, suffix="11")
+    second = _create_wallet(db_session, suffix="22")
+    reader = FailingForOneWalletReader(failing_wallet=first.proxy_wallet)
+
+    response = run_demo_tick(db_session, data_client=reader, now=_now())
+
+    assert response.wallets_scanned == 2
+    assert response.errors == ["No se pudo leer actividad publica."]
+    assert set(reader.wallets_seen) == {first.proxy_wallet, second.proxy_wallet}
 
 
 def test_real_mode_returns_blocked_not_configured(db_session: Session) -> None:

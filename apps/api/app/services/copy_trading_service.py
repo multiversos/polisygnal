@@ -86,6 +86,14 @@ def resolve_copy_wallet_input(value: str) -> ResolvedCopyWalletInput:
 def create_copy_wallet(db: Session, payload: CopyWalletCreate) -> CopyWallet:
     _validate_copy_amount(payload.copy_amount_mode, payload.copy_amount_usd)
     resolved = resolve_copy_wallet_input(payload.wallet_input)
+    existing_wallet = db.scalar(
+        select(CopyWallet)
+        .where(CopyWallet.proxy_wallet == resolved.proxy_wallet)
+        .limit(1)
+    )
+    if existing_wallet is not None:
+        raise DuplicateCopyWalletError("Esta wallet ya esta en seguimiento.")
+
     wallet = CopyWallet(
         id=str(uuid4()),
         label=payload.label,
@@ -108,6 +116,7 @@ def create_copy_wallet(db: Session, payload: CopyWalletCreate) -> CopyWallet:
     try:
         db.flush()
     except IntegrityError as exc:
+        db.rollback()
         raise DuplicateCopyWalletError("Esta wallet ya esta en seguimiento.") from exc
     db.refresh(wallet)
     add_copy_event(
