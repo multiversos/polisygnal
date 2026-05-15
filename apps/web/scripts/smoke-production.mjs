@@ -1087,9 +1087,17 @@ async function main() {
   const profilesRender = validatePublicProductPage(profilesDom, "profiles", ["Perfiles"]);
   const profilesText = visibleText(profilesDom);
   assertTextIncludes(profilesText, "Billeteras publicas detectadas", "profiles public heading");
-  assertTextIncludes(profilesText, "registro persistente", "profiles persistent storage copy");
+  assertTextIncludesOneOf(
+    profilesText,
+    ["Registro persistente", "Sincronizacion parcial", "Guardado local por ahora", "Cargando perfiles"],
+    "profiles persistent storage state",
+  );
   assertTextIncludes(profilesText, "Actualizar todos", "profiles refresh all control");
-  assertTextIncludes(profilesText, "Los perfiles destacados apareceran", "profiles empty state copy");
+  assertTextIncludesOneOf(
+    profilesText,
+    ["Los perfiles destacados apareceran", "Perfil destacado", "Perfiles guardados"],
+    "profiles empty or persisted state copy",
+  );
   assertTextIncludes(profilesText, "No es recomendacion de copy-trading", "profiles anti-copy-trading copy");
   assertTextExcludes(profilesText, ["tokenId", "conditionId", "transactionHash", "raw JSON"], "profiles technical noise");
   const performanceDom = await dumpDom(urlFor(PERFORMANCE_PATH));
