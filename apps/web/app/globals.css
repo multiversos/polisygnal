@@ -9114,6 +9114,7 @@ html:not([data-theme="dark"]) .app-sidebar {
 }
 
 .profiles-hero p {
+  overflow-wrap: anywhere;
   color: var(--ps-text-soft, #cbd5e1);
 }
 
