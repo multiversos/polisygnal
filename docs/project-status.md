@@ -89,6 +89,12 @@ Estado visible verificado:
   drawers existentes y no se abren automaticamente. Si
   `suggestedDecision.available=false`, no muestra prediccion ni estimate
   propio; explica que el precio de mercado es solo referencia de Polymarket.
+- `/analyze` ahora expone una capa `Evidencia independiente`: separa referencia
+  de mercado, senales auxiliares y soportes realmente independientes. Muestra
+  que Polymarket price no es estimate propio, que Wallet Intelligence no basta
+  sola para estimar y que fuentes como odds externas, noticias/lesiones o
+  comparables politicos deben figurar como conectadas y verificadas antes de
+  habilitar una estimacion propia.
 - `Ver billeteras` usa una vista compacta por wallet: direccion publica,
   tipo de actividad, outcome/posicion, monto, precio, shares/contratos,
   posicion, PnL/win rate solo si vienen reales, mercados cerrados y wins/losses

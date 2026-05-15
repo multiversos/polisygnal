@@ -29,13 +29,17 @@ create a PolySignal percentage.
 
 ## Gate C - Independent Support
 
-Gate C requires at least one real support beyond the market reference:
+Gate C requires at least one real independent support beyond the market
+reference:
 
-- Wallet Intelligence with enough public wallet activity.
-- Wallet profile history with enough resolved closed-position data.
 - Comparable external odds from a validated report.
 - Equivalent Kalshi comparison from a validated report.
 - Strong external evidence from a validated Samantha report.
+
+Wallet Intelligence and wallet profile history remain auxiliary. They can help
+organize the review and explain why a market deserves attention, but they do
+not satisfy Gate C by themselves and cannot turn a Samantha summary into a
+PolySignal estimate on their own.
 
 Weak wallet activity, incomplete wallet profiles, Reddit/social-only evidence,
 non-equivalent Kalshi, or unsupported odds do not pass Gate C.

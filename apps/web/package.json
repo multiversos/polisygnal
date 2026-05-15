@@ -16,7 +16,8 @@
     "test:analyzer-progress": "node scripts/test-analyzer-progress.mjs",
     "test:profiles": "node scripts/test-profiles.mjs",
     "test:profile-alerts": "node scripts/test-profile-alerts.mjs",
-    "test:analysis-agent-timeout": "node scripts/test-analysis-agent-timeout.mjs"
+    "test:analysis-agent-timeout": "node scripts/test-analysis-agent-timeout.mjs",
+    "test:independent-evidence": "node scripts/test-independent-evidence.mjs"
   },
   "dependencies": {
     "next": "15.5.15",

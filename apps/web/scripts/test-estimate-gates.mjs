@@ -109,26 +109,30 @@ expectPending(noIndependentGate, "valid-shape report without enough independent 
 
 const withWallet = buildConservativePolySignalEstimate({
   marketImpliedProbability: marketReference,
-  samanthaReport: strongValidSamanthaReport,
+  samanthaReport: validButNoIndependentGateReport,
   walletSignal: sufficientWalletSignal,
 });
-expectAvailable(withWallet, "Samantha plus sufficient wallet signal");
+expectPending(withWallet, "Samantha plus sufficient wallet signal");
 assert(
   withWallet.contributions.some(
-    (entry) => entry.source === "wallet_intelligence" && entry.usedForEstimate,
+    (entry) => entry.source === "wallet_intelligence" && !entry.usedForEstimate,
   ),
-  "sufficient wallet signal should be marked as a used contribution",
+  "wallet intelligence must stay auxiliary and not become estimate support by itself",
+);
+assert(
+  withWallet.blockers.some((entry) => entry.code === "missing_independent_support"),
+  "wallet support alone must still leave the independent-support blocker visible",
 );
 
 const withWalletProfile = buildConservativePolySignalEstimate({
   marketImpliedProbability: marketReference,
-  samanthaReport: strongValidSamanthaReport,
+  samanthaReport: validButNoIndependentGateReport,
   walletSignal: sufficientWalletProfileSignal,
 });
-expectAvailable(withWalletProfile, "Samantha plus sufficient wallet profile");
+expectPending(withWalletProfile, "Samantha plus sufficient wallet profile");
 assert(
-  withWalletProfile.contributions.some((entry) => entry.source === "wallet_profile" && entry.usedForEstimate),
-  "sufficient wallet profile should be marked as a used contribution",
+  withWalletProfile.contributions.some((entry) => entry.source === "wallet_profile" && !entry.usedForEstimate),
+  "wallet profile support must stay auxiliary and not become estimate support by itself",
 );
 
 const withExternalEvidence = buildConservativePolySignalEstimate({
@@ -164,8 +168,8 @@ assert(
 console.log(
   JSON.stringify(
     {
-      available_cases: 3,
-      pending_cases: 4,
+      available_cases: 1,
+      pending_cases: 6,
       status: "ok",
     },
     null,

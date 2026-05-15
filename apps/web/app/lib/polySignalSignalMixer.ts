@@ -34,6 +34,7 @@ export type EstimateBlocker = {
 };
 
 export type EstimateReadiness = {
+  auxiliarySupportCount: number;
   gatesPassed: boolean;
   independentSupportCount: number;
   marketReferenceAvailable: boolean;
@@ -283,9 +284,8 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
   );
   const strongEvidence = strongExternalEvidence(report);
   const strongExternalEvidenceSufficient = strongEvidence.length >= 2;
+  const auxiliarySupportCount = [walletSufficient, profileSufficient].filter(Boolean).length;
   const independentSupportCount = [
-    walletSufficient,
-    profileSufficient,
     oddsUsable,
     kalshiUsable,
     strongExternalEvidenceSufficient,
@@ -322,7 +322,7 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
       summary: walletSufficient
         ? "Actividad publica de billeteras suficiente como senal auxiliar."
         : "Actividad publica de billeteras observada, pero insuficiente como senal fuerte.",
-      usedForEstimate: walletSufficient,
+      usedForEstimate: false,
     });
   }
 
@@ -341,7 +341,7 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
       summary: profileSufficient
         ? "Al menos una billetera tiene historial publico cerrado suficiente."
         : "No hay historial publico cerrado suficiente para usar perfiles como senal.",
-      usedForEstimate: profileSufficient,
+      usedForEstimate: false,
     });
   }
 
@@ -431,13 +431,14 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
       blocker(
         "missing_independent_support",
         "Faltan soportes independientes",
-        "Hace falta al menos una senal real adicional: wallets suficientes, perfiles cerrados, odds/Kalshi comparables o evidencia externa fuerte.",
+        "Hace falta al menos una fuente independiente real adicional, como odds comparables, Kalshi equivalente o evidencia externa fuerte. Wallet Intelligence y perfiles solo cuentan como apoyo auxiliar.",
       ),
     );
   }
 
   const gatesPassed = marketReferenceAvailable && samanthaEstimateAccepted && independentSupportCount > 0;
   const readiness: EstimateReadiness = {
+    auxiliarySupportCount,
     gatesPassed,
     independentSupportCount,
     marketReferenceAvailable,
@@ -455,7 +456,7 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
       countsForHistoryAccuracy: false,
       decisionSide: "unavailable",
       explanation:
-        "Estimacion PolySignal pendiente: falta reporte Samantha validado o soporte independiente suficiente. El precio de mercado queda solo como referencia.",
+        "Estimacion PolySignal pendiente: falta reporte Samantha validado o soporte independiente suficiente. El precio de mercado queda solo como referencia y las wallets permanecen como senal auxiliar.",
       marketImpliedProbability: marketImpliedProbability ?? undefined,
       readiness,
       warnings: dedupeWarnings([

@@ -80,6 +80,13 @@ existing detail drawers instead of exposing raw payloads. `Dato real` badges are
 allowed only for structured signals marked real by the agent or derived from
 Polymarket/Wallet Intelligence fields already shown elsewhere in the UI.
 
+The visible `Evidencia independiente` section follows the same rule set. It may
+say a source is available, partial, auxiliary, not connected, unavailable,
+timed out or blocked, but it must not invent odds, news, injuries, polls,
+external stats, source URLs or comparables. `Precio de mercado` stays a
+reference only, and Wallet Intelligence stays auxiliary unless separate
+independent support is actually present.
+
 The report may show agent key signals, risks, limitations and sources, but only
 from sanitized structured output or derived unavailable-state explanations. It
 must not invent ROI, win rate, PnL, odds, news, injuries, wallet actions or

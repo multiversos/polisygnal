@@ -717,6 +717,15 @@ Use these quick checks when reviewing public pages:
    `Mercado`, `Billeteras`, `Samantha` and `Limitaciones`. These cards must
    summarize only real Polymarket/Wallet Intelligence/agent data and must not
    replace the detail drawers.
+6. Confirm the final report shows `Evidencia independiente` and that it marks:
+   - `Precio de mercado` as available reference only,
+   - `Billeteras` as auxiliary only,
+   - `Odds externas` as `Fuente no conectada` unless a real comparable source
+     was returned,
+   - `Noticias/lesiones` or `Noticias/encuestas` as missing when no provider is
+     connected.
+7. Confirm `Que falta para estimar` explains why there is still no PolySignal
+   estimate when only Polymarket + Wallet Intelligence are present.
 6. Confirm key signal cards show their source and mark `Dato real` only when
    the structured report says the signal is real. Polymarket signals should
    offer `Ver datos`; Wallet Intelligence signals should offer `Ver

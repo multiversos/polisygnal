@@ -249,6 +249,10 @@ eso solo confirma que el contrato paso validacion.
   mercado, billeteras, agente y limitaciones. Los botones `Ver datos` y `Ver
   billeteras` reutilizan los drawers existentes y nunca se abren
   automaticamente.
+- `Evidencia independiente` separa lo que cuenta como referencia de mercado, lo
+  que queda como senal auxiliar y lo que realmente falta para una estimacion
+  propia. Polymarket price nunca cuenta como estimate propio y Wallet
+  Intelligence no basta por si sola.
 - Las senales del reporte se muestran como tarjetas con label, direccion,
   confianza, fuente y badge `Dato real` solo cuando el agente marco la senal
   como real. Las senales de Polymarket enlazan a `Ver datos`; las de Wallet

@@ -1713,6 +1713,10 @@ function validateDeepAnalysisJobRules() {
   assert(reportSource.includes("Fuente automatica no disponible"), "AnalyzerReport should show unavailable automatic source state");
   assert(reportSource.includes("Evidencia usada"), "AnalyzerReport should expose a compact evidence-used section");
   assert(reportSource.includes("Datos reales revisados para esta lectura"), "AnalyzerReport should explain evidence provenance");
+  assert(reportSource.includes("Evidencia independiente"), "AnalyzerReport should explain independent evidence requirements");
+  assert(reportSource.includes("Que falta para estimar"), "AnalyzerReport should explain what is still missing for an estimate");
+  assert(reportSource.includes("Fuente no conectada"), "AnalyzerReport should label disconnected evidence sources honestly");
+  assert(reportSource.includes("Cuenta como referencia o apoyo auxiliar"), "AnalyzerReport should keep auxiliary data separate from independent evidence");
   assert(reportSource.includes("Dato real"), "AnalyzerReport should badge real-data key signals");
   assert(reportSource.includes("getDisplayMarketPrices"), "AnalyzerReport should reuse flexible market outcome pricing");
   assert(reportSource.includes("NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS"), "AnalyzerReport should gate manual tools behind debug flag");

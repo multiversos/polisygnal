@@ -44,6 +44,10 @@ import {
   getDisplayMarketPrices,
   type DisplayMarketPriceCard,
 } from "../lib/marketDataDisplay";
+import {
+  buildIndependentEvidenceSummary,
+  getIndependentEvidenceStatusLabel,
+} from "../lib/independentEvidence";
 import type { MarketOverviewItem } from "../lib/marketOverview";
 import {
   formatProbability,
@@ -557,6 +561,10 @@ function buildReviewChecklist(input: {
   );
 }
 
+function independentEvidenceStatusClass(status: string): string {
+  return status.replace(/_/g, "-");
+}
+
 function marketEvidenceDetail(item: MarketOverviewItem): string {
   const display = getDisplayMarketPrices(item);
   if (display.mode === "outcome" && display.leader) {
@@ -791,6 +799,14 @@ export function AnalyzerReport({
   const verifiableSignalCards = buildVerifiableSignalCards({
     item,
     samanthaSignals,
+    walletSummary,
+  });
+  const independentEvidence = buildIndependentEvidenceSummary({
+    agentName: analysisAgentName,
+    item,
+    samanthaReport,
+    samanthaStatus: samanthaReportUiStatus,
+    suggestedDecisionAvailable: polySignalEstimate.available,
     walletSummary,
   });
   const walletPublicActivityCount =
@@ -1459,6 +1475,90 @@ export function AnalyzerReport({
                 <small>Una lectura parcial no cuenta como prediccion si no hay decision propia disponible.</small>
               </article>
             </div>
+          </section>
+
+          <section className="analyzer-independent-evidence" aria-label="Evidencia independiente">
+            <div className="probability-display-heading">
+              <div>
+                <p className="eyebrow">Evidencia independiente</p>
+                <h4>Fuentes que separan una estimacion propia del precio de mercado</h4>
+              </div>
+              <span>
+                {independentEvidence.enoughForEstimate
+                  ? "Lista para estimacion"
+                  : "Fuentes independientes pendientes"}
+              </span>
+            </div>
+            <p className="section-note">
+              Datos que PolySignal necesita para separar una estimacion propia del precio de
+              mercado. Si una fuente no esta conectada o no respondio, se muestra como
+              Fuente no conectada, No disponible o Timeout en vez de inventar datos.
+            </p>
+            <div className="wallet-report-summary">
+              <div>
+                <span>Independientes disponibles</span>
+                <strong>{independentEvidence.availableIndependentCount}</strong>
+              </div>
+              <div>
+                <span>Auxiliares disponibles</span>
+                <strong>{independentEvidence.availableAuxiliaryCount}</strong>
+              </div>
+              <div>
+                <span>Estimate propio</span>
+                <strong>{independentEvidence.enoughForEstimate ? "Listo" : "No disponible"}</strong>
+              </div>
+            </div>
+            <div className="samantha-report-grid evidence-used-grid">
+              {independentEvidence.items.map((entry) => (
+                <article className="samantha-report-section" key={entry.id}>
+                  <div className="samantha-report-section-heading">
+                    <span>{entry.label}</span>
+                    <em className={`independent-evidence-status ${independentEvidenceStatusClass(entry.status)}`}>
+                      {getIndependentEvidenceStatusLabel(entry.status)}
+                    </em>
+                  </div>
+                  <strong>{entry.summary}</strong>
+                  <p>
+                    {entry.isIndependent
+                      ? "Cuenta como evidencia independiente solo cuando esta disponible y validada."
+                      : "Cuenta como referencia o apoyo auxiliar; no basta sola para estimar."}
+                  </p>
+                  <small>
+                    Fuente: {entry.sourceName || "sin fuente conectada"}
+                    {entry.checkedAt ? ` · revisado ${formatDate(entry.checkedAt)}` : ""}
+                  </small>
+                  {entry.limitations.length > 0 ? (
+                    <div className="wallet-warning-list">
+                      {entry.limitations.slice(0, 2).map((limitation) => (
+                        <span className="warning-chip" key={`${entry.id}-${limitation}`}>
+                          {limitation}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+            <article className="samantha-report-section">
+              <span>Que falta para estimar</span>
+              <strong>
+                {independentEvidence.enoughForEstimate
+                  ? "Hay suficiente evidencia para una estimacion propia"
+                  : "Sin estimacion propia suficiente"}
+              </strong>
+              <p>{independentEvidence.reason}</p>
+              {independentEvidence.missingRequiredCategories.length > 0 ? (
+                <ul className="samantha-report-list">
+                  {independentEvidence.missingRequiredCategories.map((missing) => (
+                    <li key={missing}>{missing}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="section-note">
+                  Las compuertas actuales ya tienen el minimo de evidencia independiente disponible.
+                </p>
+              )}
+            </article>
           </section>
 
           <div className="wallet-report-summary">

@@ -672,6 +672,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Lectura parcial automatica"), "AnalyzerReport should label partial automatic readings");
   assert(reportSource.includes("Evidencia usada"), "AnalyzerReport should show verifiable evidence used");
   assert(reportSource.includes("Datos reales revisados para esta lectura"), "AnalyzerReport should explain evidence cards");
+  assert(reportSource.includes("Evidencia independiente"), "AnalyzerReport should explain independent evidence");
+  assert(reportSource.includes("Que falta para estimar"), "AnalyzerReport should explain what is missing for an estimate");
+  assert(reportSource.includes("Fuente no conectada"), "AnalyzerReport should label disconnected evidence providers honestly");
   assert(reportSource.includes("Dato real"), "AnalyzerReport key signals should badge real data");
   assert(reportSource.includes("getDisplayMarketPrices"), "AnalyzerReport should use flexible outcome price summaries");
   assert(reportSource.includes("Senales principales"), "AnalyzerReport should expose agent key signals");

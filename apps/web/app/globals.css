@@ -10991,6 +10991,12 @@ html:not([data-theme="dark"]) .app-sidebar {
   min-width: 0;
 }
 
+.analyzer-independent-evidence {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
 .samantha-report-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -11030,6 +11036,22 @@ html:not([data-theme="dark"]) .app-sidebar {
   font-weight: 900;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+
+.independent-evidence-status.available {
+  color: var(--accent-ink);
+}
+
+.independent-evidence-status.partial {
+  color: var(--blue);
+}
+
+.independent-evidence-status.not-connected,
+.independent-evidence-status.unavailable,
+.independent-evidence-status.timeout,
+.independent-evidence-status.insufficient,
+.independent-evidence-status.blocked {
+  color: var(--amber);
 }
 
 .samantha-report-section strong {

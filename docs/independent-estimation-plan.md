@@ -1,216 +1,74 @@
 # Independent Estimation Plan
 
-## Current Purpose
+Fecha de corte: `2026-05-15`.
 
-PolySignal must keep market probability and PolySignal probability separate.
-The visible Polymarket price can be useful context, but it is not a
-PolySignal estimate and must not create `predictedSide`.
+## Objetivo
 
-This plan documents what exists today, what is independent, and what is still
-missing before PolySignal can produce durable sport estimates.
+PolySignal necesita distinguir entre:
 
-## Signal Audit
+- referencia de mercado;
+- senales auxiliares;
+- evidencia realmente independiente.
 
-### Market Signals
+La referencia de precio de Polymarket nunca debe presentarse como estimate
+propio. Wallet Intelligence, perfiles destacados o actividad publica pueden
+ayudar a priorizar revision, pero no alcanzan solos para una estimacion propia
+responsable.
 
-Available today:
+## Que cuenta como evidencia independiente
 
-- YES/NO price from latest market snapshot.
-- Volume and liquidity when Polymarket exposes them.
-- Recent snapshot timestamp.
-- Active/closed state.
-- Price movement when price history has multiple snapshots.
+- odds externas comparables y verificadas;
+- comparacion Kalshi equivalente y verificable;
+- evidencia externa validada por Samantha con fuentes reales;
+- calibracion historica estructurada real cuando exista.
 
-Use:
+## Que no cuenta por si solo
 
-- Good for context, freshness, and confidence support.
-- Not independent of the market.
-- Must not be copied into `polysignal_probability_yes`.
+- precio o probabilidad implicita de Polymarket;
+- solo Wallet Intelligence;
+- solo perfiles destacados;
+- solo una wallet con actividad grande;
+- contexto parcial del evento sin fuentes externas;
+- resumen Samantha que solo reempaqueta market/wallet data.
 
-### PolySignal Signals
+## Capa visible en `/analyze`
 
-Available today:
+`AnalyzerReport` ahora expone `Evidencia independiente` para mostrar:
 
-- `latest_prediction` records when the pipeline has scored a market.
-- `confidence_score`, `edge_signed`, `edge_magnitude`, `prediction_family`,
-  `run_at`.
-- `used_odds_count`, `used_news_count`, and
-  `used_evidence_in_scoring` in overview summaries.
-- Market detail can expose research runs, findings, reports, evidence items,
-  external signals, freshness, and data quality.
+- que fuentes se revisaron;
+- cuales dieron datos reales;
+- cuales siguen como auxiliares;
+- cuales no estan conectadas;
+- que falta para habilitar una estimacion propia.
 
-Use:
+Estados publicos esperados:
 
-- A prediction can be shown as PolySignal only when it passes the
-  estimate-quality gate.
-- A score that only mirrors Polymarket baseline is treated as
-  `market_price_only`.
-- A saved value without evidence is treated as `saved_without_evidence`.
+- `Disponible`
+- `Parcial`
+- `Fuente no conectada`
+- `No disponible`
+- `Timeout`
+- `Insuficiente`
+- `Bloqueada`
 
-### Independent Signals
+## Gates
 
-Partially available today:
+Para que PolySignal muestre `suggestedDecision.available=true`, se necesita:
 
-- Evidence counts in overview.
-- Research/finding/report objects in market detail.
-- External signal objects when already loaded.
-- Odds/news counts that were used by scoring.
-- Wallet Intelligence as an auxiliary signal when real public Polymarket data is
-  available and sanitized.
-- Samantha automatic analysis as context only when a validated structured
-  response exists; unavailable sources must remain partial and must not create a
-  PolySignal estimate.
+1. referencia real del mercado;
+2. reporte Samantha validado;
+3. al menos una fuente independiente real adicional.
 
-Missing or incomplete for a full real estimator:
+Wallet Intelligence y perfiles siguen visibles, pero quedan como soporte
+auxiliar y no destraban Gate C por si solos.
 
-- Team form and matchup stats.
-- Injuries and suspensions.
-- Official lineups and availability.
-- Schedule congestion and travel context.
-- Ratings/ELO/xG or comparable sport models.
-- Cross-book odds references with legal/compliance review.
-- Resolved-market calibration by sport and confidence band.
+## Proximos providers posibles
 
-### Non-Independent Signals
+- odds comparables;
+- noticias y contexto externo;
+- injuries / disponibilidad deportiva;
+- estadisticas deportivas estructuradas;
+- calibracion historica persistente.
 
-These must never create a PolySignal estimate on their own:
-
-- Polymarket YES/NO price.
-- A score equal to the Polymarket price.
-- A baseline derived only from Polymarket.
-- Fallback 50/50.
-- A saved local value without evidence metadata.
-
-## Estimate Readiness
-
-The frontend now has explicit readiness helpers:
-
-- `collectMarketSignals`
-- `collectIndependentSignals`
-- `getEstimateReadiness`
-- `getEstimateReadinessScore`
-- `shouldAllowPolySignalEstimate`
-- `explainMissingEstimateData`
-- `extractSoccerMatchContext`
-- `getResearchCoverage`
-- `getMissingResearchCategories`
-- `getWalletIntelligenceSummary`
-- `getWalletIntelligenceReadiness`
-- `getWalletSignalSummary`
-- `shouldUseWalletAsAuxiliarySignal`
-
-Rules:
-
-- Market price can be collected as a signal with `isIndependent=false`.
-- Volume and liquidity can support confidence but do not create a prediction.
-- Soccer match context can be an independent neutral signal when teams or dates
-  are identified from existing event data.
-- Match context alone is still not enough to create a PolySignal probability.
-- Wallet intelligence can become an independent auxiliary signal only when real
-  structured wallet positions/trades are available.
-- Wallet data alone is still not enough to create a PolySignal probability or
-  a `predictedSide`.
-- A clear `predictedSide` can exist only after a real PolySignal estimate
-  exists and crosses the 55% threshold.
-
-`Preparacion de datos` is a non-predictive 0-100 score. It indicates how much
-input data exists for future analysis; it is not a probability of YES or NO.
-
-`ResearchFinding` and `researchReadiness.ts` now model future external evidence.
-If no real source exists, findings stay empty and the UI shows missing
-categories instead of demo data.
-
-`walletIntelligence.ts` and `walletIntelligenceAdapter.ts` now define the
-wallet signal boundary. The adapter is read-only, uses the existing backend
-wallet-intelligence endpoint through the same-origin proxy, applies a `100 USD`
-threshold, abbreviates wallet addresses, and returns unavailable if the endpoint
-has no reliable data. It does not expose raw wallet payloads and does not
-generate a PolySignal estimate. The public readout may summarize capital
-leaning YES/NO/NEUTRAL and confidence, but the estimator remains unavailable
-unless a separate calibrated PolySignal estimate exists.
-
-## Conservative Engine V0
-
-`polySignalEstimateEngine` intentionally does not invent a new number.
-
-Behavior:
-
-- If no independent signals exist: `available=false`.
-- If only market price exists: `available=false`.
-- If a real PolySignal estimate already exists and passes quality checks:
-  `available=true` and the stored estimate is returned.
-- If partial signals exist but are insufficient: `available=false`.
-- If only soccer context exists, the engine may show partial readiness but still
-  returns `available=false`.
-- If wallet intelligence exists later, it is treated as an auxiliary signal.
-  Without a calibrated estimator and other evidence, the engine still returns
-  `available=false`.
-
-This keeps the UI honest while preparing the future estimator API.
-
-## Soccer Context Layer
-
-The first sports-specific layer lives in `soccerMatchContext.ts`.
-
-It extracts only from already-loaded fields:
-
-- event title;
-- market question;
-- event/market slug as fallback context;
-- sport type;
-- close/end time.
-
-It can identify `Team A vs Team B` from clear titles, but keeps home/away as
-`unknown` unless a future structured source provides it. It does not infer league
-from slug abbreviations.
-
-## Future Sources
-
-### Sports Data
-
-- Recent form.
-- Goals/points for and against.
-- Home/away context.
-- Injuries and suspensions.
-- Rest days, travel, and calendar congestion.
-- ELO, xG, or sport-specific ratings.
-
-### News And Public Sources
-
-- Official team and league sources.
-- Reputable sports reports.
-- Recent injury/team news.
-- Reddit/social discussion only as weak context, never a primary source.
-
-### Odds References
-
-- Regulated sportsbook odds as comparison inputs where legally appropriate.
-- Cross-market differences vs Polymarket.
-- Compliance review before production use.
-
-### Calibration
-
-- Accuracy by sport.
-- Accuracy by confidence band.
-- Market-vs-PolySignal edge performance.
-- Model drift and stale-data checks.
-
-### Wallet Intelligence
-
-- Public market positions/trades by wallet.
-- Minimum relevant position/trade threshold of `100 USD`.
-- Side bias by capital leaning YES/NO.
-- Historical win rate and ROI only after closed-position outcomes can be
-  reconstructed from reliable data.
-- Shortened addresses only; no identity inference.
-
-## Guardrails
-
-- Do not estimate when data is insufficient.
-- Do not promise profit.
-- Do not copy traders or imply wallet activity is a guaranteed edge.
-- Do not identify people behind wallets.
-- Show sources and missing data.
-- Store analysis time, market price, signals used, and estimator version later.
-- Keep external fetches rate-limited and allow-listed.
-- Do not write production data without explicit supervised approval.
+Hasta que esos providers existan y devuelvan datos reales, la UI debe mostrar
+faltantes honestos en vez de completar huecos con texto inventado.
