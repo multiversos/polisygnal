@@ -321,6 +321,22 @@ def test_demo_tick_with_wallet_without_trades_returns_clean_summary(db_session: 
     assert response.errors == []
 
 
+def test_demo_tick_counts_historical_skips(db_session: Session) -> None:
+    _create_wallet(db_session)
+    old_trade = _trade("0xhistorical") | {"timestamp": (_now() - timedelta(seconds=90)).isoformat()}
+
+    response = run_demo_tick(db_session, data_client=FakeTradeReader([old_trade]), now=_now())
+    orders = list_copy_orders(db_session)
+
+    assert response.new_trades == 1
+    assert response.orders_simulated == 0
+    assert response.orders_skipped == 1
+    assert response.historical_trades == 1
+    assert response.skipped_reasons == {"trade_too_old": 1}
+    assert orders[0].status == "skipped"
+    assert orders[0].reason == "trade_too_old"
+
+
 def test_demo_tick_scans_multiple_wallets_without_trades(db_session: Session) -> None:
     first = _create_wallet(db_session, suffix="11")
     second = _create_wallet(db_session, suffix="22")

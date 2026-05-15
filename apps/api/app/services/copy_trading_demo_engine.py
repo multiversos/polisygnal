@@ -161,6 +161,7 @@ def _scan_wallet(
                 reason=intent.reason,
             )
             response.orders_skipped += 1
+            _record_skipped_reason(response, intent.reason)
             continue
 
         trade = create_detected_trade(
@@ -223,6 +224,7 @@ def _scan_wallet(
             )
         else:
             response.orders_skipped += 1
+            _record_skipped_reason(response, order.reason)
             add_copy_event(
                 db,
                 wallet_id=wallet.id,
@@ -232,6 +234,13 @@ def _scan_wallet(
                 metadata={"reason": order.reason or "unknown"},
             )
     touch_wallet_scan(db, wallet, now=current_time)
+
+
+def _record_skipped_reason(response: CopyTradingTickResponse, reason: str | None) -> None:
+    safe_reason = reason or "unknown"
+    response.skipped_reasons[safe_reason] = response.skipped_reasons.get(safe_reason, 0) + 1
+    if safe_reason == "trade_too_old":
+        response.historical_trades += 1
 
 
 def _record_scan_error(

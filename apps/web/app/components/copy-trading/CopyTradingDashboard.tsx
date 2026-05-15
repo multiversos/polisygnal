@@ -77,6 +77,7 @@ export function CopyTradingDashboard() {
         <section className="copy-tick-summary" aria-label="Resultado del ultimo demo tick">
           <span>Wallets escaneadas {tickSummary.wallets_scanned}</span>
           <span>Trades nuevos {tickSummary.new_trades}</span>
+          <span>Historicos {tickSummary.historical_trades}</span>
           <span>Simuladas {tickSummary.orders_simulated}</span>
           <span>Saltadas {tickSummary.orders_skipped}</span>
         </section>
@@ -126,6 +127,9 @@ function getDemoTickMessage(summary: CopyTradingTickSummary): string {
   }
   if (summary.new_trades === 0) {
     return "Escaneo completado. No se detectaron trades nuevos.";
+  }
+  if (summary.historical_trades > 0 && summary.orders_simulated === 0) {
+    return `Escaneo completado. Se detectaron ${summary.historical_trades} trades historicos. No se simularon porque ocurrieron fuera de la ventana de copia en vivo.`;
   }
   return `Escaneo completado. Trades nuevos ${summary.new_trades}, simuladas ${summary.orders_simulated}, saltadas ${summary.orders_skipped}.`;
 }

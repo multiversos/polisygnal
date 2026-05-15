@@ -2551,6 +2551,14 @@ function validateAnalyzerFirstProductSource() {
     resolve(appRoot, "app/components/copy-trading/ExecutionWalletCard.tsx"),
     "utf8",
   );
+  const copyOrdersTable = readFileSync(
+    resolve(appRoot, "app/components/copy-trading/CopyOrdersTable.tsx"),
+    "utf8",
+  );
+  const copyBotEvents = readFileSync(
+    resolve(appRoot, "app/components/copy-trading/CopyBotEvents.tsx"),
+    "utf8",
+  );
 
   for (const item of ["Analizar enlace", "Historial", "Rendimiento", "Alertas", "Metodologia", "Copiar Wallets"]) {
     assert(shell.includes(item), `expected analyzer-first nav item: ${item}`);
@@ -2592,8 +2600,14 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["$1", "$5", "$10", "$20", "Personalizado", "Monto personalizado USD"]) {
     assert(copyAmountSelector.includes(text), `copy amount selector missing preset/custom text: ${text}`);
   }
+  assert(copyOrdersTable.includes("formatCopyOrderReason"), "copy orders should translate technical reasons");
+  assert(copyOrdersTable.includes("Trade historico: fuera de la ventana de copia."), "historical copy orders need humane copy");
+  assert(copyOrdersTable.includes("Historico"), "historical copy orders need a visible status label");
+  assert(copyBotEvents.includes("groupCopyBotEvents"), "copy bot events should group repeated audit messages");
+  assert(copyBotEvents.includes("Trades historicos detectados fuera de la ventana de copia."), "historical audit events need humane copy");
+  assert(copyTradingDashboard.includes("historical_trades"), "demo tick summary should expose historical trade counts");
   assertTextExcludes(
-    `${copyTradingSource}\n${copyAmountSelector}`,
+    `${copyTradingSource}\n${copyAmountSelector}\n${copyOrdersTable}\n${copyBotEvents}`,
     [
       "Conectar Phantom",
       "Conectar MetaMask",

@@ -176,6 +176,8 @@ class CopyTradingTickResponse(BaseModel):
     orders_simulated: int = 0
     orders_skipped: int = 0
     orders_blocked: int = 0
+    historical_trades: int = 0
+    skipped_reasons: dict[str, int] = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)
 
 

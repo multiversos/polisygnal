@@ -99,6 +99,8 @@ export type CopyTradingTickSummary = {
   orders_simulated: number;
   orders_skipped: number;
   orders_blocked: number;
+  historical_trades: number;
+  skipped_reasons: Record<string, number>;
   errors: string[];
 };
 

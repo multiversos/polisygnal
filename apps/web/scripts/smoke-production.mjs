@@ -1145,6 +1145,7 @@ async function main() {
       "POLY_API_KEY",
       "authorization header",
       "stack trace",
+      "trade_too_old",
       "trading real activo",
       "orden real enviada",
     ],

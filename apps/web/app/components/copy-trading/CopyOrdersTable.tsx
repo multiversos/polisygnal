@@ -17,11 +17,11 @@ export function CopyOrdersTable({ orders }: { orders: CopyOrder[] }) {
               <div>
                 <span className={`copy-side ${order.action}`}>{order.action.toUpperCase()}</span>
                 <strong>{formatUsd(order.intended_amount_usd)}</strong>
-                <small>{order.reason || "Monto fijo aplicado"}</small>
+                <small>{formatCopyOrderReason(order.reason, order.status)}</small>
               </div>
               <div className="copy-feed-numbers">
                 <span>{order.simulated_price ? Number(order.simulated_price).toFixed(3) : "-"}</span>
-                <span className={`copy-badge ${order.status}`}>{order.status}</span>
+                <span className={`copy-badge ${copyOrderStatusClass(order)}`}>{formatCopyOrderStatus(order)}</span>
                 <small>{formatDateTime(order.created_at)}</small>
               </div>
             </article>
@@ -30,4 +30,44 @@ export function CopyOrdersTable({ orders }: { orders: CopyOrder[] }) {
       )}
     </section>
   );
+}
+
+function formatCopyOrderStatus(order: CopyOrder): string {
+  if (order.status === "skipped" && order.reason === "trade_too_old") {
+    return "Historico";
+  }
+  if (order.status === "skipped") {
+    return "Saltada";
+  }
+  if (order.status === "simulated") {
+    return "Simulada";
+  }
+  if (order.status === "blocked") {
+    return "Bloqueada";
+  }
+  return "Pendiente";
+}
+
+function copyOrderStatusClass(order: CopyOrder): string {
+  if (order.status === "skipped" && order.reason === "trade_too_old") {
+    return "historical";
+  }
+  return order.status;
+}
+
+function formatCopyOrderReason(reason: string | null, status: CopyOrder["status"]): string {
+  if (!reason) {
+    return status === "simulated" ? "Monto fijo aplicado" : "Sin detalle adicional.";
+  }
+  const reasonLabels: Record<string, string> = {
+    capped_by_max_trade_usd: "Monto limitado por maximo por trade.",
+    copy_buys_disabled: "Copia de compras desactivada.",
+    copy_sells_disabled: "Copia de ventas desactivada.",
+    invalid_copy_amount: "Monto de copia invalido.",
+    missing_price: "Sin precio suficiente para simular.",
+    missing_side: "Sin direccion de trade suficiente.",
+    real_trading_not_configured: "Modo real bloqueado.",
+    trade_too_old: "Trade historico: fuera de la ventana de copia.",
+  };
+  return reasonLabels[reason] || "No se simulo por una regla de seguridad.";
 }
