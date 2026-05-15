@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from decimal import Decimal
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -30,7 +29,6 @@ from app.schemas.codex_agent_research import (
     CodexAgentExistingEvidencePayload,
     CodexAgentResearchRequest,
     CodexAgentResearchResponse,
-    CodexAgentRiskResponse,
     CodexAgentSnapshotPayload,
 )
 from app.services.research.classification import classify_market_research_context
@@ -39,7 +37,7 @@ from app.services.research.codex_agent_validation import (
     validate_codex_agent_response_text,
 )
 from app.services.research.prompts import select_research_template
-from app.services.research.scoring import ResearchScoringResult, score_codex_agent_research
+from app.services.research.scoring import score_codex_agent_research
 
 CODEX_AGENT_RESEARCH_MODE = "codex_agent"
 CODEX_AGENT_MODEL_VERSION = "research_codex_agent_v1"

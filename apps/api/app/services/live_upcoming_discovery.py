@@ -23,7 +23,6 @@ from app.schemas.live_upcoming_discovery import (
 )
 from app.services.research.classification import (
     classify_market_research_context,
-    normalize_market_shape,
     normalize_sport,
 )
 from app.services.research.upcoming_market_selector import PAUSED_FOCUS_TITLE_TERMS

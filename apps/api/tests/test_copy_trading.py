@@ -68,7 +68,7 @@ def test_sell_trade_normalizes() -> None:
 
 
 def test_dedupe_by_dedupe_key(db_session: Session) -> None:
-    wallet = _create_wallet(db_session)
+    _create_wallet(db_session)
     reader = FakeTradeReader([_trade("0xdupe")])
 
     first = run_demo_tick(db_session, data_client=reader, now=_now())

@@ -34,7 +34,7 @@ def test_data_health_overview_counts_coverage(
         sport="soccer",
         end_date=now + timedelta(days=3),
     )
-    other_market = _create_market(
+    _create_market(
         db_session,
         suffix="other-no-close",
         sport=None,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from app.services.research.templates.sports_nba_match_winner import (
     NBA_MATCH_WINNER_RESEARCH_INSTRUCTIONS,
-    NBA_TRUSTED_DOMAINS,
     SPORTS_NBA_MATCH_WINNER_TEMPLATE,
 )
 

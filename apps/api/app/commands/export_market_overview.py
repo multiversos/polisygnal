@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Literal
 
 from app.db.session import SessionLocal
-from app.schemas.overview import PriorityBucket, OverviewSortBy
+from app.schemas.overview import OverviewSortBy
 from app.services.market_overview import build_markets_overview
 
 ExportPreset = Literal["all", "top_opportunities", "watchlist", "evidence_backed", "fallback_only"]

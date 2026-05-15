@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.core.config import REPO_ROOT
 from app.models.external_market_signal import ExternalMarketSignal
-from app.models.prediction import Prediction
 from app.models.prediction_report import PredictionReport
 from app.models.research_finding import ResearchFinding
 from app.models.research_run import ResearchRun
