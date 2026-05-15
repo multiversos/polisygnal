@@ -165,6 +165,13 @@ function eventTeams(event: OddsBlazeEvent): string[] {
   ].filter(Boolean);
 }
 
+function teamMatchCount(event: OddsBlazeEvent, participants: string[]): number {
+  const candidates = eventTeams(event);
+  return participants.filter((participant) =>
+    candidates.some((candidate) => teamNamesLookEquivalent(participant, candidate)),
+  ).length;
+}
+
 function sameCalendarDate(left?: string | null, right?: string | null): boolean {
   if (!left || !right) {
     return false;
@@ -194,10 +201,7 @@ function matchConfidenceForEvent(
   if (participants.length < 2) {
     return "unknown";
   }
-  const candidates = eventTeams(event);
-  const matches = participants.filter((participant) =>
-    candidates.some((candidate) => teamNamesLookEquivalent(participant, candidate)),
-  ).length;
+  const matches = teamMatchCount(event, participants);
   if (matches >= 2 && sameOrAdjacentDate(event.date, context.eventDate)) {
     return "high";
   }
@@ -233,6 +237,89 @@ function pickBestEvent(
   return {
     confidence: scored[0]?.confidence ?? "unknown",
     event: scored[0]?.event ?? null,
+  };
+}
+
+function buildNoMatchDiagnostics(
+  events: OddsBlazeEvent[],
+  input: ExternalOddsCompareInput,
+): { limitations: string[]; warnings: string[] } {
+  const context = buildSportsContextParticipants(input);
+  const participants = context.participants.slice(0, 2);
+  if (participants.length < 2) {
+    return {
+      limitations: ["No hubo participantes suficientes para comparar el mercado contra OddsBlaze."],
+      warnings: ["odds_compare_missing_participants"],
+    };
+  }
+  let hasSingleTeamCandidate = false;
+  let hasDualTeamWrongDate = false;
+  for (const event of events) {
+    const matches = teamMatchCount(event, participants);
+    if (matches >= 2) {
+      if (sameOrAdjacentDate(event.date, context.eventDate)) {
+        continue;
+      }
+      hasDualTeamWrongDate = true;
+    } else if (matches === 1) {
+      hasSingleTeamCandidate = true;
+    }
+  }
+
+  if (hasDualTeamWrongDate) {
+    return {
+      limitations: [
+        "OddsBlaze devolvio un evento con ambos equipos, pero la fecha no fue suficientemente cercana para un match seguro.",
+      ],
+      warnings: ["odds_match_date_mismatch"],
+    };
+  }
+  if (hasSingleTeamCandidate) {
+    return {
+      limitations: [
+        "OddsBlaze devolvio candidatos con un equipo coincidente, pero no encontro un evento con ambos equipos.",
+      ],
+      warnings: ["odds_match_one_team_only"],
+    };
+  }
+  return {
+    limitations: [
+      "OddsBlaze no devolvio un evento con ambos equipos bajo los filtros actuales de sportsbook, liga y mercado.",
+      "Los filtros main=true, live=false o moneyline pueden excluir este partido en el feed temporal del trial.",
+    ],
+    warnings: ["odds_match_no_candidate"],
+  };
+}
+
+function buildPartialMatchDiagnostics(
+  event: OddsBlazeEvent,
+  input: ExternalOddsCompareInput,
+  outcomes: ExternalOddsOutcome[],
+): { limitations: string[]; warnings: string[] } {
+  const context = buildSportsContextParticipants(input);
+  const matches = teamMatchCount(event, context.participants.slice(0, 2));
+  if (matches === 1) {
+    return {
+      limitations: [
+        "OddsBlaze encontro un candidato con un equipo coincidente, pero no devolvio un evento con ambos equipos para un match seguro.",
+      ],
+      warnings: ["odds_match_one_team_only"],
+    };
+  }
+  if (matches >= 2 && outcomes.length < 2) {
+    return {
+      limitations: [
+        "OddsBlaze encontro el evento, pero no devolvio dos lados de moneyline utilizables para comparar este mercado.",
+      ],
+      warnings: ["odds_market_incomplete"],
+    };
+  }
+  return {
+    limitations: ["La comparacion externa quedo parcial o sin match suficientemente claro."],
+    warnings:
+      matches >= 2
+        ? ["odds_market_incomplete"]
+        : ["odds_match_low_confidence"],
   };
 }
 
@@ -372,20 +459,24 @@ export async function fetchOddsBlazeComparison(
 
     const best = pickBestEvent(parsed.events, input);
     if (!best.event || best.confidence === "unknown") {
+      const diagnostics = buildNoMatchDiagnostics(parsed.events, input);
       return {
         bestSourceUrl: null,
         checkedAt: parsed.updated || checkedAt,
         eventName: null,
         eventStartTime: null,
         league: parsed.league?.name || config.league || null,
-        limitations: ["OddsBlaze respondio, pero no hubo match claro contra este mercado de Polymarket."],
+        limitations: [
+          "OddsBlaze respondio, pero no hubo match claro contra este mercado de Polymarket.",
+          ...diagnostics.limitations,
+        ],
         matchConfidence: "unknown",
         matchedMarket: false,
         outcomes: [],
         providerName: config.name,
         sportsbook: parsed.sportsbook?.name || config.sportsbook,
         status: "no_match",
-        warnings: [],
+        warnings: diagnostics.warnings,
       };
     }
 
@@ -395,6 +486,8 @@ export async function fetchOddsBlazeComparison(
     const homeName = cleanText(best.event.teams?.home?.name);
     const eventName = [awayName, homeName].filter(Boolean).join(" vs. ") || null;
     const matchedMarket = (best.confidence === "high" || best.confidence === "medium") && outcomes.length >= 2;
+    const partialDiagnostics =
+      matchedMarket ? null : buildPartialMatchDiagnostics(best.event, input, outcomes);
     return {
       bestSourceUrl: bestSourceUrlForEvent(best.event),
       checkedAt: parsed.updated || checkedAt,
@@ -404,7 +497,7 @@ export async function fetchOddsBlazeComparison(
       limitations: [
         matchedMarket
           ? "Usar solo como comparacion externa de mercado, no como recomendacion automatica."
-          : "La comparacion externa quedo parcial o sin match suficientemente claro.",
+          : (partialDiagnostics?.limitations[0] ?? "La comparacion externa quedo parcial o sin match suficientemente claro."),
       ],
       matchConfidence: best.confidence,
       matchedMarket,
@@ -417,12 +510,7 @@ export async function fetchOddsBlazeComparison(
           : best.confidence === "low" || outcomes.length > 0
             ? "partial"
             : "no_match",
-      warnings:
-        best.confidence === "low"
-          ? ["odds_match_low_confidence"]
-          : outcomes.length < 2
-            ? ["odds_market_incomplete"]
-            : [],
+      warnings: matchedMarket ? [] : (partialDiagnostics?.warnings ?? []),
     };
   } catch (error) {
     const timedOut = typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";

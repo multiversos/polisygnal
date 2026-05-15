@@ -92,6 +92,50 @@ try {
     );
   result = await compareExternalOdds(fixtureInput);
   assert(result.status === "no_match", `expected no_match, got ${result.status}`);
+  assert(
+    result.warnings.includes("odds_match_no_candidate"),
+    "no_match without team candidates should explain that the provider returned no comparable event",
+  );
+  assert(
+    result.limitations.some((entry) => entry.includes("no devolvio un evento con ambos equipos")),
+    "no_match should explain why the provider could not match both teams",
+  );
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        events: [
+          {
+            date: "2026-05-15T19:00:00.000Z",
+            live: false,
+            odds: [],
+            teams: {
+              away: { abbreviation: "DET", name: "Detroit Pistons" },
+              home: { abbreviation: "BOS", name: "Boston Celtics" },
+            },
+          },
+        ],
+        league: { id: "nba", name: "NBA" },
+        sportsbook: { id: "draftkings", name: "DraftKings" },
+        updated: "2026-05-15T14:00:00.000Z",
+      }),
+      { headers: { "content-type": "application/json" }, status: 200 },
+    );
+  result = await compareExternalOdds({
+    ...fixtureInput,
+    eventSlug: "nba-det-cle-2026-05-15",
+    marketSlug: "nba-det-cle-2026-05-15",
+    marketTitle: "Pistons vs. Cavaliers",
+    outcomePrices: [
+      { label: "Pistons", price: 0.385, side: "UNKNOWN" },
+      { label: "Cavaliers", price: 0.615, side: "UNKNOWN" },
+    ],
+  });
+  assert(result.status === "partial", `expected partial for one-team candidate, got ${result.status}`);
+  assert(
+    result.warnings.includes("odds_match_one_team_only"),
+    "partial result should explain when only one team candidate was found",
+  );
 
   globalThis.fetch = async () =>
     new Response(
