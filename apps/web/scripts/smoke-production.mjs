@@ -1115,14 +1115,36 @@ async function main() {
   const copyTradingDom = await dumpDom(urlFor(COPY_TRADING_PATH));
   const copyTradingRender = validatePublicProductPage(copyTradingDom, "copy trading", ["Copiar Wallets"]);
   const copyTradingText = visibleText(copyTradingDom);
-  for (const expected of ["$1", "$5", "$10", "$20", "Personalizado", "Input wallet/perfil"]) {
+  for (const expected of [
+    "$1",
+    "$5",
+    "$10",
+    "$20",
+    "Personalizado",
+    "Mi wallet de ejecución",
+    "Conectar wallet",
+    "Wallet que quieres copiar",
+    "Perfil o wallet pública",
+  ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
   }
   assertTextIncludesOneOf(copyTradingText, ["Demo activo", "Real no conectado"], "copy trading mode badges");
   assertTextIncludes(copyTradingText, "Bloqueado hasta configurar credenciales", "copy trading real lock");
   assertTextExcludes(
     copyTradingText,
-    ["private key", "seed phrase", "POLY_SECRET", "POLY_API_KEY", "authorization header", "stack trace"],
+    [
+      "Backend no disponible",
+      "Conectar Phantom",
+      "Conectar MetaMask",
+      "private key",
+      "seed phrase",
+      "POLY_SECRET",
+      "POLY_API_KEY",
+      "authorization header",
+      "stack trace",
+      "trading real activo",
+      "orden real enviada",
+    ],
     "copy trading security leakage",
   );
   const performanceDom = await dumpDom(urlFor(PERFORMANCE_PATH));

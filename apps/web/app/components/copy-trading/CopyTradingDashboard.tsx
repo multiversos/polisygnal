@@ -10,6 +10,7 @@ import { CopyTradesTable } from "./CopyTradesTable";
 import { CopyTradingHeader } from "./CopyTradingHeader";
 import { CopyTradingMetrics } from "./CopyTradingMetrics";
 import { CopyWalletsTable } from "./CopyWalletsTable";
+import { ExecutionWalletCard } from "./ExecutionWalletCard";
 
 export function CopyTradingDashboard() {
   const [data, setData] = useState<CopyTradingDashboardData | null>(null);
@@ -77,16 +78,20 @@ export function CopyTradingDashboard() {
 
       <div className="copy-dashboard-grid">
         <AddCopyWalletForm onCreated={refresh} />
+        <ExecutionWalletCard />
         <section className="copy-panel copy-real-lock">
           <div className="copy-panel-heading">
             <span>Modo real</span>
             <strong>Real no conectado</strong>
           </div>
-          <p>Preparado para proximo sprint. Bloqueado hasta configurar credenciales.</p>
+          <p>
+            Conecta tu wallet de ejecución para preparar el modo real. Bloqueado hasta configurar credenciales,
+            permisos y firma de órdenes.
+          </p>
           <div className="copy-lock-list">
             <span>Sin clave privada</span>
-            <span>Sin firma de ordenes</span>
-            <span>Sin envio a CLOB</span>
+            <span>Sin firma de órdenes</span>
+            <span>Sin envío a CLOB</span>
           </div>
         </section>
       </div>

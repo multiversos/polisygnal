@@ -2466,6 +2466,14 @@ function validateAnalyzerFirstProductSource() {
     resolve(appRoot, "app/components/copy-trading/CopyAmountSelector.tsx"),
     "utf8",
   );
+  const copyWalletForm = readFileSync(
+    resolve(appRoot, "app/components/copy-trading/AddCopyWalletForm.tsx"),
+    "utf8",
+  );
+  const copyExecutionWallet = readFileSync(
+    resolve(appRoot, "app/components/copy-trading/ExecutionWalletCard.tsx"),
+    "utf8",
+  );
 
   for (const item of ["Analizar enlace", "Historial", "Rendimiento", "Alertas", "Metodologia", "Copiar Wallets"]) {
     assert(shell.includes(item), `expected analyzer-first nav item: ${item}`);
@@ -2494,16 +2502,35 @@ function validateAnalyzerFirstProductSource() {
   assert(legacySports.includes("Vista legacy"), "sports route should be marked legacy");
   assert(!existsSync(legacySamanthaRoute), "legacy samantha-polysignal-analysis route must not be reintroduced");
   assert(copyTradingPage.includes("CopyTradingDashboard"), "copy trading page should render the dashboard");
-  const copyTradingSource = `${copyTradingHeader}\n${copyTradingDashboard}`;
+  const copyTradingSource = `${copyTradingHeader}\n${copyTradingDashboard}\n${copyExecutionWallet}`;
   for (const text of ["Copiar Wallets", "Demo activo", "Real no conectado", "Bloqueado hasta configurar credenciales"]) {
     assert(copyTradingSource.includes(text), `copy trading dashboard missing safe text: ${text}`);
+  }
+  for (const text of ["Mi wallet de ejecución", "Conectar wallet", "Wallet conectada", "Ejecución real pendiente"]) {
+    assert(copyExecutionWallet.includes(text), `execution wallet card missing safe text: ${text}`);
+  }
+  for (const text of ["Wallet que quieres copiar", "Perfil o wallet pública"]) {
+    assert(copyWalletForm.includes(text), `copy wallet form missing target wallet text: ${text}`);
   }
   for (const text of ["$1", "$5", "$10", "$20", "Personalizado", "Monto personalizado USD"]) {
     assert(copyAmountSelector.includes(text), `copy amount selector missing preset/custom text: ${text}`);
   }
   assertTextExcludes(
     `${copyTradingSource}\n${copyAmountSelector}`,
-    ["private key", "seed phrase", "POLY_SECRET", "POLY_API_KEY", "authorization header", "stack trace"],
+    [
+      "Conectar Phantom",
+      "Conectar MetaMask",
+      "Phantom no detectado",
+      "MetaMask no detectado",
+      "private key",
+      "seed phrase",
+      "POLY_SECRET",
+      "POLY_API_KEY",
+      "authorization header",
+      "stack trace",
+      "trading real activo",
+      "orden real enviada",
+    ],
     "copy trading source security copy",
   );
 

@@ -62,15 +62,16 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
   return (
     <form className="copy-panel copy-add-form" onSubmit={handleSubmit}>
       <div className="copy-panel-heading">
-        <span>Agregar perfil</span>
-        <strong>Wallet o perfil publico</strong>
+        <span>Wallet que quieres copiar</span>
+        <strong>Perfil o wallet pública</strong>
       </div>
+      <p className="copy-field-helper">Esta es la wallet objetivo que PolySignal observará en modo demo.</p>
       <label className="copy-field">
-        <span>Input wallet/perfil</span>
+        <span>Perfil o wallet pública</span>
         <input
           disabled={saving}
           onChange={(event) => setWalletInput(event.target.value)}
-          placeholder="0x... o https://polymarket.com/profile/0x..."
+          placeholder="Pega perfil o wallet pública de Polymarket"
           value={walletInput}
         />
       </label>
@@ -94,22 +95,28 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
         }}
       />
       <div className="copy-toggle-row">
-        <label>
+        <label className="copy-toggle-pill">
           <input
+            aria-label="Copiar compras"
             checked={copyBuys}
+            className="copy-toggle-input"
             disabled={saving}
             onChange={(event) => setCopyBuys(event.target.checked)}
             type="checkbox"
           />
+          <span className="copy-toggle-switch" aria-hidden="true" />
           Copiar compras
         </label>
-        <label>
+        <label className="copy-toggle-pill">
           <input
+            aria-label="Copiar ventas"
             checked={copySells}
+            className="copy-toggle-input"
             disabled={saving}
             onChange={(event) => setCopySells(event.target.checked)}
             type="checkbox"
           />
+          <span className="copy-toggle-switch" aria-hidden="true" />
           Copiar ventas
         </label>
       </div>

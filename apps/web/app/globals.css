@@ -83,7 +83,9 @@
 }
 
 .copy-trading-header p,
-.copy-real-lock p {
+.copy-real-lock p,
+.copy-execution-wallet p,
+.copy-field-helper {
   margin: 0;
   color: var(--muted-foreground);
 }
@@ -91,6 +93,7 @@
 .copy-status-strip,
 .copy-tick-summary,
 .copy-lock-list,
+.copy-wallet-status-strip,
 .copy-action-row,
 .copy-toggle-row {
   display: flex;
@@ -141,7 +144,7 @@
 }
 
 .copy-dashboard-grid {
-  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr) minmax(280px, 0.9fr);
 }
 
 .copy-dashboard-grid.three {
@@ -219,6 +222,11 @@
   font-weight: 700;
 }
 
+.copy-field-helper {
+  margin-bottom: 14px;
+  line-height: 1.45;
+}
+
 .copy-field input,
 .copy-custom-amount input {
   width: 100%;
@@ -268,13 +276,61 @@
   opacity: 0.58;
 }
 
-.copy-toggle-row label {
+.copy-toggle-pill {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: var(--muted-foreground);
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  border-radius: 999px;
+  color: var(--foreground);
   font-size: 0.9rem;
   font-weight: 700;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.copy-toggle-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.copy-toggle-switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.copy-toggle-switch::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.95);
+  content: "";
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.copy-toggle-input:checked + .copy-toggle-switch {
+  border-color: rgba(34, 211, 238, 0.52);
+  background: rgba(34, 211, 238, 0.18);
+}
+
+.copy-toggle-input:checked + .copy-toggle-switch::after {
+  transform: translateX(14px);
+  background: #22d3ee;
+}
+
+.copy-toggle-input:focus-visible + .copy-toggle-switch {
+  outline: 2px solid rgba(34, 211, 238, 0.7);
+  outline-offset: 3px;
 }
 
 .copy-form-error,
@@ -321,6 +377,35 @@
   min-height: 32px;
   padding: 6px 8px;
   font-size: 0.78rem;
+}
+
+.copy-execution-wallet {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.copy-execution-details {
+  display: grid;
+  gap: 8px;
+}
+
+.copy-execution-details span,
+.copy-wallet-status-strip span {
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.copy-wallet-status-strip span:first-child {
+  border-color: rgba(34, 211, 238, 0.32);
+  color: #67e8f9;
 }
 
 .copy-action-row button.danger {
