@@ -42,7 +42,7 @@ Tablas nuevas:
 - `copy_orders`
 - `copy_bot_events`
 
-La migracion esta en `apps/api/alembic/versions/0017_copy_trading_wallets.py`. No debe aplicarse contra produccion sin autorizacion explicita.
+La migracion esta en `apps/api/alembic/versions/0018_copy_trading_wallets.py`. No debe aplicarse contra produccion sin autorizacion explicita.
 
 ## Lectura De Wallets
 

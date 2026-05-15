@@ -436,6 +436,14 @@ async function validateWalletIntelligenceRules() {
     resolve(appRoot, "app/api/polymarket-wallet-intelligence/route.ts"),
     "utf8",
   );
+  const profileRefreshRouteSource = readFileSync(
+    resolve(appRoot, "app/api/profiles/refresh-wallet/route.ts"),
+    "utf8",
+  );
+  const profilePersistentRouteSource = readFileSync(
+    resolve(appRoot, "app/api/profiles/highlighted/route.ts"),
+    "utf8",
+  );
 
   const fullWallet = "0x1234567890abcdef1234567890abcdef12345678";
   const secondWallet = "0x2222222222222222222222222222222222222222";
@@ -449,6 +457,15 @@ async function validateWalletIntelligenceRules() {
   assert(!JSON.stringify(empty).includes(fullWallet), "empty wallet summary should not include wallet addresses");
   assert(getWalletBiasLabel(empty) === "Datos de billeteras insuficientes", "expected empty wallet bias label to stay unavailable");
   assert(!shouldUseWalletAsAuxiliarySignal(empty), "expected unavailable wallet summary not to become auxiliary signal");
+  assert(profileRefreshRouteSource.includes("isPolymarketWalletAddress"), "profile refresh route must validate full public wallets");
+  assert(profileRefreshRouteSource.includes("SAFE_DATA_PATHS"), "profile refresh route must allowlist Data API paths");
+  assert(profileRefreshRouteSource.includes("SAFE_GAMMA_PATHS"), "profile refresh route must allowlist Gamma API paths");
+  assert(!profileRefreshRouteSource.includes("new URL(input"), "profile refresh route must not accept arbitrary URLs");
+  assert(!profileRefreshRouteSource.includes("localhost"), "profile refresh route must not call localhost");
+  assert(profilePersistentRouteSource.includes("WALLET_PATTERN"), "persistent profile route must validate wallet writes");
+  assert(profilePersistentRouteSource.includes("/profiles/highlighted/upsert"), "persistent profile route must proxy only to the fixed upsert endpoint");
+  assert(!profilePersistentRouteSource.includes("new URL(input"), "persistent profile route must not accept arbitrary URLs");
+  assert(!profilePersistentRouteSource.includes("service_role"), "persistent profile route must not expose service-role writes");
 
   const belowThreshold = filterRelevantWallets(
     [{ amountUsd: 99, shortAddress: "", side: "YES", walletAddress: fullWallet }],
@@ -611,6 +628,25 @@ async function validateWalletIntelligenceRules() {
     assert(!JSON.stringify(external).includes(fullWallet), "live wallet adapter leaked a full wallet address");
 
     const walletRoute = loadTsModule("app/api/polymarket-wallet-intelligence/route.ts");
+    const profileRefreshRoute = loadTsModule("app/api/profiles/refresh-wallet/route.ts");
+    const profilePersistentRoute = loadTsModule("app/api/profiles/highlighted/route.ts");
+    const invalidProfileRefresh = await profileRefreshRoute.POST(
+      new Request("https://example.test/api/profiles/refresh-wallet", {
+        body: JSON.stringify({ walletAddress: "0x1234...5678" }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      }),
+    );
+    assert(invalidProfileRefresh.status === 400, "profile refresh route must reject short wallet addresses");
+    const invalidPersistentProfile = await profilePersistentRoute.POST(
+      new Request("https://example.test/api/profiles/highlighted", {
+        body: JSON.stringify({ walletAddress: "0x1234...5678" }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      }),
+    );
+    assert(invalidPersistentProfile.status === 400, "persistent profile route must reject short wallet addresses");
+    assert(profilePersistentRoute.DELETE().status === 405, "persistent profile route must reject DELETE");
     globalThis.fetch = async (url) => {
       const target = String(url);
       if (target.includes("/trades")) {

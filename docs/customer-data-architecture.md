@@ -2,9 +2,39 @@
 
 Last updated: 2026-05-10
 
-This document describes the future customer data model for PolySignal. It is a
-design document only. No authentication, database tables, migrations, or backend
-write paths were created as part of this work.
+This document describes the customer-data boundary for PolySignal. Most
+user-specific data is still local-only. The one new exception is a global public
+registry of highlighted Polymarket wallet profiles; it is not user-specific and
+does not create accounts, ownership, or private customer storage.
+
+## Current Persistent Public Registry
+
+`highlighted_wallet_profiles` stores public wallet profiles that meet the
+highlighted profile criteria from Wallet Intelligence:
+
+- real `winRate >= 80%`;
+- `closedMarkets >= 50`;
+- real PnL available, or observed public capital of at least `100 USD`;
+- valid full public wallet address (`0x` + 40 hex).
+
+This registry is global and public-product data, not a private saved list. It
+stores only public Polymarket/Wallet Intelligence fields such as wallet address,
+public profile URL, public pseudonym/avatar if the source returns it, real
+closed-market counts, wins/losses, real PnL if available, observed capital,
+compact public market history, warnings and limitations.
+
+It must not store:
+
+- private user identity;
+- authenticated user preferences;
+- service-role keys, tokens or connection strings;
+- raw Polymarket payloads or complete wallet dumps;
+- invented win rate, PnL, ROI, markets or history.
+
+Because no auth/owner_id model exists, `/profiles` reads the global registry and
+uses localStorage only for fallback, migration state and local hiding. Removing
+a persistent profile means "hide in this browser"; global delete/admin actions
+require a future authenticated admin model.
 
 ## Current Local User Data Audit
 

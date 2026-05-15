@@ -1,0 +1,60 @@
+name: Highlighted Profiles Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type apply-highlighted-profiles-0017 to run the additive profiles migration"
+        required: true
+
+jobs:
+  migrate:
+    name: Apply highlighted profiles migration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Confirm explicit migration request
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "apply-highlighted-profiles-0017" ]; then
+            echo "::error::Confirmation did not match the required migration phrase."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install API dependencies
+        working-directory: apps/api
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Preflight database configuration
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.POLYSIGNAL_NEON_DATABASE_URL }}
+          DATABASE_MIGRATION_URL: ${{ secrets.POLYSIGNAL_NEON_DATABASE_URL }}
+          POLYSIGNAL_ENV: production
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::POLYSIGNAL_NEON_DATABASE_URL secret is not configured."
+            exit 1
+          fi
+          python -m app.commands.check_database_config --connect
+          python -m alembic current
+
+      - name: Apply additive highlighted profiles migration
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.POLYSIGNAL_NEON_DATABASE_URL }}
+          DATABASE_MIGRATION_URL: ${{ secrets.POLYSIGNAL_NEON_DATABASE_URL }}
+          POLYSIGNAL_ENV: production
+        run: |
+          python -m alembic upgrade 0017_highlighted_wallet_profiles
+          python -m alembic current

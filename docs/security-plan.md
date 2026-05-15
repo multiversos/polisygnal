@@ -3,8 +3,9 @@
 Last updated: 2026-05-12
 
 This document captures the current defensive security baseline for PolySignal.
-It is intentionally conservative: no production writes, no trading, no
-migrations, and no customer authentication or payment system are active yet.
+It is intentionally conservative: no trading, no customer authentication and no
+payment system are active yet. The highlighted profiles registry is the first
+global public-data write path and must stay tightly validated.
 
 ## Public Surface Audit
 
@@ -361,14 +362,29 @@ Wallet Intelligence UI controls:
   closed markets, wins/losses, real win rate, real PnL and related markets
   delivered by the public source. If the source returns only counts, the UI says
   so; if it returns nothing, history remains unavailable.
-- `/profiles` stores highlighted public wallets in localStorage only. A profile
-  can be auto-saved only when the data includes real `winRate >= 80%`,
-  `closedMarkets >= 50`, and either real PnL or observed capital of at least
-  `100 USD`. The app must not save low-sample wallets, null win rates, invented
-  PnL, or raw wallet lists.
-- The Profiles page is not account-synced and must say so. Global persistence
-  requires a later backend/DB sprint with ownership checks; no Neon migration is
-  part of this feature.
+- `/profiles` v2 stores highlighted public wallets in a global persistent
+  registry, with localStorage v1 kept as fallback and migration source. This is
+  not user-specific storage because there is no auth/owner_id model yet.
+  A profile can be auto-saved only when the data includes real
+  `winRate >= 80%`, `closedMarkets >= 50`, and either real PnL or observed
+  capital of at least `100 USD`. The app must not save low-sample wallets, null
+  win rates, invented PnL, or raw wallet lists.
+- `/profiles` refresh controls use `POST /api/profiles/refresh-wallet`, which
+  accepts only a validated full public wallet address. It does not accept
+  arbitrary URLs, localhost destinations, client-provided hosts, tokens, raw
+  payloads, or redirects. Refresh can update public profile metadata, closed
+  market counts, wins/losses, real win rate, real PnL, observed capital and
+  public market history only when the source returns them. Failed or partial
+  refreshes preserve the local profile and mark it stale instead of inventing
+  missing data.
+- Persistent profile writes go through `POST /api/profiles/highlighted`, which
+  proxies only to the fixed backend upsert endpoint and validates the wallet
+  shape before forwarding. The backend also validates the same qualification
+  criteria and normalizes wallet addresses to lowercase.
+- Without auth, removing a persistent profile means hiding it locally in this
+  browser. It must not delete the global public registry row. User-specific
+  profile saves and global deletion/admin workflows require a future auth and
+  ownership model.
 
 Samantha-side local endpoints:
 

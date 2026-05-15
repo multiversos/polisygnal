@@ -46,7 +46,7 @@ Checkpoint Copy Trading:
 - Demo tick lee actividad publica de wallets, deduplica trades y crea ordenes simuladas con monto fijo por wallet.
 - Montos soportados: `$1`, `$5`, `$10`, `$20` y `Personalizado`.
 - Modo real queda preparado pero bloqueado con `real_trading_not_configured`; no firma ni envia ordenes.
-- Migracion preparada: `apps/api/alembic/versions/0017_copy_trading_wallets.py`. No aplicar contra produccion sin autorizacion explicita.
+- Migracion preparada: `apps/api/alembic/versions/0018_copy_trading_wallets.py`. No aplicar contra produccion sin autorizacion explicita.
 
 Estado visible verificado:
 
@@ -101,13 +101,27 @@ Estado visible verificado:
   Polymarket con `/profile/{wallet}`. Si solo hay short address o la direccion
   no valida el patron publico, la UI muestra `Perfil Polymarket no disponible`
   y permite copiar la direccion visible sin inventar enlaces.
-- `/profiles` esta disponible como seccion local `Perfiles`. Guarda en
-  localStorage v1 wallets publicas destacadas detectadas por Wallet
-  Intelligence. La regla inicial exige `winRate >= 80%`, `closedMarkets >= 50`
-  y PnL real disponible o capital observado relevante (`observedCapitalUsd >=
+- `/profiles` esta disponible como `Perfiles` v2. Lee un registro global
+  persistente de wallets publicas destacadas y conserva localStorage v1 como
+  fallback/migracion. La regla exige `winRate >= 80%`, `closedMarkets >= 50` y
+  PnL real disponible o capital observado relevante (`observedCapitalUsd >=
   100`). No guarda perfiles 1/1, 2/2, sin win rate real ni sin datos publicos
-  verificables. Persistencia multi-dispositivo requiere backend/DB futuro; no
-  se toco Neon ni se creo migracion.
+  verificables.
+- Como no hay auth real ni `owner_id`, Perfiles v2 no es una lista privada por
+  usuario. Quitar un perfil persistente significa ocultarlo en este navegador;
+  borrado global/admin requiere un sprint posterior con auth y permisos.
+- `/profiles` tambien permite refrescar perfiles guardados con `Actualizar` y
+  `Actualizar todos`. La ruta segura `POST /api/profiles/refresh-wallet` acepta
+  solo `walletAddress` publica valida (`0x` + 40 hex), consulta fuentes publicas
+  allowlisted y actualiza localStorage con datos reales disponibles. Si la
+  fuente falla, el perfil no se borra; queda con estado `failed` o `partial`.
+  Si deja de cumplir el criterio, se marca `Ya no cumple criterio` para que el
+  usuario lo quite manualmente.
+- Perfiles persistentes usan backend FastAPI en `/profiles/highlighted` y tabla
+  `highlighted_wallet_profiles`. El frontend escribe mediante
+  `/api/profiles/highlighted`, una ruta same-origin allowlisted que valida wallet
+  completa antes de llamar al backend. No usa service role en frontend ni guarda
+  payloads crudos.
 - En mercados grandes, `/analyze` puede mostrar fases opcionales reales en el
   progreso: `Enriqueciendo perfiles`, `Construyendo historial de wallets` y
   `Validando consistencia de capital`. Se activan por datos reales de volumen,
@@ -475,7 +489,8 @@ Sprints pendientes inmediatos:
 - El smoke de produccion reintenta errores transitorios, pero sigue fallando si
   todos los intentos fallan.
 - No hay auth real, tablas de usuario, migraciones de usuario ni backend
-  persistente para Historial/Mi lista.
+  persistente para Historial/Mi lista. El registro de Perfiles v2 es global y
+  publico, no user-specific.
 - Neon real no esta disponible localmente; no usar diagnosticos locales como
   autorizacion para cambios de produccion.
 
@@ -507,6 +522,9 @@ Estado actual:
 
 - Historial sigue en localStorage.
 - Mi lista sigue en localStorage.
+- Perfiles destacados ahora tienen registro global persistente para wallets
+  publicas calificadas; localStorage queda como fallback/migracion y para
+  ocultar perfiles en este navegador.
 - Alertas ahora se enfocan en analisis guardados y no en una lista generica de
   mercados.
 - Analizar enlace es el flujo principal del producto y resuelve enlaces desde
@@ -528,12 +546,14 @@ Estado actual:
   `deepAnalysisJobId`, `awaitingResearch` y `researchStatus`, y ofrece
   `Continuar analisis`.
 - No se creo auth real.
-- No se crearon tablas reales.
-- No se ejecutaron migraciones.
+- Se preparo una tabla real global/publica para Perfiles v2:
+  `highlighted_wallet_profiles`.
+- La migracion de Perfiles v2 debe aplicarse de forma controlada antes de
+  depender de persistencia global en produccion.
 
 Riesgos pendientes:
 
-- localStorage no sincroniza entre dispositivos;
+- Historial y Mi lista en localStorage no sincronizan entre dispositivos;
 - los registros locales pueden ser manipulados por el navegador;
 - no existe backend persistente de usuarios;
 - la resolucion automatica local depende de datos disponibles y no sustituye

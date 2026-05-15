@@ -11,6 +11,7 @@ from app.models import (
     evidence_item,
     event,
     external_market_signal,
+    highlighted_wallet_profile,
     market,
     market_outcome,
     market_snapshot,

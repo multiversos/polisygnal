@@ -1,7 +1,7 @@
 """copy trading wallets
 
-Revision ID: 0017_copy_trading_wallets
-Revises: 0016_add_polymarket_identifiers
+Revision ID: 0018_copy_trading_wallets
+Revises: 0017_highlighted_wallet_profiles
 Create Date: 2026-05-15 00:00:00.000000
 """
 
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision = "0017_copy_trading_wallets"
-down_revision = "0016_add_polymarket_identifiers"
+revision = "0018_copy_trading_wallets"
+down_revision = "0017_highlighted_wallet_profiles"
 branch_labels = None
 depends_on = None
 
