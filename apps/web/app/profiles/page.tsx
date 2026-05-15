@@ -110,6 +110,24 @@ function profileName(profile: HighlightedWalletProfile): string {
   return profile.pseudonym || profile.name || profile.shortAddress;
 }
 
+function profileSourceLabel(source?: string | null): string {
+  if (!source) {
+    return "Fuente publica no especificada";
+  }
+  const normalized = source.trim().toLowerCase();
+  if (
+    normalized.includes("polymarket_data") ||
+    normalized.includes("data api") ||
+    normalized.includes("wallet intelligence")
+  ) {
+    return "Polymarket / Wallet Intelligence";
+  }
+  if (normalized.includes("polymarket")) {
+    return "Polymarket";
+  }
+  return source.replace(/[_-]+/g, " ");
+}
+
 function hasPnl(profile: HighlightedWalletProfile): boolean {
   return typeof profile.realizedPnl === "number" || typeof profile.unrealizedPnl === "number";
 }
@@ -614,7 +632,7 @@ export default function ProfilesPage() {
                     <p>Ultima actualizacion: {formatDate(profile.lastUpdatedAt ?? profile.updatedAt)}</p>
                     <p>Estado: {refreshStatusCopy(profile.refreshStatus, profile.stale)}</p>
                     <p>Sincronizacion: {syncStatusCopy(profile)}</p>
-                    <p>Fuente: {profile.source || "Fuente publica no especificada"}</p>
+                    <p>Fuente: {profileSourceLabel(profile.source)}</p>
                     {profile.syncError ? (
                       <p>{profile.syncError}</p>
                     ) : null}

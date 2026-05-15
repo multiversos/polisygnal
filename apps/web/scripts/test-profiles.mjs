@@ -84,6 +84,8 @@ assert(profilesSource.includes("Historial pasado no garantiza resultados futuros
 assert(profilesSource.includes("No es recomendacion de copy-trading."), "/profiles must avoid copy-trading framing");
 assert(profilesSource.includes("Copiar direccion"), "/profiles must copy addresses without copy-trading wording");
 assert(!profilesSource.includes("Copiar wallet"), "/profiles must avoid copy-trading-adjacent wallet copy wording");
+assert(profilesSource.includes("profileSourceLabel"), "/profiles must normalize technical source labels");
+assert(profilesSource.includes("Polymarket / Wallet Intelligence"), "/profiles must keep profile source labels public-friendly");
 assert(profilesSource.includes("removeHighlightedProfile"), "/profiles must allow removing saved profiles");
 assert(highlightedProfilesSource.includes("lastUpdatedAt"), "highlighted profile storage must track lastUpdatedAt");
 assert(highlightedProfilesSource.includes("refreshStatus"), "highlighted profile storage must track refreshStatus");
