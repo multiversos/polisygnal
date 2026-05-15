@@ -7,6 +7,7 @@ const SAFE_GET_PREFIXES = [
   "/alerts",
   "/backtesting",
   "/briefing",
+  "/copy-trading",
   "/dashboard",
   "/data-health",
   "/decisions",

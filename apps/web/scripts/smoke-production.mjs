@@ -25,6 +25,7 @@ const ALERTS_PATH = "/alerts";
 const WATCHLIST_PATH = "/watchlist";
 const HISTORY_PATH = "/history";
 const PROFILES_PATH = "/profiles";
+const COPY_TRADING_PATH = "/copy-trading";
 const PERFORMANCE_PATH = "/performance";
 const METHODOLOGY_PATH = "/methodology";
 const ANALYZE_PATH = "/analyze";
@@ -46,6 +47,7 @@ const PUBLIC_NAV_TEXT = [
   "Analizar enlace",
   "Historial",
   "Perfiles",
+  "Copiar Wallets",
   "Rendimiento",
   "Alertas",
   "Metodologia",
@@ -1104,6 +1106,19 @@ async function main() {
     "profiles anti-copy-trading copy",
   );
   assertTextExcludes(profilesText, ["tokenId", "conditionId", "transactionHash", "raw JSON"], "profiles technical noise");
+  const copyTradingDom = await dumpDom(urlFor(COPY_TRADING_PATH));
+  const copyTradingRender = validatePublicProductPage(copyTradingDom, "copy trading", ["Copiar Wallets"]);
+  const copyTradingText = visibleText(copyTradingDom);
+  for (const expected of ["$1", "$5", "$10", "$20", "Personalizado", "Input wallet/perfil"]) {
+    assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
+  }
+  assertTextIncludesOneOf(copyTradingText, ["Demo activo", "Real no conectado"], "copy trading mode badges");
+  assertTextIncludes(copyTradingText, "Bloqueado hasta configurar credenciales", "copy trading real lock");
+  assertTextExcludes(
+    copyTradingText,
+    ["private key", "seed phrase", "POLY_SECRET", "POLY_API_KEY", "authorization header", "stack trace"],
+    "copy trading security leakage",
+  );
   const performanceDom = await dumpDom(urlFor(PERFORMANCE_PATH));
   const performanceRender = validatePublicProductPage(performanceDom, "performance", ["Rendimiento"]);
   const performanceText = visibleText(performanceDom);
@@ -1513,6 +1528,7 @@ async function main() {
           watchlist: watchlistRender,
           history: historyRender,
           profiles: profilesRender,
+          copy_trading: copyTradingRender,
           performance: performanceRender,
           methodology: methodologyRender,
           analyze: analyzeRender,

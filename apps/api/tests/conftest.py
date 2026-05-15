@@ -12,6 +12,10 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models import (
+    CopyBotEvent,
+    CopyDetectedTrade,
+    CopyOrder,
+    CopyWallet,
     EvidenceItem,
     Event,
     ExternalMarketSignal,
@@ -36,6 +40,10 @@ from app.models import (
 def db_session() -> Generator[Session, None, None]:
     _ = (
         EvidenceItem,
+        CopyBotEvent,
+        CopyDetectedTrade,
+        CopyOrder,
+        CopyWallet,
         Event,
         ExternalMarketSignal,
         HighlightedWalletProfile,

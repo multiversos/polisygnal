@@ -15,7 +15,6 @@ from app.models.market_snapshot import MarketSnapshot
 from app.models.prediction import Prediction
 from app.models.prediction_report import PredictionReport
 from app.models.research_finding import ResearchFinding
-from app.models.research_run import ResearchRun
 from app.models.source import Source
 from app.repositories.predictions import get_latest_prediction_for_market
 from app.schemas.codex_agent_research import CODEX_AGENT_OUTPUT_SCHEMA_VERSION

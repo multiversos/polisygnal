@@ -796,6 +796,19 @@ secretos.
    raw errors.
 11. Run `npm.cmd --workspace apps/web run smoke:production`.
 
+## Copiar Wallets
+
+1. Open `https://polisygnal-web.vercel.app/copy-trading`.
+2. Confirm the sidebar contains `Copiar Wallets`.
+3. Confirm the page shows `Demo activo` and `Real no conectado`.
+4. Confirm the add form has `Input wallet/perfil`, optional alias, and amount choices `$1`, `$5`, `$10`, `$20`, `Personalizado`.
+5. Select `Personalizado` and confirm `Monto personalizado USD` appears and rejects zero/negative values.
+6. Confirm the empty states for wallets, trades, demo orders, and events are calm and do not expose stack traces or raw payloads.
+7. Confirm real mode copy says it is blocked until credentials are configured and does not ask for private keys, seed phrases, or API secrets.
+8. Add a safe public `0x...` wallet only in a non-production test environment unless the backend is explicitly ready.
+9. Run `Ejecutar demo tick` and confirm the result summarizes scanned wallets, new trades, simulated orders, skipped orders, and errors without promising profit.
+10. Confirm no text recommends copying a trader, guarantees outcomes, or presents wallet activity as financial advice.
+
 ## Cache Troubleshooting
 
 If a normal browser shows old data but backend/proxy checks pass:

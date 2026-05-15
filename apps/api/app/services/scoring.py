@@ -1024,9 +1024,9 @@ def _external_market_note(
     field_availability: dict[str, bool],
     reasons: dict[str, str],
 ) -> str:
-    for field in ("line_movement_score", "consensus_strength", "current_implied_prob"):
-        if field_availability.get(field, False):
-            return reasons[field]
+    for score_field in ("line_movement_score", "consensus_strength", "current_implied_prob"):
+        if field_availability.get(score_field, False):
+            return reasons[score_field]
     return "missing_external_market"
 
 

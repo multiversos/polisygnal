@@ -22,7 +22,8 @@ type NavIconName =
   | "sources"
   | "data"
   | "trial"
-  | "backtesting";
+  | "backtesting"
+  | "copy";
 
 const THEME_STORAGE_KEY = "polysignal-theme";
 
@@ -36,6 +37,7 @@ const publicNavigationItems: Array<{
   { label: "Analizar enlace", href: "/analyze", icon: "analyze", primary: true },
   { label: "Historial", href: "/history", icon: "history" },
   { label: "Perfiles", href: "/profiles", icon: "profiles" },
+  { label: "Copiar Wallets", href: "/copy-trading", icon: "copy" },
   { label: "Rendimiento", href: "/performance", icon: "decisions" },
   { label: "Alertas", href: "/alerts", icon: "alerts" },
   { label: "Metodologia", href: "/methodology", icon: "evidence" },
@@ -273,6 +275,14 @@ function NavIcon({ name }: { name: NavIconName }) {
       return (
         <svg {...commonProps}>
           <path d="M4 19V5m0 14h16M7 16l3-4 3 2 5-7" />
+        </svg>
+      );
+    case "copy":
+      return (
+        <svg {...commonProps}>
+          <path d="M7 7h7a4 4 0 0 1 0 8H9" />
+          <path d="m10 4-3 3 3 3M17 17H10a4 4 0 0 1 0-8h5" />
+          <path d="m14 20 3-3-3-3" />
         </svg>
       );
     default:

@@ -21,7 +21,6 @@ from app.schemas.external_market_signal import ExternalMarketSignalCreate
 from app.services.external_market_signals import (
     create_external_market_signal,
     external_signal_create_from_kalshi_market,
-    list_external_market_signals,
     list_external_market_signals_by_market_id,
     list_external_market_signals_by_source,
     list_external_market_signals_by_ticker,

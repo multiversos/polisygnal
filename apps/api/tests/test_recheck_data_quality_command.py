@@ -12,7 +12,6 @@ from app.models.event import Event
 from app.models.market import Market
 from app.models.market_snapshot import MarketSnapshot
 from app.models.prediction import Prediction
-from app.models.refresh_run import RefreshRun
 from app.models.research_run import ResearchRun
 from app.services.refresh_runs import record_refresh_run
 
