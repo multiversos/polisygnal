@@ -61,6 +61,27 @@ async function fetchBackendJson(url: URL, init: RequestInit): Promise<{ body: st
         status: 502,
       };
     }
+    if (!response.ok) {
+      return {
+        body: JSON.stringify({
+          error:
+            response.status === 404
+              ? "profiles_backend_not_found"
+              : response.status === 422
+                ? "profile_rejected"
+                : "profiles_backend_unavailable",
+        }),
+        status: response.status === 404 || response.status === 422 ? response.status : 502,
+      };
+    }
+    try {
+      JSON.parse(body);
+    } catch {
+      return {
+        body: JSON.stringify({ error: "profiles_backend_unavailable" }),
+        status: 502,
+      };
+    }
     return {
       body,
       status: response.status,
