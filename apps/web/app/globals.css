@@ -234,7 +234,8 @@
 }
 
 .copy-field input,
-.copy-custom-amount input {
+.copy-custom-amount input,
+.copy-select {
   width: 100%;
   min-height: 42px;
   padding: 10px 12px;
@@ -375,6 +376,16 @@
   text-transform: uppercase;
 }
 
+.copy-wallet-details {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.copy-wallet-details small {
+  color: var(--muted-foreground);
+}
+
 .copy-mono {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
@@ -441,6 +452,10 @@
 .copy-event {
   display: grid;
   gap: 4px;
+}
+
+.copy-feed-item .copy-status-strip {
+  margin-top: 4px;
 }
 
 .copy-feed-numbers {

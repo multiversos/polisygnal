@@ -2627,11 +2627,22 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["$1", "$5", "$10", "$20", "Personalizado", "Monto personalizado USD"]) {
     assert(copyAmountSelector.includes(text), `copy amount selector missing preset/custom text: ${text}`);
   }
+  for (const text of ["Ultima actualizacion", "Auto-refresh", "Refrescar ahora", "Pausar auto"]) {
+    assert(copyTradingDashboard.includes(text), `copy trading auto-refresh controls missing text: ${text}`);
+  }
+  assert(copyTradingDashboard.includes("visibilityState"), "copy trading auto-refresh should respect hidden tabs");
+  assert(copyTradingDashboard.includes("isRefreshingRef"), "copy trading auto-refresh should avoid overlapping refresh requests");
   assert(copyOrdersTable.includes("formatCopyOrderReason"), "copy orders should translate technical reasons");
-  assert(copyOrdersTable.includes("Trade historico: fuera de la ventana de copia."), "historical copy orders need humane copy");
+  assert(
+    copyOrdersTable.includes("Historico: fuera de la ventana de copia.")
+      || copyOrdersTable.includes("Trade historico: fuera de la ventana de copia."),
+    "historical copy orders need humane copy",
+  );
+  assert(copyOrdersTable.includes("Trade reciente, pero llego tarde para esta ventana."), "recent late trades need humane copy");
   assert(copyOrdersTable.includes("Historico"), "historical copy orders need a visible status label");
   assert(copyBotEvents.includes("groupCopyBotEvents"), "copy bot events should group repeated audit messages");
   assert(copyBotEvents.includes("Trades historicos detectados fuera de la ventana de copia."), "historical audit events need humane copy");
+  assert(copyTradingDashboard.includes("live_candidates"), "demo tick summary should expose live readiness counts");
   assert(copyTradingDashboard.includes("historical_trades"), "demo tick summary should expose historical trade counts");
   assertTextExcludes(
     `${copyTradingSource}\n${copyAmountSelector}\n${copyOrdersTable}\n${copyBotEvents}`,

@@ -9,6 +9,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 CopyTradingMode = Literal["demo", "real"]
 CopyAmountMode = Literal["preset", "custom"]
 CopyTradeSide = Literal["buy", "sell"]
+CopyTradeFreshnessStatus = Literal[
+    "live_candidate",
+    "recent_outside_window",
+    "historical",
+    "unknown_time",
+]
 CopyOrderStatus = Literal[
     "pending",
     "simulated",
@@ -93,9 +99,15 @@ class CopyWalletRead(BaseModel):
     max_daily_usd: Decimal | None = None
     max_slippage_bps: int | None = None
     max_delay_seconds: int | None = None
+    copy_window_seconds: int | None = None
     sports_only: bool
     last_scan_at: datetime | None = None
     last_trade_at: datetime | None = None
+    recent_trades: int = 0
+    historical_trades: int = 0
+    live_candidates: int = 0
+    last_trade_freshness_status: CopyTradeFreshnessStatus | None = None
+    last_trade_freshness_label: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -119,6 +131,11 @@ class CopyDetectedTradeRead(BaseModel):
     source_amount_usd: Decimal | None = None
     source_timestamp: datetime | None = None
     detected_at: datetime
+    age_seconds: int | None = None
+    freshness_status: CopyTradeFreshnessStatus
+    freshness_label: str
+    copy_window_seconds: int | None = None
+    is_live_candidate: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -138,6 +155,8 @@ class CopyOrderRead(BaseModel):
     filled_price: Decimal | None = None
     filled_size: Decimal | None = None
     polymarket_order_id: str | None = None
+    freshness_status: CopyTradeFreshnessStatus | None = None
+    freshness_label: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -176,6 +195,8 @@ class CopyTradingTickResponse(BaseModel):
     orders_simulated: int = 0
     orders_skipped: int = 0
     orders_blocked: int = 0
+    live_candidates: int = 0
+    recent_outside_window: int = 0
     historical_trades: int = 0
     skipped_reasons: dict[str, int] = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)

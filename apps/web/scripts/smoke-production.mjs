@@ -1153,6 +1153,9 @@ async function main() {
     "Conectar wallet",
     "Wallet que quieres copiar",
     "Perfil o wallet pública",
+    "Ultima actualizacion",
+    "Auto-refresh",
+    "Refrescar ahora",
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
   }

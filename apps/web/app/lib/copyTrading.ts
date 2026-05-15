@@ -8,6 +8,7 @@ import type {
   CopyBotEvent,
   CopyDetectedTrade,
   CopyOrder,
+  CopyTradeFreshnessStatus,
 } from "./copyTradingTypes";
 
 type WalletsResponse = { wallets: CopyWallet[] };
@@ -103,4 +104,66 @@ export function formatDateTime(value: string | null | undefined): string {
     dateStyle: "short",
     timeStyle: "short",
   }).format(parsed);
+}
+
+export function formatTradeAge(ageSeconds: number | null | undefined): string {
+  if (ageSeconds === null || ageSeconds === undefined || ageSeconds < 0) {
+    return "Sin hora confiable";
+  }
+  if (ageSeconds < 60) {
+    return `Hace ${ageSeconds}s`;
+  }
+  const ageMinutes = Math.floor(ageSeconds / 60);
+  if (ageMinutes < 60) {
+    return `Hace ${ageMinutes}m`;
+  }
+  const ageHours = Math.floor(ageMinutes / 60);
+  if (ageHours < 24) {
+    return `Hace ${ageHours}h`;
+  }
+  const ageDays = Math.floor(ageHours / 24);
+  return `Hace ${ageDays}d`;
+}
+
+export function formatCopyWindow(copyWindowSeconds: number | null | undefined): string {
+  if (copyWindowSeconds === null || copyWindowSeconds === undefined) {
+    return "Ventana no configurada";
+  }
+  if (copyWindowSeconds < 60) {
+    return `Ventana ${copyWindowSeconds}s`;
+  }
+  const minutes = copyWindowSeconds / 60;
+  if (Number.isInteger(minutes)) {
+    return `Ventana ${minutes}m`;
+  }
+  return `Ventana ${minutes.toFixed(1)}m`;
+}
+
+export function formatFreshnessLabel(
+  status: CopyTradeFreshnessStatus | null | undefined,
+  fallbackLabel?: string | null,
+): string {
+  const labels: Record<CopyTradeFreshnessStatus, string> = {
+    historical: "Historico",
+    live_candidate: "Copiable ahora",
+    recent_outside_window: "Fuera de ventana",
+    unknown_time: "Sin hora confiable",
+  };
+  if (status && labels[status]) {
+    return labels[status];
+  }
+  return fallbackLabel || "Sin clasificar";
+}
+
+export function freshnessBadgeClass(status: CopyTradeFreshnessStatus | null | undefined): string {
+  switch (status) {
+    case "live_candidate":
+      return "success";
+    case "recent_outside_window":
+      return "locked";
+    case "historical":
+      return "historical";
+    default:
+      return "skipped";
+  }
 }

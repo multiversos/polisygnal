@@ -1,4 +1,4 @@
-import { formatDateTime, formatUsd } from "../../lib/copyTrading";
+import { freshnessBadgeClass, formatDateTime, formatFreshnessLabel, formatUsd } from "../../lib/copyTrading";
 import type { CopyOrder } from "../../lib/copyTradingTypes";
 
 export function CopyOrdersTable({ orders }: { orders: CopyOrder[] }) {
@@ -17,7 +17,12 @@ export function CopyOrdersTable({ orders }: { orders: CopyOrder[] }) {
               <div>
                 <span className={`copy-side ${order.action}`}>{order.action.toUpperCase()}</span>
                 <strong>{formatUsd(order.intended_amount_usd)}</strong>
-                <small>{formatCopyOrderReason(order.reason, order.status)}</small>
+                <small>{formatCopyOrderReason(order)}</small>
+                {order.freshness_status ? (
+                  <span className={`copy-badge ${freshnessBadgeClass(order.freshness_status)}`}>
+                    {formatFreshnessLabel(order.freshness_status, order.freshness_label)}
+                  </span>
+                ) : null}
               </div>
               <div className="copy-feed-numbers">
                 <span>{order.simulated_price ? Number(order.simulated_price).toFixed(3) : "-"}</span>
@@ -33,6 +38,9 @@ export function CopyOrdersTable({ orders }: { orders: CopyOrder[] }) {
 }
 
 function formatCopyOrderStatus(order: CopyOrder): string {
+  if (order.status === "skipped" && order.reason === "trade_too_old" && order.freshness_status === "recent_outside_window") {
+    return "Fuera de ventana";
+  }
   if (order.status === "skipped" && order.reason === "trade_too_old") {
     return "Historico";
   }
@@ -40,7 +48,7 @@ function formatCopyOrderStatus(order: CopyOrder): string {
     return "Saltada";
   }
   if (order.status === "simulated") {
-    return "Simulada";
+    return "Simulacion creada";
   }
   if (order.status === "blocked") {
     return "Bloqueada";
@@ -49,25 +57,31 @@ function formatCopyOrderStatus(order: CopyOrder): string {
 }
 
 function copyOrderStatusClass(order: CopyOrder): string {
+  if (order.status === "skipped" && order.reason === "trade_too_old" && order.freshness_status === "recent_outside_window") {
+    return "locked";
+  }
   if (order.status === "skipped" && order.reason === "trade_too_old") {
     return "historical";
   }
   return order.status;
 }
 
-function formatCopyOrderReason(reason: string | null, status: CopyOrder["status"]): string {
-  if (!reason) {
-    return status === "simulated" ? "Monto fijo aplicado" : "Sin detalle adicional.";
+function formatCopyOrderReason(order: CopyOrder): string {
+  if (!order.reason) {
+    return order.status === "simulated" ? "Simulacion creada" : "Sin detalle adicional.";
+  }
+  if (order.reason === "trade_too_old" && order.freshness_status === "recent_outside_window") {
+    return "Trade reciente, pero llego tarde para esta ventana.";
   }
   const reasonLabels: Record<string, string> = {
     capped_by_max_trade_usd: "Monto limitado por maximo por trade.",
-    copy_buys_disabled: "Copia de compras desactivada.",
-    copy_sells_disabled: "Copia de ventas desactivada.",
+    copy_buys_disabled: "Compras desactivadas para esta wallet.",
+    copy_sells_disabled: "Ventas desactivadas para esta wallet.",
     invalid_copy_amount: "Monto de copia invalido.",
     missing_price: "Sin precio suficiente para simular.",
     missing_side: "Sin direccion de trade suficiente.",
     real_trading_not_configured: "Modo real bloqueado.",
-    trade_too_old: "Trade historico: fuera de la ventana de copia.",
+    trade_too_old: "Historico: fuera de la ventana de copia.",
   };
-  return reasonLabels[reason] || "No se simulo por una regla de seguridad.";
+  return reasonLabels[order.reason] || "No se simulo por una regla de seguridad.";
 }

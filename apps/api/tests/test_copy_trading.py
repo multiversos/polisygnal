@@ -15,6 +15,7 @@ from app.services.copy_trading_risk_rules import CopyTradeForRules, evaluate_dem
 from app.services.copy_trading_service import (
     DuplicateCopyWalletError,
     InvalidCopyWalletInputError,
+    build_copy_trade_read,
     create_copy_wallet,
     list_copy_orders,
     list_copy_trades,
@@ -285,6 +286,8 @@ def test_demo_tick_creates_simulated_order_for_valid_trade(db_session: Session) 
     orders = list_copy_orders(db_session)
 
     assert response.orders_simulated == 1
+    assert response.live_candidates == 1
+    assert response.recent_outside_window == 0
     assert orders[0].status == "simulated"
     assert orders[0].intended_amount_usd == Decimal("5.00")
     assert orders[0].intended_size == Decimal("10.00000000")
@@ -331,7 +334,25 @@ def test_demo_tick_counts_historical_skips(db_session: Session) -> None:
     assert response.new_trades == 1
     assert response.orders_simulated == 0
     assert response.orders_skipped == 1
+    assert response.live_candidates == 0
+    assert response.recent_outside_window == 0
     assert response.historical_trades == 1
+    assert response.skipped_reasons == {"trade_too_old": 1}
+    assert orders[0].status == "skipped"
+    assert orders[0].reason == "trade_too_old"
+
+
+def test_demo_tick_counts_recent_trades_outside_window(db_session: Session) -> None:
+    _create_wallet(db_session)
+    recent_trade = _trade("0xrecent") | {"timestamp": (_now() - timedelta(seconds=45)).isoformat()}
+
+    response = run_demo_tick(db_session, data_client=FakeTradeReader([recent_trade]), now=_now())
+    orders = list_copy_orders(db_session)
+
+    assert response.new_trades == 1
+    assert response.live_candidates == 0
+    assert response.recent_outside_window == 1
+    assert response.historical_trades == 0
     assert response.skipped_reasons == {"trade_too_old": 1}
     assert orders[0].status == "skipped"
     assert orders[0].reason == "trade_too_old"
@@ -361,6 +382,18 @@ def test_demo_tick_continues_when_one_wallet_scan_fails(db_session: Session) -> 
     assert response.wallets_scanned == 2
     assert response.errors == ["No se pudo leer actividad publica."]
     assert set(reader.wallets_seen) == {first.proxy_wallet, second.proxy_wallet}
+
+
+def test_copy_trade_read_includes_freshness_fields(db_session: Session) -> None:
+    wallet = _create_wallet(db_session)
+    run_demo_tick(db_session, data_client=FakeTradeReader([_trade("0xfreshness")]), now=_now())
+
+    trade = list_copy_trades(db_session)[0]
+    trade_read = build_copy_trade_read(trade, copy_window_seconds=wallet.max_delay_seconds, now=_now())
+
+    assert trade_read.freshness_status == "live_candidate"
+    assert trade_read.freshness_label == "Copiable ahora"
+    assert trade_read.is_live_candidate is True
 
 
 def test_real_mode_returns_blocked_not_configured(db_session: Session) -> None:

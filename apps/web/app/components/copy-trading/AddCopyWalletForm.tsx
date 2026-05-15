@@ -18,6 +18,12 @@ const WALLET_HEX_MESSAGE = "La wallet contiene caracteres no validos.";
 const PROFILE_NOT_RECOGNIZED_MESSAGE =
   "No pudimos reconocer ese perfil. Pega una wallet 0x publica o un perfil valido.";
 const SAVE_WALLET_ERROR_MESSAGE = "No pudimos guardar esta wallet. Intenta nuevamente.";
+const COPY_WINDOW_OPTIONS = [
+  { label: "10 segundos", value: 10 },
+  { label: "30 segundos", value: 30 },
+  { label: "60 segundos", value: 60 },
+  { label: "5 minutos", value: 300 },
+];
 
 type WalletInputValidation =
   | { normalizedWallet: string | null; ok: true; value: string }
@@ -28,6 +34,7 @@ export function AddCopyWalletForm({ onCreated, wallets }: AddCopyWalletFormProps
   const [label, setLabel] = useState("");
   const [amountMode, setAmountMode] = useState<CopyAmountMode>("preset");
   const [amount, setAmount] = useState(5);
+  const [maxDelaySeconds, setMaxDelaySeconds] = useState(10);
   const [copyBuys, setCopyBuys] = useState(true);
   const [copySells, setCopySells] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
@@ -62,6 +69,7 @@ export function AddCopyWalletForm({ onCreated, wallets }: AddCopyWalletFormProps
       copy_amount_usd: amount,
       copy_buys: copyBuys,
       copy_sells: copySells,
+      max_delay_seconds: maxDelaySeconds,
     };
     setSaving(true);
     try {
@@ -70,6 +78,7 @@ export function AddCopyWalletForm({ onCreated, wallets }: AddCopyWalletFormProps
       setLabel("");
       setAmountMode("preset");
       setAmount(5);
+      setMaxDelaySeconds(10);
       setCopyBuys(true);
       setCopySells(true);
       await onCreated();
@@ -122,6 +131,24 @@ export function AddCopyWalletForm({ onCreated, wallets }: AddCopyWalletFormProps
           setFormError(null);
         }}
       />
+      <label className="copy-field">
+        <span>Ventana de copia en vivo</span>
+        <select
+          className="copy-select"
+          disabled={saving}
+          onChange={(event) => {
+            setMaxDelaySeconds(Number(event.target.value));
+            setFormError(null);
+          }}
+          value={maxDelaySeconds}
+        >
+          {COPY_WINDOW_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="copy-toggle-row">
         <label className="copy-toggle-pill">
           <input

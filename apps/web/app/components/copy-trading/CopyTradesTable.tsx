@@ -1,4 +1,4 @@
-import { formatDateTime, formatUsd } from "../../lib/copyTrading";
+import { freshnessBadgeClass, formatCopyWindow, formatDateTime, formatFreshnessLabel, formatTradeAge, formatUsd } from "../../lib/copyTrading";
 import type { CopyDetectedTrade } from "../../lib/copyTradingTypes";
 
 export function CopyTradesTable({ trades }: { trades: CopyDetectedTrade[] }) {
@@ -18,11 +18,18 @@ export function CopyTradesTable({ trades }: { trades: CopyDetectedTrade[] }) {
                 <span className={`copy-side ${trade.side}`}>{trade.side.toUpperCase()}</span>
                 <strong>{trade.market_title || trade.market_slug || "Mercado Polymarket"}</strong>
                 <small>{trade.outcome || "Outcome no informado"}</small>
+                <div className="copy-status-strip">
+                  <span className={`copy-badge ${freshnessBadgeClass(trade.freshness_status)}`}>
+                    {formatFreshnessLabel(trade.freshness_status, trade.freshness_label)}
+                  </span>
+                  <span className="copy-badge">{formatTradeAge(trade.age_seconds)}</span>
+                  <span className="copy-badge">{formatCopyWindow(trade.copy_window_seconds)}</span>
+                </div>
               </div>
               <div className="copy-feed-numbers">
                 <span>{trade.source_price ? Number(trade.source_price).toFixed(3) : "-"}</span>
                 <span>{formatUsd(trade.source_amount_usd)}</span>
-                <small>{formatDateTime(trade.detected_at)}</small>
+                <small>{formatDateTime(trade.source_timestamp || trade.detected_at)}</small>
               </div>
             </article>
           ))}

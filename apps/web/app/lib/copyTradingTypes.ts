@@ -1,6 +1,11 @@
 export type CopyTradingMode = "demo" | "real";
 export type CopyAmountMode = "preset" | "custom";
 export type CopyTradeSide = "buy" | "sell";
+export type CopyTradeFreshnessStatus =
+  | "live_candidate"
+  | "recent_outside_window"
+  | "historical"
+  | "unknown_time";
 export type CopyOrderStatus =
   | "pending"
   | "simulated"
@@ -28,9 +33,15 @@ export type CopyWallet = {
   max_daily_usd: string | null;
   max_slippage_bps: number | null;
   max_delay_seconds: number | null;
+  copy_window_seconds: number | null;
   sports_only: boolean;
   last_scan_at: string | null;
   last_trade_at: string | null;
+  recent_trades: number;
+  historical_trades: number;
+  live_candidates: number;
+  last_trade_freshness_status: CopyTradeFreshnessStatus | null;
+  last_trade_freshness_label: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -52,6 +63,11 @@ export type CopyDetectedTrade = {
   source_amount_usd: string | null;
   source_timestamp: string | null;
   detected_at: string;
+  age_seconds: number | null;
+  freshness_status: CopyTradeFreshnessStatus;
+  freshness_label: string;
+  copy_window_seconds: number | null;
+  is_live_candidate: boolean;
 };
 
 export type CopyOrder = {
@@ -65,6 +81,8 @@ export type CopyOrder = {
   intended_amount_usd: string | null;
   intended_size: string | null;
   simulated_price: string | null;
+  freshness_status: CopyTradeFreshnessStatus | null;
+  freshness_label: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -99,6 +117,8 @@ export type CopyTradingTickSummary = {
   orders_simulated: number;
   orders_skipped: number;
   orders_blocked: number;
+  live_candidates: number;
+  recent_outside_window: number;
   historical_trades: number;
   skipped_reasons: Record<string, number>;
   errors: string[];
@@ -120,4 +140,5 @@ export type CopyWalletCreateInput = {
   copy_amount_usd: number;
   copy_buys: boolean;
   copy_sells: boolean;
+  max_delay_seconds?: number;
 };

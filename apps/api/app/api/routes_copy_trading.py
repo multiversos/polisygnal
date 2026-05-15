@@ -7,8 +7,6 @@ from app.clients.polymarket_data import PolymarketDataClient, get_polymarket_dat
 from app.db.session import get_db
 from app.schemas.copy_trading import (
     CopyBotEventRead,
-    CopyDetectedTradeRead,
-    CopyOrderRead,
     CopyTradingEventsResponse,
     CopyTradingListResponse,
     CopyTradingOrdersResponse,
@@ -24,7 +22,10 @@ from app.services.copy_trading_service import (
     CopyWalletNotFoundError,
     DuplicateCopyWalletError,
     InvalidCopyWalletInputError,
+    build_copy_order_read,
     build_copy_trading_status,
+    build_copy_trade_read,
+    build_copy_wallet_read,
     create_copy_wallet,
     delete_copy_wallet,
     get_copy_wallet,
@@ -46,7 +47,7 @@ def get_copy_trading_status(db: Session = Depends(get_db)) -> CopyTradingStatusR
 @router.get("/wallets", response_model=CopyTradingListResponse)
 def get_copy_wallets(db: Session = Depends(get_db)) -> CopyTradingListResponse:
     return CopyTradingListResponse(
-        wallets=[CopyWalletRead.model_validate(wallet) for wallet in list_copy_wallets(db)]
+        wallets=[build_copy_wallet_read(wallet) for wallet in list_copy_wallets(db)]
     )
 
 
@@ -62,7 +63,7 @@ def post_copy_wallet(
     except DuplicateCopyWalletError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     db.commit()
-    return CopyWalletRead.model_validate(wallet)
+    return build_copy_wallet_read(wallet)
 
 
 @router.patch("/wallets/{wallet_id}", response_model=CopyWalletRead)
@@ -78,7 +79,7 @@ def patch_copy_wallet(
     except InvalidCopyWalletInputError as exc:
         raise _bad_request(str(exc)) from exc
     db.commit()
-    return CopyWalletRead.model_validate(wallet)
+    return build_copy_wallet_read(wallet)
 
 
 @router.delete("/wallets/{wallet_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -100,7 +101,13 @@ def get_copy_trades(
     db: Session = Depends(get_db),
 ) -> CopyTradingTradesResponse:
     return CopyTradingTradesResponse(
-        trades=[CopyDetectedTradeRead.model_validate(trade) for trade in list_copy_trades(db, limit=limit)]
+        trades=[
+            build_copy_trade_read(
+                trade,
+                copy_window_seconds=trade.wallet.max_delay_seconds if trade.wallet is not None else None,
+            )
+            for trade in list_copy_trades(db, limit=limit)
+        ]
     )
 
 
@@ -110,7 +117,18 @@ def get_copy_orders(
     db: Session = Depends(get_db),
 ) -> CopyTradingOrdersResponse:
     return CopyTradingOrdersResponse(
-        orders=[CopyOrderRead.model_validate(order) for order in list_copy_orders(db, limit=limit)]
+        orders=[
+            build_copy_order_read(
+                order,
+                copy_window_seconds=(
+                    order.wallet.max_delay_seconds
+                    if order.wallet is not None and order.detected_trade is not None
+                    else None
+                ),
+                source_timestamp=order.detected_trade.source_timestamp if order.detected_trade is not None else None,
+            )
+            for order in list_copy_orders(db, limit=limit)
+        ]
     )
 
 
