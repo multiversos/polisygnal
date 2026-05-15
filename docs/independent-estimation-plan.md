@@ -72,3 +72,25 @@ auxiliar y no destraban Gate C por si solos.
 
 Hasta que esos providers existan y devuelvan datos reales, la UI debe mostrar
 faltantes honestos en vez de completar huecos con texto inventado.
+
+## Trial activo de odds externas
+
+Durante la trial temporal de 24 horas se puede habilitar `OddsBlaze` como
+proveedor externo read-only para NBA:
+
+- provider: `OddsBlaze`;
+- endpoint base: `https://odds.oddsblaze.com/`;
+- auth mode: query param `key`, solo server-side;
+- sportsbook inicial: `draftkings`;
+- market inicial: `moneyline`;
+- `price=probability`, `main=true`, `live=false`.
+
+La comparacion solo cuenta como evidencia independiente si:
+
+1. el provider responde;
+2. hay match medio/alto contra el mercado NBA de Polymarket;
+3. los outcomes externos son reales y comparables.
+
+Si no, debe quedar como `Parcial`, `Sin match claro`, `Timeout` o `Proveedor no
+configurado`. El precio de Polymarket sigue siendo solo referencia y no se
+convierte en estimate propio.

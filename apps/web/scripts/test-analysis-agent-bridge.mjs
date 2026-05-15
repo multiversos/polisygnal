@@ -31,6 +31,19 @@ function fixtureTask() {
     brief: {
       createdAt: "2026-05-13T00:00:00.000Z",
       knownSignals: {
+        externalOddsComparison: {
+          checkedAt: "2026-05-13T00:00:00.000Z",
+          eventName: "Thunder vs. Lakers",
+          matchConfidence: "medium",
+          matchedMarket: true,
+          outcomes: [
+            { impliedProbability: 0.53, label: "Thunder", priceAmerican: null, priceDecimal: null },
+            { impliedProbability: 0.47, label: "Lakers", priceAmerican: null, priceDecimal: null },
+          ],
+          providerName: "OddsBlaze",
+          sportsbook: "draftkings",
+          status: "available",
+        },
         marketProbability: { no: 0.46, yes: 0.54 },
         walletIntelligence: {
           available: false,
@@ -101,8 +114,10 @@ try {
 
   process.env.ANALYSIS_AGENT_TOKEN = "test-token-value";
   let capturedAuthorization = "";
+  let capturedBody = "";
   globalThis.fetch = async (_url, init) => {
     capturedAuthorization = init?.headers?.authorization || "";
+    capturedBody = String(init?.body || "");
     return new Response(
       JSON.stringify({
         agentId: "jarvis",
@@ -127,6 +142,8 @@ try {
   };
   const partial = await sendAnalysisAgentResearchTask(fixtureTask());
   assert(capturedAuthorization === "Bearer test-token-value", "bridge should send token as bearer header");
+  assert(capturedBody.includes('"externalOddsComparison"'), "bridge payload must include sanitized external odds context");
+  assert(capturedBody.includes('"providerName":"OddsBlaze"'), "bridge payload must include provider name");
   assert(!JSON.stringify(partial).includes("test-token-value"), "bridge result must not leak token");
   assert(partial.agentName === "Jarvis", "bridge response should preserve dynamic agent name");
   assert(partial.status === "partial", "partial agent response should be terminal instead of leaving the UI researching");

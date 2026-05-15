@@ -17,7 +17,9 @@
     "test:profiles": "node scripts/test-profiles.mjs",
     "test:profile-alerts": "node scripts/test-profile-alerts.mjs",
     "test:analysis-agent-timeout": "node scripts/test-analysis-agent-timeout.mjs",
-    "test:independent-evidence": "node scripts/test-independent-evidence.mjs"
+    "test:independent-evidence": "node scripts/test-independent-evidence.mjs",
+    "test:external-odds": "node scripts/test-external-odds.mjs",
+    "test:sports-context": "node scripts/test-sports-context.mjs"
   },
   "dependencies": {
     "next": "15.5.15",

@@ -66,6 +66,24 @@ const walletSummary = {
 
 const sportsSummary = buildIndependentEvidenceSummary({
   agentName: "Samantha",
+  externalOddsComparison: {
+    bestSourceUrl: "https://sportsbook.draftkings.com/event/fixture",
+    checkedAt: "2026-05-15T14:01:00.000Z",
+    eventName: "Spurs vs. Timberwolves",
+    eventStartTime: "2026-05-15T19:00:00.000Z",
+    league: "NBA",
+    limitations: ["Comparison only."],
+    matchConfidence: "medium",
+    matchedMarket: true,
+    outcomes: [
+      { impliedProbability: 0.61, label: "Spurs", priceAmerican: null, priceDecimal: null, sourceOutcomeName: "Spurs" },
+      { impliedProbability: 0.39, label: "Timberwolves", priceAmerican: null, priceDecimal: null, sourceOutcomeName: "Timberwolves" },
+    ],
+    providerName: "OddsBlaze",
+    sportsbook: "DraftKings",
+    status: "available",
+    warnings: [],
+  },
   item: sportsMarket,
   samanthaReport: validButNoIndependentGateReport,
   samanthaStatus: "partial",
@@ -82,16 +100,16 @@ assert(
   "wallet intelligence should remain auxiliary",
 );
 assert(
-  sportsSummary.items.some((item) => item.label === "Odds externas" && item.status === "not_connected"),
-  "external odds should stay not_connected without a real provider",
+  sportsSummary.items.some((item) => item.label === "Odds externas" && item.status === "available" && item.isIndependent),
+  "external odds should count as independent only when the provider returns a matched market",
 );
 assert(
   sportsSummary.items.some((item) => item.label === "Noticias/lesiones" && item.status === "not_connected"),
   "sports summary should show missing news/injuries honestly",
 );
 assert(
-  sportsSummary.missingRequiredCategories.some((label) => label.startsWith("Odds externas")),
-  "sports summary should explain missing odds",
+  !sportsSummary.missingRequiredCategories.some((label) => label.startsWith("Odds externas")),
+  "sports summary should stop listing missing odds when a real provider match is available",
 );
 assert(!sportsSummary.enoughForEstimate, "sports summary must not enable estimate with only market + wallets");
 
@@ -124,6 +142,24 @@ assert(
 
 const readySummary = buildIndependentEvidenceSummary({
   agentName: "Samantha",
+  externalOddsComparison: {
+    bestSourceUrl: "https://sportsbook.draftkings.com/event/fixture",
+    checkedAt: "2026-05-15T14:01:00.000Z",
+    eventName: "Spurs vs. Timberwolves",
+    eventStartTime: "2026-05-15T19:00:00.000Z",
+    league: "NBA",
+    limitations: ["Comparison only."],
+    matchConfidence: "high",
+    matchedMarket: true,
+    outcomes: [
+      { impliedProbability: 0.61, label: "Spurs", priceAmerican: null, priceDecimal: null, sourceOutcomeName: "Spurs" },
+      { impliedProbability: 0.39, label: "Timberwolves", priceAmerican: null, priceDecimal: null, sourceOutcomeName: "Timberwolves" },
+    ],
+    providerName: "OddsBlaze",
+    sportsbook: "DraftKings",
+    status: "available",
+    warnings: [],
+  },
   item: sportsMarket,
   samanthaReport: strongValidSamanthaReport,
   samanthaStatus: "completed",
@@ -139,6 +175,10 @@ assert(
 assert(
   getIndependentEvidenceStatusLabel("not_connected") === "Fuente no conectada",
   "status labels should stay user-facing and explicit",
+);
+assert(
+  getIndependentEvidenceStatusLabel("no_match") === "Sin match claro",
+  "no_match status should remain explicit for provider mismatches",
 );
 
 console.log(

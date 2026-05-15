@@ -913,6 +913,31 @@ async function main() {
     ["DATABASE_URL", "SECRET", "TOKEN", "API_KEY", "copy-trading", "ROI 100%", "win rate 100%"],
     "analysis agent smoke response",
   );
+  const externalOddsSmoke = await postJsonAllowFailure("/api/external-odds/compare", {
+    eventDate: "2026-05-15",
+    eventSlug: "nba-sas-min-2026-05-15",
+    league: "nba",
+    marketSlug: "nba-sas-min-2026-05-15",
+    marketTitle: "Spurs vs. Timberwolves",
+    outcomePrices: [
+      { label: "Spurs", price: 0.655, side: "UNKNOWN" },
+      { label: "Timberwolves", price: 0.345, side: "UNKNOWN" },
+    ],
+    participants: ["Spurs", "Timberwolves"],
+    sport: "nba",
+  });
+  assert(externalOddsSmoke.status === 200, `external odds smoke returned HTTP ${externalOddsSmoke.status}`);
+  assert(
+    ["available", "partial", "no_match", "disabled", "unavailable", "timeout", "error"].includes(
+      externalOddsSmoke.body?.status,
+    ),
+    `external odds smoke returned unexpected status ${externalOddsSmoke.body?.status}`,
+  );
+  assertTextExcludes(
+    JSON.stringify(externalOddsSmoke.body),
+    ["DATABASE_URL", "SECRET", "TOKEN", "API_KEY", "key=", "copy-trading"],
+    "external odds smoke response",
+  );
   const analyzeLoadingPanel = validateAnalyzeLoadingPanelSource();
   const securityHeaders = validateSecurityHeaders(await fetchPage(HOME_PATH), "home headers");
   const overview = await fetchJson(PROXY_PATH);

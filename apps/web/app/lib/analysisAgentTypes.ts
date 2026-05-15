@@ -78,6 +78,7 @@ export type AnalysisAgentTask = {
 export type AnalysisAgentRequest = {
   category: string | null;
   eventSlug: string | null;
+  externalOddsComparison: object | null;
   liquidity: number | null;
   marketId: string | null;
   marketProbability: number | null;

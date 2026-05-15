@@ -1066,6 +1066,8 @@ function validateSamanthaResearchRules() {
   const analysisAgentRegistrySource = readFileSync(resolve(appRoot, "app/lib/analysisAgentRegistry.ts"), "utf8");
   const analysisAgentBridgeSource = readFileSync(resolve(appRoot, "app/lib/analysisAgentBridge.ts"), "utf8");
   const analysisAgentRouteSource = readFileSync(resolve(appRoot, "app/api/analysis-agent/send-research/route.ts"), "utf8");
+  const externalOddsRouteSource = readFileSync(resolve(appRoot, "app/api/external-odds/compare/route.ts"), "utf8");
+  const externalOddsProviderSource = readFileSync(resolve(appRoot, "app/lib/externalOddsProvider.ts"), "utf8");
   const bridgeTypesSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridgeTypes.ts"), "utf8");
   const bridgeSource = readFileSync(resolve(appRoot, "app/lib/samanthaBridge.ts"), "utf8");
   const envExampleSource = readFileSync(resolve(appRoot, ".env.example"), "utf8");
@@ -1076,6 +1078,24 @@ function validateSamanthaResearchRules() {
   const packageSource = readFileSync(resolve(appRoot, "package.json"), "utf8");
 
   const brief = buildSamanthaResearchBrief({
+    externalOddsComparison: {
+      bestSourceUrl: "https://sportsbook.draftkings.com/event/fixture",
+      checkedAt: "2026-05-12T12:00:00.000Z",
+      eventName: "Thunder vs. Lakers",
+      eventStartTime: "2026-05-12T19:00:00.000Z",
+      league: "NBA",
+      limitations: ["Fixture comparison only."],
+      matchConfidence: "medium",
+      matchedMarket: true,
+      outcomes: [
+        { impliedProbability: 0.57, label: "Thunder", priceAmerican: null, priceDecimal: null, sourceOutcomeName: "Thunder" },
+        { impliedProbability: 0.43, label: "Lakers", priceAmerican: null, priceDecimal: null, sourceOutcomeName: "Lakers" },
+      ],
+      providerName: "OddsBlaze",
+      sportsbook: "DraftKings",
+      status: "available",
+      warnings: [],
+    },
     item: {
       latest_snapshot: {
         liquidity: 800,
@@ -1137,6 +1157,7 @@ function validateSamanthaResearchRules() {
   assert(serializedBrief.includes("walletSignalAvailable"), "Samantha brief must include sanitized wallet signal availability");
   assert(serializedBrief.includes("notableWalletCount"), "Samantha brief must include sanitized notable wallet count");
   assert(serializedBrief.includes("profileSummary"), "Samantha brief must include sanitized wallet profile summary");
+  assert(serializedBrief.includes("externalOddsComparison"), "Samantha brief must include sanitized external odds context when present");
   const taskPacket = buildSamanthaTaskPacket(brief);
   const taskPacketText = [
     taskPacket.researchBriefJson,
@@ -1163,6 +1184,7 @@ function validateSamanthaResearchRules() {
   assert(analysisAgentBridgeSource.includes("buildAnalysisAgentMarketPayload"), "analysis agent bridge must send automatic market-analysis payloads");
   assert(analysisAgentBridgeSource.includes("polymarketUrl"), "analysis agent payload must include the Polymarket URL");
   assert(analysisAgentBridgeSource.includes("walletIntelligence"), "analysis agent payload must include sanitized Wallet Intelligence context");
+  assert(analysisAgentBridgeSource.includes("externalOddsComparison"), "analysis agent payload must include sanitized external odds context");
   assert(analysisAgentBridgeSource.includes('"insufficient_data"'), "analysis agent bridge must understand insufficient_data responses");
   assert(analysisAgentBridgeSource.includes("credentials: \"omit\""), "analysis agent bridge fetch must omit credentials");
   assert(analysisAgentBridgeSource.includes("redirect: \"error\""), "analysis agent bridge fetch must reject redirects");
@@ -1175,7 +1197,12 @@ function validateSamanthaResearchRules() {
   assert(envExampleSource.includes("ANALYSIS_AGENT_PROVIDER=samantha"), "env example must document generic analysis agent provider");
   assert(envExampleSource.includes("ANALYSIS_AGENT_URL=https://<agent-host>/polysignal/analyze-market"), "env example must document generic HTTPS analysis agent URL");
   assert(envExampleSource.includes("SAMANTHA_BRIDGE_ALLOW_LOCALHOST=false"), "env example must keep localhost disabled by default");
+  assert(envExampleSource.includes("ODDS_PROVIDER_ENABLED=false"), "env example must document OddsBlaze provider toggle");
+  assert(envExampleSource.includes("ODDS_PROVIDER_API_KEY="), "env example must expose only an empty OddsBlaze API key placeholder");
   assert(analysisAgentRouteSource.includes("handleAnalysisAgentSendResearch"), "generic send route must use shared handler");
+  assert(externalOddsRouteSource.includes("compareExternalOdds"), "external odds route must delegate to the server-side provider");
+  assert(externalOddsRouteSource.includes("unsupported_sport"), "external odds route must reject unsupported sports safely");
+  assert(!externalOddsProviderSource.includes("NEXT_PUBLIC"), "external odds provider must remain server-side");
   assert(analysisAgentRouteSource.includes("analysisAgentJsonResponse"), "generic send route must use safe JSON response helper");
   assert(bridgeRouteSource.includes("../../analysis-agent/send-research/route"), "legacy Samantha send route must alias generic route");
   assert(!analysisAgentRouteSource.includes("request.nextUrl"), "analysis agent send route must not derive destination from request URL");

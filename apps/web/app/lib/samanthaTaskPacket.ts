@@ -106,6 +106,15 @@ export function buildSamanthaInstructionsText(brief: SamanthaResearchBrief): str
       return `- ${outcome.label}${price} side=${outcome.side ?? "UNKNOWN"}`;
     })
     .join("\n");
+  const externalOdds = brief.knownSignals.externalOddsComparison;
+  const externalOddsSummary =
+    externalOdds?.matchedMarket && (externalOdds.outcomes?.length ?? 0) > 0
+      ? externalOdds.outcomes
+          ?.map((outcome) =>
+            `${outcome.label} ${typeof outcome.impliedProbability === "number" ? outcome.impliedProbability.toFixed(3) : "sin_dato"}`,
+          )
+          .join(" / ")
+      : null;
   return [
     "Samantha, investigate this Polymarket market for PolySignal.",
     "",
@@ -115,6 +124,9 @@ export function buildSamanthaInstructionsText(brief: SamanthaResearchBrief): str
     brief.market.eventSlug ? `- Event slug: ${brief.market.eventSlug}` : "- Event slug: unavailable",
     brief.market.marketSlug ? `- Market slug: ${brief.market.marketSlug}` : "- Market slug: unavailable",
     brief.market.eventDate ? `- Event/close date: ${brief.market.eventDate}` : "- Event/close date: unavailable",
+    externalOdds?.status ? `- External odds status: ${externalOdds.status}` : "- External odds status: unavailable",
+    externalOdds?.providerName ? `- External odds provider: ${externalOdds.providerName}` : null,
+    externalOddsSummary ? `- External odds summary: ${externalOddsSummary}` : null,
     "",
     "Outcomes:",
     outcomes || "- Outcomes unavailable",
