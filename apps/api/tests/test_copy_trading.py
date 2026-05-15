@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.api import routes_copy_trading
 from app.models.copy_trading import CopyWallet
 from app.schemas.copy_trading import CopyWalletCreate
 from app.services.copy_trading_demo_engine import normalize_public_trade, run_demo_tick
@@ -21,6 +22,7 @@ from app.services.copy_trading_service import (
     list_copy_trades,
     resolve_copy_wallet_input,
 )
+from app.services.copy_trading_watcher import CopyTradingDemoWatcher
 
 WALLET = "0x1111111111111111111111111111111111111111"
 WALLET_B = "0x2222222222222222222222222222222222222222"
@@ -54,6 +56,22 @@ class FailingForOneWalletReader:
         if wallet == self.failing_wallet:
             raise RuntimeError("upstream unavailable")
         return []
+
+
+class DummySession:
+    def commit(self) -> None:
+        return None
+
+    def rollback(self) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
+class DummyDataClient:
+    def close(self) -> None:
+        return None
 
 
 def test_valid_wallet_normalizes_direct_0x() -> None:
@@ -406,6 +424,138 @@ def test_real_mode_returns_blocked_not_configured(db_session: Session) -> None:
     assert intent.reason == "real_trading_not_configured"
 
 
+def test_watcher_status_initial() -> None:
+    watcher = _build_test_watcher()
+
+    status = watcher.get_status()
+
+    assert status.enabled is False
+    assert status.running is False
+    assert status.interval_seconds == 10
+    assert status.last_result is None
+    assert status.error_count == 0
+
+
+def test_watcher_start_changes_state() -> None:
+    watcher = _build_test_watcher()
+
+    status = watcher.start()
+    watcher.stop()
+
+    assert status.enabled is True
+    assert status.message == "Watcher demo iniciado."
+
+
+def test_watcher_start_twice_does_not_duplicate() -> None:
+    watcher = _build_test_watcher()
+
+    watcher.start()
+    status = watcher.start()
+    watcher.stop()
+
+    assert status.enabled is True
+    assert status.message == "Watcher demo ya activo."
+
+
+def test_watcher_stop_changes_state() -> None:
+    watcher = _build_test_watcher()
+    watcher.start()
+
+    status = watcher.stop()
+
+    assert status.enabled is False
+    assert status.message == "Watcher demo pausado."
+
+
+def test_watcher_run_once_executes_demo_tick_once(db_session: Session) -> None:
+    _create_wallet(db_session)
+    watcher = _build_test_watcher()
+
+    result = watcher.run_once(db=db_session, data_client=FakeTradeReader([_trade("0xwatcher")]), now=_now())
+
+    assert result.executed is True
+    assert result.status.last_result is not None
+    assert result.status.last_result.new_trades == 1
+    assert result.status.last_result.orders_simulated == 1
+
+
+def test_watcher_run_once_without_wallets_returns_safe_result(db_session: Session) -> None:
+    watcher = _build_test_watcher()
+
+    result = watcher.run_once(db=db_session, data_client=FakeTradeReader([]), now=_now())
+
+    assert result.executed is True
+    assert result.status.last_result is not None
+    assert result.status.last_result.wallets_scanned == 0
+    assert result.status.last_result.new_trades == 0
+
+
+def test_watcher_respects_demo_mode(db_session: Session) -> None:
+    demo_wallet = _create_wallet(db_session, suffix="11")
+    real_wallet = _create_wallet(db_session, suffix="22")
+    real_wallet.mode = "real"
+    db_session.add(real_wallet)
+    db_session.commit()
+    reader = TrackingTradeReader({demo_wallet.proxy_wallet: [], real_wallet.proxy_wallet: []})
+    watcher = _build_test_watcher()
+
+    result = watcher.run_once(db=db_session, data_client=reader, now=_now())
+
+    assert result.executed is True
+    assert reader.wallets_seen == [demo_wallet.proxy_wallet]
+
+
+def test_watcher_continues_when_one_wallet_fails(db_session: Session) -> None:
+    first = _create_wallet(db_session, suffix="11")
+    _create_wallet(db_session, suffix="22")
+    watcher = _build_test_watcher()
+
+    result = watcher.run_once(
+        db=db_session,
+        data_client=FailingForOneWalletReader(failing_wallet=first.proxy_wallet),
+        now=_now(),
+    )
+
+    assert result.executed is True
+    assert result.status.last_result is not None
+    assert result.status.last_result.wallets_scanned == 2
+    assert result.status.last_result.errors == ["No se pudo leer actividad publica."]
+
+
+def test_watcher_saves_last_result(db_session: Session) -> None:
+    _create_wallet(db_session)
+    watcher = _build_test_watcher()
+
+    watcher.run_once(db=db_session, data_client=FakeTradeReader([_trade("0xresult")]), now=_now())
+    status = watcher.get_status()
+
+    assert status.last_result is not None
+    assert status.last_result.orders_simulated == 1
+
+
+def test_watcher_run_once_route(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    watcher = _build_test_watcher()
+    monkeypatch.setattr(routes_copy_trading, "demo_watcher", watcher)
+
+    response = client.post("/copy-trading/watcher/run-once")
+
+    assert response.status_code == 200
+    assert response.json()["last_result"]["wallets_scanned"] == 0
+
+
+def test_watcher_start_stop_routes(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    watcher = _build_test_watcher()
+    monkeypatch.setattr(routes_copy_trading, "demo_watcher", watcher)
+
+    start_response = client.post("/copy-trading/watcher/start")
+    stop_response = client.post("/copy-trading/watcher/stop")
+
+    assert start_response.status_code == 200
+    assert start_response.json()["enabled"] is True
+    assert stop_response.status_code == 200
+    assert stop_response.json()["enabled"] is False
+
+
 def _create_wallet(
     db_session: Session,
     *,
@@ -438,6 +588,15 @@ def _trade(transaction_hash: str) -> dict[str, object]:
         "outcome": "YES",
         "transactionHash": transaction_hash,
     }
+
+
+def _build_test_watcher() -> CopyTradingDemoWatcher:
+    return CopyTradingDemoWatcher(
+        interval_seconds=10,
+        session_factory=DummySession,
+        data_client_factory=DummyDataClient,
+        tick_runner=run_demo_tick,
+    )
 
 
 def _now() -> datetime:

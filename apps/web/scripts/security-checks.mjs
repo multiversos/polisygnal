@@ -2578,6 +2578,10 @@ function validateAnalyzerFirstProductSource() {
     resolve(appRoot, "app/components/copy-trading/ExecutionWalletCard.tsx"),
     "utf8",
   );
+  const copyWatcherPanel = readFileSync(
+    resolve(appRoot, "app/components/copy-trading/CopyWatcherPanel.tsx"),
+    "utf8",
+  );
   const copyOrdersTable = readFileSync(
     resolve(appRoot, "app/components/copy-trading/CopyOrdersTable.tsx"),
     "utf8",
@@ -2614,7 +2618,7 @@ function validateAnalyzerFirstProductSource() {
   assert(legacySports.includes("Vista legacy"), "sports route should be marked legacy");
   assert(!existsSync(legacySamanthaRoute), "legacy samantha-polysignal-analysis route must not be reintroduced");
   assert(copyTradingPage.includes("CopyTradingDashboard"), "copy trading page should render the dashboard");
-  const copyTradingSource = `${copyTradingHeader}\n${copyTradingDashboard}\n${copyExecutionWallet}`;
+  const copyTradingSource = `${copyTradingHeader}\n${copyTradingDashboard}\n${copyExecutionWallet}\n${copyWatcherPanel}`;
   for (const text of ["Copiar Wallets", "Demo activo", "Real no conectado", "Bloqueado hasta configurar credenciales"]) {
     assert(copyTradingSource.includes(text), `copy trading dashboard missing safe text: ${text}`);
   }
@@ -2630,6 +2634,13 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["Ultima actualizacion", "Auto-refresh", "Refrescar ahora", "Pausar auto"]) {
     assert(copyTradingDashboard.includes(text), `copy trading auto-refresh controls missing text: ${text}`);
   }
+  for (const text of ["Watcher demo", "Iniciar watcher demo", "Pausar watcher", "Ejecutar una vez"]) {
+    assert(copyWatcherPanel.includes(text), `copy watcher panel missing text: ${text}`);
+  }
+  assert(
+    copyWatcherPanel.includes("No ejecuta operaciones reales"),
+    "copy watcher panel must state that it does not execute real operations",
+  );
   assert(copyTradingDashboard.includes("visibilityState"), "copy trading auto-refresh should respect hidden tabs");
   assert(copyTradingDashboard.includes("isRefreshingRef"), "copy trading auto-refresh should avoid overlapping refresh requests");
   assert(copyOrdersTable.includes("formatCopyOrderReason"), "copy orders should translate technical reasons");

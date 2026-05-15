@@ -91,6 +91,10 @@ Calculo demo:
 - `GET /copy-trading/events`
 - `POST /copy-trading/wallets/{wallet_id}/scan`
 - `POST /copy-trading/demo/tick`
+- `GET /copy-trading/watcher/status`
+- `POST /copy-trading/watcher/start`
+- `POST /copy-trading/watcher/stop`
+- `POST /copy-trading/watcher/run-once`
 
 ## Modo Real
 
@@ -123,9 +127,23 @@ npm.cmd --workspace apps/web run smoke:production
 
 - No hay autenticacion ni ownership por usuario.
 - No hay trading real.
-- No hay scheduler persistente.
+- El watcher demo vive en memoria; si el proceso se reinicia, su estado se pierde.
+- No hay scheduler persistente ni distribuido.
 - La lectura depende de disponibilidad publica de Polymarket Data API.
 - El historial real de posiciones cerradas queda para un sprint posterior.
+
+## Watcher demo automatico
+
+- El watcher demo escanea wallets activas en modo `demo` cada `10 segundos`.
+- Reutiliza la misma logica segura de `demo tick`: lectura publica, dedupe, ordenes `simulated` o `skipped`, y eventos auditables.
+- No ejecuta operaciones reales, no firma ordenes, no usa private keys y no llama CLOB real.
+- `Auto-refresh` de frontend y `watcher demo` son cosas distintas:
+  - `Auto-refresh` solo vuelve a leer status, wallets, trades, orders y events.
+  - `Watcher demo` busca trades nuevos y actualiza resultados desde backend.
+- El watcher puede iniciarse, pausarse o correrse una vez mediante endpoints controlados.
+- Usa un lock interno para evitar ejecuciones solapadas y no arranca un segundo loop si ya hay uno activo.
+- Si una wallet falla, registra error limpio y sigue con las demas.
+- Esta version en memoria es suficiente para demo inicial. La siguiente etapa natural es moverlo a worker o scheduler dedicado.
 
 ## Copy Trading tiempo real - ruta tecnica
 
@@ -133,12 +151,13 @@ Fase actual:
 
 - Auto-refresh frontend cada 5s.
 - Demo tick manual.
+- Watcher demo backend cada 10s con control start/stop/run-once.
 - Lectura publica por backend/proxy.
 
 Fase siguiente:
 
-- Backend polling cada 2-3s para wallets activas.
-- Cola de deteccion con dedupe.
+- Backend polling mas fino por wallet activa.
+- Cola de deteccion con dedupe y persistencia de estado.
 - Estado por wallet.
 
 Fase avanzada:

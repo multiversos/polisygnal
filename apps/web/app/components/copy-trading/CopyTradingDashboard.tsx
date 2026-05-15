@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getCopyTradingDashboardData, runCopyTradingDemoTick } from "../../lib/copyTrading";
+import {
+  getCopyTradingDashboardData,
+  runCopyTradingDemoTick,
+  runCopyTradingWatcherOnce,
+  startCopyTradingWatcher,
+  stopCopyTradingWatcher,
+} from "../../lib/copyTrading";
 import type { CopyTradingDashboardData, CopyTradingTickSummary } from "../../lib/copyTradingTypes";
 import { AddCopyWalletForm } from "./AddCopyWalletForm";
 import { CopyBotEvents } from "./CopyBotEvents";
@@ -9,6 +15,7 @@ import { CopyOrdersTable } from "./CopyOrdersTable";
 import { CopyTradesTable } from "./CopyTradesTable";
 import { CopyTradingHeader } from "./CopyTradingHeader";
 import { CopyTradingMetrics } from "./CopyTradingMetrics";
+import { CopyWatcherPanel } from "./CopyWatcherPanel";
 import { CopyWalletsTable } from "./CopyWalletsTable";
 import { ExecutionWalletCard } from "./ExecutionWalletCard";
 
@@ -22,6 +29,7 @@ export function CopyTradingDashboard() {
   const [tickSummary, setTickSummary] = useState<CopyTradingTickSummary | null>(null);
   const [runningTick, setRunningTick] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [watcherBusy, setWatcherBusy] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [pageVisible, setPageVisible] = useState(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -144,6 +152,56 @@ export function CopyTradingDashboard() {
     await refresh();
   }
 
+  async function handleWatcherStart() {
+    setWatcherBusy(true);
+    setError(null);
+    try {
+      const watcher = await startCopyTradingWatcher();
+      setData((current) => (current ? { ...current, watcher } : current));
+      setNotice(watcher.message || "Watcher demo iniciado.");
+      await refresh({ isBackground: true });
+    } catch {
+      setError("No pudimos iniciar el watcher demo ahora.");
+    } finally {
+      setWatcherBusy(false);
+    }
+  }
+
+  async function handleWatcherStop() {
+    setWatcherBusy(true);
+    setError(null);
+    try {
+      const watcher = await stopCopyTradingWatcher();
+      setData((current) => (current ? { ...current, watcher } : current));
+      setNotice(watcher.message || "Watcher demo pausado.");
+      await refresh({ isBackground: true });
+    } catch {
+      setError("No pudimos pausar el watcher demo ahora.");
+    } finally {
+      setWatcherBusy(false);
+    }
+  }
+
+  async function handleWatcherRunOnce() {
+    setWatcherBusy(true);
+    setError(null);
+    try {
+      const watcher = await runCopyTradingWatcherOnce();
+      setData((current) => (current ? { ...current, watcher } : current));
+      if (watcher.last_result) {
+        setTickSummary(watcher.last_result);
+        setNotice(getDemoTickMessage(watcher.last_result));
+      } else {
+        setNotice(watcher.message || "Watcher demo ejecuto un escaneo.");
+      }
+      await refresh({ isBackground: true });
+    } catch {
+      setError("No pudimos ejecutar el watcher demo ahora.");
+    } finally {
+      setWatcherBusy(false);
+    }
+  }
+
   return (
     <main className="copy-trading-page">
       <CopyTradingHeader status={data?.status ?? null} />
@@ -204,6 +262,25 @@ export function CopyTradingDashboard() {
             await refresh();
           }}
           wallets={data?.wallets ?? []}
+        />
+        <CopyWatcherPanel
+          busy={watcherBusy}
+          onRunOnce={handleWatcherRunOnce}
+          onStart={handleWatcherStart}
+          onStop={handleWatcherStop}
+          watcher={
+            data?.watcher ?? {
+              enabled: false,
+              running: false,
+              interval_seconds: 10,
+              last_run_at: null,
+              next_run_at: null,
+              last_result: null,
+              error_count: 0,
+              last_error: null,
+              message: null,
+            }
+          }
         />
         <ExecutionWalletCard />
         <section className="copy-panel copy-real-lock">

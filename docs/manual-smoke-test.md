@@ -865,6 +865,15 @@ secretos.
     promising profit.
 12. Confirm no text recommends copying a trader, guarantees outcomes, or
     presents wallet activity as financial advice.
+13. Confirm `Watcher demo` is visible and explains that it does not execute
+    real operations.
+14. Confirm the page shows:
+    - `Iniciar watcher demo`
+    - `Pausar watcher`
+    - `Ejecutar una vez`
+15. Confirm watcher status is separate from `Auto-refresh` and that the page
+    makes clear `Auto-refresh` only updates the UI while the watcher scans
+    wallets in backend.
 
 ## Cache Troubleshooting
 

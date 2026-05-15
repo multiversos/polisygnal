@@ -124,8 +124,21 @@ export type CopyTradingTickSummary = {
   errors: string[];
 };
 
+export type CopyTradingWatcherStatus = {
+  enabled: boolean;
+  running: boolean;
+  interval_seconds: number;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  last_result: CopyTradingTickSummary | null;
+  error_count: number;
+  last_error: string | null;
+  message: string | null;
+};
+
 export type CopyTradingDashboardData = {
   status: CopyTradingStatus;
+  watcher: CopyTradingWatcherStatus;
   wallets: CopyWallet[];
   trades: CopyDetectedTrade[];
   orders: CopyOrder[];
