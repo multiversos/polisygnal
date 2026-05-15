@@ -81,7 +81,8 @@ assert(profilesSource.includes("Limpiar filtros"), "/profiles must let users cle
 assert(profilesSource.includes("Ya no cumple criterio"), "/profiles must show stale profiles that no longer pass current gates");
 assert(profilesSource.includes("Actualizando"), "/profiles must show refresh progress");
 assert(profilesSource.includes("Historial pasado no garantiza resultados futuros."), "/profiles must warn about historical performance");
-assert(profilesSource.includes("No es recomendacion de copy-trading."), "/profiles must avoid copy-trading framing");
+assert(profilesSource.includes("No da consejos de copy-trading."), "/profiles hero must avoid copy-trading framing");
+assert(profilesSource.includes("No es recomendacion de copy-trading."), "/profiles details must avoid copy-trading framing");
 assert(profilesSource.includes("Copiar direccion"), "/profiles must copy addresses without copy-trading wording");
 assert(!profilesSource.includes("Copiar wallet"), "/profiles must avoid copy-trading-adjacent wallet copy wording");
 assert(profilesSource.includes("profileSourceLabel"), "/profiles must normalize technical source labels");

@@ -1098,7 +1098,11 @@ async function main() {
     ["Los perfiles destacados apareceran", "Perfil destacado", "Perfiles guardados"],
     "profiles empty or persisted state copy",
   );
-  assertTextIncludes(profilesText, "No es recomendacion de copy-trading", "profiles anti-copy-trading copy");
+  assertTextIncludesOneOf(
+    profilesText,
+    ["No da consejos de copy-trading", "No es recomendacion de copy-trading"],
+    "profiles anti-copy-trading copy",
+  );
   assertTextExcludes(profilesText, ["tokenId", "conditionId", "transactionHash", "raw JSON"], "profiles technical noise");
   const performanceDom = await dumpDom(urlFor(PERFORMANCE_PATH));
   const performanceRender = validatePublicProductPage(performanceDom, "performance", ["Rendimiento"]);

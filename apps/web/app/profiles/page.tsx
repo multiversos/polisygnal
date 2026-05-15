@@ -490,7 +490,8 @@ export default function ProfilesPage() {
           <p className="eyebrow">Wallet Intelligence</p>
           <h1>Perfiles</h1>
           <p>Billeteras publicas destacadas detectadas por PolySignal.</p>
-          <p>Datos publicos de Polymarket. No es recomendacion de copy-trading.</p>
+          <p>Datos publicos de Polymarket.</p>
+          <p>No da consejos de copy-trading.</p>
         </div>
         <div className="profiles-hero-actions">
           <span className="badge external-hint">
