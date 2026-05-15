@@ -2,7 +2,12 @@
 
 import type { CopyAmountMode } from "../../lib/copyTradingTypes";
 
-const PRESETS = [1, 5, 10, 20];
+const PRESETS = [
+  { label: "$1", value: 1 },
+  { label: "$5", value: 5 },
+  { label: "$10", value: 10 },
+  { label: "$20", value: 20 },
+];
 
 type CopyAmountSelectorProps = {
   amount: number;
@@ -24,13 +29,13 @@ export function CopyAmountSelector({
       <div className="copy-amount-presets" aria-label="Monto por trade">
         {PRESETS.map((preset) => (
           <button
-            className={mode === "preset" && amount === preset ? "active" : ""}
+            className={mode === "preset" && amount === preset.value ? "active" : ""}
             disabled={disabled}
-            key={preset}
-            onClick={() => onChange({ amount: preset, mode: "preset" })}
+            key={preset.value}
+            onClick={() => onChange({ amount: preset.value, mode: "preset" })}
             type="button"
           >
-            ${preset}
+            {preset.label}
           </button>
         ))}
         <button

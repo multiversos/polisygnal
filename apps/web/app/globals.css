@@ -198,6 +198,12 @@
   margin-bottom: 14px;
 }
 
+.copy-control-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
 .copy-panel-heading strong,
 .copy-control-bar strong {
   font-size: 1.08rem;

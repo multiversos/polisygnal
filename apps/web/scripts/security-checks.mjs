@@ -2487,7 +2487,7 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["Copiar Wallets", "Demo activo", "Real no conectado", "Bloqueado hasta configurar credenciales"]) {
     assert(copyTradingSource.includes(text), `copy trading dashboard missing safe text: ${text}`);
   }
-  for (const text of ["1, 5, 10, 20", "Personalizado", "Monto personalizado USD"]) {
+  for (const text of ["$1", "$5", "$10", "$20", "Personalizado", "Monto personalizado USD"]) {
     assert(copyAmountSelector.includes(text), `copy amount selector missing preset/custom text: ${text}`);
   }
   assertTextExcludes(

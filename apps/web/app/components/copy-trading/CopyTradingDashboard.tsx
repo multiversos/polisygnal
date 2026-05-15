@@ -54,7 +54,7 @@ export function CopyTradingDashboard() {
       <CopyTradingMetrics status={data?.status ?? null} />
 
       <section className="copy-control-bar" aria-label="Controles del modo demo">
-        <div>
+        <div className="copy-control-copy">
           <span>Modo demo funcional</span>
           <strong>Escanea wallets seguidas y simula copias con monto fijo.</strong>
         </div>
