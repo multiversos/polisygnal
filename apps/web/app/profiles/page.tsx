@@ -296,7 +296,7 @@ export default function ProfilesPage() {
         }
         setProfiles(localProfiles);
         setStorageMode("local_fallback");
-        setSyncNotice("Mostrando perfiles guardados en este navegador porque el backend no esta disponible.");
+        setSyncNotice("Mostrando perfiles guardados en este navegador por ahora.");
       }
     };
 
@@ -477,11 +477,11 @@ export default function ProfilesPage() {
         <div className="profiles-hero-actions">
           <span className="badge external-hint">
             {storageMode === "persistent"
-              ? "DB persistente + fallback local"
+              ? "Registro persistente"
               : storageMode === "mixed"
-                ? "DB + perfiles locales"
+                ? "Sincronizacion parcial"
                 : storageMode === "local_fallback"
-                  ? "Solo local por ahora"
+                  ? "Guardado local por ahora"
                   : "Cargando perfiles"}
           </span>
           <button
@@ -674,8 +674,8 @@ export default function ProfilesPage() {
             observado relevante.
           </p>
           <p>
-            Perfiles v2 usa un registro persistente de datos publicos y conserva localStorage como fallback si el
-            backend no esta disponible o quedan perfiles pendientes de sincronizar.
+            Perfiles v2 usa un registro persistente de datos publicos y conserva localStorage como respaldo si la
+            sincronizacion no esta disponible o quedan perfiles pendientes.
           </p>
         </section>
       )}

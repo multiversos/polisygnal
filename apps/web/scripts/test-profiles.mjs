@@ -67,7 +67,7 @@ assert(
 
 assert(appShellSource.includes('label: "Perfiles"'), "sidebar must include Perfiles");
 assert(profilesSource.includes("Billeteras publicas detectadas con historial fuerte en Polymarket."), "/profiles must explain the section");
-assert(profilesSource.includes("DB persistente + fallback local"), "/profiles must document persistent storage with local fallback");
+assert(profilesSource.includes("Registro persistente"), "/profiles must document persistent profile storage");
 assert(profilesSource.includes("Actualizar todos"), "/profiles must expose bulk refresh");
 assert(profilesSource.includes("Actualizar"), "/profiles must expose per-profile refresh");
 assert(profilesSource.includes("/api/profiles/refresh-wallet"), "/profiles refresh must use the safe same-origin route");
