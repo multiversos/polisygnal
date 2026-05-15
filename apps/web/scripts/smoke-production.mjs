@@ -1147,6 +1147,24 @@ async function main() {
     ],
     "copy trading security leakage",
   );
+  const invalidCopyWalletRoute = await postJsonAllowFailure("/api/backend/copy-trading/wallets", {
+    copy_amount_mode: "preset",
+    copy_amount_usd: 5,
+    copy_buys: true,
+    copy_sells: true,
+    label: "qa-invalid-no-write",
+    mode: "demo",
+    wallet_input: "0x123",
+  });
+  assert(
+    invalidCopyWalletRoute.status === 400,
+    `copy trading invalid wallet route returned status ${invalidCopyWalletRoute.status}`,
+  );
+  assertTextIncludes(
+    JSON.stringify(invalidCopyWalletRoute.body),
+    "formato 0x",
+    "copy trading invalid wallet route",
+  );
   const performanceDom = await dumpDom(urlFor(PERFORMANCE_PATH));
   const performanceRender = validatePublicProductPage(performanceDom, "performance", ["Rendimiento"]);
   const performanceText = visibleText(performanceDom);
@@ -1561,6 +1579,9 @@ async function main() {
           methodology: methodologyRender,
           analyze: analyzeRender,
           market_detail: marketDetailRender,
+        },
+        copy_trading_invalid_wallet: {
+          status: invalidCopyWalletRoute.status,
         },
         analyze_loading_panel: analyzeLoadingPanel,
         data_health: dataHealthRender,

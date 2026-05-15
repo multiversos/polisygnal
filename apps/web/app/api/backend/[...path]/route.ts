@@ -1,5 +1,6 @@
 const DEFAULT_BACKEND_BASE_URL = "https://polisygnal.onrender.com";
 const REQUEST_TIMEOUT_MS = 15000;
+const MAX_PROXY_BODY_LENGTH = 32000;
 const MAX_PROXY_QUERY_LENGTH = 1800;
 const SAFE_RESPONSE_CONTENT_TYPES = ["application/json", "text/plain"];
 
@@ -21,6 +22,13 @@ const SAFE_GET_PREFIXES = [
   "/sources",
   "/tags",
   "/watchlist",
+];
+const SAFE_WRITE_RULES = [
+  { method: "POST", pattern: /^\/copy-trading\/wallets$/ },
+  { method: "PATCH", pattern: /^\/copy-trading\/wallets\/[^/]+$/ },
+  { method: "DELETE", pattern: /^\/copy-trading\/wallets\/[^/]+$/ },
+  { method: "POST", pattern: /^\/copy-trading\/wallets\/[^/]+\/scan$/ },
+  { method: "POST", pattern: /^\/copy-trading\/demo\/tick$/ },
 ];
 
 type RouteContext = {
@@ -72,7 +80,7 @@ function methodNotAllowed(): Response {
     {
       status: 405,
       headers: {
-        Allow: "GET",
+        Allow: "GET, POST, PATCH, DELETE",
         "Cache-Control": "no-store",
         "X-PolySignal-Proxy": "enabled",
         "X-Content-Type-Options": "nosniff",
@@ -99,6 +107,10 @@ function isAllowedBackendPath(pathname: string): boolean {
   return SAFE_GET_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
+}
+
+function isAllowedBackendWritePath(method: string, pathname: string): boolean {
+  return SAFE_WRITE_RULES.some((rule) => rule.method === method && rule.pattern.test(pathname));
 }
 
 function isSafeResponseContentType(contentType: string | null): boolean {
@@ -183,18 +195,91 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
   }
 }
 
-export function POST(): Response {
-  return methodNotAllowed();
+async function forwardWriteRequest(
+  request: Request,
+  context: RouteContext,
+  method: "POST" | "PATCH" | "DELETE",
+): Promise<Response> {
+  const { path = [] } = await context.params;
+  const backendPath = buildBackendPath(path);
+  if (!backendPath || !isAllowedBackendWritePath(method, backendPath)) {
+    return proxyErrorResponse(404, "route_not_allowed");
+  }
+
+  const incomingUrl = new URL(request.url);
+  if (incomingUrl.search.length > MAX_PROXY_QUERY_LENGTH) {
+    return proxyErrorResponse(414, "query_too_large");
+  }
+
+  let body: string | undefined;
+  if (method !== "DELETE") {
+    const contentType = request.headers.get("content-type") || "";
+    if (contentType && !contentType.toLowerCase().includes("application/json")) {
+      return proxyErrorResponse(415, "unsupported_content_type");
+    }
+    body = await request.text();
+    if (body.length > MAX_PROXY_BODY_LENGTH) {
+      return proxyErrorResponse(413, "body_too_large");
+    }
+  }
+
+  const targetUrl = new URL(`${backendBaseUrl()}${backendPath}`);
+  targetUrl.search = incomingUrl.search;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const upstream = await fetch(targetUrl, {
+      body,
+      cache: "no-store",
+      next: { revalidate: 0 },
+      headers: {
+        Accept: "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+        "User-Agent": "PolySignal Web API proxy",
+      },
+      method,
+      signal: controller.signal,
+    } as RequestInit & { next: { revalidate: number } });
+    const responseBody = await upstream.text();
+    const contentType = upstream.headers.get("content-type");
+    if (!isSafeResponseContentType(contentType)) {
+      return proxyErrorResponse(502, "unexpected_content_type");
+    }
+    return new Response(upstream.status === 204 ? null : responseBody, {
+      status: upstream.status,
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Type": contentType || "application/json",
+        "X-PolySignal-Proxy": "enabled",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (error) {
+    return proxyErrorResponse(
+      error instanceof Error && error.name === "AbortError" ? 504 : 502,
+      error instanceof Error && error.name === "AbortError"
+        ? "proxy_timeout"
+        : "proxy_fetch_failed",
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export function POST(request: Request, context: RouteContext): Promise<Response> {
+  return forwardWriteRequest(request, context, "POST");
 }
 
 export function PUT(): Response {
   return methodNotAllowed();
 }
 
-export function PATCH(): Response {
-  return methodNotAllowed();
+export function PATCH(request: Request, context: RouteContext): Promise<Response> {
+  return forwardWriteRequest(request, context, "PATCH");
 }
 
-export function DELETE(): Response {
-  return methodNotAllowed();
+export function DELETE(request: Request, context: RouteContext): Promise<Response> {
+  return forwardWriteRequest(request, context, "DELETE");
 }

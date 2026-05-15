@@ -18,7 +18,8 @@ from app.schemas.copy_trading import (
     CopyWalletUpdate,
 )
 
-WALLET_PATTERN = re.compile(r"0[xX][a-fA-F0-9]{40}")
+DIRECT_WALLET_PATTERN = re.compile(r"0[xX][a-fA-F0-9]{40}")
+EMBEDDED_WALLET_PATTERN = re.compile(r"0[xX][a-fA-F0-9]{40}(?![a-fA-F0-9])")
 
 
 class CopyTradingError(Exception):
@@ -50,14 +51,35 @@ def resolve_copy_wallet_input(value: str) -> ResolvedCopyWalletInput:
     if not raw_value:
         raise InvalidCopyWalletInputError("Ingresa una wallet o perfil publico de Polymarket.")
 
-    match = WALLET_PATTERN.search(raw_value)
-    if match is None:
-        raise InvalidCopyWalletInputError("No pudimos detectar una direccion 0x valida.")
+    if raw_value.lower().startswith("0x"):
+        if len(raw_value) != 42:
+            raise InvalidCopyWalletInputError("La wallet debe tener formato 0x y 40 caracteres hexadecimales.")
+        if DIRECT_WALLET_PATTERN.fullmatch(raw_value) is None:
+            raise InvalidCopyWalletInputError("La wallet contiene caracteres no validos.")
+        return ResolvedCopyWalletInput(proxy_wallet=raw_value.lower(), profile_url=None)
 
-    wallet = match.group(0).lower()
     profile_url = None
     if raw_value.lower().startswith(("https://polymarket.com/", "https://www.polymarket.com/")):
         profile_url = _safe_profile_url(raw_value)
+        match = EMBEDDED_WALLET_PATTERN.search(raw_value)
+        if profile_url is None or match is None:
+            raise InvalidCopyWalletInputError(
+                "No pudimos reconocer ese perfil. Pega una wallet 0x publica o un perfil valido."
+            )
+        wallet = match.group(0).lower()
+        return ResolvedCopyWalletInput(proxy_wallet=wallet, profile_url=profile_url)
+
+    if raw_value.lower().startswith(("http://", "https://")):
+        raise InvalidCopyWalletInputError(
+            "No pudimos reconocer ese perfil. Pega una wallet 0x publica o un perfil valido."
+        )
+
+    match = EMBEDDED_WALLET_PATTERN.search(raw_value)
+    if match is None:
+        raise InvalidCopyWalletInputError(
+            "No pudimos reconocer ese perfil. Pega una wallet 0x publica o un perfil valido."
+        )
+    wallet = match.group(0).lower()
     return ResolvedCopyWalletInput(proxy_wallet=wallet, profile_url=profile_url)
 
 

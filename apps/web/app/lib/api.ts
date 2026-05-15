@@ -21,6 +21,7 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 10000;
 const DEFAULT_TRANSIENT_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 450;
 const TRANSIENT_STATUS_CODES = new Set([502, 503, 504]);
+const SAFE_PROXY_WRITE_PREFIXES = ["/copy-trading"];
 
 const SAFE_PROXY_GET_PREFIXES = [
   "/alerts",
@@ -81,11 +82,16 @@ function isSafeProxyGetPath(path: string): boolean {
 
 function shouldUseSameOriginProxy(path: string, init?: RequestInit): boolean {
   const method = (init?.method || "GET").toUpperCase();
-  return (
-    typeof window !== "undefined" &&
-    method === "GET" &&
-    isSafeProxyGetPath(path)
-  );
+  if (typeof window === "undefined") {
+    return false;
+  }
+  if (method === "GET") {
+    return isSafeProxyGetPath(path);
+  }
+  return SAFE_PROXY_WRITE_PREFIXES.some((prefix) => {
+    const pathname = backendPathname(path);
+    return pathname === prefix || pathname.startsWith(`${prefix}/`);
+  });
 }
 
 export function buildBackendApiPath(path: string): string {
@@ -128,6 +134,25 @@ function isTransientError(error: unknown): boolean {
   return error instanceof TypeError;
 }
 
+function safeApiErrorMessage(path: string, status: number, bodyText: string): string {
+  try {
+    const parsed = JSON.parse(bodyText) as { detail?: unknown; error?: unknown };
+    const detail = typeof parsed.detail === "string" ? parsed.detail : undefined;
+    const error = typeof parsed.error === "string" ? parsed.error : undefined;
+    const message = detail || error;
+    if (
+      message &&
+      message.length <= 300 &&
+      !/(DATABASE_URL|SECRET|TOKEN|API_KEY|postgres:\/\/|postgresql:\/\/|Traceback|stack trace)/i.test(message)
+    ) {
+      return message;
+    }
+  } catch {
+    // Keep the generic HTTP message when the body is not JSON.
+  }
+  return `${path} responded ${status}`;
+}
+
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {
     globalThis.setTimeout(resolve, ms);
@@ -158,7 +183,12 @@ export async function fetchApiJson<T>(
       } as RequestInit & { next: { revalidate: number } });
 
       if (!response.ok) {
-        throw new ApiRequestError(`${path} responded ${response.status}`, response.status, path);
+        const errorText = await response.text();
+        throw new ApiRequestError(
+          safeApiErrorMessage(path, response.status, errorText),
+          response.status,
+          path,
+        );
       }
       if (response.status === 204) {
         return null as T;

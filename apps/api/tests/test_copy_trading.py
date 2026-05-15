@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,7 @@ from app.schemas.copy_trading import CopyWalletCreate
 from app.services.copy_trading_demo_engine import normalize_public_trade, run_demo_tick
 from app.services.copy_trading_risk_rules import CopyTradeForRules, evaluate_demo_trade
 from app.services.copy_trading_service import (
+    DuplicateCopyWalletError,
     InvalidCopyWalletInputError,
     create_copy_wallet,
     list_copy_orders,
@@ -40,6 +42,56 @@ def test_valid_wallet_normalizes_direct_0x() -> None:
 def test_invalid_wallet_input_fails_cleanly() -> None:
     with pytest.raises(InvalidCopyWalletInputError):
         resolve_copy_wallet_input("not-a-wallet")
+
+
+def test_invalid_wallet_length_has_specific_error() -> None:
+    with pytest.raises(InvalidCopyWalletInputError, match="formato 0x"):
+        resolve_copy_wallet_input("0x123")
+
+
+def test_invalid_wallet_hex_has_specific_error() -> None:
+    with pytest.raises(InvalidCopyWalletInputError, match="caracteres no validos"):
+        resolve_copy_wallet_input("0x111111111111111111111111111111111111111z")
+
+
+def test_post_wallet_with_valid_0x_creates_wallet(client: TestClient) -> None:
+    response = client.post(
+        "/copy-trading/wallets",
+        json={
+            "wallet_input": WALLET,
+            "label": "qa-delete-me",
+            "mode": "demo",
+            "copy_amount_mode": "preset",
+            "copy_amount_usd": "5",
+            "copy_buys": True,
+            "copy_sells": True,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["proxy_wallet"] == WALLET
+
+
+def test_post_wallet_invalid_returns_clear_error(client: TestClient) -> None:
+    response = client.post(
+        "/copy-trading/wallets",
+        json={
+            "wallet_input": "0x123",
+            "mode": "demo",
+            "copy_amount_mode": "preset",
+            "copy_amount_usd": "5",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "formato 0x" in response.json()["detail"]
+
+
+def test_duplicate_wallet_is_rejected_cleanly(db_session: Session) -> None:
+    create_copy_wallet(db_session, CopyWalletCreate(wallet_input=WALLET))
+
+    with pytest.raises(DuplicateCopyWalletError, match="ya esta en seguimiento"):
+        create_copy_wallet(db_session, CopyWalletCreate(wallet_input=WALLET))
 
 
 def test_buy_trade_normalizes() -> None:
@@ -172,6 +224,26 @@ def test_demo_tick_does_not_duplicate_processed_trade(db_session: Session) -> No
 
     assert response.new_trades == 0
     assert len(list_copy_orders(db_session)) == 1
+
+
+def test_demo_tick_without_wallets_returns_empty_summary(db_session: Session) -> None:
+    response = run_demo_tick(db_session, data_client=FakeTradeReader([]), now=_now())
+
+    assert response.wallets_scanned == 0
+    assert response.new_trades == 0
+    assert response.orders_simulated == 0
+    assert response.errors == []
+
+
+def test_demo_tick_with_wallet_without_trades_returns_clean_summary(db_session: Session) -> None:
+    _create_wallet(db_session)
+
+    response = run_demo_tick(db_session, data_client=FakeTradeReader([]), now=_now())
+
+    assert response.wallets_scanned == 1
+    assert response.trades_detected == 0
+    assert response.new_trades == 0
+    assert response.errors == []
 
 
 def test_real_mode_returns_blocked_not_configured(db_session: Session) -> None:

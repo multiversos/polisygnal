@@ -2,13 +2,25 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { ApiRequestError } from "../../lib/api";
 import { createCopyWallet } from "../../lib/copyTrading";
 import type { CopyAmountMode, CopyWalletCreateInput } from "../../lib/copyTradingTypes";
 import { CopyAmountSelector } from "./CopyAmountSelector";
 
 type AddCopyWalletFormProps = {
-  onCreated: () => void;
+  onCreated: () => Promise<void> | void;
 };
+
+const EMPTY_WALLET_MESSAGE = "Ingresa una wallet o perfil publico de Polymarket.";
+const WALLET_FORMAT_MESSAGE = "La wallet debe tener formato 0x y 40 caracteres hexadecimales.";
+const WALLET_HEX_MESSAGE = "La wallet contiene caracteres no validos.";
+const PROFILE_NOT_RECOGNIZED_MESSAGE =
+  "No pudimos reconocer ese perfil. Pega una wallet 0x publica o un perfil valido.";
+const SAVE_WALLET_ERROR_MESSAGE = "No pudimos guardar esta wallet. Intenta nuevamente.";
+
+type WalletInputValidation =
+  | { ok: true; value: string }
+  | { ok: false; message: string };
 
 export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
   const [walletInput, setWalletInput] = useState("");
@@ -25,8 +37,9 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
-    if (!walletInput.trim()) {
-      setFormError("Ingresa una wallet o perfil publico de Polymarket.");
+    const walletValidation = validateWalletTargetInput(walletInput);
+    if (walletValidation.ok === false) {
+      setFormError(walletValidation.message);
       return;
     }
     if (amountError) {
@@ -34,7 +47,7 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
       return;
     }
     const payload: CopyWalletCreateInput = {
-      wallet_input: walletInput,
+      wallet_input: walletValidation.value,
       label: label.trim() || undefined,
       mode: "demo",
       copy_amount_mode: amountMode,
@@ -51,9 +64,9 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
       setAmount(5);
       setCopyBuys(true);
       setCopySells(true);
-      onCreated();
+      await onCreated();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "No pudimos agregar la wallet.");
+      setFormError(getCreateWalletErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -70,7 +83,10 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
         <span>Perfil o wallet pública</span>
         <input
           disabled={saving}
-          onChange={(event) => setWalletInput(event.target.value)}
+          onChange={(event) => {
+            setWalletInput(event.target.value);
+            setFormError(null);
+          }}
           placeholder="Pega perfil o wallet pública de Polymarket"
           value={walletInput}
         />
@@ -79,7 +95,10 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
         <span>Alias opcional</span>
         <input
           disabled={saving}
-          onChange={(event) => setLabel(event.target.value)}
+          onChange={(event) => {
+            setLabel(event.target.value);
+            setFormError(null);
+          }}
           placeholder="Ej. Wallet futbol conservadora"
           value={label}
         />
@@ -92,6 +111,7 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
         onChange={(next) => {
           setAmount(next.amount);
           setAmountMode(next.mode);
+          setFormError(null);
         }}
       />
       <div className="copy-toggle-row">
@@ -101,7 +121,10 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
             checked={copyBuys}
             className="copy-toggle-input"
             disabled={saving}
-            onChange={(event) => setCopyBuys(event.target.checked)}
+            onChange={(event) => {
+              setCopyBuys(event.target.checked);
+              setFormError(null);
+            }}
             type="checkbox"
           />
           <span className="copy-toggle-switch" aria-hidden="true" />
@@ -113,7 +136,10 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
             checked={copySells}
             className="copy-toggle-input"
             disabled={saving}
-            onChange={(event) => setCopySells(event.target.checked)}
+            onChange={(event) => {
+              setCopySells(event.target.checked);
+              setFormError(null);
+            }}
             type="checkbox"
           />
           <span className="copy-toggle-switch" aria-hidden="true" />
@@ -126,4 +152,50 @@ export function AddCopyWalletForm({ onCreated }: AddCopyWalletFormProps) {
       </button>
     </form>
   );
+}
+
+function validateWalletTargetInput(input: string): WalletInputValidation {
+  const value = input.trim();
+  if (!value) {
+    return { ok: false, message: EMPTY_WALLET_MESSAGE };
+  }
+
+  if (value.toLowerCase().startsWith("0x")) {
+    if (value.length !== 42) {
+      return { ok: false, message: WALLET_FORMAT_MESSAGE };
+    }
+    if (!/^0x[0-9a-fA-F]+$/.test(value)) {
+      return { ok: false, message: WALLET_HEX_MESSAGE };
+    }
+    return { ok: true, value: value.toLowerCase() };
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value);
+      const host = url.hostname.toLowerCase();
+      const isPolymarket = host === "polymarket.com" || host === "www.polymarket.com";
+      const embeddedWallet = value.match(/0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/);
+      if (isPolymarket && embeddedWallet) {
+        return { ok: true, value };
+      }
+    } catch {
+      // Fall through to the friendly profile error.
+    }
+    return { ok: false, message: PROFILE_NOT_RECOGNIZED_MESSAGE };
+  }
+
+  return { ok: false, message: PROFILE_NOT_RECOGNIZED_MESSAGE };
+}
+
+function getCreateWalletErrorMessage(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 409) {
+      return "Esta wallet ya esta en seguimiento.";
+    }
+    if (error.status === 400 && error.message && !error.message.includes("responded")) {
+      return error.message;
+    }
+  }
+  return SAVE_WALLET_ERROR_MESSAGE;
 }

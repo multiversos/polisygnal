@@ -16,6 +16,7 @@ export function CopyTradingDashboard() {
   const [data, setData] = useState<CopyTradingDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [tickSummary, setTickSummary] = useState<CopyTradingTickSummary | null>(null);
   const [runningTick, setRunningTick] = useState(false);
 
@@ -36,14 +37,22 @@ export function CopyTradingDashboard() {
   }, [refresh]);
 
   async function handleDemoTick() {
+    if (!loading && (data?.wallets.length ?? 0) === 0) {
+      setError(null);
+      setNotice("Agrega una wallet para ejecutar el demo.");
+      setTickSummary(null);
+      return;
+    }
     setRunningTick(true);
     setError(null);
+    setNotice(null);
     try {
       const summary = await runCopyTradingDemoTick();
       setTickSummary(summary);
+      setNotice(getDemoTickMessage(summary));
       await refresh();
     } catch {
-      setError("No pudimos ejecutar el tick demo ahora.");
+      setError("No pudimos ejecutar el demo ahora. Revisa la conexion del backend.");
     } finally {
       setRunningTick(false);
     }
@@ -74,6 +83,7 @@ export function CopyTradingDashboard() {
       ) : null}
 
       {error ? <div className="copy-error-state">{error}</div> : null}
+      {notice ? <div className="copy-empty-state">{notice}</div> : null}
       {loading ? <div className="copy-empty-state">Cargando modulo Copiar Wallets...</div> : null}
 
       <div className="copy-dashboard-grid">
@@ -105,4 +115,17 @@ export function CopyTradingDashboard() {
       </div>
     </main>
   );
+}
+
+function getDemoTickMessage(summary: CopyTradingTickSummary): string {
+  if (summary.wallets_scanned === 0) {
+    return "Agrega una wallet para ejecutar el demo.";
+  }
+  if (summary.errors.length > 0) {
+    return "Escaneo completado con avisos. No se pudo leer actividad publica de una o mas wallets.";
+  }
+  if (summary.new_trades === 0) {
+    return "Escaneo completado. No se detectaron trades nuevos.";
+  }
+  return `Escaneo completado. Trades nuevos ${summary.new_trades}, simuladas ${summary.orders_simulated}, saltadas ${summary.orders_skipped}.`;
 }
