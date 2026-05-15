@@ -146,7 +146,7 @@ export default function ProfilesPage() {
 
       <section className="profiles-kpis" aria-label="Resumen de perfiles">
         <div><span>Perfiles guardados</span><strong>{profiles.length}</strong></div>
-        <div><span>Win rate promedio</span><strong>{formatPercent(averageWinRate)}</strong></div>
+        <div><span>Promedio win rate</span><strong>{formatPercent(averageWinRate)}</strong></div>
         <div><span>Capital observado total</span><strong>{formatUsd(observedCapital || null)}</strong></div>
         <div><span>Con PnL real</span><strong>{pnlProfiles}</strong></div>
       </section>
@@ -253,8 +253,13 @@ export default function ProfilesPage() {
         <section className="profiles-empty">
           <strong>No hay perfiles destacados guardados todavia.</strong>
           <p>
-            Analiza un mercado con Wallet Intelligence. PolySignal solo guardara wallets con winRate real,
-            al menos 50 mercados cerrados y PnL real o capital observado relevante.
+            Los perfiles destacados apareceran cuando analices mercados con wallets publicas que cumplan los criterios.
+            PolySignal solo guardara wallets con winRate real, al menos 50 mercados cerrados y PnL real o capital
+            observado relevante.
+          </p>
+          <p>
+            Se guardan en localStorage v1 de este navegador. En otro navegador, dispositivo o modo incognito no
+            apareceran hasta que vuelvas a analizar un mercado compatible.
           </p>
         </section>
       )}
