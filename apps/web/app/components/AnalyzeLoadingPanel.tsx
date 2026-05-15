@@ -77,7 +77,26 @@ type AnalyzeProgressStepAction = {
 
 export type AnalyzeProgressStepActions = Partial<Record<AnalyzeProgressStep["id"], AnalyzeProgressStepAction>>;
 
+type AnalyzeAgentOperationalStatus = {
+  bridgeLabel: string;
+  healthLabel: string;
+  maxWaitLabel: string;
+  retryLabel: string;
+};
+
+type AnalyzeAgentRecoveryActions = {
+  marketDetailsAvailable?: boolean;
+  onContinuePartial: () => void;
+  onOpenMarketDetails: () => void;
+  onOpenWalletDetails: () => void;
+  onRetryAgent: () => void;
+  visible?: boolean;
+  walletDetailsAvailable?: boolean;
+};
+
 type AnalyzeProgressPanelProps = {
+  agentOperationalStatus?: AnalyzeAgentOperationalStatus;
+  agentRecoveryActions?: AnalyzeAgentRecoveryActions;
   agentName?: string;
   canSaveForLater?: boolean;
   elapsedSeconds: number;
@@ -183,6 +202,9 @@ function elapsedHint(
   agentName = "Samantha",
 ): string {
   if (issue === "timeout") {
+    if (sourcesConsulted) {
+      return `Mercado, datos y billeteras ya fueron consultados. ${agentName} no respondio a tiempo; puedes reintentar o continuar parcial.`;
+    }
     return "No pudimos completar esta busqueda ahora. Puedes reintentar o revisar el enlace.";
   }
   if (issue === "error") {
@@ -401,6 +423,8 @@ function terminalActionReady(status: AnalyzeProgressStepStatus): boolean {
 }
 
 export function AnalyzeProgressPanel({
+  agentOperationalStatus,
+  agentRecoveryActions,
   agentName = "Samantha",
   canSaveForLater = false,
   elapsedSeconds,
@@ -524,6 +548,8 @@ export function AnalyzeProgressPanel({
     : "PolySignal avanza por etapas reales. No usamos porcentajes falsos ni asumimos evidencia que no existe.";
   const showRecovery =
     Boolean(issue) || elapsedSeconds >= 45 || samanthaPending || !isBusy;
+  const showAgentRecovery = Boolean(agentRecoveryActions?.visible);
+  const showAgentOperationalStatus = Boolean(agentOperationalStatus && (samanthaPending || showAgentRecovery));
   const reviewedSources = visibleStepStates
     .filter(({ actionReady, override }) => actionReady && Boolean(override?.summary || override?.statusLabel));
   const consultedStepIds = new Set(
@@ -565,6 +591,15 @@ export function AnalyzeProgressPanel({
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {showAgentOperationalStatus && agentOperationalStatus ? (
+        <div className="analyze-agent-status" aria-label={`Estado operativo de ${agentName}`}>
+          <strong>{agentOperationalStatus.bridgeLabel}</strong>
+          <span>{agentOperationalStatus.healthLabel}</span>
+          <span>{agentOperationalStatus.maxWaitLabel}</span>
+          <span>{agentOperationalStatus.retryLabel}</span>
         </div>
       ) : null}
 
@@ -616,6 +651,40 @@ export function AnalyzeProgressPanel({
               </li>
             ))}
           </ol>
+        </div>
+      ) : null}
+
+      {showAgentRecovery && agentRecoveryActions ? (
+        <div className="analyze-agent-recovery" aria-label="Recuperacion del agente analizador">
+          <div>
+            <strong>{agentName} no respondio a tiempo</strong>
+            <p>
+              Mercado, datos y billeteras ya fueron consultados. Puedes reintentar el agente o
+              continuar con una lectura parcial basada en las fuentes disponibles.
+            </p>
+          </div>
+          <div className="analyze-progress-actions">
+            <button disabled={isBusy} onClick={agentRecoveryActions.onRetryAgent} type="button">
+              Reintentar {agentName}
+            </button>
+            <button onClick={agentRecoveryActions.onContinuePartial} type="button">
+              Continuar con lectura parcial
+            </button>
+            <button
+              disabled={!agentRecoveryActions.marketDetailsAvailable}
+              onClick={agentRecoveryActions.onOpenMarketDetails}
+              type="button"
+            >
+              Ver datos
+            </button>
+            <button
+              disabled={!agentRecoveryActions.walletDetailsAvailable}
+              onClick={agentRecoveryActions.onOpenWalletDetails}
+              type="button"
+            >
+              Ver billeteras
+            </button>
+          </div>
         </div>
       ) : null}
 

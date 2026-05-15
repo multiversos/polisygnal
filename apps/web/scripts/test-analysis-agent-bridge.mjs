@@ -129,7 +129,8 @@ try {
   assert(capturedAuthorization === "Bearer test-token-value", "bridge should send token as bearer header");
   assert(!JSON.stringify(partial).includes("test-token-value"), "bridge result must not leak token");
   assert(partial.agentName === "Jarvis", "bridge response should preserve dynamic agent name");
-  assert(partial.status === "agent_researching", "partial agent response should not be treated as a fake completed estimate");
+  assert(partial.status === "partial", "partial agent response should be terminal instead of leaving the UI researching");
+  assert(!partial.fallbackRequired, "partial agent response should remain available while still avoiding fake estimates");
 
   globalThis.fetch = async () =>
     new Response(JSON.stringify({ summary: "Wallet 0x1234567890abcdef1234567890abcdef12345678" }), {

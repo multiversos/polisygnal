@@ -747,8 +747,7 @@ export function AnalyzerReport({
     deepAnalysisJob?.samanthaBridge?.bridgeTaskId;
   const samanthaAutomaticUnavailable =
     deepAnalysisJob?.samanthaBridge?.bridgeStatus === "manual_needed" ||
-    (deepAnalysisJob?.samanthaBridge?.fallbackRequired === true &&
-      deepAnalysisJob.status === "awaiting_samantha");
+    deepAnalysisJob?.samanthaBridge?.fallbackRequired === true;
   const samanthaDraftReport = samanthaReportDraftResult?.valid ? samanthaReportDraftResult.report : undefined;
   const samanthaReport = samanthaReportResult?.valid ? samanthaReportResult.report : undefined;
   const samanthaDraftEvidence = samanthaDraftReport ? convertSamanthaReportToEvidence(samanthaDraftReport) : [];

@@ -9042,6 +9042,49 @@ html:not([data-theme="dark"]) .app-sidebar {
   line-height: 1.35;
 }
 
+.analyze-agent-status {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--ps-cyan, #22d3ee) 28%, var(--ps-border));
+  border-radius: 16px;
+  background: rgba(3, 7, 18, 0.28);
+}
+
+.analyze-agent-status strong,
+.analyze-agent-status span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ps-text-soft, #cbd5e1);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.analyze-agent-status strong {
+  color: var(--ps-cyan, #22d3ee);
+}
+
+.analyze-agent-recovery {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--ps-warning, #fbbf24) 42%, var(--ps-border));
+  border-radius: 16px;
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.analyze-agent-recovery strong {
+  color: var(--ps-text, #f8fafc);
+}
+
+.analyze-agent-recovery p {
+  max-width: 780px;
+  margin: 4px 0 0;
+  color: var(--ps-text-soft, #cbd5e1);
+  line-height: 1.5;
+}
+
 .analyze-progress-job {
   display: grid;
   gap: 10px;
@@ -9997,6 +10040,10 @@ html:not([data-theme="dark"]) .app-sidebar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .analyze-agent-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .market-details-summary,
   .wallet-details-summary,
   .wallet-details-grid,
@@ -10043,6 +10090,10 @@ html:not([data-theme="dark"]) .app-sidebar {
   }
 
   .analyze-progress-sources ul {
+    grid-template-columns: 1fr;
+  }
+
+  .analyze-agent-status {
     grid-template-columns: 1fr;
   }
 

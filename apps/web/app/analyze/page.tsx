@@ -57,6 +57,7 @@ import {
 } from "../lib/analyzerResult";
 import {
   createDeepAnalysisJob,
+  markJobAnalysisAgentReadingLoaded,
   markJobFailed,
   markJobMarketAnalyzed,
   markJobPolymarketRead,
@@ -178,8 +179,13 @@ type SearchState =
 type AnalysisAgentRouteResult = {
   agentId?: string;
   agentName?: string;
+  analysis?: {
+    status?: string;
+    summary?: string;
+  };
   automaticAvailable?: boolean;
   fallbackRequired?: boolean;
+  errorCode?: string;
   reason?: string;
   report?: unknown;
   status?: string;
@@ -194,9 +200,27 @@ type AnalysisAgentConfigRouteResult = {
   enabled?: boolean;
 };
 
+type AnalysisAgentDiagnosticsRouteResult = {
+  bridgeEnabled?: boolean;
+  endpointHost?: string;
+  expectedState?: string;
+  health?: {
+    checkedAt?: string;
+    httpStatus?: number;
+    status?: string;
+  };
+  message?: string;
+};
+
 const LINK_RESOLVE_TIMEOUT_MS = 45_000;
 const WALLET_INTELLIGENCE_TIMEOUT_MS = 45_000;
 const ANALYSIS_AGENT_TIMEOUT_MS = 45_000;
+const ANALYSIS_AGENT_STATUS_TIMEOUT_MS = 15_000;
+const ANALYSIS_AGENT_POLL_TIMEOUT_MS = 90_000;
+const ANALYSIS_AGENT_POLL_INTERVAL_MS = 3_000;
+const ANALYSIS_AGENT_RETRY_DELAY_MS = 2_500;
+const ANALYSIS_AGENT_MAX_AUTO_RETRIES = 1;
+const ANALYSIS_AGENT_UI_TIMEOUT_SECONDS = 120;
 
 class AnalyzeRequestTimeoutError extends Error {
   constructor(label: string) {
@@ -251,6 +275,177 @@ async function withRequestTimeout<T>(
     window.clearTimeout(timeoutId);
     parentSignal.removeEventListener("abort", abortFromParent);
   }
+}
+
+function waitWithAbort(ms: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    return Promise.reject(new AnalyzeRequestCancelledError());
+  }
+  let abort: () => void = () => undefined;
+  return new Promise<void>((resolve, reject) => {
+    const timeoutId = window.setTimeout(resolve, ms);
+    abort = () => {
+      window.clearTimeout(timeoutId);
+      reject(new AnalyzeRequestCancelledError());
+    };
+    signal.addEventListener("abort", abort, { once: true });
+  }).finally(() => {
+    signal.removeEventListener("abort", abort);
+  });
+}
+
+function isAnalysisAgentTerminalStatus(status?: string): boolean {
+  return (
+    status === "completed" ||
+    status === "partial" ||
+    status === "insufficient_data" ||
+    status === "failed_safe" ||
+    status === "unavailable" ||
+    status === "timeout" ||
+    status === "disabled" ||
+    status === "fallback_required" ||
+    status === "manual_needed" ||
+    status === "report_invalid" ||
+    status === "error" ||
+    status === "report_received"
+  );
+}
+
+function isTerminalAnalysisAgentResult(result: AnalysisAgentRouteResult, responseOk = true): boolean {
+  return Boolean(
+    result.report ||
+      result.analysis ||
+      result.fallbackRequired ||
+      !responseOk ||
+      isAnalysisAgentTerminalStatus(result.status),
+  );
+}
+
+function isRetryableAnalysisAgentResult(httpStatus: number, result: AnalysisAgentRouteResult): boolean {
+  return (
+    httpStatus === 502 ||
+    httpStatus === 503 ||
+    httpStatus === 504 ||
+    result.errorCode === "request_timeout" ||
+    (result.errorCode === "request_failed" && result.status !== "invalid_request") ||
+    result.status === "timeout"
+  );
+}
+
+function safeAnalysisStatus(value?: string): "completed" | "failed_safe" | "insufficient_data" | "partial" | "unavailable" {
+  if (
+    value === "completed" ||
+    value === "failed_safe" ||
+    value === "insufficient_data" ||
+    value === "partial" ||
+    value === "unavailable"
+  ) {
+    return value;
+  }
+  return "partial";
+}
+
+async function sendAnalysisAgentResearchWithRetry(input: {
+  body: Record<string, unknown>;
+  signal: AbortSignal;
+}): Promise<{ attempts: number; responseOk: boolean; result: AnalysisAgentRouteResult; status: number }> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= ANALYSIS_AGENT_MAX_AUTO_RETRIES; attempt += 1) {
+    try {
+      const response = await withRequestTimeout(
+        ANALYSIS_AGENT_TIMEOUT_MS,
+        input.signal,
+        "analysis_agent_timeout",
+        (signal) =>
+          fetch("/api/analysis-agent/send-research", {
+            body: JSON.stringify(input.body),
+            cache: "no-store",
+            credentials: "omit",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+            method: "POST",
+            redirect: "error",
+            signal,
+          }),
+      );
+      const result = (await response.json().catch(() => ({}))) as AnalysisAgentRouteResult;
+      if (
+        attempt < ANALYSIS_AGENT_MAX_AUTO_RETRIES &&
+        isRetryableAnalysisAgentResult(response.status, result)
+      ) {
+        await waitWithAbort(ANALYSIS_AGENT_RETRY_DELAY_MS, input.signal);
+        continue;
+      }
+      return {
+        attempts: attempt + 1,
+        responseOk: response.ok,
+        result,
+        status: response.status,
+      };
+    } catch (error) {
+      if (isAnalyzeCancelled(error)) {
+        throw error;
+      }
+      lastError = error;
+      if (attempt < ANALYSIS_AGENT_MAX_AUTO_RETRIES) {
+        await waitWithAbort(ANALYSIS_AGENT_RETRY_DELAY_MS, input.signal);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
+async function pollAnalysisAgentResearchStatus(input: {
+  agentId?: string;
+  agentName: string;
+  signal: AbortSignal;
+  taskId: string;
+  timeoutMs?: number;
+}): Promise<AnalysisAgentRouteResult> {
+  const startedAt = Date.now();
+  const timeoutMs = Math.max(0, Math.min(input.timeoutMs ?? ANALYSIS_AGENT_POLL_TIMEOUT_MS, ANALYSIS_AGENT_POLL_TIMEOUT_MS));
+  let lastResult: AnalysisAgentRouteResult | null = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    await waitWithAbort(ANALYSIS_AGENT_POLL_INTERVAL_MS, input.signal);
+    const response = await withRequestTimeout(
+      ANALYSIS_AGENT_STATUS_TIMEOUT_MS,
+      input.signal,
+      "analysis_agent_status_timeout",
+      (signal) =>
+        fetch("/api/analysis-agent/research-status", {
+          body: JSON.stringify({ taskId: input.taskId }),
+          cache: "no-store",
+          credentials: "omit",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+          redirect: "error",
+          signal,
+        }),
+    );
+    const result = (await response.json().catch(() => ({}))) as AnalysisAgentRouteResult;
+    lastResult = result;
+    if (isTerminalAnalysisAgentResult(result, response.ok)) {
+      return result;
+    }
+  }
+  return {
+    agentId: lastResult?.agentId || input.agentId,
+    agentName: lastResult?.agentName || input.agentName,
+    automaticAvailable: true,
+    errorCode: "request_timeout",
+    fallbackRequired: true,
+    reason: `${input.agentName} no respondio dentro de ${Math.round(timeoutMs / 1000)} segundos.`,
+    status: "timeout",
+    taskId: input.taskId,
+    warnings: lastResult?.warnings ?? [],
+  };
 }
 
 function toNumber(value: unknown): number | null {
@@ -560,6 +755,18 @@ function buildAgentProgress(input: {
   message?: string;
 }): AnalyzeProgressStepOverrides["preparing_samantha"] {
   const status = input.job?.analysisAgent?.status;
+  const bridgeReason = input.message || input.job?.samanthaBridge?.reason || "";
+  if (
+    input.job?.samanthaBridge?.fallbackRequired &&
+    /timeout|tiempo|respond/i.test(bridgeReason)
+  ) {
+    return {
+      detail: bridgeReason || `${input.agentName} no respondio a tiempo.`,
+      status: "timeout",
+      statusLabel: `${input.agentName} no respondio`,
+      summary: "Mercado, datos y billeteras quedan disponibles para una lectura parcial.",
+    };
+  }
   if (status === "completed") {
     return {
       detail: `${input.agentName} devolvio una lectura validada por PolySignal.`,
@@ -582,6 +789,14 @@ function buildAgentProgress(input: {
       status: "failed_safe",
       statusLabel: "Fallo seguro",
       summary: "PolySignal conserva una lectura parcial sin mostrar errores tecnicos.",
+    };
+  }
+  if (status === "insufficient_data") {
+    return {
+      detail: input.message || `${input.agentName} no encontro senales independientes suficientes.`,
+      status: "limited",
+      statusLabel: "Sin senales suficientes",
+      summary: "La lectura final conserva datos reales sin crear estimacion propia.",
     };
   }
   if (status === "unavailable") {
@@ -790,11 +1005,12 @@ function confidenceForHistory(estimate?: PolySignalEstimateResult): "Alta" | "Ba
 }
 
 function jobAwaitsResearch(job?: DeepAnalysisJob | null): boolean {
+  if (!job || job.samanthaBridge?.fallbackRequired || job.samanthaReportLoaded) {
+    return false;
+  }
   return Boolean(
-    job &&
-      [
+    [
         "awaiting_samantha",
-        "ready_to_score",
         "receiving_samantha_report",
         "samantha_researching",
         "sending_to_samantha",
@@ -1045,10 +1261,19 @@ function agentStatusForHistory(
   if (deepJob?.samanthaBridge?.fallbackRequired) {
     return "unavailable";
   }
+  if (deepJob?.analysisAgent?.status === "partial") {
+    return "partial";
+  }
+  if (deepJob?.analysisAgent?.status === "insufficient_data") {
+    return "insufficient_data";
+  }
+  if (deepJob?.analysisAgent?.status === "failed_safe" || deepJob?.analysisAgent?.status === "unavailable") {
+    return "unavailable";
+  }
   if (deepJob?.status === "samantha_researching" || deepJob?.status === "awaiting_samantha") {
     return "researching";
   }
-  return deepJob?.analysisAgent?.status === "unavailable" ? "unavailable" : undefined;
+  return undefined;
 }
 
 function pendingHistoryPayload(normalizedUrl: string) {
@@ -2030,6 +2255,8 @@ export default function AnalyzePage() {
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
   const [deepAnalysisJob, setDeepAnalysisJob] = useState<DeepAnalysisJob | null>(null);
   const [analysisAgent, setAnalysisAgent] = useState({ id: "samantha", name: "Samantha" });
+  const [analysisAgentDiagnostics, setAnalysisAgentDiagnostics] =
+    useState<AnalysisAgentDiagnosticsRouteResult | null>(null);
   const [samanthaAutoReportResult, setSamanthaAutoReportResult] =
     useState<SamanthaResearchParseResult | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -2078,6 +2305,27 @@ export default function AnalyzePage() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  const refreshAnalysisAgentDiagnostics = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch("/api/analysis-agent/diagnostics", {
+        cache: "no-store",
+        credentials: "omit",
+        headers: { Accept: "application/json" },
+        method: "GET",
+        redirect: "error",
+        signal,
+      });
+      if (!response.ok) {
+        setAnalysisAgentDiagnostics(null);
+        return;
+      }
+      const diagnostics = (await response.json().catch(() => null)) as AnalysisAgentDiagnosticsRouteResult | null;
+      setAnalysisAgentDiagnostics(diagnostics);
+    } catch {
+      setAnalysisAgentDiagnostics(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -2189,29 +2437,15 @@ export default function AnalyzePage() {
           url: input.normalizedUrl,
           walletSummary: input.walletSummary,
         });
-        const response = await withRequestTimeout(
-          ANALYSIS_AGENT_TIMEOUT_MS,
-          input.signal,
-          "analysis_agent_timeout",
-          (signal) =>
-            fetch("/api/analysis-agent/send-research", {
-              body: JSON.stringify({
-                brief,
-                deepAnalysisJobId: job.id,
-                normalizedUrl: input.normalizedUrl,
-              }),
-              cache: "no-store",
-              credentials: "omit",
-              headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-              },
-              method: "POST",
-              redirect: "error",
-              signal,
-            }),
-        );
-        const result = (await response.json().catch(() => ({}))) as AnalysisAgentRouteResult;
+        const agentAttemptStartedAt = Date.now();
+        let { responseOk, result } = await sendAnalysisAgentResearchWithRetry({
+          body: {
+            brief,
+            deepAnalysisJobId: job.id,
+            normalizedUrl: input.normalizedUrl,
+          },
+          signal: input.signal,
+        });
         const agentId = result.agentId || analysisAgent.id;
         const agentName = result.agentName || analysisAgent.name;
         if (result.agentName && result.agentName !== analysisAgent.name) {
@@ -2224,25 +2458,56 @@ export default function AnalyzePage() {
             reportResult: null,
           };
         }
-        if (!response.ok || result.fallbackRequired || result.status === "disabled" || result.status === "fallback_required") {
-          const reason =
-            !result.reason || /bridge|fallback/i.test(result.reason)
-              ? `${agentName} automatico no esta conectado todavia; prepararemos una lectura parcial con las fuentes disponibles.`
-              : result.reason;
+        if (!isTerminalAnalysisAgentResult(result, responseOk)) {
+          if (!result.taskId) {
+            const reason = `${agentName} acepto la tarea, pero no devolvio reporte ni id consultable; PolySignal continua con lectura parcial.`;
+            job = persistDeepAnalysisJob(
+              markJobSamanthaBridgeFallback(job, {
+                agentId,
+                agentName,
+                automaticAvailable: true,
+                reason,
+                warnings: result.warnings ?? [],
+              }),
+            );
+            return {
+              job,
+              message: reason,
+              reportResult: null,
+            };
+          }
           job = persistDeepAnalysisJob(
-            markJobSamanthaBridgeFallback(job, {
+            markJobSamanthaResearching(job, {
               agentId,
               agentName,
-              automaticAvailable: result.automaticAvailable,
-              reason,
-              warnings: result.warnings ?? result.validationErrors ?? [],
+              reason: result.reason || `${agentName} recibio la tarea; esperando reporte estructurado.`,
+              taskId: result.taskId,
             }),
           );
-          return {
-            job,
-            message: reason,
-            reportResult: null,
-          };
+          const remainingAgentMs =
+            ANALYSIS_AGENT_UI_TIMEOUT_SECONDS * 1000 - (Date.now() - agentAttemptStartedAt);
+          if (remainingAgentMs <= 0) {
+            result = {
+              agentId,
+              agentName,
+              automaticAvailable: true,
+              errorCode: "request_timeout",
+              fallbackRequired: true,
+              reason: `${agentName} no respondio dentro del tiempo maximo.`,
+              status: "timeout",
+              taskId: result.taskId,
+              warnings: result.warnings ?? [],
+            };
+          } else {
+            result = await pollAnalysisAgentResearchStatus({
+              agentId,
+              agentName,
+              signal: input.signal,
+              taskId: result.taskId,
+              timeoutMs: remainingAgentMs,
+            });
+          }
+          responseOk = result.status !== "error" && result.status !== "timeout";
         }
         if (result.report) {
           job = persistDeepAnalysisJob(markJobReceivingSamanthaReport(job, { agentId, agentName }));
@@ -2291,6 +2556,87 @@ export default function AnalyzePage() {
             job,
             message: `${agentName} devolvio un reporte validado; PolySignal actualizo las senales del job.`,
             reportResult,
+          };
+        }
+        if (result.analysis) {
+          const analysisStatus = safeAnalysisStatus(result.analysis.status);
+          const reason =
+            result.analysis.summary ||
+            result.reason ||
+            (analysisStatus === "insufficient_data"
+              ? `${agentName} no encontro senales suficientes para una lectura completa.`
+              : `${agentName} devolvio una lectura automatica parcial.`);
+          job = persistDeepAnalysisJob(
+            markJobAnalysisAgentReadingLoaded(job, {
+              agentId,
+              agentName,
+              analysisStatus,
+              reason,
+              warnings: result.warnings ?? result.validationErrors ?? [],
+            }),
+          );
+          return {
+            job,
+            message: reason,
+            reportResult: null,
+          };
+        }
+        if (
+          result.status === "completed" ||
+          result.status === "partial" ||
+          result.status === "insufficient_data" ||
+          result.status === "unavailable" ||
+          result.status === "failed_safe"
+        ) {
+          const analysisStatus = safeAnalysisStatus(result.status);
+          const reason =
+            result.reason ||
+            (analysisStatus === "insufficient_data"
+              ? `${agentName} no encontro senales suficientes para una lectura completa.`
+              : `${agentName} devolvio un estado terminal sin reporte estructurado; PolySignal conserva una lectura parcial.`);
+          job = persistDeepAnalysisJob(
+            markJobAnalysisAgentReadingLoaded(job, {
+              agentId,
+              agentName,
+              analysisStatus,
+              reason,
+              warnings: result.warnings ?? result.validationErrors ?? [],
+            }),
+          );
+          return {
+            job,
+            message: reason,
+            reportResult: null,
+          };
+        }
+        if (
+          !responseOk ||
+          result.fallbackRequired ||
+          result.status === "disabled" ||
+          result.status === "fallback_required" ||
+          result.status === "manual_needed" ||
+          result.status === "timeout" ||
+          result.status === "insufficient_data" ||
+          result.status === "unavailable" ||
+          result.status === "failed_safe"
+        ) {
+          const reason =
+            !result.reason || /bridge|fallback/i.test(result.reason)
+              ? `${agentName} automatico no esta conectado todavia; prepararemos una lectura parcial con las fuentes disponibles.`
+              : result.reason;
+          job = persistDeepAnalysisJob(
+            markJobSamanthaBridgeFallback(job, {
+              agentId,
+              agentName,
+              automaticAvailable: result.automaticAvailable,
+              reason,
+              warnings: result.warnings ?? result.validationErrors ?? [],
+            }),
+          );
+          return {
+            job,
+            message: reason,
+            reportResult: null,
           };
         }
         job = persistDeepAnalysisJob(
@@ -2741,6 +3087,7 @@ export default function AnalyzePage() {
       if (!(await advancePhase("preparing_samantha"))) {
         return;
       }
+      void refreshAnalysisAgentDiagnostics(runController.signal);
       setProgressStepOverrides((current) => ({
         ...current,
         preparing_samantha: buildAgentProgress({ agentName: analysisAgent.name, job }),
@@ -2867,7 +3214,7 @@ export default function AnalyzePage() {
         }
       }
     }
-  }, [analysisAgent, persistDeepAnalysisJob, tryAutomaticAnalysisAgentBridge]);
+  }, [analysisAgent, persistDeepAnalysisJob, refreshAnalysisAgentDiagnostics, tryAutomaticAnalysisAgentBridge]);
 
   useEffect(() => {
     if (
@@ -3016,8 +3363,150 @@ export default function AnalyzePage() {
   const previewProps = previewPropsForState({ deepAnalysisJob, state });
   const canSaveProgressForLater =
     state.status === "result" && Boolean(state.match.item.market?.id || state.match.item.market?.market_slug);
+
+  const markCurrentAgentTimeout = useCallback((reason?: string) => {
+    if (state.status !== "result" || !deepAnalysisJob) {
+      return null;
+    }
+    const agentName = deepAnalysisJob.analysisAgent?.agentName || analysisAgent.name;
+    const timeoutReason =
+      reason ||
+      `${agentName} no respondio dentro del tiempo maximo. Mercado, datos y billeteras ya fueron consultados.`;
+    const nextJob = persistDeepAnalysisJob(
+      markJobSamanthaBridgeFallback(deepAnalysisJob, {
+        agentId: deepAnalysisJob.analysisAgent?.agentId || analysisAgent.id,
+        agentName,
+        automaticAvailable: true,
+        reason: timeoutReason,
+        warnings: ["analysis_agent_timeout"],
+      }),
+    );
+    setProgressStepOverrides((current) => ({
+      ...current,
+      preparing_samantha: buildAgentProgress({
+        agentName,
+        job: nextJob,
+        message: timeoutReason,
+      }),
+    }));
+    setLoading(false);
+    setProgressIssue("timeout");
+    setProgressStartedAt(null);
+    setActionMessage("Samantha no respondio a tiempo; puedes reintentar el agente o continuar con lectura parcial.");
+    return nextJob;
+  }, [analysisAgent.id, analysisAgent.name, deepAnalysisJob, persistDeepAnalysisJob, state]);
+
+  useEffect(() => {
+    if (!samanthaProgressPending || progressIssue === "timeout" || progressElapsedSeconds < ANALYSIS_AGENT_UI_TIMEOUT_SECONDS) {
+      return;
+    }
+    markCurrentAgentTimeout();
+  }, [markCurrentAgentTimeout, progressElapsedSeconds, progressIssue, samanthaProgressPending]);
+
+  const handleContinueWithPartial = useCallback(() => {
+    if (state.status === "result" && jobAwaitsResearch(deepAnalysisJob)) {
+      markCurrentAgentTimeout();
+    }
+    setProgressIssue(null);
+    setProgressStartedAt(null);
+    setActionMessage("Lectura parcial preparada con Polymarket y Wallet Intelligence. No se invento reporte de Samantha.");
+  }, [deepAnalysisJob, markCurrentAgentTimeout, state]);
+
+  const handleRetrySamantha = useCallback(async () => {
+    if (loading || state.status !== "result" || !deepAnalysisJob) {
+      return;
+    }
+    const runId = analysisRunRef.current + 1;
+    analysisRunRef.current = runId;
+    analysisAbortRef.current?.abort();
+    const runController = new AbortController();
+    analysisAbortRef.current = runController;
+    const isCurrentRun = () => analysisRunRef.current === runId;
+    const agentName = deepAnalysisJob.analysisAgent?.agentName || analysisAgent.name;
+    const walletSummary = getWalletIntelligenceSummary(state.match.item);
+
+    setLoading(true);
+    setProgressIssue(null);
+    setProgressStartedAt(Date.now());
+    setLoadingPhase("sending_samantha");
+    setActionMessage(`Reintentando conexion con ${agentName}...`);
+    void refreshAnalysisAgentDiagnostics(runController.signal);
+    setProgressStepOverrides((current) => ({
+      ...current,
+      preparing_samantha: {
+        detail: `Reintentando conexion con ${agentName}...`,
+        status: "running",
+        statusLabel: "Reintentando",
+        summary: "Intento 2 de 2; no se rehacen Polymarket ni Wallet Intelligence.",
+      },
+    }));
+
+    try {
+      const bridgeResult = await tryAutomaticAnalysisAgentBridge({
+        isCurrentRun,
+        item: state.match.item,
+        job: deepAnalysisJob,
+        normalizedUrl: state.normalizedUrl,
+        signal: runController.signal,
+        walletSummary,
+      });
+      if (!isCurrentRun()) {
+        return;
+      }
+      setSamanthaAutoReportResult(bridgeResult.reportResult);
+      setProgressStepOverrides((current) => ({
+        ...current,
+        preparing_samantha: buildAgentProgress({
+          agentName: bridgeResult.job.analysisAgent?.agentName || agentName,
+          job: bridgeResult.job,
+          message: bridgeResult.message,
+        }),
+      }));
+      setState({
+        match: state.match,
+        message:
+          bridgeResult.job.status === "completed"
+            ? `Analisis profundo actualizado con reporte de ${bridgeResult.job.analysisAgent?.agentName || agentName} validado.`
+            : `Lectura parcial actualizada: ${bridgeResult.message}`,
+        normalizedUrl: state.normalizedUrl,
+        status: "result",
+      });
+      if (!jobAwaitsResearch(bridgeResult.job)) {
+        setProgressStartedAt(null);
+      }
+      setActionMessage(bridgeResult.message);
+    } catch (error) {
+      if (!isCurrentRun() || isAnalyzeCancelled(error)) {
+        return;
+      }
+      const reason = isAnalyzeTimeout(error)
+        ? `${agentName} no respondio a tiempo en el reintento.`
+        : `${agentName} no respondio de forma segura en el reintento.`;
+      markCurrentAgentTimeout(reason);
+    } finally {
+      if (isCurrentRun()) {
+        setLoading(false);
+        if (analysisAbortRef.current === runController) {
+          analysisAbortRef.current = null;
+        }
+      }
+    }
+  }, [
+    analysisAgent.name,
+    deepAnalysisJob,
+    loading,
+    markCurrentAgentTimeout,
+    refreshAnalysisAgentDiagnostics,
+    state,
+    tryAutomaticAnalysisAgentBridge,
+  ]);
+
   const handleProgressRetry = () => {
     if (loading) {
+      return;
+    }
+    if (progressIssue === "timeout" && state.status === "result") {
+      void handleRetrySamantha();
       return;
     }
     if (state.status === "result") {
@@ -3025,6 +3514,22 @@ export default function AnalyzePage() {
       return;
     }
     void runAnalysis(lastWorkingUrl || input);
+  };
+  const agentOperationalStatus = {
+    bridgeLabel:
+      analysisAgentDiagnostics?.expectedState === "Connected"
+        ? `${analysisAgent.name} Bridge: conectado`
+        : analysisAgentDiagnostics?.expectedState
+          ? `${analysisAgent.name} Bridge: ${analysisAgentDiagnostics.expectedState}`
+          : "Estado del agente no disponible",
+    healthLabel:
+      analysisAgentDiagnostics?.health?.status === "ok"
+        ? `Ultimo health check: OK${analysisAgentDiagnostics.health.httpStatus ? ` (${analysisAgentDiagnostics.health.httpStatus})` : ""}`
+        : analysisAgentDiagnostics?.health?.status
+          ? `Ultimo health check: ${analysisAgentDiagnostics.health.status}`
+          : "Ultimo health check: no disponible",
+    maxWaitLabel: `Tiempo maximo: ${Math.round(ANALYSIS_AGENT_POLL_TIMEOUT_MS / 1000)}s`,
+    retryLabel: progressIssue === "timeout" ? "Reintento disponible: 1" : "Intento 1 de 2",
   };
 
   return (
@@ -3049,6 +3554,16 @@ export default function AnalyzePage() {
 
       {radarVisible ? (
         <AnalyzeLoadingPanel
+          agentOperationalStatus={agentOperationalStatus}
+          agentRecoveryActions={{
+            marketDetailsAvailable: Boolean(marketDetailsItem),
+            onContinuePartial: handleContinueWithPartial,
+            onOpenMarketDetails: () => setMarketDetailsOpen(true),
+            onOpenWalletDetails: () => setWalletDetailsOpen(true),
+            onRetryAgent: handleRetrySamantha,
+            visible: progressIssue === "timeout" && state.status === "result",
+            walletDetailsAvailable: Boolean(walletDetailsSummary),
+          }}
           agentName={deepAnalysisJob?.analysisAgent?.agentName || analysisAgent.name}
           canSaveForLater={canSaveProgressForLater}
           elapsedSeconds={progressElapsedSeconds}

@@ -15,7 +15,8 @@
     "test:market-data": "node scripts/test-market-data.mjs",
     "test:analyzer-progress": "node scripts/test-analyzer-progress.mjs",
     "test:profiles": "node scripts/test-profiles.mjs",
-    "test:profile-alerts": "node scripts/test-profile-alerts.mjs"
+    "test:profile-alerts": "node scripts/test-profile-alerts.mjs",
+    "test:analysis-agent-timeout": "node scripts/test-analysis-agent-timeout.mjs"
   },
   "dependencies": {
     "next": "15.5.15",

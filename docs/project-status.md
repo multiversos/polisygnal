@@ -161,6 +161,11 @@ Estado visible verificado:
 - Si Render esta dormido o tarda en despertar, la UI debe conservar lectura
   parcial/fuente automatica no disponible sin mostrar stack traces, JSON,
   schema ni flujo manual publico.
+- `/analyze` ahora convierte esperas largas del agente en estados terminales:
+  envio con timeout corto, maximo un retry automatico, polling de task id con
+  limite total de `90s` y guardrail visual de `120s`. Si Samantha no responde,
+  el usuario ve `Reintentar Samantha`, `Continuar con lectura parcial`, `Ver
+  datos` y `Ver billeteras`; no se inventa reporte ni se marca `completed`.
 - Regla nueva de arquitectura: los mercados internos de PolySignal no son la
   fuente principal del Analizador de enlaces. Si Polymarket/Gamma no devuelve
   un evento o mercado, `/analyze` muestra un no-match honesto y no busca una

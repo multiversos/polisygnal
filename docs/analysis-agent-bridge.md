@@ -1,6 +1,6 @@
 # Analysis Agent Bridge
 
-Fecha de corte: `2026-05-14`.
+Fecha de corte: `2026-05-15`.
 
 PolySignal ya no acopla `/analyze` a Samantha como unico proveedor. El flujo
 publico es:
@@ -42,6 +42,24 @@ Si Render esta dormido, `smoke:production` permite retry razonable. Si el
 servicio no responde despues del retry, PolySignal debe mostrar lectura parcial
 o fuente automatica no disponible, nunca `JSON`, schema, stack trace ni carga
 manual publica.
+
+## Timeouts y recuperacion
+
+`/analyze` no debe quedar indefinidamente en `Samantha analizando`.
+
+- El envio a `/api/analysis-agent/send-research` usa timeout corto y como maximo
+  un retry automatico para timeout, error de red o 502/503/504.
+- Si el agente acepta una tarea asincrona, `/api/analysis-agent/research-status`
+  se consulta con limite total de `90s` y requests cortos.
+- A los `120s` de UI, cualquier job todavia pendiente del agente se convierte en
+  timeout terminal visible.
+- En timeout se muestran acciones: `Reintentar Samantha`, `Continuar con lectura
+  parcial`, `Ver datos` y `Ver billeteras`.
+- `Continuar con lectura parcial` conserva datos reales de Polymarket y Wallet
+  Intelligence; no inventa reporte de Samantha ni marca `completed`.
+- El panel muestra estado operativo sanitizado: bridge conectado/no disponible,
+  ultimo health check y tiempo maximo. Nunca muestra token, headers ni payload
+  crudo.
 
 ## Archivos
 

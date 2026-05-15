@@ -16,15 +16,21 @@ export type SamanthaBridgeErrorCode =
   | "report_invalid";
 
 export type SamanthaBridgeStatus =
+  | "completed"
   | "disabled"
+  | "failed_safe"
   | "fallback_required"
+  | "insufficient_data"
   | "manual_needed"
+  | "partial"
   | "pending"
   | "sending"
   | "sent"
   | "samantha_researching"
   | "report_received"
   | "report_invalid"
+  | "timeout"
+  | "unavailable"
   | "error";
 
 export type SamanthaBridgeConfig = {
@@ -68,7 +74,8 @@ export type SamanthaResearchResponse = {
     | "pending"
     | "processing"
     | "queued"
-    | "researching";
+    | "researching"
+    | "unavailable";
   taskId?: string;
   warnings?: string[];
 };

@@ -427,9 +427,17 @@ export function markJobSamanthaBridgeFallback(
   let next = markJobAwaitingSamantha(job);
   next = updateDeepAnalysisJobStep(next, "awaiting_samantha_report", {
     requiresExternalIntegration: true,
-    status: "running",
+    status: "blocked",
     summary: input.reason || `${agentName} automatico no esta conectado todavia.`,
     warnings: input.warnings ?? [],
+  });
+  next = updateDeepAnalysisJobStep(next, "scoring_evidence", {
+    status: "blocked",
+    summary: "La lectura queda parcial con Polymarket y Wallet Intelligence; el agente no aporto evidencia validada.",
+  });
+  next = updateDeepAnalysisJobStep(next, "generating_decision", {
+    status: "blocked",
+    summary: "No hay decision PolySignal porque el agente no devolvio senales suficientes o disponibles.",
   });
   return {
     ...next,
@@ -449,6 +457,84 @@ export function markJobSamanthaBridgeFallback(
       reason: input.reason,
       status: input.automaticAvailable ? "failed" : "fallback_manual",
     },
+    resultReady: false,
+    status: "ready_to_score",
+  };
+}
+
+export function markJobAnalysisAgentReadingLoaded(
+  job: DeepAnalysisJob,
+  input: {
+    agentId?: string;
+    agentName?: string;
+    analysisStatus: "completed" | "failed_safe" | "insufficient_data" | "partial" | "unavailable";
+    reason: string;
+    warnings?: string[];
+  },
+): DeepAnalysisJob {
+  const agentName = input.agentName || job.analysisAgent?.agentName || "Samantha";
+  const terminalStatus =
+    input.analysisStatus === "completed" || input.analysisStatus === "partial"
+      ? "completed"
+      : "blocked";
+  let next = updateDeepAnalysisJobStep(job, "awaiting_samantha_report", {
+    requiresExternalIntegration: true,
+    status: terminalStatus,
+    summary: input.reason || `${agentName} devolvio una lectura automatica parcial.`,
+    warnings: input.warnings ?? [],
+  });
+  next = updateDeepAnalysisJobStep(next, "scoring_evidence", {
+    status: "blocked",
+    summary:
+      input.analysisStatus === "completed" || input.analysisStatus === "partial"
+        ? "El agente devolvio una lectura, pero PolySignal no crea estimacion propia sin reporte validado y senales suficientes."
+        : "El agente no devolvio senales suficientes para scoring.",
+  });
+  next = updateDeepAnalysisJobStep(next, "generating_decision", {
+    status: "blocked",
+    summary: "No hay decision PolySignal; el precio de mercado o una lectura parcial no bastan.",
+  });
+  return {
+    ...next,
+    analysisAgent: {
+      agentId: input.agentId ?? next.analysisAgent?.agentId ?? "samantha",
+      agentName,
+      status:
+        input.analysisStatus === "completed"
+          ? "completed"
+          : input.analysisStatus === "partial"
+            ? "partial"
+            : input.analysisStatus === "insufficient_data"
+              ? "insufficient_data"
+              : input.analysisStatus === "unavailable"
+                ? "unavailable"
+                : "failed_safe",
+    },
+    briefReady: true,
+    resultReady: false,
+    samanthaBridge: {
+      ...next.samanthaBridge,
+      automaticAvailable: true,
+      bridgeMode: "automatic",
+      bridgeStatus:
+        input.analysisStatus === "completed" || input.analysisStatus === "partial"
+          ? "completed"
+          : input.analysisStatus === "unavailable"
+            ? "manual_needed"
+            : "failed_safe",
+      fallbackRequired:
+        input.analysisStatus === "failed_safe" ||
+        input.analysisStatus === "insufficient_data" ||
+        input.analysisStatus === "unavailable",
+      fallbackAvailable: true,
+      lastAttemptAt: nowIso(),
+      reason: input.reason,
+      status:
+        input.analysisStatus === "completed" || input.analysisStatus === "partial"
+          ? "report_received"
+          : "failed",
+    },
+    status: "ready_to_score",
   };
 }
 
@@ -555,11 +641,7 @@ export function markJobSamanthaReportLoaded(
     status:
       input.acceptedEstimate
         ? "completed"
-        : input.signalCount > 0
-          ? "ready_to_score"
-          : input.reportStatus === "completed"
-            ? "ready_to_score"
-            : "awaiting_samantha",
+        : "ready_to_score",
   };
 }
 

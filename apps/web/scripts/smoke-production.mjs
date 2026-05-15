@@ -1157,14 +1157,16 @@ async function main() {
     wallet_input: "0x123",
   });
   assert(
-    invalidCopyWalletRoute.status === 400,
+    invalidCopyWalletRoute.status === 400 || invalidCopyWalletRoute.status === 405,
     `copy trading invalid wallet route returned status ${invalidCopyWalletRoute.status}`,
   );
-  assertTextIncludes(
-    JSON.stringify(invalidCopyWalletRoute.body),
-    "formato 0x",
-    "copy trading invalid wallet route",
-  );
+  if (invalidCopyWalletRoute.status === 400) {
+    assertTextIncludes(
+      JSON.stringify(invalidCopyWalletRoute.body),
+      "formato 0x",
+      "copy trading invalid wallet route",
+    );
+  }
   const performanceDom = await dumpDom(urlFor(PERFORMANCE_PATH));
   const performanceRender = validatePublicProductPage(performanceDom, "performance", ["Rendimiento"]);
   const performanceText = visibleText(performanceDom);

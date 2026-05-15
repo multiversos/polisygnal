@@ -335,8 +335,12 @@ Camino B controls:
   explicitly allowed for local development;
 - request uses `credentials: omit`, `redirect: error`, `no-store`, timeout and
   request/response size caps;
-- if the bridge is disabled or unsafe, the route returns a controlled fallback
-  response and the job remains `awaiting_samantha`;
+- if the bridge is disabled, unsafe, times out or returns no usable report, the
+  route returns a controlled fallback and the job moves to a terminal partial
+  state instead of remaining `awaiting_samantha`;
+- async task polling is bounded to avoid infinite loading. Timeout recovery
+  preserves Polymarket and Wallet Intelligence data and never fabricates a
+  Samantha report;
 - if Samantha returns a report, PolySignal validates it with the same report
   validator before exposing evidence.
 

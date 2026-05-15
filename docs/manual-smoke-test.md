@@ -240,8 +240,8 @@ If this test fails, stop feature work and treat it as a production regression.
 ## Deep Analyzer / Samantha
 
 1. Open `/analyze` and analyze a valid Polymarket link.
-2. Confirm Radar Analytics remains visible when the job is waiting for Samantha
-   instead of disappearing after Polymarket is read.
+2. Confirm Radar Analytics remains visible while Samantha is actively being
+   contacted, but does not stay in `Samantha analizando` indefinitely.
 3. Confirm the public report shows `Samantha automatica`, source availability,
    Wallet Intelligence status, and a partial-reading state when needed.
 4. Confirm the UI says Samantha automatic bridge is unavailable or pending when
@@ -249,9 +249,13 @@ If this test fails, stop feature work and treat it as a production regression.
 5. Confirm no JSON/schema/debug/manual report tools are visible by default.
 6. In local debug mode only, report validation can still be tested behind
    `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`; it must never invent a prediction.
-7. Save the analysis and confirm `/history` shows `Esperando Samantha`,
-   `Samantha investigando`, or equivalent pending research state, not hit/miss.
-8. Confirm `/performance` does not count research-pending analyses as failures.
+7. If Samantha times out, confirm the panel shows `Samantha no respondio a
+   tiempo`, offers `Reintentar Samantha` and `Continuar con lectura parcial`,
+   and keeps `Ver datos` / `Ver billeteras` available when those sources were
+   loaded.
+8. Save the analysis and confirm `/history` shows pending/partial agent state,
+   not hit/miss.
+9. Confirm `/performance` does not count research-pending analyses as failures.
 15. Click `Actualizar resultados` and confirm the page says it is verifying
     automatically. It must not ask the user to choose `Gano YES` or `Gano NO`.
 16. Confirm the page explains `Como se mide PolySignal`: only clear PolySignal
@@ -675,8 +679,8 @@ Use these quick checks when reviewing public pages:
 6. Confirm `Ver datos` and `Ver billeteras` stay closed by default and only
    open after a click/tap.
 7. If Samantha takes longer than normal, confirm the timer explains that
-   market, data and wallet sources were already consulted and that PolySignal is
-   waiting for the agent.
+   market, data and wallet sources were already consulted. By 90-120 seconds it
+   must become a visible timeout/recovery state, not an infinite loader.
 8. Confirm the job also shows:
    - Mercado leido desde Polymarket.
    - Datos principales revisados.

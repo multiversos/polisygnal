@@ -1587,6 +1587,7 @@ function validateDeepAnalysisJobRules() {
     createDeepAnalysisJob,
     getCurrentJobStep,
     getJobProgressSummary,
+    markJobAnalysisAgentReadingLoaded,
     markJobAwaitingSamantha,
     markJobMarketAnalyzed,
     markJobPolymarketRead,
@@ -1655,8 +1656,21 @@ function validateDeepAnalysisJobRules() {
     automaticAvailable: false,
     reason: "Bridge disabled for fixture.",
   });
-  assert(fallbackJob.status === "awaiting_samantha", "bridge fallback must keep job awaiting Samantha");
+  assert(fallbackJob.status === "ready_to_score", "bridge fallback must become terminal partial state");
+  assert(
+    fallbackJob.steps.find((step) => step.id === "awaiting_samantha_report")?.status === "blocked",
+    "bridge fallback must close the Samantha waiting step",
+  );
   assert(fallbackJob.resultReady !== true, "bridge fallback must not complete the analysis");
+
+  const terminalAgentReading = markJobAnalysisAgentReadingLoaded(sendingJob, {
+    analysisStatus: "partial",
+    reason: "Fixture partial reading.",
+  });
+  assert(
+    terminalAgentReading.status === "ready_to_score",
+    "terminal agent analysis should not leave the UI researching",
+  );
 
   const withEvidenceNoDecision = markJobSamanthaReportLoaded(job, {
     acceptedEstimate: false,
@@ -1688,7 +1702,9 @@ function validateDeepAnalysisJobRules() {
   assert(analyzePage.includes("createDeepAnalysisJob"), "analyze page should create local deep analysis jobs");
   assert(analyzePage.includes("getLatestDeepAnalysisJobForUrl(normalizedUrl)"), "analyze page should reuse pending jobs by URL");
   assert(analyzePage.includes("existingBridgeTaskId"), "analyze page should not duplicate Samantha sends when continuing a job");
-  assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page should keep jobs awaiting Samantha when bridge is unavailable");
+  assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page should keep safe partial state when bridge is unavailable");
+  assert(analyzePage.includes("ANALYSIS_AGENT_POLL_TIMEOUT_MS"), "analyze page should cap Samantha polling");
+  assert(analyzePage.includes("handleContinueWithPartial"), "analyze page should allow continuing without Samantha after timeout");
   assert(analyzePage.includes("markJobSendingToSamantha"), "analyze page should expose automatic bridge states");
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
   assert(reportSource.includes("Progreso del analisis"), "AnalyzerReport should show human progress copy");
@@ -2434,13 +2450,21 @@ async function validateBackendProxy() {
       "expected internal proxy diagnostic header for upstream timeout",
     );
 
-    assert(route.POST().status === 405, "expected POST to be rejected");
-    assert(route.DELETE().status === 405, "expected DELETE to be rejected");
+    const blockedPost = await route.POST(
+      new Request("https://example.test/api/backend/markets/overview", {
+        body: JSON.stringify({ unsafe: true }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      }),
+      { params: Promise.resolve({ path: ["markets", "overview"] }) },
+    );
+    assert(blockedPost.status === 404, `expected non-allowlisted POST to be blocked, got ${blockedPost.status}`);
+    assert(route.PUT().status === 405, "expected PUT to be rejected");
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  return { proxy_checks: 7 };
+  return { proxy_checks: 8 };
 }
 
 function validateAnalyzerFirstProductSource() {

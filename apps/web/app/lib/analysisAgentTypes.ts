@@ -32,9 +32,13 @@ export type AnalysisAgentErrorCode =
   | "report_invalid";
 
 export type AnalysisAgentStatus =
+  | "completed"
   | "disabled"
+  | "failed_safe"
   | "fallback_required"
+  | "insufficient_data"
   | "manual_needed"
+  | "partial"
   | "pending"
   | "sending"
   | "sent"
@@ -42,6 +46,8 @@ export type AnalysisAgentStatus =
   | "samantha_researching"
   | "report_received"
   | "report_invalid"
+  | "timeout"
+  | "unavailable"
   | "error";
 
 export type AnalysisAgentBridgeConfig = {

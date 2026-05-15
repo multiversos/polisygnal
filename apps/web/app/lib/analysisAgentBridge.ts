@@ -182,7 +182,12 @@ function fallbackResult(
     fallbackRequired: true,
     mode: config.mode,
     reason,
-    status: config.mode === "disabled" ? "disabled" : "fallback_required",
+    status:
+      config.mode === "disabled"
+        ? "disabled"
+        : errorCode === "request_timeout"
+          ? "timeout"
+          : "fallback_required",
     warnings: [],
   };
 }
@@ -318,7 +323,8 @@ function parseAgentResponse(value: unknown, config: AnalysisAgentBridgeConfig): 
       record.status === "insufficient_data" ||
       record.status === "manual_needed" ||
       record.status === "failed_safe" ||
-      record.status === "failed"
+      record.status === "failed" ||
+      record.status === "unavailable"
         ? record.status
         : analysis?.status,
     taskId: typeof record.taskId === "string" ? record.taskId.slice(0, 120) : undefined,
@@ -475,7 +481,11 @@ export async function sendAnalysisAgentResearchTask(task: AnalysisAgentTask): Pr
       };
     }
     if (agentResponse.analysis) {
-      const insufficient = agentResponse.analysis.status === "insufficient_data" || agentResponse.analysis.status === "unavailable";
+      const terminalStatus = agentResponse.analysis.status;
+      const insufficient =
+        terminalStatus === "failed_safe" ||
+        terminalStatus === "insufficient_data" ||
+        terminalStatus === "unavailable";
       return {
         agentId: agentResponse.analysis.agentId || config.agentId,
         agentName: agentResponse.analysis.agentName || config.agentName,
@@ -485,7 +495,7 @@ export async function sendAnalysisAgentResearchTask(task: AnalysisAgentTask): Pr
         fallbackRequired: insufficient,
         mode: config.mode,
         reason: agentResponse.analysis.summary || agentResponse.message || `${config.agentName} returned an automatic reading.`,
-        status: insufficient ? "fallback_required" : "agent_researching",
+        status: terminalStatus,
         taskId: agentResponse.taskId,
         warnings: agentResponse.warnings ?? [],
       };
@@ -499,7 +509,7 @@ export async function sendAnalysisAgentResearchTask(task: AnalysisAgentTask): Pr
         fallbackRequired: true,
         mode: config.mode,
         reason: agentResponse.message || `${config.agentName} did not find enough automatic signals.`,
-        status: "fallback_required",
+        status: "insufficient_data",
         taskId: agentResponse.taskId,
         warnings: agentResponse.warnings ?? [],
       };
@@ -651,6 +661,27 @@ export async function lookupAnalysisAgentResearchTask(taskId: string): Promise<A
         status: "report_received",
         taskId: agentResponse.taskId || taskId,
         warnings: reportResult.warnings,
+      };
+    }
+    if (agentResponse.analysis) {
+      const terminalStatus = agentResponse.analysis.status;
+      const insufficient =
+        terminalStatus === "failed_safe" ||
+        terminalStatus === "insufficient_data" ||
+        terminalStatus === "unavailable";
+      return {
+        agentId: agentResponse.analysis.agentId || config.agentId,
+        agentName: agentResponse.analysis.agentName || config.agentName,
+        analysis: agentResponse.analysis,
+        automaticAvailable: true,
+        bridgeTaskStatus: insufficient ? "manual_needed" : "completed",
+        checkedAt: nowIso(),
+        fallbackRequired: insufficient,
+        mode: config.mode,
+        reason: agentResponse.analysis.summary || agentResponse.message || `${config.agentName} returned an automatic reading.`,
+        status: terminalStatus,
+        taskId: agentResponse.taskId || taskId,
+        warnings: agentResponse.warnings ?? [],
       };
     }
     return {
