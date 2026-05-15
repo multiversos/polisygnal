@@ -709,7 +709,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(walletDetailsSource.includes("Copiar wallet"), "wallet drawer must allow copying wallet addresses");
   assert(walletDetailsSource.includes("Wallet completa no disponible"), "wallet drawer must not treat short addresses as verifiable wallets");
   assert(walletDetailsSource.includes("wallet-details-key-grid"), "wallet drawer must keep a compact key-data view");
-  assert(walletDetailsSource.includes("Ver detalles"), "wallet technical details must stay collapsed by default");
+  assert(walletDetailsSource.includes("Datos tecnicos"), "wallet technical details must stay collapsed by default");
+  assert(walletDetailsSource.includes("Historial de esta wallet"), "wallet drawer must keep wallet history collapsed and explicit");
+  assert(walletDetailsSource.includes("Perfil destacado"), "wallet drawer must support highlighted profile badges");
   assert(reportSource.includes("No encontramos datos publicos suficientes de billeteras"), "AnalyzerReport missing honest wallet unavailable state");
   assert(reportSource.includes("Perfil de billeteras"), "AnalyzerReport missing wallet profile summary");
   assert(reportSource.includes("Porcentaje PolySignal"), "AnalyzerReport missing conservative signal mix copy");
