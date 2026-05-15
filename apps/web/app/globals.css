@@ -9475,6 +9475,19 @@ html:not([data-theme="dark"]) .app-sidebar {
     display: grid;
   }
 
+  .profiles-hero-actions {
+    display: grid;
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .profiles-hero-actions .badge,
+  .profiles-hero-actions button {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
   .profiles-kpis,
   .profile-card-grid {
     grid-template-columns: 1fr;
