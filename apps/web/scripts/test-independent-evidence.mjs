@@ -112,6 +112,10 @@ assert(
   "sports summary should stop listing missing odds when a real provider match is available",
 );
 assert(!sportsSummary.enoughForEstimate, "sports summary must not enable estimate with only market + wallets");
+assert(
+  sportsSummary.reason.includes("Hay algo de soporte independiente"),
+  "sports summary should acknowledge partial independent support when real external odds are available",
+);
 
 const politicsSummary = buildIndependentEvidenceSummary({
   agentName: "Samantha",

@@ -52,6 +52,24 @@ const sufficientWalletProfileSignal = {
     },
   ],
 };
+const matchedExternalOdds = {
+  bestSourceUrl: "https://sportsbook.draftkings.com/event/pistons-cavaliers",
+  checkedAt: "2026-05-15T19:15:00.000Z",
+  eventName: "Detroit Pistons vs. Cleveland Cavaliers",
+  eventStartTime: "2026-05-15T23:00:00.000Z",
+  league: "NBA",
+  limitations: ["Controlled comparison fixture only."],
+  matchConfidence: "high",
+  matchedMarket: true,
+  outcomes: [
+    { impliedProbability: 0.4082, label: "Pistons", priceAmerican: 145, priceDecimal: 2.45, sourceOutcomeName: "Detroit Pistons" },
+    { impliedProbability: 0.6364, label: "Cavaliers", priceAmerican: -175, priceDecimal: 1.57, sourceOutcomeName: "Cleveland Cavaliers" },
+  ],
+  providerName: "OddsBlaze",
+  sportsbook: "DraftKings",
+  status: "available",
+  warnings: [],
+};
 
 function expectPending(result, label) {
   assert(!result.available, `${label} should keep estimate unavailable`);
@@ -106,6 +124,26 @@ const noIndependentGate = buildConservativePolySignalEstimate({
   walletSignal: emptyWalletSignal,
 });
 expectPending(noIndependentGate, "valid-shape report without enough independent support");
+
+const withDirectExternalOdds = buildConservativePolySignalEstimate({
+  externalOddsComparison: matchedExternalOdds,
+  marketImpliedProbability: marketReference,
+  samanthaReport: validButNoIndependentGateReport,
+  walletSignal: emptyWalletSignal,
+});
+expectPending(withDirectExternalOdds, "valid-shape report with direct external odds only");
+assert(
+  !withDirectExternalOdds.blockers.some((entry) => entry.code === "missing_independent_support"),
+  "direct external odds should clear the missing independent support blocker even if the estimate still stays pending",
+);
+assert(
+  withDirectExternalOdds.blockers.some((entry) => entry.code === "samantha_estimate_not_accepted"),
+  "direct external odds alone must not bypass Samantha validation gates",
+);
+assert(
+  withDirectExternalOdds.explanation.includes("soporte independiente parcial disponible"),
+  "pending explanation should acknowledge when external support exists but conservative gates still block the estimate",
+);
 
 const withWallet = buildConservativePolySignalEstimate({
   marketImpliedProbability: marketReference,

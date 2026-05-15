@@ -1,4 +1,5 @@
 import { CLEAR_DECISION_THRESHOLD } from "./analysisDecision";
+import type { ExternalOddsComparison } from "./externalOddsTypes";
 import { normalizeProbability, type ProbabilityPair, type ProbabilityValue } from "./marketProbabilities";
 import {
   convertSamanthaReportToSignals,
@@ -62,6 +63,7 @@ export type SignalContribution = {
 };
 
 export type PolySignalEstimateInput = {
+  externalOddsComparison?: ExternalOddsComparison | null;
   marketImpliedProbability?: {
     no?: ProbabilityValue;
     yes?: ProbabilityValue;
@@ -88,6 +90,7 @@ export type PolySignalEstimateResult = {
 
 export type PolySignalSignalMixInput = {
   externalOddsSignalAvailable?: boolean;
+  externalOddsComparison?: ExternalOddsComparison | null;
   marketImpliedProbability?: {
     no?: ProbabilityValue;
     yes?: ProbabilityValue;
@@ -198,6 +201,15 @@ function comparisonIsUsable(input?: {
   );
 }
 
+function externalOddsComparisonIsUsable(input?: ExternalOddsComparison | null): boolean {
+  return Boolean(
+    input?.status === "available" &&
+      input.matchedMarket === true &&
+      input.outcomes.length >= 2 &&
+      (input.matchConfidence === "high" || input.matchConfidence === "medium"),
+  );
+}
+
 function strongExternalEvidence(report?: SamanthaResearchReport | null): SamanthaEvidenceItem[] {
   if (!report || report.status === "failed") {
     return [];
@@ -276,6 +288,7 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
   const samanthaEstimateAccepted = report ? shouldAcceptSuggestedEstimate(report) : false;
   const walletSufficient = walletSignalIsSufficient(input.walletSignal);
   const profileSufficient = profileSignalIsSufficient(input.walletSignal);
+  const directExternalOddsUsable = externalOddsComparisonIsUsable(input.externalOddsComparison);
   const oddsUsable = comparisonIsUsable(report?.oddsComparison);
   const kalshiUsable = Boolean(
     report?.kalshiComparison?.found &&
@@ -286,7 +299,7 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
   const strongExternalEvidenceSufficient = strongEvidence.length >= 2;
   const auxiliarySupportCount = [walletSufficient, profileSufficient].filter(Boolean).length;
   const independentSupportCount = [
-    oddsUsable,
+    directExternalOddsUsable || oddsUsable,
     kalshiUsable,
     strongExternalEvidenceSufficient,
   ].filter(Boolean).length;
@@ -369,12 +382,35 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
     });
   }
 
-  const oddsContribution = comparisonContribution(
-    "odds_comparison",
-    "Odds externas comparables",
-    report?.oddsComparison,
-    oddsUsable,
-  );
+  const oddsContribution: SignalContribution | null = directExternalOddsUsable
+    ? {
+        confidence:
+          input.externalOddsComparison?.matchConfidence === "high" ||
+          input.externalOddsComparison?.matchConfidence === "medium" ||
+          input.externalOddsComparison?.matchConfidence === "low"
+            ? input.externalOddsComparison.matchConfidence
+            : "unknown",
+        direction: "UNKNOWN",
+        isReal: true,
+        label: "Odds externas comparables",
+        source: "odds_comparison",
+        strength:
+          input.externalOddsComparison?.matchConfidence === "high"
+            ? "high"
+            : input.externalOddsComparison?.matchConfidence === "medium"
+              ? "medium"
+              : "low",
+        summary: `${input.externalOddsComparison?.providerName || "Proveedor externo"} / ${
+          input.externalOddsComparison?.sportsbook || "sportsbook"
+        } devolvio comparacion usable para este mercado.`,
+        usedForEstimate: true,
+      }
+    : comparisonContribution(
+        "odds_comparison",
+        "Odds externas comparables",
+        report?.oddsComparison,
+        oddsUsable,
+      );
   if (oddsContribution) {
     contributions.push(oddsContribution);
   }
@@ -448,6 +484,10 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
   };
 
   if (!gatesPassed || !report?.suggestedEstimate) {
+    const explanation =
+      independentSupportCount > 0
+        ? "Estimacion PolySignal pendiente: ya hay soporte independiente parcial disponible, pero la lectura todavia no supera las compuertas conservadoras. El precio de mercado sigue solo como referencia y las wallets permanecen como senal auxiliar."
+        : "Estimacion PolySignal pendiente: falta reporte Samantha validado o soporte independiente suficiente. El precio de mercado queda solo como referencia y las wallets permanecen como senal auxiliar.";
     return {
       available: false,
       blockers,
@@ -455,8 +495,7 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
       contributions,
       countsForHistoryAccuracy: false,
       decisionSide: "unavailable",
-      explanation:
-        "Estimacion PolySignal pendiente: falta reporte Samantha validado o soporte independiente suficiente. El precio de mercado queda solo como referencia y las wallets permanecen como senal auxiliar.",
+      explanation,
       marketImpliedProbability: marketImpliedProbability ?? undefined,
       readiness,
       warnings: dedupeWarnings([
@@ -535,6 +574,7 @@ export function buildConservativePolySignalEstimate(input: PolySignalEstimateInp
 
 export function buildConservativePolySignalSignalMix(input: PolySignalSignalMixInput): PolySignalSignalMix {
   const estimate = buildConservativePolySignalEstimate({
+    externalOddsComparison: input.externalOddsComparison,
     marketImpliedProbability: input.marketImpliedProbability,
     samanthaReport: input.samanthaReport,
     walletSignal: input.walletSignal,

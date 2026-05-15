@@ -478,11 +478,20 @@ function uniqueLimited(items: Array<string | null | undefined>, limit: number): 
 function buildSamanthaSourcesUsed(
   report: SamanthaResearchReport | undefined,
   walletSummary: WalletIntelligenceSummary,
+  externalOddsComparison?: ExternalOddsComparison | null,
 ): string[] {
+  const directExternalOddsSource =
+    externalOddsComparison?.status === "available" &&
+    externalOddsComparison.matchedMarket &&
+    (externalOddsComparison.matchConfidence === "high" ||
+      externalOddsComparison.matchConfidence === "medium")
+      ? `${externalOddsComparison.providerName} / ${externalOddsComparison.sportsbook}`
+      : null;
   return uniqueLimited(
     [
       "Polymarket",
       walletSummary.available ? "Wallet Intelligence" : null,
+      directExternalOddsSource,
       report ? "Analysis Agent Bridge" : null,
       ...(report?.evidence.map((evidence) => evidence.sourceName) ?? []),
       report?.oddsComparison?.found ? "Odds externas" : null,
@@ -494,6 +503,7 @@ function buildSamanthaSourcesUsed(
 
 function buildSamanthaRisks(input: {
   estimateAvailable: boolean;
+  externalOddsComparison?: ExternalOddsComparison | null;
   report: SamanthaResearchReport | undefined;
   walletSummary: WalletIntelligenceSummary;
 }): string[] {
@@ -503,7 +513,20 @@ function buildSamanthaRisks(input: {
       !input.estimateAvailable
         ? "No hay senales independientes suficientes para una estimacion propia."
         : null,
-      input.report && !input.report.oddsComparison?.found
+      input.externalOddsComparison?.status === "available" &&
+      input.externalOddsComparison.matchedMarket &&
+      (input.externalOddsComparison.matchConfidence === "high" ||
+        input.externalOddsComparison.matchConfidence === "medium")
+        ? "Hay odds externas comparables disponibles, pero la estimacion propia sigue bloqueada por compuertas conservadoras."
+        : null,
+      input.report &&
+      !input.report.oddsComparison?.found &&
+      !(
+        input.externalOddsComparison?.status === "available" &&
+        input.externalOddsComparison.matchedMarket &&
+        (input.externalOddsComparison.matchConfidence === "high" ||
+          input.externalOddsComparison.matchConfidence === "medium")
+      )
         ? "No hay odds externas comparables aceptadas en esta lectura."
         : null,
       input.walletSummary.available && input.walletSummary.confidence !== "high"
@@ -519,6 +542,7 @@ function buildSamanthaRisks(input: {
 
 function buildSamanthaLimitations(input: {
   estimateAvailable: boolean;
+  externalOddsComparison?: ExternalOddsComparison | null;
   hasOutcomePrices: boolean;
   report: SamanthaResearchReport | undefined;
   walletSummary: WalletIntelligenceSummary;
@@ -534,6 +558,12 @@ function buildSamanthaLimitations(input: {
       !input.estimateAvailable
         ? "No hay estimacion propia de PolySignal para este mercado."
         : null,
+      input.externalOddsComparison?.status === "available" &&
+      input.externalOddsComparison.matchedMarket &&
+      (input.externalOddsComparison.matchConfidence === "high" ||
+        input.externalOddsComparison.matchConfidence === "medium")
+        ? "Las odds externas ya estan disponibles, pero no bastan solas para destrabar una estimacion propia."
+        : null,
       !input.hasOutcomePrices ? "Precio/outcomes no disponibles desde Polymarket." : null,
       !input.walletSummary.available ? "Wallet Intelligence no esta disponible para este mercado." : null,
       input.walletSummary.available && (input.walletSummary.profileSummaries?.length ?? 0) === 0
@@ -545,6 +575,7 @@ function buildSamanthaLimitations(input: {
 }
 
 function buildReviewChecklist(input: {
+  externalOddsComparison?: ExternalOddsComparison | null;
   hasOutcomePrices: boolean;
   report: SamanthaResearchReport | undefined;
   walletSummary: WalletIntelligenceSummary;
@@ -557,7 +588,14 @@ function buildReviewChecklist(input: {
         ? "Actividad de billeteras, capital observado y sesgo agregado."
         : "Disponibilidad de Wallet Intelligence para este mercado.",
       "Cierre del mercado o fecha del evento.",
-      input.report?.oddsComparison?.found ? "Comparacion externa aceptada." : "Senales externas faltantes.",
+      input.externalOddsComparison?.status === "available" &&
+      input.externalOddsComparison.matchedMarket &&
+      (input.externalOddsComparison.matchConfidence === "high" ||
+        input.externalOddsComparison.matchConfidence === "medium")
+        ? "Odds externas comparables disponibles."
+        : input.report?.oddsComparison?.found
+          ? "Comparacion externa aceptada."
+          : "Senales externas faltantes.",
     ],
     5,
   );
@@ -743,12 +781,13 @@ export function AnalyzerReport({
   const samanthaBrief = useMemo(
     () =>
       buildSamanthaResearchBrief({
+        externalOddsComparison,
         item,
         normalizedUrl,
         url: normalizedUrl,
         walletSummary,
       }),
-    [item, normalizedUrl, walletSummary],
+    [externalOddsComparison, item, normalizedUrl, walletSummary],
   );
   const samanthaBriefText = useMemo(() => serializeResearchBrief(samanthaBrief), [samanthaBrief]);
   const samanthaTaskPacket = useMemo(() => buildSamanthaTaskPacket(samanthaBrief), [samanthaBrief]);
@@ -773,6 +812,7 @@ export function AnalyzerReport({
   const samanthaAutomaticStatus = samanthaReportStatusLabel(samanthaReportUiStatus);
   const samanthaEstimateAccepted = samanthaReport ? shouldAcceptSuggestedEstimate(samanthaReport) : false;
   const polySignalEstimate = buildConservativePolySignalEstimate({
+    externalOddsComparison,
     marketImpliedProbability: probabilityState.market,
     samanthaReport,
     walletSignal: walletSummary,
@@ -782,19 +822,26 @@ export function AnalyzerReport({
     estimateAvailable: polySignalEstimate.available,
     status: samanthaReportUiStatus,
   });
-  const samanthaSourcesUsed = buildSamanthaSourcesUsed(samanthaReport, walletSummary);
+  const samanthaSourcesUsed = buildSamanthaSourcesUsed(
+    samanthaReport,
+    walletSummary,
+    externalOddsComparison,
+  );
   const samanthaRiskItems = buildSamanthaRisks({
     estimateAvailable: polySignalEstimate.available,
+    externalOddsComparison,
     report: samanthaReport,
     walletSummary,
   });
   const samanthaLimitations = buildSamanthaLimitations({
     estimateAvailable: polySignalEstimate.available,
+    externalOddsComparison,
     hasOutcomePrices: Boolean(probabilityState.market || outcomePrices),
     report: samanthaReport,
     walletSummary,
   });
   const samanthaReviewChecklist = buildReviewChecklist({
+    externalOddsComparison,
     hasOutcomePrices: Boolean(probabilityState.market || outcomePrices),
     report: samanthaReport,
     walletSummary,
@@ -819,12 +866,23 @@ export function AnalyzerReport({
   const walletLargePositionCount = walletSummary.largePositions?.length ?? 0;
   const walletNotableCount = walletSummary.notableWallets?.length ?? 0;
   const signalMix = buildConservativePolySignalSignalMix({
-    externalOddsSignalAvailable: Boolean(samanthaReport?.oddsComparison?.found),
+    externalOddsComparison,
+    externalOddsSignalAvailable:
+      (externalOddsComparison?.status === "available" &&
+        externalOddsComparison.matchedMarket &&
+        (externalOddsComparison.matchConfidence === "high" ||
+          externalOddsComparison.matchConfidence === "medium")) ||
+      Boolean(samanthaReport?.oddsComparison?.found),
     marketImpliedProbability: probabilityState.market,
     samanthaReport,
     samanthaResearchSignalCount: samanthaSignals.length,
     walletSignal: walletSummary,
   });
+  const hasDirectExternalOdds =
+    externalOddsComparison?.status === "available" &&
+    externalOddsComparison.matchedMarket &&
+    (externalOddsComparison.matchConfidence === "high" ||
+      externalOddsComparison.matchConfidence === "medium");
   const displayedPolySignalProbability = polySignalEstimate.available
     ? {
         no: polySignalEstimate.estimateNoProbability,
@@ -934,6 +992,7 @@ export function AnalyzerReport({
     setSamanthaReportResult(result);
     if (deepAnalysisJob) {
       const nextEstimate = buildConservativePolySignalEstimate({
+        externalOddsComparison,
         marketImpliedProbability: probabilityState.market,
         samanthaReport: result.report,
         walletSignal: walletSummary,
@@ -993,6 +1052,7 @@ export function AnalyzerReport({
         }
         setSamanthaReportResult(reportResult);
         const nextEstimate = buildConservativePolySignalEstimate({
+          externalOddsComparison,
           marketImpliedProbability: probabilityState.market,
           samanthaReport: reportResult.report,
           walletSignal: walletSummary,
@@ -1279,8 +1339,9 @@ export function AnalyzerReport({
         ) : (
           <>
             <p className="section-note">
-              Todavia no hay suficiente evidencia para generar un porcentaje propio.
-              PolySignal necesita Samantha validada y al menos un soporte independiente real.
+              {hasDirectExternalOdds
+                ? "Ya hay odds externas comparables disponibles. PolySignal mantiene la estimacion propia en espera hasta que las compuertas conservadoras validen suficiente soporte adicional."
+                : "Todavia no hay suficiente evidencia para generar un porcentaje propio. PolySignal necesita Samantha validada y al menos un soporte independiente real."}
             </p>
             <div className="wallet-warning-list">
               {polySignalEstimate.blockers.slice(0, 5).map((entry) => (
@@ -1297,8 +1358,21 @@ export function AnalyzerReport({
         <span>Precio: Polymarket</span>
         <span>Mercado/evento: datos publicos de Polymarket</span>
         <span>Billeteras: {sourceLabel(walletSummary)}</span>
+        <span>
+          Odds externas:{" "}
+          {hasDirectExternalOdds
+            ? `${externalOddsComparison?.providerName} / ${externalOddsComparison?.sportsbook}`
+            : externalOddsComparison?.status === "no_match"
+              ? "sin equivalente claro"
+              : externalOddsComparison?.status === "disabled"
+                ? "proveedor no configurado"
+                : "pendiente"}
+        </span>
         <span>Resolucion: Polymarket si aplica</span>
-        <span>Investigacion externa: {research.verifiedVisibleCount > 0 ? "fuentes verificadas" : "pendiente"}</span>
+        <span>
+          {item.market?.sport_type ? "Noticias/lesiones" : "Investigacion externa"}:{" "}
+          {research.verifiedVisibleCount > 0 ? "fuentes verificadas" : "pendiente"}
+        </span>
         <span>Historial: este navegador</span>
       </section>
 
