@@ -9088,7 +9088,8 @@ html:not([data-theme="dark"]) .app-sidebar {
 .profiles-hero,
 .profiles-kpis,
 .profiles-controls,
-.profiles-empty {
+.profiles-empty,
+.profiles-refresh-status {
   border: 1px solid var(--ps-border, rgba(96, 165, 250, 0.22));
   border-radius: 18px;
   background: rgba(11, 23, 40, 0.72);
@@ -9114,6 +9115,46 @@ html:not([data-theme="dark"]) .app-sidebar {
 
 .profiles-hero p {
   color: var(--ps-text-soft, #cbd5e1);
+}
+
+.profiles-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.profiles-hero-actions button {
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 1px solid var(--ps-border-cyan, rgba(34, 211, 238, 0.38));
+  border-radius: 999px;
+  color: var(--ps-cyan, #22d3ee);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+  background: rgba(34, 211, 238, 0.1);
+}
+
+.profiles-hero-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.profiles-refresh-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  color: var(--ps-text-soft, #cbd5e1);
+}
+
+.profiles-refresh-status strong {
+  color: var(--ps-text, #f8fafc);
 }
 
 .profiles-kpis {
@@ -9228,6 +9269,13 @@ html:not([data-theme="dark"]) .app-sidebar {
 .profile-card-heading span {
   color: var(--ps-muted, #8ea4bf);
   font-size: 0.82rem;
+}
+
+.profile-card-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .profile-card-grid {

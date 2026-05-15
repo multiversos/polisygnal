@@ -98,6 +98,13 @@ Estado visible verificado:
   100`). No guarda perfiles 1/1, 2/2, sin win rate real ni sin datos publicos
   verificables. Persistencia multi-dispositivo requiere backend/DB futuro; no
   se toco Neon ni se creo migracion.
+- `/profiles` tambien permite refrescar perfiles guardados con `Actualizar` y
+  `Actualizar todos`. La ruta segura `POST /api/profiles/refresh-wallet` acepta
+  solo `walletAddress` publica valida (`0x` + 40 hex), consulta fuentes publicas
+  allowlisted y actualiza localStorage con datos reales disponibles. Si la
+  fuente falla, el perfil no se borra; queda con estado `failed` o `partial`.
+  Si deja de cumplir el criterio, se marca `Ya no cumple criterio` para que el
+  usuario lo quite manualmente.
 - En mercados grandes, `/analyze` puede mostrar fases opcionales reales en el
   progreso: `Enriqueciendo perfiles`, `Construyendo historial de wallets` y
   `Validando consistencia de capital`. Se activan por datos reales de volumen,

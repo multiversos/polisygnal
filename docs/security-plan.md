@@ -366,6 +366,14 @@ Wallet Intelligence UI controls:
   `closedMarkets >= 50`, and either real PnL or observed capital of at least
   `100 USD`. The app must not save low-sample wallets, null win rates, invented
   PnL, or raw wallet lists.
+- `/profiles` refresh controls use `POST /api/profiles/refresh-wallet`, which
+  accepts only a validated full public wallet address. It does not accept
+  arbitrary URLs, localhost destinations, client-provided hosts, tokens, raw
+  payloads, or redirects. Refresh can update public profile metadata, closed
+  market counts, wins/losses, real win rate, real PnL, observed capital and
+  public market history only when the source returns them. Failed or partial
+  refreshes preserve the local profile and mark it stale instead of inventing
+  missing data.
 - The Profiles page is not account-synced and must say so. Global persistence
   requires a later backend/DB sprint with ownership checks; no Neon migration is
   part of this feature.

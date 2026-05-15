@@ -1088,6 +1088,8 @@ async function main() {
   const profilesText = visibleText(profilesDom);
   assertTextIncludes(profilesText, "Billeteras publicas detectadas", "profiles public heading");
   assertTextIncludes(profilesText, "localStorage v1", "profiles local storage copy");
+  assertTextIncludes(profilesText, "Actualizar todos", "profiles refresh all control");
+  assertTextIncludes(profilesText, "Los perfiles destacados apareceran", "profiles empty state copy");
   assertTextIncludes(profilesText, "No es recomendacion de copy-trading", "profiles anti-copy-trading copy");
   assertTextExcludes(profilesText, ["tokenId", "conditionId", "transactionHash", "raw JSON"], "profiles technical noise");
   const performanceDom = await dumpDom(urlFor(PERFORMANCE_PATH));

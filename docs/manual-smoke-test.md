@@ -418,6 +418,18 @@ If this test fails, stop feature work and treat it as a production regression.
    it loads, says localStorage v1, shows saved public profiles, links to
    Polymarket profiles, allows removing a saved profile, and warns that history
    is not copy-trading or a guarantee.
+45j. In `/profiles`, click `Actualizar` on one saved profile. Confirm the
+   card shows `Actualizando...`, then `Actualizado`, `Actualizacion parcial`,
+   or `No se pudo actualizar`. The profile must not be deleted on failure.
+   Real win rate, closed markets, wins/losses, PnL, capital, profile metadata
+   and history may update only when public sources return those fields.
+45k. Click `Actualizar todos`. Confirm it refreshes saved profiles with visible
+   progress such as `Actualizando 2 de 10`, then summarizes updated, partial
+   and failed results. It must not create duplicates or fire an unbounded
+   request burst.
+45l. If refreshed stats no longer meet the highlighted criteria, confirm the
+   card says `Ya no cumple criterio` and remains removable manually. It should
+   not disappear automatically.
 45a. In the progress panel, confirm `Cargando datos de Polymarket` shows an
    honest badge such as `Datos cargados`, `Datos basicos`, `Datos limitados`,
    `Fuente no disponible`, or `No respondio`, plus a `Ver datos` or

@@ -4,13 +4,59 @@ import { useEffect, useMemo, useState } from "react";
 
 import { MainNavigation } from "../components/MainNavigation";
 import {
+  HIGHLIGHTED_PROFILE_MIN_CLOSED_MARKETS,
+  HIGHLIGHTED_PROFILE_MIN_OBSERVED_CAPITAL_USD,
+  HIGHLIGHTED_PROFILE_MIN_WIN_RATE,
   getHighlightedProfiles,
   HIGHLIGHTED_PROFILES_STORAGE_EVENT,
   removeHighlightedProfile,
   type HighlightedWalletProfile,
+  type HighlightedProfileRefreshStatus,
+  updateHighlightedProfile,
 } from "../lib/highlightedProfiles";
+import {
+  buildPolymarketWalletProfileUrl,
+  isPolymarketWalletAddress,
+} from "../lib/polymarketWalletProfile";
+import type { WalletPublicMarketHistoryItem } from "../lib/walletIntelligenceTypes";
 
 type ProfileFilter = "all" | "pnl" | "recent" | "win80" | "win90";
+
+type RefreshWalletResponse = {
+  limitations?: string[];
+  profile?: {
+    avatarUrl?: string | null;
+    closedMarkets?: number | null;
+    lastUpdatedAt?: string | null;
+    losses?: number | null;
+    markets?: WalletPublicMarketHistoryItem[];
+    name?: string | null;
+    observedCapitalUsd?: number | null;
+    profileUrl?: string | null;
+    proxyWallet?: string | null;
+    pseudonym?: string | null;
+    realizedPnl?: number | null;
+    shortAddress?: string | null;
+    source?: string | null;
+    unrealizedPnl?: number | null;
+    verifiedBadge?: boolean | null;
+    walletAddress?: string | null;
+    winRate?: number | null;
+    wins?: number | null;
+    xUsername?: string | null;
+  };
+  status?: "failed" | "partial" | "unavailable" | "updated";
+  warnings?: string[];
+};
+
+type BulkRefreshProgress = {
+  active: boolean;
+  done: number;
+  failed: number;
+  partial: number;
+  total: number;
+  updated: number;
+};
 
 function formatUsd(value: unknown): string {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -59,6 +105,100 @@ function hasPnl(profile: HighlightedWalletProfile): boolean {
   return typeof profile.realizedPnl === "number" || typeof profile.unrealizedPnl === "number";
 }
 
+function profileMeetsCurrentCriteria(profile: HighlightedWalletProfile): boolean {
+  return (
+    profile.winRate >= HIGHLIGHTED_PROFILE_MIN_WIN_RATE &&
+    profile.closedMarkets >= HIGHLIGHTED_PROFILE_MIN_CLOSED_MARKETS &&
+    (hasPnl(profile) || (profile.observedCapitalUsd ?? 0) >= HIGHLIGHTED_PROFILE_MIN_OBSERVED_CAPITAL_USD)
+  );
+}
+
+function mergeNumber(previous: number | null | undefined, next: number | null | undefined): number | null | undefined {
+  return typeof next === "number" && Number.isFinite(next) ? next : previous;
+}
+
+function mergeString(previous: string | null | undefined, next: string | null | undefined): string | null | undefined {
+  return typeof next === "string" && next.trim() ? next : previous;
+}
+
+function mergeBoolean(previous: boolean | null | undefined, next: boolean | null | undefined): boolean | null | undefined {
+  return typeof next === "boolean" ? next : previous;
+}
+
+function mergeRefreshedProfile(
+  profile: HighlightedWalletProfile,
+  refresh: RefreshWalletResponse,
+): HighlightedWalletProfile {
+  const refreshed = refresh.profile;
+  const now = refreshed?.lastUpdatedAt || new Date().toISOString();
+  const safeWalletAddress = isPolymarketWalletAddress(refreshed?.walletAddress)
+    ? refreshed!.walletAddress!.trim()
+    : profile.walletAddress;
+  const builtProfileUrl = buildPolymarketWalletProfileUrl(safeWalletAddress);
+  const profileUrl =
+    (typeof refreshed?.profileUrl === "string" && refreshed.profileUrl === builtProfileUrl
+      ? refreshed.profileUrl
+      : null) ||
+    builtProfileUrl ||
+    profile.profileUrl;
+  const merged: HighlightedWalletProfile = {
+    ...profile,
+    avatarUrl: mergeString(profile.avatarUrl, refreshed?.avatarUrl),
+    closedMarkets: mergeNumber(profile.closedMarkets, refreshed?.closedMarkets) ?? profile.closedMarkets,
+    history: Array.isArray(refreshed?.markets) && refreshed!.markets!.length > 0 ? refreshed!.markets : profile.history,
+    lastUpdatedAt: now,
+    losses: mergeNumber(profile.losses, refreshed?.losses),
+    name: mergeString(profile.name, refreshed?.name),
+    observedCapitalUsd: mergeNumber(profile.observedCapitalUsd, refreshed?.observedCapitalUsd),
+    profileUrl,
+    proxyWallet: mergeString(profile.proxyWallet, refreshed?.proxyWallet),
+    pseudonym: mergeString(profile.pseudonym, refreshed?.pseudonym),
+    realizedPnl: mergeNumber(profile.realizedPnl, refreshed?.realizedPnl),
+    refreshError:
+      refresh.status === "failed" || refresh.status === "unavailable"
+        ? "No pudimos actualizar este perfil con las fuentes publicas disponibles."
+        : null,
+    refreshStatus:
+      refresh.status === "unavailable" || refresh.status === "failed"
+        ? "failed"
+        : refresh.status === "partial"
+          ? "partial"
+          : "updated",
+    shortAddress: mergeString(profile.shortAddress, refreshed?.shortAddress) ?? profile.shortAddress,
+    source: mergeString(profile.source, refreshed?.source) ?? profile.source,
+    sourceLimitations: refresh.limitations ?? profile.sourceLimitations ?? [],
+    sourceWarnings: refresh.warnings ?? profile.sourceWarnings ?? [],
+    stale: refresh.status !== "updated",
+    unrealizedPnl: mergeNumber(profile.unrealizedPnl, refreshed?.unrealizedPnl),
+    updatedAt: now,
+    verifiedBadge: mergeBoolean(profile.verifiedBadge, refreshed?.verifiedBadge),
+    walletAddress: safeWalletAddress,
+    winRate: mergeNumber(profile.winRate, refreshed?.winRate) ?? profile.winRate,
+    wins: mergeNumber(profile.wins, refreshed?.wins),
+    xUsername: mergeString(profile.xUsername, refreshed?.xUsername),
+  };
+  return {
+    ...merged,
+    noLongerQualifies: !profileMeetsCurrentCriteria(merged),
+  };
+}
+
+function refreshStatusCopy(status?: HighlightedProfileRefreshStatus, stale?: boolean): string {
+  if (status === "refreshing") {
+    return "Actualizando...";
+  }
+  if (status === "updated") {
+    return "Actualizado";
+  }
+  if (status === "partial") {
+    return "Actualizacion parcial";
+  }
+  if (status === "failed") {
+    return "No se pudo actualizar";
+  }
+  return stale ? "Datos locales" : "Listo para actualizar";
+}
+
 function matchesFilter(profile: HighlightedWalletProfile, filter: ProfileFilter): boolean {
   if (filter === "win80") {
     return profile.winRate >= 0.8;
@@ -77,10 +217,12 @@ function matchesFilter(profile: HighlightedWalletProfile, filter: ProfileFilter)
 }
 
 export default function ProfilesPage() {
+  const [bulkProgress, setBulkProgress] = useState<BulkRefreshProgress | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<ProfileFilter>("all");
   const [profiles, setProfiles] = useState<HighlightedWalletProfile[]>([]);
   const [query, setQuery] = useState("");
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const syncProfiles = () => setProfiles(getHighlightedProfiles());
@@ -131,6 +273,91 @@ export default function ProfilesPage() {
     setProfiles(removeHighlightedProfile(profile.walletAddress));
   };
 
+  const refreshProfile = async (profile: HighlightedWalletProfile): Promise<HighlightedProfileRefreshStatus> => {
+    if (!isPolymarketWalletAddress(profile.walletAddress)) {
+      const failedProfile: HighlightedWalletProfile = {
+        ...profile,
+        refreshError: "Wallet invalida para actualizar.",
+        refreshStatus: "failed",
+        sourceWarnings: ["No se actualizo porque la wallet guardada no tiene formato publico valido."],
+        stale: true,
+      };
+      setProfiles(updateHighlightedProfile(failedProfile));
+      return "failed";
+    }
+
+    setRefreshingIds((current) => new Set([...current, profile.id]));
+    try {
+      const response = await fetch("/api/profiles/refresh-wallet", {
+        body: JSON.stringify({ walletAddress: profile.walletAddress }),
+        cache: "no-store",
+        credentials: "omit",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        redirect: "error",
+      });
+      const text = await response.text();
+      if (!response.ok || text.length > 128_000) {
+        throw new Error("refresh_failed");
+      }
+      const payload = JSON.parse(text) as RefreshWalletResponse;
+      const merged = mergeRefreshedProfile(profile, payload);
+      setProfiles(updateHighlightedProfile(merged));
+      return merged.refreshStatus ?? "partial";
+    } catch {
+      const failedProfile: HighlightedWalletProfile = {
+        ...profile,
+        lastUpdatedAt: new Date().toISOString(),
+        refreshError: "No pudimos actualizar este perfil con las fuentes publicas disponibles.",
+        refreshStatus: "failed",
+        sourceWarnings: [
+          "La actualizacion fallo o la fuente publica no respondio. Se conserva el perfil local guardado.",
+        ],
+        stale: true,
+      };
+      setProfiles(updateHighlightedProfile(failedProfile));
+      return "failed";
+    } finally {
+      setRefreshingIds((current) => {
+        const next = new Set(current);
+        next.delete(profile.id);
+        return next;
+      });
+    }
+  };
+
+  const refreshAllProfiles = async () => {
+    if (profiles.length === 0 || bulkProgress?.active) {
+      return;
+    }
+    const targets = [...profiles];
+    const progress: BulkRefreshProgress = {
+      active: true,
+      done: 0,
+      failed: 0,
+      partial: 0,
+      total: targets.length,
+      updated: 0,
+    };
+    setBulkProgress(progress);
+    for (const profile of targets) {
+      const status = await refreshProfile(profile);
+      progress.done += 1;
+      if (status === "updated") {
+        progress.updated += 1;
+      } else if (status === "partial") {
+        progress.partial += 1;
+      } else {
+        progress.failed += 1;
+      }
+      setBulkProgress({ ...progress });
+    }
+    setBulkProgress({ ...progress, active: false });
+  };
+
   return (
     <main className="dashboard-shell profiles-page">
       <MainNavigation />
@@ -141,8 +368,30 @@ export default function ProfilesPage() {
           <p>Billeteras publicas detectadas con historial fuerte en Polymarket.</p>
           <p>No es recomendacion de copy-trading; solo organiza datos publicos verificables.</p>
         </div>
-        <span className="badge external-hint">localStorage v1</span>
+        <div className="profiles-hero-actions">
+          <span className="badge external-hint">localStorage v1</span>
+          <button
+            disabled={profiles.length === 0 || Boolean(bulkProgress?.active)}
+            onClick={() => void refreshAllProfiles()}
+            type="button"
+          >
+            {bulkProgress?.active ? "Actualizando todos..." : "Actualizar todos"}
+          </button>
+        </div>
       </section>
+
+      {bulkProgress ? (
+        <section className="profiles-refresh-status" aria-live="polite">
+          {bulkProgress.active ? (
+            <strong>Actualizando {bulkProgress.done + 1 > bulkProgress.total ? bulkProgress.total : bulkProgress.done + 1} de {bulkProgress.total}</strong>
+          ) : (
+            <strong>Actualizacion terminada</strong>
+          )}
+          <span>
+            {bulkProgress.updated} actualizados, {bulkProgress.partial} parciales, {bulkProgress.failed} fallidos.
+          </span>
+        </section>
+      ) : null}
 
       <section className="profiles-kpis" aria-label="Resumen de perfiles">
         <div><span>Perfiles guardados</span><strong>{profiles.length}</strong></div>
@@ -180,6 +429,9 @@ export default function ProfilesPage() {
         <section className="profiles-list" aria-label="Perfiles destacados">
           {filteredProfiles.map((profile) => {
             const latestMarket = profile.sourceMarkets[profile.sourceMarkets.length - 1];
+            const isRefreshing = refreshingIds.has(profile.id);
+            const canRefresh = isPolymarketWalletAddress(profile.walletAddress);
+            const refreshStatus = isRefreshing ? "refreshing" : profile.refreshStatus;
             return (
               <article className="profile-card" key={profile.id}>
                 <div className="profile-card-heading">
@@ -190,7 +442,12 @@ export default function ProfilesPage() {
                     <strong>{profileName(profile)}</strong>
                     <span>{profile.walletAddress}</span>
                   </div>
-                  <span className="badge external-hint">Perfil destacado</span>
+                  <div className="profile-card-status">
+                    <span className={profile.noLongerQualifies ? "badge muted" : "badge external-hint"}>
+                      {profile.noLongerQualifies ? "Ya no cumple criterio" : "Perfil destacado"}
+                    </span>
+                    <span className="badge muted">{refreshStatusCopy(refreshStatus, profile.stale)}</span>
+                  </div>
                 </div>
 
                 <div className="profile-card-grid">
@@ -200,18 +457,47 @@ export default function ProfilesPage() {
                   <div><span>PnL real</span><strong>{formatUsd(profile.realizedPnl ?? profile.unrealizedPnl)}</strong></div>
                   <div><span>Capital observado</span><strong>{formatUsd(profile.observedCapitalUsd)}</strong></div>
                   <div><span>Ultimo mercado visto</span><strong>{latestMarket?.sourceMarketTitle || latestMarket?.sourceMarketSlug || "No disponible"}</strong></div>
+                  <div><span>Ultima actualizacion</span><strong>{formatDate(profile.lastUpdatedAt ?? profile.updatedAt)}</strong></div>
                 </div>
 
                 <div className="profile-card-actions">
                   <a href={profile.profileUrl} rel="noopener noreferrer" target="_blank">Ver perfil en Polymarket</a>
+                  <button
+                    disabled={!canRefresh || isRefreshing}
+                    onClick={() => void refreshProfile(profile)}
+                    type="button"
+                  >
+                    {isRefreshing ? "Actualizando..." : "Actualizar"}
+                  </button>
                   <button onClick={() => copyWallet(profile)} type="button">
                     {copiedId === profile.id ? "Wallet copiada" : "Copiar wallet"}
                   </button>
                   <button onClick={() => removeProfile(profile)} type="button">Quitar perfil</button>
                 </div>
+                {!canRefresh ? (
+                  <p className="profile-warning">Esta wallet no tiene formato publico valido para actualizar.</p>
+                ) : null}
+                {profile.refreshError ? (
+                  <p className="profile-warning">{profile.refreshError}</p>
+                ) : null}
 
                 <details className="profile-card-details">
                   <summary>Ver detalle</summary>
+                  <div className="profile-detail-section">
+                    <strong>Auditoria de actualizacion</strong>
+                    <p>Ultima actualizacion: {formatDate(profile.lastUpdatedAt ?? profile.updatedAt)}</p>
+                    <p>Estado: {refreshStatusCopy(profile.refreshStatus, profile.stale)}</p>
+                    <p>Fuente: {profile.source || "Fuente publica no especificada"}</p>
+                    {profile.stale ? (
+                      <p>Algunos datos pueden venir de localStorage porque la fuente publica no devolvio todo en la ultima consulta.</p>
+                    ) : null}
+                    {(profile.sourceWarnings ?? []).length > 0 ? (
+                      <p>Warnings: {profile.sourceWarnings!.slice(0, 3).join(" | ")}</p>
+                    ) : null}
+                    {(profile.sourceLimitations ?? []).length > 0 ? (
+                      <p>Limitaciones: {profile.sourceLimitations!.slice(0, 3).join(" | ")}</p>
+                    ) : null}
+                  </div>
                   <div className="profile-detail-section">
                     <strong>Mercados donde fue detectado por PolySignal</strong>
                     {profile.sourceMarkets.length > 0 ? (

@@ -23,6 +23,8 @@ export type HighlightedProfileSourceMarket = {
   sourceMarketUrl?: string | null;
 };
 
+export type HighlightedProfileRefreshStatus = "failed" | "idle" | "partial" | "refreshing" | "updated";
+
 export type HighlightedWalletProfile = {
   avatarUrl?: string | null;
   closedMarkets: number;
@@ -30,16 +32,23 @@ export type HighlightedWalletProfile = {
   history?: WalletPublicMarketHistoryItem[];
   id: string;
   lastSeenAt: string;
+  lastUpdatedAt?: string | null;
   losses?: number | null;
   name?: string | null;
+  noLongerQualifies?: boolean;
   observedCapitalUsd?: number | null;
   profileUrl: string;
   proxyWallet?: string | null;
   pseudonym?: string | null;
   realizedPnl?: number | null;
+  refreshError?: string | null;
+  refreshStatus?: HighlightedProfileRefreshStatus;
   shortAddress: string;
   source: string;
+  sourceLimitations?: string[];
   sourceMarkets: HighlightedProfileSourceMarket[];
+  sourceWarnings?: string[];
+  stale?: boolean;
   unrealizedPnl?: number | null;
   updatedAt: string;
   verifiedBadge?: boolean | null;
@@ -133,6 +142,18 @@ function mergeSourceMarkets(
   return [...byKey.values()].slice(-20);
 }
 
+function normalizeStoredProfile(profile: HighlightedWalletProfile): HighlightedWalletProfile {
+  return {
+    ...profile,
+    lastUpdatedAt: profile.lastUpdatedAt ?? profile.updatedAt ?? profile.lastSeenAt ?? null,
+    refreshError: profile.refreshError ?? null,
+    refreshStatus: profile.refreshStatus ?? "idle",
+    sourceLimitations: profile.sourceLimitations ?? [],
+    sourceWarnings: profile.sourceWarnings ?? [],
+    stale: profile.stale ?? false,
+  };
+}
+
 function profileName(profile?: WalletPublicProfile | null): Pick<HighlightedWalletProfile, "avatarUrl" | "name" | "proxyWallet" | "pseudonym" | "verifiedBadge" | "xUsername"> {
   return {
     avatarUrl: profile?.avatarUrl ?? null,
@@ -199,11 +220,17 @@ export function buildHighlightedProfileFromActivity(
     observedCapitalUsd,
     profileUrl,
     realizedPnl: toNumber(activity.realizedPnl ?? activity.historySummary?.realizedPnl),
+    refreshError: null,
+    refreshStatus: "idle",
     shortAddress: shortAddressFor(walletAddress, activity.shortAddress),
     source: context?.source || activity.source || "Wallet Intelligence",
+    sourceLimitations: activity.limitations ?? [],
     sourceMarkets: [sourceMarketFromContext(context)],
+    sourceWarnings: activity.warnings ?? [],
+    stale: false,
     unrealizedPnl: toNumber(activity.unrealizedPnl ?? activity.historySummary?.unrealizedPnl),
     updatedAt: now,
+    lastUpdatedAt: now,
     walletAddress,
     winRate,
     wins: toNumber(activity.wins ?? activity.historySummary?.wins),
@@ -223,10 +250,12 @@ export function getHighlightedProfiles(): HighlightedWalletProfile[] {
     if (!Array.isArray(parsed)) {
       return [];
     }
-    return parsed.filter((item): item is HighlightedWalletProfile => {
-      const profile = item as Partial<HighlightedWalletProfile>;
-      return Boolean(profile.walletAddress && isPolymarketWalletAddress(profile.walletAddress) && profile.profileUrl);
-    });
+    return parsed
+      .filter((item): item is HighlightedWalletProfile => {
+        const profile = item as Partial<HighlightedWalletProfile>;
+        return Boolean(profile.walletAddress && isPolymarketWalletAddress(profile.walletAddress) && profile.profileUrl);
+      })
+      .map(normalizeStoredProfile);
   } catch {
     return [];
   }
@@ -253,6 +282,22 @@ export function saveHighlightedProfile(profile: HighlightedWalletProfile): Highl
     window.dispatchEvent(new CustomEvent(HIGHLIGHTED_PROFILES_STORAGE_EVENT));
   }
   return nextProfile;
+}
+
+export function updateHighlightedProfile(profile: HighlightedWalletProfile): HighlightedWalletProfile[] {
+  if (!storageAvailable()) {
+    return [];
+  }
+  const normalizedProfile = normalizeStoredProfile(profile);
+  const next = [
+    normalizedProfile,
+    ...getHighlightedProfiles().filter((item) => item.id !== normalizedProfile.id),
+  ]
+    .sort((left, right) => (right.winRate - left.winRate) || (right.closedMarkets - left.closedMarkets))
+    .slice(0, 100);
+  window.localStorage.setItem(HIGHLIGHTED_PROFILES_STORAGE_KEY, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent(HIGHLIGHTED_PROFILES_STORAGE_EVENT));
+  return next;
 }
 
 export function removeHighlightedProfile(walletAddress: string): HighlightedWalletProfile[] {
