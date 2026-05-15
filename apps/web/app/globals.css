@@ -8346,6 +8346,8 @@ html:not([data-theme="dark"]) .app-sidebar {
 
 .analyze-progress-step.attention,
 .analyze-progress-step.completed_empty,
+.analyze-progress-step.limited,
+.analyze-progress-step.timeout,
 .analyze-progress-step.warning {
   border-color: color-mix(in srgb, var(--ps-warning, #fbbf24) 45%, var(--ps-border));
   background: rgba(251, 191, 36, 0.1);
@@ -8389,6 +8391,8 @@ html:not([data-theme="dark"]) .app-sidebar {
 
 .analyze-progress-step.attention .analyze-progress-step-marker,
 .analyze-progress-step.completed_empty .analyze-progress-step-marker,
+.analyze-progress-step.limited .analyze-progress-step-marker,
+.analyze-progress-step.timeout .analyze-progress-step-marker,
 .analyze-progress-step.warning .analyze-progress-step-marker {
   color: #291a00;
   background: var(--ps-warning, #fbbf24);
@@ -8480,6 +8484,8 @@ html:not([data-theme="dark"]) .app-sidebar {
 
 .analyze-progress-step.attention .analyze-progress-step-status,
 .analyze-progress-step.completed_empty .analyze-progress-step-status,
+.analyze-progress-step.limited .analyze-progress-step-status,
+.analyze-progress-step.timeout .analyze-progress-step-status,
 .analyze-progress-step.warning .analyze-progress-step-status {
   color: var(--ps-warning, #fbbf24);
 }

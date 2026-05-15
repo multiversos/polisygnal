@@ -34,6 +34,7 @@ import {
   getProbabilityDisplayState,
   normalizeProbability,
 } from "../lib/marketProbabilities";
+import { getDisplayMarketPrices } from "../lib/marketDataDisplay";
 import {
   getEstimateQuality,
   getEstimateQualityLabel,
@@ -273,6 +274,17 @@ function formatUsd(value: unknown): string {
   }).format(parsed);
 }
 
+function formatMarketPriceValue(value: unknown): string {
+  const parsed = toNumber(value);
+  if (parsed === null) {
+    return "sin precio";
+  }
+  return new Intl.NumberFormat("es", {
+    maximumFractionDigits: 3,
+    minimumFractionDigits: parsed > 0 && parsed < 0.1 ? 3 : 0,
+  }).format(parsed);
+}
+
 function formatDate(value?: string | null): string {
   if (!value) {
     return "sin fecha";
@@ -322,19 +334,14 @@ function insightInput(item: MarketOverviewItem) {
   };
 }
 
-function hasOutcomePrice(item: MarketOverviewItem): boolean {
-  return Boolean(
-    item.market?.outcomes?.some((outcome) => toNumber(outcome.price) !== null),
-  );
-}
-
 function buildMarketDataProgress(item: MarketOverviewItem): AnalyzeProgressStepOverrides["loading_polymarket"] {
-  const priceAvailable = Boolean(
-    getMarketImpliedProbabilities({
-      marketNoPrice: item.latest_snapshot?.no_price,
-      marketYesPrice: item.latest_snapshot?.yes_price,
-    }),
-  ) || hasOutcomePrice(item);
+  const displayPrices = getDisplayMarketPrices(item, 4);
+  const pricedCards = displayPrices.cards.filter((card) => card.price !== null);
+  const priceSummary = pricedCards
+    .slice(0, 2)
+    .map((card) => `${card.name} ${formatMarketPriceValue(card.price)}`)
+    .join(" | ");
+  const priceAvailable = displayPrices.mode !== "unavailable" && pricedCards.length > 0;
   const volume = toNumber(item.latest_snapshot?.volume);
   const liquidity = toNumber(item.latest_snapshot?.liquidity);
   const stateKnown = item.market?.active !== undefined || item.market?.closed !== undefined;
@@ -345,23 +352,23 @@ function buildMarketDataProgress(item: MarketOverviewItem): AnalyzeProgressStepO
       status: "completed_with_data",
       statusLabel: "Datos cargados",
       summary: [
-        priceAvailable ? "precio visible" : null,
+        priceAvailable ? priceSummary || "precio visible" : null,
         volume !== null ? `volumen ${formatMetric(volume)}` : null,
         liquidity !== null ? `liquidez ${formatMetric(liquidity)}` : null,
-      ].filter(Boolean).join(" · "),
+      ].filter(Boolean).join(" | "),
     };
   }
   if (hasMarketData || item.market?.question || item.market?.market_slug) {
     return {
       detail: "Tenemos metadata del mercado, pero precio, volumen o liquidez son limitados.",
-      status: "warning",
+      status: "limited",
       statusLabel: "Datos basicos cargados",
       summary: "Titulo, slug o estado disponible; sin datos suficientes para tratarlo como analisis completo.",
     };
   }
   return {
     detail: "No hay precio, volumen, liquidez ni estado suficientes para este mercado.",
-    status: "warning",
+    status: "limited",
     statusLabel: "Sin datos suficientes",
     summary: "PolySignal no inventa datos de mercado faltantes.",
   };
@@ -371,7 +378,7 @@ function buildWalletProgress(summary: WalletIntelligenceSummary): AnalyzeProgres
   if (summary.queryStatus === "timeout") {
     return {
       detail: summary.reason,
-      status: "unavailable",
+      status: "timeout",
       statusLabel: "No respondio a tiempo",
       summary: "Wallet Intelligence no se usa como senal fuerte en esta lectura.",
     };
@@ -2751,6 +2758,7 @@ export default function AnalyzePage() {
           onRetry={handleProgressRetry}
           onSaveForLater={handleSaveCurrentAnalysis}
           phase={radarPhase}
+          progressKey={analysisRunRef.current}
           stepActions={{
             loading_polymarket: {
               disabled: !marketDetailsItem,

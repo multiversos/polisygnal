@@ -236,3 +236,24 @@ eso solo confirma que el contrato paso validacion.
   `Ver datos` y `Ver billeteras`; esos drawers no se abren automaticamente.
 
 La UI publica sigue sin carga manual, JSON, schema, brief ni reportes manuales.
+
+## Progreso visual
+
+`AnalyzeLoadingPanel` mantiene dos estados: el estado real de cada consulta y
+el estado visual que se revela al usuario. Las consultas de link, mercado,
+datos, Wallet Intelligence y agente pueden terminar rapido internamente, pero
+la UI no marca todos los pasos como listos en el mismo render. Cada paso se
+presenta primero como `running` y se revela en orden cuando:
+
+1. Existe resultado real para ese paso.
+2. El paso anterior ya fue mostrado como terminado.
+3. Paso el minimo visual corto de `700ms`.
+
+Este minimo no es un porcentaje ni una espera larga para simular trabajo; solo
+evita que las primeras etapas parpadeen como completadas. Si un paso tarda de
+verdad, queda en curso. Si hay timeout o fallo seguro, se muestra sin esperar.
+
+Los botones `Ver datos` y `Ver billeteras` se habilitan solo cuando su etapa ya
+fue revelada. Los drawers siguen cerrados por defecto y se abren solamente por
+accion del usuario. Si Samantha tarda, el panel debe explicar que mercado,
+datos y billeteras ya fueron consultados y que se esta esperando al agente.

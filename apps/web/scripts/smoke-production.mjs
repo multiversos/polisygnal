@@ -618,9 +618,15 @@ function validateAnalyzeLoadingPanelSource() {
   for (const step of expectedSteps) {
     assert(source.includes(step), `analyze loading panel missing step: ${step}`);
   }
-  assert(!source.includes("setTimeout"), "analyze loading panel should not use fake timers");
+  assert(source.includes("ANALYZE_PROGRESS_MIN_STEP_MS"), "analyze loading panel should use a short sequential reveal constant");
+  assert(source.includes("visualStepIndex"), "analyze loading panel should keep visual progress separate from real data state");
+  assert(source.includes("window.setTimeout"), "analyze loading panel may use a short visual timer for sequential reveal");
+  assert(source.includes("Resumen encontrado hasta ahora"), "analyze loading panel should summarize sources as they are revealed");
+  assert(source.includes("Mercado, datos y billeteras ya fueron consultados"), "analyze loading panel should explain long waits after source checks finish");
   assert(!source.includes("setInterval"), "analyze loading panel should not use fake progress intervals");
   assert(!source.includes("100%"), "analyze loading panel should not display invented 100% progress");
+  assert(!source.includes("5000"), "analyze loading panel should not add long fake delays");
+  assert(!source.includes("10000"), "analyze loading panel should not add long fake delays");
   assert(!source.includes("Buscando evidencia externa"), "analyze loading panel must not claim external research is running");
   assert(!source.includes("buscando internet"), "analyze loading panel must not claim internet search is running");
   assert(analyzePage.includes("withRequestTimeout"), "analyze page does not use frontend request timeouts");

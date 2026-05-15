@@ -616,24 +616,41 @@ Use these quick checks when reviewing public pages:
 1. Open `/analyze`.
 2. Paste a valid Polymarket link and confirm/select one market.
 3. Confirm the report shows `Progreso del analisis`.
-4. Confirm the job shows:
+4. Confirm the visual steps reveal sequentially instead of all turning green at
+   once:
+   - `Leyendo enlace` first shows validation copy, then `Validado`.
+   - `Detectando mercado` appears after the link step and shows the market name
+     or selection state.
+   - `Cargando datos de Polymarket` shows real outcome/price/volume summary
+     when available, or a limited-data state when not.
+   - `Revisando billeteras` shows activity, empty, unavailable or timeout state
+     from Wallet Intelligence.
+   - `Samantha analizando` remains active while the agent responds.
+5. Confirm the short sequential reveal does not add fake percentages or long
+   fake waits. It should only prevent the first steps from collapsing instantly.
+6. Confirm `Ver datos` and `Ver billeteras` stay closed by default and only
+   open after a click/tap.
+7. If Samantha takes longer than normal, confirm the timer explains that
+   market, data and wallet sources were already consulted and that PolySignal is
+   waiting for the agent.
+8. Confirm the job also shows:
    - Mercado leido desde Polymarket.
    - Datos principales revisados.
    - Actividad de billeteras revisada o bloqueada de forma honesta.
    - Samantha automatica preparada.
    - `Samantha analizando`.
    - Odds/Kalshi/profile steps blocked or pending integration.
-5. Confirm the report does not say the deep analysis is completed while waiting
+9. Confirm the report does not say the deep analysis is completed while waiting
    for Samantha.
-6. Confirm public UI does not show copy/download/schema/report-upload tools.
-7. Save the analysis as pending and open `/history`.
-8. Confirm the saved item shows `Pendiente de investigacion`, the brief date when
+10. Confirm public UI does not show copy/download/schema/report-upload tools.
+11. Save the analysis as pending and open `/history`.
+12. Confirm the saved item shows `Pendiente de investigacion`, the brief date when
    available, and a `Continuar analisis` action.
-9. Paste an invalid Samantha report and confirm it fails without changing the
+13. Paste an invalid Samantha report and confirm it fails without changing the
    job to completed.
-10. In a safe local test, paste a valid structured report and confirm the job
+14. In a safe local test, paste a valid structured report and confirm the job
     updates evidence/scoring state without inventing market data.
-11. Confirm `/performance` does not count awaiting research or ready-to-score
+15. Confirm `/performance` does not count awaiting research or ready-to-score
     records as hit/miss.
 12. Confirm `/performance` separates `Pendientes de investigacion` from
     `Pendientes de resolucion`.

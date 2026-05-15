@@ -1,5 +1,13 @@
+import { useEffect, useMemo, useState } from "react";
+
 import type { DeepAnalysisJobStep } from "../lib/deepAnalysisJob";
 import { jobStepStatusLabel } from "../lib/deepAnalysisJob";
+import {
+  ANALYZE_PROGRESS_MIN_STEP_MS,
+  isImmediateAnalyzeStepStatus,
+  isTerminalAnalyzeStepStatus,
+  remainingStepRevealMs,
+} from "../lib/analyzerProgressReveal";
 
 export type AnalyzeLoadingPhase =
   | "validating"
@@ -24,9 +32,11 @@ type AnalyzeProgressStepStatus =
   | "completed_with_data"
   | "error"
   | "failed_safe"
+  | "limited"
   | "pending"
   | "running"
   | "skipped"
+  | "timeout"
   | "unavailable"
   | "warning";
 
@@ -72,6 +82,7 @@ type AnalyzeProgressPanelProps = {
   onRetry: () => void;
   onSaveForLater?: () => void;
   phase: AnalyzeLoadingPhase;
+  progressKey?: string | number;
   stepActions?: AnalyzeProgressStepActions;
   stepOverrides?: AnalyzeProgressStepOverrides;
   samanthaPending?: boolean;
@@ -132,12 +143,26 @@ function formatElapsed(seconds: number): string {
   return `${minutes} min ${remainder.toString().padStart(2, "0")} s`;
 }
 
-function elapsedHint(seconds: number, issue: AnalyzeProgressIssue): string {
+function elapsedHint(
+  seconds: number,
+  issue: AnalyzeProgressIssue,
+  sourcesConsulted = false,
+  agentName = "Samantha",
+): string {
   if (issue === "timeout") {
     return "No pudimos completar esta busqueda ahora. Puedes reintentar o revisar el enlace.";
   }
   if (issue === "error") {
     return "La busqueda se detuvo de forma segura. No mostramos detalles tecnicos ni datos internos.";
+  }
+  if (sourcesConsulted && seconds >= 180) {
+    return `Mercado, datos y billeteras ya fueron consultados. Parece que ${agentName} sigue esperando respuesta; puedes reintentar.`;
+  }
+  if (sourcesConsulted && seconds >= 90) {
+    return "Puedes seguir esperando o reintentar sin perder el enlace.";
+  }
+  if (sourcesConsulted && seconds >= 45) {
+    return "Esto esta tardando mas de lo normal. PolySignal conserva los datos ya encontrados.";
   }
   if (seconds >= 180) {
     return "Parece que esta busqueda se quedo esperando respuesta. Puedes reintentar sin perder el enlace.";
@@ -193,11 +218,17 @@ function statusLabel(status: AnalyzeProgressStepStatus, override?: AnalyzeProgre
   if (override?.statusLabel) {
     return override.statusLabel;
   }
-  if (status === "completed" || status === "completed_with_data") {
-    return "Completado";
+  if (status === "completed") {
+    return "Listo";
+  }
+  if (status === "completed_with_data") {
+    return "Datos encontrados";
   }
   if (status === "completed_empty") {
     return "Sin datos relevantes";
+  }
+  if (status === "limited") {
+    return "Datos limitados";
   }
   if (status === "running") {
     return "En curso";
@@ -207,6 +238,9 @@ function statusLabel(status: AnalyzeProgressStepStatus, override?: AnalyzeProgre
   }
   if (status === "unavailable") {
     return "Fuente no disponible";
+  }
+  if (status === "timeout") {
+    return "No respondio";
   }
   if (status === "skipped") {
     return "No aplica";
@@ -224,7 +258,9 @@ function markerForStatus(status: AnalyzeProgressStepStatus, index: number): stri
   if (
     status === "attention" ||
     status === "completed_empty" ||
+    status === "limited" ||
     status === "skipped" ||
+    status === "timeout" ||
     status === "unavailable" ||
     status === "warning"
   ) {
@@ -234,6 +270,70 @@ function markerForStatus(status: AnalyzeProgressStepStatus, index: number): stri
     return "×";
   }
   return String(index + 1);
+}
+
+function runningOverrideForStep(
+  step: AnalyzeProgressStep,
+  agentName: string,
+): AnalyzeProgressStepOverride {
+  if (step.id === "reading_link") {
+    return {
+      detail: "Validando enlace de Polymarket...",
+      status: "running",
+      statusLabel: "Validando enlace",
+      summary: "Revisamos dominio, protocolo y formato antes de consultar fuentes.",
+    };
+  }
+  if (step.id === "detecting_market") {
+    return {
+      detail: "Consultando Polymarket/Gamma...",
+      status: "running",
+      statusLabel: "Detectando mercado",
+      summary: "Buscando si el enlace apunta a un mercado unico o a un evento.",
+    };
+  }
+  if (step.id === "loading_polymarket") {
+    return {
+      detail: "Leyendo precios, outcomes, volumen y liquidez...",
+      status: "running",
+      statusLabel: "Leyendo datos",
+      summary: "Aun no se marca como cargado hasta tener respuesta real.",
+    };
+  }
+  if (step.id === "reviewing_wallets") {
+    return {
+      detail: "Consultando Wallet Intelligence...",
+      status: "running",
+      statusLabel: "Consultando billeteras",
+      summary: "La fuente puede devolver actividad, sin actividad o no disponible.",
+    };
+  }
+  if (step.id === "preparing_samantha") {
+    return {
+      detail: `${agentName} esta revisando fuentes automaticas disponibles...`,
+      status: "running",
+      statusLabel: `${agentName} analizando`,
+      summary: "Esperando respuesta del agente analizador.",
+    };
+  }
+  return {
+    detail: "Preparando la lectura con las fuentes reales disponibles...",
+    status: "running",
+    statusLabel: "Preparando lectura",
+    summary: "No convertimos esperas ni precios de mercado en prediccion propia.",
+  };
+}
+
+function pendingOverrideForStep(step: AnalyzeProgressStep): AnalyzeProgressStepOverride {
+  return {
+    detail: step.detail,
+    status: "pending",
+    statusLabel: "Pendiente",
+  };
+}
+
+function terminalActionReady(status: AnalyzeProgressStepStatus): boolean {
+  return isTerminalAnalyzeStepStatus(status);
 }
 
 export function AnalyzeProgressPanel({
@@ -248,16 +348,108 @@ export function AnalyzeProgressPanel({
   onRetry,
   onSaveForLater,
   phase,
+  progressKey,
   stepActions,
   stepOverrides,
   samanthaPending = false,
 }: AnalyzeProgressPanelProps) {
+  const steps = useMemo(() => analysisProgressSteps(agentName), [agentName]);
+  const activeIndex = activeStepIndex(phase, steps);
+  const [visualStepIndex, setVisualStepIndex] = useState(0);
+  const [visualStepStartedAt, setVisualStepStartedAt] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!isVisible) {
+      return;
+    }
+    const now = Date.now();
+    setVisualStepIndex(0);
+    setVisualStepStartedAt(now);
+  }, [agentName, isVisible, progressKey]);
+
+  const realStepStates = useMemo(
+    () =>
+      steps.map((step, index) => {
+        const override = stepOverrides?.[step.id];
+        const status = statusForStep(step, index, activeIndex, issue, samanthaPending, override);
+        return { override, status, step };
+      }),
+    [activeIndex, issue, samanthaPending, stepOverrides, steps],
+  );
+
+  const currentVisualStatus = realStepStates[visualStepIndex]?.status;
+
+  useEffect(() => {
+    if (!isVisible || visualStepIndex >= realStepStates.length || !currentVisualStatus) {
+      return;
+    }
+    if (!isTerminalAnalyzeStepStatus(currentVisualStatus)) {
+      return;
+    }
+    const remainingMs = remainingStepRevealMs({
+      elapsedMs: Date.now() - visualStepStartedAt,
+      status: currentVisualStatus,
+    });
+    const timeoutId = window.setTimeout(() => {
+      const now = Date.now();
+      setVisualStepIndex((current) => Math.min(current + 1, realStepStates.length));
+      setVisualStepStartedAt(now);
+    }, remainingMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [currentVisualStatus, isVisible, realStepStates.length, visualStepIndex, visualStepStartedAt]);
+
+  const visibleStepStates = realStepStates.map(({ override, status, step }, index) => {
+    const terminal = terminalActionReady(status);
+    const isRevealed = index < visualStepIndex || visualStepIndex >= steps.length;
+    const isCurrent = index === visualStepIndex;
+    const shouldHoldCurrent =
+      isCurrent &&
+      terminal &&
+      !isImmediateAnalyzeStepStatus(status) &&
+      remainingStepRevealMs({
+        elapsedMs: Date.now() - visualStepStartedAt,
+        status,
+      }) > 0;
+
+    if (isRevealed) {
+      return {
+        actionReady: terminal,
+        override,
+        status,
+        step,
+      };
+    }
+
+    if (shouldHoldCurrent) {
+      return {
+        actionReady: false,
+        override: runningOverrideForStep(step, agentName),
+        status: "running" as AnalyzeProgressStepStatus,
+        step,
+      };
+    }
+
+    if (isCurrent) {
+      return {
+        actionReady: terminal,
+        override,
+        status,
+        step,
+      };
+    }
+
+    return {
+      actionReady: false,
+      override: pendingOverrideForStep(step),
+      status: "pending" as AnalyzeProgressStepStatus,
+      step,
+    };
+  });
+
   if (!isVisible) {
     return null;
   }
 
-  const steps = analysisProgressSteps(agentName);
-  const activeIndex = activeStepIndex(phase, steps);
   const title = samanthaPending
     ? `${agentName} sigue analizando fuentes automaticas`
     : issue
@@ -268,9 +460,15 @@ export function AnalyzeProgressPanel({
     : "PolySignal avanza por etapas reales. No usamos porcentajes falsos ni asumimos evidencia que no existe.";
   const showRecovery =
     Boolean(issue) || elapsedSeconds >= 45 || samanthaPending || !isBusy;
-  const reviewedSources = steps
-    .map((step) => ({ step, override: stepOverrides?.[step.id] }))
-    .filter(({ override }) => Boolean(override?.summary || override?.statusLabel));
+  const reviewedSources = visibleStepStates
+    .filter(({ actionReady, override }) => actionReady && Boolean(override?.summary || override?.statusLabel));
+  const consultedStepIds = new Set(
+    visibleStepStates
+      .filter(({ actionReady, step }) => actionReady && step.id !== "reading_link" && step.id !== "detecting_market")
+      .map(({ step }) => step.id),
+  );
+  const sourcesConsultedForWait =
+    consultedStepIds.has("loading_polymarket") && consultedStepIds.has("reviewing_wallets");
 
   return (
     <section
@@ -288,15 +486,34 @@ export function AnalyzeProgressPanel({
         <div className="analyze-progress-timer">
           <span>Analizando hace</span>
           <strong>{formatElapsed(elapsedSeconds)}</strong>
-          <small>{elapsedHint(elapsedSeconds, issue)}</small>
+          <small>{elapsedHint(elapsedSeconds, issue, sourcesConsultedForWait, agentName)}</small>
         </div>
       </div>
 
+      {reviewedSources.length > 0 ? (
+        <div className="analyze-progress-sources" aria-label="Resumen encontrado hasta ahora">
+          <strong>Resumen encontrado hasta ahora</strong>
+          <ul>
+            {reviewedSources.map(({ override, step }) => (
+              <li key={step.id}>
+                <span>{step.label}</span>
+                <small>{override?.summary ?? override?.statusLabel ?? "Consultado"}</small>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <ol className="analyze-progress-steps" aria-label="Etapas del analisis">
-        {steps.map((step, index) => {
-          const override = stepOverrides?.[step.id];
-          const action = stepActions?.[step.id];
-          const status = statusForStep(step, index, activeIndex, issue, samanthaPending, override);
+        {visibleStepStates.map(({ actionReady, override, status, step }, index) => {
+          const realAction = stepActions?.[step.id];
+          const action = realAction
+            ? {
+                ...realAction,
+                disabled: !actionReady || realAction.disabled,
+                label: actionReady ? realAction.label : "Preparando...",
+              }
+            : null;
           return (
             <li className={`analyze-progress-step ${status}`} key={step.id}>
               <span className="analyze-progress-step-marker" aria-hidden="true">
@@ -323,20 +540,6 @@ export function AnalyzeProgressPanel({
           );
         })}
       </ol>
-
-      {reviewedSources.length > 0 ? (
-        <div className="analyze-progress-sources" aria-label="Fuentes revisadas">
-          <strong>Fuentes revisadas</strong>
-          <ul>
-            {reviewedSources.map(({ step, override }) => (
-              <li key={step.id}>
-                <span>{step.label}</span>
-                <small>{override?.statusLabel ?? statusLabel(override?.status ?? "pending")}</small>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
 
       {jobSteps && jobSteps.length > 0 ? (
         <div className="analyze-progress-job" aria-label="Estado local del analisis">

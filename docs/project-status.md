@@ -296,6 +296,12 @@ Estado visible verificado:
   de lo normal, timeout/reintento y estado claro cuando Samantha sigue
   pendiente. No usa una barra de progreso inventada ni convierte esperas en
   evidencia.
+- El panel de progreso usa revelado secuencial visual: aunque las consultas
+  reales terminen rapido, cada etapa se muestra primero en curso y solo se
+  revela como validada cuando existe resultado real y el paso anterior ya fue
+  mostrado. El minimo visual es corto (`700ms`) y no bloquea el pipeline ni
+  inventa datos; evita que enlace, mercado, datos y billeteras aparezcan todos
+  verdes en el mismo instante.
 - No hay flujo de captura de pantalla, OCR ni subida de imagenes en el
   analizador de enlaces.
 - Existe una capa real de Wallet Intelligence para el analizador:

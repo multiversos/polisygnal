@@ -12,7 +12,8 @@
     "test:estimate-gates": "node scripts/test-estimate-gates.mjs",
     "test:samantha-report-validation": "node scripts/test-samantha-report-validation.mjs",
     "test:wallet-intelligence": "node scripts/test-wallet-intelligence.mjs",
-    "test:market-data": "node scripts/test-market-data.mjs"
+    "test:market-data": "node scripts/test-market-data.mjs",
+    "test:analyzer-progress": "node scripts/test-analyzer-progress.mjs"
   },
   "dependencies": {
     "next": "15.5.15",
