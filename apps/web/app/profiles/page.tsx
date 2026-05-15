@@ -15,12 +15,21 @@ import {
   updateHighlightedProfile,
 } from "../lib/highlightedProfiles";
 import {
+  fetchPersistentHighlightedProfiles,
+  hidePersistentProfile,
+  mergePersistentAndLocalProfiles,
+  profileMeetsPersistentCriteria,
+  syncLocalHighlightedProfilesToBackend,
+  upsertPersistentHighlightedProfile,
+} from "../lib/persistentHighlightedProfiles";
+import {
   buildPolymarketWalletProfileUrl,
   isPolymarketWalletAddress,
 } from "../lib/polymarketWalletProfile";
 import type { WalletPublicMarketHistoryItem } from "../lib/walletIntelligenceTypes";
 
 type ProfileFilter = "all" | "pnl" | "recent" | "win80" | "win90";
+type ProfilesStorageMode = "loading" | "local_fallback" | "mixed" | "persistent";
 
 type RefreshWalletResponse = {
   limitations?: string[];
@@ -199,6 +208,19 @@ function refreshStatusCopy(status?: HighlightedProfileRefreshStatus, stale?: boo
   return stale ? "Datos locales" : "Listo para actualizar";
 }
 
+function syncStatusCopy(profile: HighlightedWalletProfile): string {
+  if (profile.syncStatus === "synced") {
+    return "Sincronizado";
+  }
+  if (profile.syncStatus === "pending") {
+    return "Pendiente de sincronizar";
+  }
+  if (profile.syncStatus === "failed") {
+    return "Error al sincronizar";
+  }
+  return "Solo local";
+}
+
 function matchesFilter(profile: HighlightedWalletProfile, filter: ProfileFilter): boolean {
   if (filter === "win80") {
     return profile.winRate >= 0.8;
@@ -223,12 +245,68 @@ export default function ProfilesPage() {
   const [profiles, setProfiles] = useState<HighlightedWalletProfile[]>([]);
   const [query, setQuery] = useState("");
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
+  const [storageMode, setStorageMode] = useState<ProfilesStorageMode>("loading");
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    const syncProfiles = () => setProfiles(getHighlightedProfiles());
-    syncProfiles();
+    let cancelled = false;
+
+    const loadProfiles = async (migrateLocal: boolean) => {
+      const localProfiles = getHighlightedProfiles();
+      if (!cancelled) {
+        setProfiles(localProfiles);
+      }
+      try {
+        const persistent = await fetchPersistentHighlightedProfiles();
+        if (cancelled) {
+          return;
+        }
+        const merged = mergePersistentAndLocalProfiles(persistent.profiles, localProfiles);
+        setProfiles(merged);
+        setStorageMode(localProfiles.length > 0 && persistent.profiles.length > 0 ? "mixed" : "persistent");
+        setSyncNotice(null);
+
+        if (migrateLocal) {
+          const pending = localProfiles.filter(
+            (profile) => profile.syncStatus !== "synced" && profileMeetsPersistentCriteria(profile),
+          );
+          if (pending.length > 0) {
+            setSyncNotice("Sincronizando perfiles locales con el registro persistente.");
+            const result = await syncLocalHighlightedProfilesToBackend(pending);
+            if (cancelled) {
+              return;
+            }
+            try {
+              const refreshed = await fetchPersistentHighlightedProfiles();
+              setProfiles(mergePersistentAndLocalProfiles(refreshed.profiles, getHighlightedProfiles()));
+            } catch {
+              setProfiles(getHighlightedProfiles());
+            }
+            setStorageMode(result.failed > 0 ? "mixed" : "persistent");
+            setSyncNotice(
+              result.failed > 0
+                ? "Algunos perfiles siguen solo en este navegador; se reintentara mas tarde."
+                : "Perfiles locales sincronizados con el registro persistente.",
+            );
+          }
+        }
+      } catch {
+        if (cancelled) {
+          return;
+        }
+        setProfiles(localProfiles);
+        setStorageMode("local_fallback");
+        setSyncNotice("Mostrando perfiles guardados en este navegador porque el backend no esta disponible.");
+      }
+    };
+
+    void loadProfiles(true);
+    const syncProfiles = () => void loadProfiles(false);
     window.addEventListener(HIGHLIGHTED_PROFILES_STORAGE_EVENT, syncProfiles);
-    return () => window.removeEventListener(HIGHLIGHTED_PROFILES_STORAGE_EVENT, syncProfiles);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(HIGHLIGHTED_PROFILES_STORAGE_EVENT, syncProfiles);
+    };
   }, []);
 
   const filteredProfiles = useMemo(() => {
@@ -270,6 +348,13 @@ export default function ProfilesPage() {
   };
 
   const removeProfile = (profile: HighlightedWalletProfile) => {
+    if (profile.syncStatus === "synced" || profile.persistentId) {
+      hidePersistentProfile(profile.walletAddress);
+      removeHighlightedProfile(profile.walletAddress);
+      setProfiles((current) => current.filter((item) => item.id !== profile.id));
+      setSyncNotice("Perfil oculto en este navegador. El registro global no se borra sin auth/admin.");
+      return;
+    }
     setProfiles(removeHighlightedProfile(profile.walletAddress));
   };
 
@@ -306,6 +391,26 @@ export default function ProfilesPage() {
       const payload = JSON.parse(text) as RefreshWalletResponse;
       const merged = mergeRefreshedProfile(profile, payload);
       setProfiles(updateHighlightedProfile(merged));
+      if (merged.refreshStatus !== "failed") {
+        try {
+          const persistent = await upsertPersistentHighlightedProfile(merged);
+          const syncedProfile: HighlightedWalletProfile = {
+            ...merged,
+            persistentId: persistent.persistentId,
+            syncError: null,
+            syncStatus: "synced",
+            syncedAt: persistent.syncedAt ?? new Date().toISOString(),
+          };
+          setProfiles(updateHighlightedProfile(syncedProfile));
+        } catch {
+          const pendingProfile: HighlightedWalletProfile = {
+            ...merged,
+            syncError: "Actualizacion guardada localmente; sincronizacion persistente pendiente.",
+            syncStatus: "failed",
+          };
+          setProfiles(updateHighlightedProfile(pendingProfile));
+        }
+      }
       return merged.refreshStatus ?? "partial";
     } catch {
       const failedProfile: HighlightedWalletProfile = {
@@ -317,6 +422,7 @@ export default function ProfilesPage() {
           "La actualizacion fallo o la fuente publica no respondio. Se conserva el perfil local guardado.",
         ],
         stale: true,
+        syncStatus: profile.syncStatus,
       };
       setProfiles(updateHighlightedProfile(failedProfile));
       return "failed";
@@ -369,7 +475,15 @@ export default function ProfilesPage() {
           <p>No es recomendacion de copy-trading; solo organiza datos publicos verificables.</p>
         </div>
         <div className="profiles-hero-actions">
-          <span className="badge external-hint">localStorage v1</span>
+          <span className="badge external-hint">
+            {storageMode === "persistent"
+              ? "DB persistente + fallback local"
+              : storageMode === "mixed"
+                ? "DB + perfiles locales"
+                : storageMode === "local_fallback"
+                  ? "Solo local por ahora"
+                  : "Cargando perfiles"}
+          </span>
           <button
             disabled={profiles.length === 0 || Boolean(bulkProgress?.active)}
             onClick={() => void refreshAllProfiles()}
@@ -379,6 +493,15 @@ export default function ProfilesPage() {
           </button>
         </div>
       </section>
+
+      {syncNotice ? (
+        <section className="profiles-refresh-status" aria-live="polite">
+          <strong>{syncNotice}</strong>
+          <span>
+            Sin auth, quitar un perfil del registro persistente lo oculta solo en este navegador.
+          </span>
+        </section>
+      ) : null}
 
       {bulkProgress ? (
         <section className="profiles-refresh-status" aria-live="polite">
@@ -447,6 +570,7 @@ export default function ProfilesPage() {
                       {profile.noLongerQualifies ? "Ya no cumple criterio" : "Perfil destacado"}
                     </span>
                     <span className="badge muted">{refreshStatusCopy(refreshStatus, profile.stale)}</span>
+                    <span className="badge muted">{syncStatusCopy(profile)}</span>
                   </div>
                 </div>
 
@@ -472,7 +596,9 @@ export default function ProfilesPage() {
                   <button onClick={() => copyWallet(profile)} type="button">
                     {copiedId === profile.id ? "Wallet copiada" : "Copiar wallet"}
                   </button>
-                  <button onClick={() => removeProfile(profile)} type="button">Quitar perfil</button>
+                  <button onClick={() => removeProfile(profile)} type="button">
+                    {profile.syncStatus === "synced" || profile.persistentId ? "Ocultar en este navegador" : "Quitar perfil"}
+                  </button>
                 </div>
                 {!canRefresh ? (
                   <p className="profile-warning">Esta wallet no tiene formato publico valido para actualizar.</p>
@@ -487,7 +613,11 @@ export default function ProfilesPage() {
                     <strong>Auditoria de actualizacion</strong>
                     <p>Ultima actualizacion: {formatDate(profile.lastUpdatedAt ?? profile.updatedAt)}</p>
                     <p>Estado: {refreshStatusCopy(profile.refreshStatus, profile.stale)}</p>
+                    <p>Sincronizacion: {syncStatusCopy(profile)}</p>
                     <p>Fuente: {profile.source || "Fuente publica no especificada"}</p>
+                    {profile.syncError ? (
+                      <p>{profile.syncError}</p>
+                    ) : null}
                     {profile.stale ? (
                       <p>Algunos datos pueden venir de localStorage porque la fuente publica no devolvio todo en la ultima consulta.</p>
                     ) : null}
@@ -544,8 +674,8 @@ export default function ProfilesPage() {
             observado relevante.
           </p>
           <p>
-            Se guardan en localStorage v1 de este navegador. En otro navegador, dispositivo o modo incognito no
-            apareceran hasta que vuelvas a analizar un mercado compatible.
+            Perfiles v2 usa un registro persistente de datos publicos y conserva localStorage como fallback si el
+            backend no esta disponible o quedan perfiles pendientes de sincronizar.
           </p>
         </section>
       )}

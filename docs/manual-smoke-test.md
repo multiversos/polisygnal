@@ -415,9 +415,17 @@ If this test fails, stop feature work and treat it as a production regression.
    closedMarkets is at least 50, and either real PnL or observed capital is
    available. No 1/1 or 2/2 profile should be saved as highlighted.
 45i. Open `/profiles` after analyzing a market with eligible wallets. Confirm
-   it loads, says localStorage v1, shows saved public profiles, links to
-   Polymarket profiles, allows removing a saved profile, and warns that history
-   is not copy-trading or a guarantee.
+   it loads, says `DB persistente + fallback local` or a clear local fallback
+   state, shows saved public profiles, links to Polymarket profiles, and warns
+   that history is not copy-trading or a guarantee.
+45i-1. If a profile came from the persistent registry, confirm the remove action
+   says `Ocultar en este navegador`. Without auth/admin it must not delete the
+   global public registry row.
+45i-2. If the backend is unavailable, confirm `/profiles` falls back to
+   localStorage v1 and says `Mostrando perfiles guardados en este navegador`.
+45i-3. If local profiles exist, confirm eligible entries sync to the persistent
+   registry and show `Sincronizado` or a pending/error sync state without losing
+   the local copy.
 45j. In `/profiles`, click `Actualizar` on one saved profile. Confirm the
    card shows `Actualizando...`, then `Actualizado`, `Actualizacion parcial`,
    or `No se pudo actualizar`. The profile must not be deleted on failure.

@@ -1087,7 +1087,7 @@ async function main() {
   const profilesRender = validatePublicProductPage(profilesDom, "profiles", ["Perfiles"]);
   const profilesText = visibleText(profilesDom);
   assertTextIncludes(profilesText, "Billeteras publicas detectadas", "profiles public heading");
-  assertTextIncludes(profilesText, "localStorage v1", "profiles local storage copy");
+  assertTextIncludes(profilesText, "fallback local", "profiles persistent fallback copy");
   assertTextIncludes(profilesText, "Actualizar todos", "profiles refresh all control");
   assertTextIncludes(profilesText, "Los perfiles destacados apareceran", "profiles empty state copy");
   assertTextIncludes(profilesText, "No es recomendacion de copy-trading", "profiles anti-copy-trading copy");

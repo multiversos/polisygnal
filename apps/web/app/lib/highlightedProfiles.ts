@@ -48,7 +48,11 @@ export type HighlightedWalletProfile = {
   sourceLimitations?: string[];
   sourceMarkets: HighlightedProfileSourceMarket[];
   sourceWarnings?: string[];
+  persistentId?: string | null;
   stale?: boolean;
+  syncError?: string | null;
+  syncStatus?: "failed" | "local" | "pending" | "synced";
+  syncedAt?: string | null;
   unrealizedPnl?: number | null;
   updatedAt: string;
   verifiedBadge?: boolean | null;
@@ -150,6 +154,9 @@ function normalizeStoredProfile(profile: HighlightedWalletProfile): HighlightedW
     refreshStatus: profile.refreshStatus ?? "idle",
     sourceLimitations: profile.sourceLimitations ?? [],
     sourceWarnings: profile.sourceWarnings ?? [],
+    syncError: profile.syncError ?? null,
+    syncStatus: profile.syncStatus ?? "local",
+    syncedAt: profile.syncedAt ?? null,
     stale: profile.stale ?? false,
   };
 }

@@ -92,6 +92,7 @@ import {
   unavailablePolymarketWalletIntelligenceSummary,
 } from "../lib/polymarketWalletIntelligence";
 import { saveHighlightedProfilesFromWalletSummary } from "../lib/highlightedProfiles";
+import { syncLocalHighlightedProfilesToBackend } from "../lib/persistentHighlightedProfiles";
 import {
   buildConservativePolySignalEstimate,
   type PolySignalEstimateResult,
@@ -2525,6 +2526,9 @@ export default function AnalyzePage() {
         sourceMarketTitle: marketTitle(enrichedMatch.item),
         sourceMarketUrl: normalizedUrl,
       });
+      if (highlightedProfiles.saved.length > 0) {
+        void syncLocalHighlightedProfilesToBackend(highlightedProfiles.saved);
+      }
       walletSummary = buildWalletExpandedSummary(enrichedMatch.item, walletSummary, highlightedProfiles.saved.length);
       enrichedMatch = {
         ...enrichedMatch,
