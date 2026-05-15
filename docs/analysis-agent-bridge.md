@@ -221,8 +221,14 @@ eso solo confirma que el contrato paso validacion.
 - `completed` solo se muestra cuando el agente lo devuelve realmente.
 - `suggestedDecision.available=false` o una sugerencia que no pasa compuertas
   conserva el texto `No hay estimacion propia de PolySignal para este mercado`.
+- `Evidencia usada` resume las fuentes verificables que alimentaron la lectura:
+  mercado, billeteras, agente y limitaciones. Los botones `Ver datos` y `Ver
+  billeteras` reutilizan los drawers existentes y nunca se abren
+  automaticamente.
 - Las senales del reporte se muestran como tarjetas con label, direccion,
-  confianza y fuente real.
+  confianza, fuente y badge `Dato real` solo cuando el agente marco la senal
+  como real. Las senales de Polymarket enlazan a `Ver datos`; las de Wallet
+  Intelligence enlazan a `Ver billeteras`.
 - Riesgos, limitaciones, fuentes usadas y `Que revisar primero` se muestran en
   secciones separadas para evitar que el precio de mercado parezca una
   prediccion.

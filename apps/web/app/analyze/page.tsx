@@ -102,7 +102,7 @@ import {
   convertSamanthaReportToSignals,
   parseSamanthaResearchReport,
 } from "../lib/samanthaResearchReport";
-import type { SamanthaResearchParseResult } from "../lib/samanthaResearchTypes";
+import type { SamanthaResearchParseResult, SamanthaResearchReport } from "../lib/samanthaResearchTypes";
 import {
   ANALYSIS_HISTORY_STORAGE_EVENT,
   getAnalysisHistory,
@@ -831,8 +831,12 @@ function historyPayloadFromMarket(
         : []),
     ],
     agentSourcesUsed: [...new Set(agentSourcesUsed)].slice(0, 10),
-    agentStatus: deepJob?.analysisAgent?.status,
-    agentSummary: samanthaEvidence[0]?.summary,
+    agentStatus: agentStatusForHistory(samanthaReport, deepJob),
+    agentSummary:
+      samanthaEvidence[0]?.summary ||
+      (samanthaReport
+        ? "Lectura automatica guardada con evidencia compacta y limitaciones visibles."
+        : undefined),
     bridgeMode: deepJob?.samanthaBridge?.bridgeMode,
     bridgeStatus: deepJob?.samanthaBridge?.bridgeStatus,
     bridgeTaskId: deepJob?.samanthaBridge?.bridgeTaskId ?? deepJob?.samanthaBridge?.taskId,
@@ -898,6 +902,28 @@ function historyPayloadFromMarket(
     walletIntelligenceSummary: safeWalletSummaryForHistory(item),
     yesTokenId: tokenIdForSide(item, "YES"),
   };
+}
+
+function agentStatusForHistory(
+  report: SamanthaResearchReport | undefined,
+  deepJob?: DeepAnalysisJob | null,
+): AnalysisHistoryItem["agentStatus"] {
+  if (report?.status === "completed") {
+    return "completed";
+  }
+  if (report?.status === "partial") {
+    return "partial";
+  }
+  if (report?.status === "failed") {
+    return "insufficient_data";
+  }
+  if (deepJob?.samanthaBridge?.fallbackRequired) {
+    return "unavailable";
+  }
+  if (deepJob?.status === "samantha_researching" || deepJob?.status === "awaiting_samantha") {
+    return "researching";
+  }
+  return deepJob?.analysisAgent?.status === "unavailable" ? "unavailable" : undefined;
 }
 
 function pendingHistoryPayload(normalizedUrl: string) {

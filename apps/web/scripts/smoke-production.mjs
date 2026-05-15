@@ -660,6 +660,10 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("{analysisAgentName} automatico"), "AnalyzerReport missing dynamic automatic agent state");
   assert(reportSource.includes("Fuente automatica no disponible"), "AnalyzerReport missing automatic-source unavailable state");
   assert(reportSource.includes("Lectura parcial automatica"), "AnalyzerReport should label partial automatic readings");
+  assert(reportSource.includes("Evidencia usada"), "AnalyzerReport should show verifiable evidence used");
+  assert(reportSource.includes("Datos reales revisados para esta lectura"), "AnalyzerReport should explain evidence cards");
+  assert(reportSource.includes("Dato real"), "AnalyzerReport key signals should badge real data");
+  assert(reportSource.includes("getDisplayMarketPrices"), "AnalyzerReport should use flexible outcome price summaries");
   assert(reportSource.includes("Senales principales"), "AnalyzerReport should expose agent key signals");
   assert(reportSource.includes("Riesgos"), "AnalyzerReport should expose agent risks");
   assert(reportSource.includes("Limitaciones"), "AnalyzerReport should expose agent limitations");

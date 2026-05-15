@@ -929,6 +929,9 @@ function validateAnalyzerReportSource() {
     "Capas del motor",
     "Pendiente de integracion",
     "{analysisAgentName} automatico",
+    "Evidencia usada",
+    "Datos reales revisados para esta lectura",
+    "Dato real",
     "Lectura rapida de",
     "Lectura parcial automatica",
     "Senales principales",
@@ -966,6 +969,9 @@ function validateAnalyzerReportSource() {
   assert(source.includes("mergeWalletIntelligenceLayer"), "expected AnalyzerReport to merge wallet layer into deep readiness");
   assert(source.includes("getWalletIntelligenceSummary"), "expected AnalyzerReport to summarize wallet intelligence");
   assert(source.includes("getProbabilityDisplayState"), "expected AnalyzerReport to keep market probability separated");
+  assert(source.includes("getDisplayMarketPrices"), "expected AnalyzerReport to use flexible outcome prices in evidence summary");
+  assert(source.includes("onOpenMarketDetails"), "AnalyzerReport evidence cards must open market details through existing handler");
+  assert(source.includes("onOpenWalletDetails"), "AnalyzerReport evidence cards must open wallet details through existing handler");
   assert(source.includes("/api/analysis-agent/research-status"), "AnalyzerReport should query agent status only through same-origin route");
   assert(!/fetch\(\s*["']https?:\/\//.test(source), "AnalyzerReport must not call external services for the analysis agent");
   assert(!source.includes("OpenClaw"), "AnalyzerReport must not try to execute OpenClaw");
@@ -1630,6 +1636,10 @@ function validateDeepAnalysisJobRules() {
   assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport should expose an accessible job-state label");
   assert(reportSource.includes("{analysisAgentName} automatico"), "AnalyzerReport should show dynamic automatic agent state");
   assert(reportSource.includes("Fuente automatica no disponible"), "AnalyzerReport should show unavailable automatic source state");
+  assert(reportSource.includes("Evidencia usada"), "AnalyzerReport should expose a compact evidence-used section");
+  assert(reportSource.includes("Datos reales revisados para esta lectura"), "AnalyzerReport should explain evidence provenance");
+  assert(reportSource.includes("Dato real"), "AnalyzerReport should badge real-data key signals");
+  assert(reportSource.includes("getDisplayMarketPrices"), "AnalyzerReport should reuse flexible market outcome pricing");
   assert(reportSource.includes("NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS"), "AnalyzerReport should gate manual tools behind debug flag");
   assert(reportSource.includes("markJobSamanthaReportLoaded"), "AnalyzerReport should merge Samantha report into the job");
   assert(historySource.includes("Continuar analisis"), "history should let users continue pending deep research");

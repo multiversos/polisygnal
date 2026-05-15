@@ -40,6 +40,10 @@ import {
   getEstimateQualityLabel,
   getRealPolySignalProbabilities,
 } from "../lib/marketEstimateQuality";
+import {
+  getDisplayMarketPrices,
+  type DisplayMarketPriceCard,
+} from "../lib/marketDataDisplay";
 import type { MarketOverviewItem } from "../lib/marketOverview";
 import {
   formatProbability,
@@ -130,6 +134,16 @@ const SAMANTHA_STATUS_TIMEOUT_MS = 30_000;
 const SHOW_ANALYZER_DEBUG_TOOLS =
   process.env.NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS === "1";
 
+type VerifiableSignalCard = {
+  action?: "market" | "wallet";
+  confidence: string;
+  direction: string;
+  isReal: boolean;
+  label: string;
+  source: string;
+  summary: string;
+};
+
 async function fetchSamanthaStatus(taskId: string): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), SAMANTHA_STATUS_TIMEOUT_MS);
@@ -185,19 +199,31 @@ function formatUsd(value: unknown): string {
   }).format(parsed);
 }
 
+function formatMarketPriceValue(value: unknown): string {
+  const parsed = toNumber(value);
+  if (parsed === null) {
+    return "sin dato";
+  }
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 4,
+  }).format(parsed);
+}
+
+function formatOutcomePriceCard(card: DisplayMarketPriceCard): string {
+  return `${card.name} ${formatMarketPriceValue(card.price)}`;
+}
+
 function outcomePriceSummary(item: MarketOverviewItem): string | null {
-  const outcomes = item.market?.outcomes ?? [];
-  const priced = outcomes
-    .filter((outcome) => outcome.label)
-    .slice(0, 4)
-    .map((outcome) => {
-      const price =
-        outcome.price === null || outcome.price === undefined
-          ? "precio no disponible"
-          : formatProbability(outcome.price);
-      return `${outcome.label}: ${price}`;
-    });
-  return priced.length > 0 ? priced.join(" | ") : null;
+  const display = getDisplayMarketPrices(item);
+  if (display.mode === "binary") {
+    const yes = display.cards.find((card) => card.side === "YES");
+    const no = display.cards.find((card) => card.side === "NO");
+    return `YES ${formatMarketPriceValue(yes?.price)} / NO ${formatMarketPriceValue(no?.price)}`;
+  }
+  if (display.mode === "outcome") {
+    return display.cards.map(formatOutcomePriceCard).join(" / ");
+  }
+  return null;
 }
 
 function formatDate(value?: string | null): string {
@@ -531,6 +557,93 @@ function buildReviewChecklist(input: {
   );
 }
 
+function marketEvidenceDetail(item: MarketOverviewItem): string {
+  const display = getDisplayMarketPrices(item);
+  if (display.mode === "outcome" && display.leader) {
+    return `Lider por precio de mercado: ${display.leader.label} ${formatMarketPriceValue(display.leader.price)}.`;
+  }
+  if (display.mode === "binary") {
+    const yes = display.cards.find((card) => card.side === "YES");
+    const no = display.cards.find((card) => card.side === "NO");
+    return `YES ${formatMarketPriceValue(yes?.price)} / NO ${formatMarketPriceValue(no?.price)}.`;
+  }
+  return "Precio/outcomes no disponibles desde Polymarket.";
+}
+
+function walletEvidenceHeadline(summary: WalletIntelligenceSummary): string {
+  if (!summary.available) {
+    return "Wallet Intelligence no disponible";
+  }
+  return `${formatMetric(summary.relevantWalletsCount)} billeteras relevantes`;
+}
+
+function walletEvidenceDetail(summary: WalletIntelligenceSummary): string {
+  if (!summary.available) {
+    return summary.reason || "La fuente automatica no devolvio actividad publica verificable.";
+  }
+  const activityCount = summary.publicActivities?.length ?? summary.allActivitiesCount ?? 0;
+  const largeTrades = summary.largeTrades?.length ?? 0;
+  const largePositions = summary.largePositions?.length ?? 0;
+  const notable = summary.notableWallets?.length ?? 0;
+  const neutral = (summary.neutralCapitalUsd ?? 0) > 0 ? ` Neutral ${formatUsd(summary.neutralCapitalUsd)}.` : "";
+  return `${formatUsd(summary.analyzedCapitalUsd)} observados. ${activityCount} actividades, ${largeTrades} trades, ${largePositions} posiciones, ${notable} notables.${neutral}`;
+}
+
+function signalSourceAction(source: string): VerifiableSignalCard["action"] | undefined {
+  const normalized = source.toLowerCase();
+  if (normalized.includes("polymarket") || normalized.includes("market")) {
+    return "market";
+  }
+  if (normalized.includes("wallet")) {
+    return "wallet";
+  }
+  return undefined;
+}
+
+function buildVerifiableSignalCards(input: {
+  item: MarketOverviewItem;
+  samanthaSignals: ReturnType<typeof convertSamanthaReportToSignals>;
+  walletSummary: WalletIntelligenceSummary;
+}): VerifiableSignalCard[] {
+  const display = getDisplayMarketPrices(input.item);
+  const marketSummary = outcomePriceSummary(input.item);
+  const marketSignal: VerifiableSignalCard | null =
+    display.mode !== "unavailable" && marketSummary
+      ? {
+          action: "market",
+          confidence: "low",
+          direction: display.leader?.label ?? (display.mode === "binary" ? "YES/NO" : "NEUTRAL"),
+          isReal: true,
+          label: "Precio de mercado",
+          source: "Polymarket",
+          summary: `${marketSummary}. Es precio/probabilidad implicita del mercado, no estimacion propia de PolySignal.`,
+        }
+      : null;
+  const walletSignal: VerifiableSignalCard | null = input.walletSummary.available
+    ? {
+        action: "wallet",
+        confidence: input.walletSummary.confidence === "none" ? "low" : input.walletSummary.confidence,
+        direction: input.walletSummary.signalDirection,
+        isReal: true,
+        label: "Wallet Intelligence",
+        source: "Wallet Intelligence",
+        summary: walletEvidenceDetail(input.walletSummary),
+      }
+    : null;
+  const agentSignals = input.samanthaSignals.slice(0, 6).map((signal) => ({
+    action: signalSourceAction(signal.source),
+    confidence: signal.confidence,
+    direction: signal.direction,
+    isReal: signal.isReal,
+    label: signal.label,
+    source: signal.source,
+    summary: signal.reason,
+  }));
+  return [marketSignal, walletSignal, ...agentSignals].filter(
+    (signal): signal is VerifiableSignalCard => Boolean(signal),
+  ).slice(0, 8);
+}
+
 function AnalyzerLayerDetails({
   children,
   layer,
@@ -668,6 +781,11 @@ export function AnalyzerReport({
   const samanthaReviewChecklist = buildReviewChecklist({
     hasOutcomePrices: Boolean(probabilityState.market || outcomePrices),
     report: samanthaReport,
+    walletSummary,
+  });
+  const verifiableSignalCards = buildVerifiableSignalCards({
+    item,
+    samanthaSignals,
     walletSummary,
   });
   const walletPublicActivityCount =
@@ -1266,6 +1384,78 @@ export function AnalyzerReport({
             ) : null}
           </div>
           {samanthaActionMessage ? <p className="section-note">{samanthaActionMessage}</p> : null}
+          <section className="analyzer-evidence-used" aria-label="Evidencia usada">
+            <div className="probability-display-heading">
+              <div>
+                <p className="eyebrow">Evidencia usada</p>
+                <h4>Datos reales revisados para esta lectura</h4>
+              </div>
+              <span>{polySignalEstimate.available ? "Estimacion propia disponible" : "Sin estimacion propia"}</span>
+            </div>
+            <p className="section-note">
+              Estas tarjetas resumen lo verificable. Los drawers siguen siendo la vista completa y se abren solo por clic.
+            </p>
+            <div className="samantha-report-grid evidence-used-grid">
+              <article className="samantha-report-section">
+                <div className="samantha-report-section-heading">
+                  <span>Mercado</span>
+                  {onOpenMarketDetails ? (
+                    <button className="analysis-link secondary" onClick={onOpenMarketDetails} type="button">
+                      Ver datos
+                    </button>
+                  ) : null}
+                </div>
+                <strong>{outcomePrices || "Precio no disponible"}</strong>
+                <p>
+                  Volumen {formatUsd(item.latest_snapshot?.volume)} - Liquidez {formatUsd(item.latest_snapshot?.liquidity)}
+                </p>
+                <small>
+                  {marketEvidenceDetail(item)} Precio/probabilidad implicita del mercado, no estimacion propia.
+                </small>
+              </article>
+
+              <article className="samantha-report-section">
+                <div className="samantha-report-section-heading">
+                  <span>Billeteras</span>
+                  {onOpenWalletDetails ? (
+                    <button className="analysis-link secondary" onClick={onOpenWalletDetails} type="button">
+                      Ver billeteras
+                    </button>
+                  ) : null}
+                </div>
+                <strong>{walletEvidenceHeadline(walletSummary)}</strong>
+                <p>{walletEvidenceDetail(walletSummary)}</p>
+                <small>Actividad publica read-only; no es instruccion operativa ni consejo financiero.</small>
+              </article>
+
+              <article className="samantha-report-section">
+                <div className="samantha-report-section-heading">
+                  <span>{analysisAgentName}</span>
+                  <em>{samanthaReport ? "reporte validado" : "en progreso"}</em>
+                </div>
+                <strong>{samanthaAutomaticStatus}</strong>
+                <p>{samanthaReport ? "Lectura generada con datos disponibles." : "Esperando respuesta segura del agente."}</p>
+                <small>
+                  Fuentes: {samanthaSourcesUsed.length > 0 ? samanthaSourcesUsed.slice(0, 4).join(", ") : "sin fuentes adicionales"}
+                </small>
+              </article>
+
+              <article className="samantha-report-section">
+                <span>Limitaciones</span>
+                <strong>
+                  {polySignalEstimate.available
+                    ? "Compuertas conservadoras superadas"
+                    : "No hay estimacion propia de PolySignal"}
+                </strong>
+                <p>
+                  {samanthaLimitations[0] ||
+                    "No se agregaron limitaciones adicionales en el reporte validado."}
+                </p>
+                <small>Una lectura parcial no cuenta como prediccion si no hay decision propia disponible.</small>
+              </article>
+            </div>
+          </section>
+
           <div className="wallet-report-summary">
             <div>
               <span>Mercado</span>
@@ -1349,16 +1539,29 @@ export function AnalyzerReport({
           <div className="samantha-report-section">
             <div className="samantha-report-section-heading">
               <span>Senales principales</span>
-              <em>{samanthaReport ? "reporte validado" : "en espera"}</em>
+              <em>{verifiableSignalCards.length > 0 ? "fuentes visibles" : "en espera"}</em>
             </div>
-            {samanthaReport && samanthaEvidence.length > 0 ? (
+            {verifiableSignalCards.length > 0 ? (
               <div className="samantha-evidence-list">
-                {samanthaEvidence.slice(0, 6).map((evidence) => (
-                  <article className="samantha-evidence-card" key={evidence.id}>
-                    <span>{shortDirectionLabel(evidence.direction)} - {evidence.reliability}</span>
-                    <strong>{evidence.title}</strong>
-                    <p>{evidence.summary}</p>
-                    <small>{evidence.sourceName}</small>
+                {verifiableSignalCards.map((signal) => (
+                  <article className="samantha-evidence-card" key={`${signal.source}-${signal.label}`}>
+                    <span>{shortDirectionLabel(signal.direction)} - {signal.confidence}</span>
+                    <strong>{signal.label}</strong>
+                    <p>{signal.summary}</p>
+                    <small>{signal.source}</small>
+                    <div className="data-health-notes">
+                      {signal.isReal ? <span className="badge external-hint">Dato real</span> : null}
+                      {signal.action === "market" && onOpenMarketDetails ? (
+                        <button className="analysis-link secondary" onClick={onOpenMarketDetails} type="button">
+                          Ver datos
+                        </button>
+                      ) : null}
+                      {signal.action === "wallet" && onOpenWalletDetails ? (
+                        <button className="analysis-link secondary" onClick={onOpenWalletDetails} type="button">
+                          Ver billeteras
+                        </button>
+                      ) : null}
+                    </div>
                   </article>
                 ))}
               </div>

@@ -72,6 +72,12 @@ The final `/analyze` report must keep three ideas separate:
 - `suggestedDecision.available=false` means no prediction should be shown or
   counted in history.
 
+The visible `Evidencia usada` section may summarize market data, Wallet
+Intelligence, the active agent status and limitations, but it must link to the
+existing detail drawers instead of exposing raw payloads. `Dato real` badges are
+allowed only for structured signals marked real by the agent or derived from
+Polymarket/Wallet Intelligence fields already shown elsewhere in the UI.
+
 The report may show agent key signals, risks, limitations and sources, but only
 from sanitized structured output or derived unavailable-state explanations. It
 must not invent ROI, win rate, PnL, odds, news, injuries, wallet actions or

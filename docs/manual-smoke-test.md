@@ -648,19 +648,30 @@ Use these quick checks when reviewing public pages:
 4. Confirm the final report shows `Senales principales`, `Riesgos`,
    `Limitaciones`, `Que revisar primero`, and source badges when Samantha
    returns them.
-5. Confirm the market summary and wallet summary in the report use real
+5. Confirm the final report shows `Evidencia usada` with compact cards for
+   `Mercado`, `Billeteras`, `Samantha` and `Limitaciones`. These cards must
+   summarize only real Polymarket/Wallet Intelligence/agent data and must not
+   replace the detail drawers.
+6. Confirm key signal cards show their source and mark `Dato real` only when
+   the structured report says the signal is real. Polymarket signals should
+   offer `Ver datos`; Wallet Intelligence signals should offer `Ver
+   billeteras`.
+7. Confirm the market summary and wallet summary in the report use real
    Polymarket/Wallet Intelligence values and offer `Ver datos` / `Ver
    billeteras` without opening drawers automatically.
-6. Confirm the public flow does not show manual upload/copy/download/schema
+8. Confirm `suggestedDecision.available=false` appears as no PolySignal-owned
+   estimate or prediction. A `partial` report is context, not a finalized
+   prediction.
+9. Confirm the public flow does not show manual upload/copy/download/schema
    controls by default.
-7. Confirm unavailable sources appear as `Fuente automatica no disponible` or
+10. Confirm unavailable sources appear as `Fuente automatica no disponible` or
    partial reading, not as a request for user evidence.
-8. Confirm no full wallet addresses appear outside the explicit `Ver billeteras`
+11. Confirm no full wallet addresses appear outside the explicit `Ver billeteras`
    drawer, and confirm no secrets, raw payloads, fake ROI/win rate, copy-trading
    language, fake odds, fake news, fake injuries, or betting advice appear.
-9. Confirm no prediction is created unless validated Samantha output and the
+12. Confirm no prediction is created unless validated Samantha output and the
    conservative PolySignal gates pass.
-10. Local debug-only manual report tooling may exist behind
+13. Local debug-only manual report tooling may exist behind
    `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`; it is not part of the public
    production flow.
 

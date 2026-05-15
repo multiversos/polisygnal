@@ -205,6 +205,28 @@ function researchSourceLabel(item: AnalysisHistoryItem, job?: DeepAnalysisJob | 
   return "Enlace Polymarket";
 }
 
+function agentStatusLabel(value: AnalysisHistoryItem["agentStatus"]): string | null {
+  if (value === "completed") {
+    return "Analisis completado";
+  }
+  if (value === "partial") {
+    return "Lectura parcial";
+  }
+  if (value === "insufficient_data") {
+    return "Sin senales suficientes";
+  }
+  if (value === "failed_safe") {
+    return "Fallo seguro";
+  }
+  if (value === "researching") {
+    return "Agente analizando";
+  }
+  if (value === "unavailable") {
+    return "Agente no disponible";
+  }
+  return null;
+}
+
 function resolutionSourceLabel(value: AnalysisHistoryItem["resolutionSource"]): string {
   if (value === "polymarket" || value === "gamma" || value === "clob") {
     return "Verificado con Polymarket";
@@ -1151,6 +1173,7 @@ export default function HistoryPage() {
               const bridgeTaskId = bridgeTaskIdForItem(item, deepJob);
               const researchStage = researchStageLabel(item, deepJob);
               const researchSource = researchSourceLabel(item, deepJob);
+              const agentStatus = agentStatusLabel(item.agentStatus);
               const continueHref = reanalyzeHref ? `${reanalyzeHref}#samantha-research` : null;
               return (
                 <article className="history-card" key={item.id}>
@@ -1176,6 +1199,11 @@ export default function HistoryPage() {
                       ) : null}
                       {item.researchStatus === "ready_to_score" ? (
                         <span className="badge external-hint">Evidencia cargada</span>
+                      ) : null}
+                      {agentStatus ? (
+                        <span className={item.agentStatus === "partial" || item.agentStatus === "insufficient_data" ? "badge muted" : "badge external-hint"}>
+                          {agentStatus}
+                        </span>
                       ) : null}
                     </div>
                     <span className="timestamp-pill">{formatDate(item.analyzedAt)}</span>

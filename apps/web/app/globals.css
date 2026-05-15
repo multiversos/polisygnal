@@ -9880,6 +9880,12 @@ html:not([data-theme="dark"]) .app-sidebar {
   min-width: 0;
 }
 
+.analyzer-evidence-used {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
 .samantha-report-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

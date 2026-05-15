@@ -72,9 +72,12 @@ Estado visible verificado:
   ver historial, abrir detalle o seguir mercado.
 - `AnalyzerReport.tsx` ahora presenta mejor el reporte automatico de Samantha:
   lectura rapida, badge `Lectura parcial automatica`/`Sin senales suficientes`/
-  `Analisis completado`, senales principales, resumen de mercado, resumen de
-  billeteras, riesgos, limitaciones, fuentes usadas y `Que revisar primero`.
-  Si `suggestedDecision.available=false`, no muestra prediccion ni estimate
+  `Analisis completado`, `Evidencia usada`, senales principales, resumen de
+  mercado, resumen de billeteras, riesgos, limitaciones, fuentes usadas y `Que
+  revisar primero`. La evidencia usada resume Mercado, Billeteras, Samantha y
+  Limitaciones con botones `Ver datos`/`Ver billeteras` que reutilizan los
+  drawers existentes y no se abren automaticamente. Si
+  `suggestedDecision.available=false`, no muestra prediccion ni estimate
   propio; explica que el precio de mercado es solo referencia de Polymarket.
 - `Ver billeteras` usa una vista compacta por wallet: direccion publica,
   tipo de actividad, outcome/posicion, monto, precio, shares/contratos,
@@ -87,8 +90,9 @@ Estado visible verificado:
   no valida el patron publico, la UI muestra `Perfil Polymarket no disponible`
   y permite copiar la direccion visible sin inventar enlaces.
 - `/history` conserva metadatos seguros del agente cuando se guarda una lectura:
-  `agentName`, `agentStatus`, resumen, senales, riesgos, limitaciones y fuentes
-  usadas. Una lectura parcial sin decision no cuenta como prediccion.
+  `agentName`, `agentStatus`, resumen, senales, riesgos, limitaciones, fuentes
+  usadas, outcomes principales y resumen compacto de Wallet Intelligence. Una
+  lectura parcial sin decision no cuenta como prediccion.
 - `/analyze` usa flujo `Detectar -> Confirmar -> Analizar -> Guardar ->
   Verificar resultado`: un enlace primero se valida, luego se resuelve desde
   Polymarket/Gamma por slug de evento o mercado, y despues el usuario confirma
