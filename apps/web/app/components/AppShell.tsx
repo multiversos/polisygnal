@@ -12,6 +12,7 @@ type NavIconName =
   | "research"
   | "evidence"
   | "history"
+  | "profiles"
   | "watchlist"
   | "decisions"
   | "workflow"
@@ -34,6 +35,7 @@ const publicNavigationItems: Array<{
   { label: "Inicio", href: "/", icon: "dashboard" },
   { label: "Analizar enlace", href: "/analyze", icon: "analyze", primary: true },
   { label: "Historial", href: "/history", icon: "history" },
+  { label: "Perfiles", href: "/profiles", icon: "profiles" },
   { label: "Rendimiento", href: "/performance", icon: "decisions" },
   { label: "Alertas", href: "/alerts", icon: "alerts" },
   { label: "Metodologia", href: "/methodology", icon: "evidence" },
@@ -210,6 +212,12 @@ function NavIcon({ name }: { name: NavIconName }) {
       return (
         <svg {...commonProps}>
           <path d="M5 19V5m0 14h15M8 16v-4m4 4V8m4 8v-6M7 6h5m0 0-2-2m2 2-2 2" />
+        </svg>
+      );
+    case "profiles":
+      return (
+        <svg {...commonProps}>
+          <path d="M8 8a4 4 0 1 1 8 0 4 4 0 0 1-8 0Zm-3 12c1-4 13-4 14 0M17 15l1.5 1.5L22 13" />
         </svg>
       );
     case "analyze":

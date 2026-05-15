@@ -17,6 +17,7 @@ Public product routes reviewed:
 - `/alerts`
 - `/watchlist`
 - `/history`
+- `/profiles`
 - `/analyze`
 - `/markets/[id]`
 
@@ -346,6 +347,9 @@ Wallet Intelligence UI controls:
 - wallet profile links are built only for strings matching a full `0x` wallet
   address and use Polymarket's public `/profile/{wallet}` path. Short addresses
   or malformed values do not become links;
+- public profile avatars may render as HTTPS images when the public profile
+  source returns a URL. This broadens only `img-src`; script/connect policies
+  stay constrained and no profile image URL is treated as identity proof;
 - compact wallet cards show analysis-useful fields first. `tokenId`,
   `conditionId`, `marketId`, transaction hashes, warnings, limitations and raw
   source fields stay behind a collapsed details element;
@@ -353,6 +357,18 @@ Wallet Intelligence UI controls:
   in public closed-position data. Missing values remain `No disponible`;
 - the drawer must not recommend following/copying wallet behavior and must not
   infer real-world identity from a public address.
+- `Historial de esta wallet` stays collapsed by default and can show only
+  closed markets, wins/losses, real win rate, real PnL and related markets
+  delivered by the public source. If the source returns only counts, the UI says
+  so; if it returns nothing, history remains unavailable.
+- `/profiles` stores highlighted public wallets in localStorage only. A profile
+  can be auto-saved only when the data includes real `winRate >= 80%`,
+  `closedMarkets >= 50`, and either real PnL or observed capital of at least
+  `100 USD`. The app must not save low-sample wallets, null win rates, invented
+  PnL, or raw wallet lists.
+- The Profiles page is not account-synced and must say so. Global persistence
+  requires a later backend/DB sprint with ownership checks; no Neon migration is
+  part of this feature.
 
 Samantha-side local endpoints:
 

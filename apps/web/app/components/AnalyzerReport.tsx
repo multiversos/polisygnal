@@ -585,8 +585,14 @@ function walletEvidenceDetail(summary: WalletIntelligenceSummary): string {
   const largeTrades = summary.largeTrades?.length ?? 0;
   const largePositions = summary.largePositions?.length ?? 0;
   const notable = summary.notableWallets?.length ?? 0;
+  const highlighted = summary.highlightedProfilesCount ?? 0;
+  const history = summary.historyAvailableCount ?? 0;
   const neutral = (summary.neutralCapitalUsd ?? 0) > 0 ? ` Neutral ${formatUsd(summary.neutralCapitalUsd)}.` : "";
-  return `${formatUsd(summary.analyzedCapitalUsd)} observados. ${activityCount} actividades, ${largeTrades} trades, ${largePositions} posiciones, ${notable} notables.${neutral}`;
+  const profiles =
+    highlighted > 0 || history > 0
+      ? ` ${history} con historial; ${highlighted} perfiles destacados.`
+      : "";
+  return `${formatUsd(summary.analyzedCapitalUsd)} observados. ${activityCount} actividades, ${largeTrades} trades, ${largePositions} posiciones, ${notable} notables.${neutral}${profiles}`;
 }
 
 function signalSourceAction(source: string): VerifiableSignalCard["action"] | undefined {

@@ -24,6 +24,7 @@ const BRIEFING_PATH = "/briefing";
 const ALERTS_PATH = "/alerts";
 const WATCHLIST_PATH = "/watchlist";
 const HISTORY_PATH = "/history";
+const PROFILES_PATH = "/profiles";
 const PERFORMANCE_PATH = "/performance";
 const METHODOLOGY_PATH = "/methodology";
 const ANALYZE_PATH = "/analyze";
@@ -44,6 +45,7 @@ const PUBLIC_NAV_TEXT = [
   "Inicio",
   "Analizar enlace",
   "Historial",
+  "Perfiles",
   "Rendimiento",
   "Alertas",
   "Metodologia",
@@ -1079,6 +1081,13 @@ async function main() {
     ["Seguimiento", "Ultima revision", "Ver rendimiento"],
     "history lifecycle tracking",
   );
+  const profilesDom = await dumpDom(urlFor(PROFILES_PATH));
+  const profilesRender = validatePublicProductPage(profilesDom, "profiles", ["Perfiles"]);
+  const profilesText = visibleText(profilesDom);
+  assertTextIncludes(profilesText, "Billeteras publicas detectadas", "profiles public heading");
+  assertTextIncludes(profilesText, "localStorage v1", "profiles local storage copy");
+  assertTextIncludes(profilesText, "No es recomendacion de copy-trading", "profiles anti-copy-trading copy");
+  assertTextExcludes(profilesText, ["tokenId", "conditionId", "transactionHash", "raw JSON"], "profiles technical noise");
   const performanceDom = await dumpDom(urlFor(PERFORMANCE_PATH));
   const performanceRender = validatePublicProductPage(performanceDom, "performance", ["Rendimiento"]);
   const performanceText = visibleText(performanceDom);
@@ -1487,6 +1496,7 @@ async function main() {
           alerts: alertsRender,
           watchlist: watchlistRender,
           history: historyRender,
+          profiles: profilesRender,
           performance: performanceRender,
           methodology: methodologyRender,
           analyze: analyzeRender,

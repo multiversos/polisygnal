@@ -15,6 +15,9 @@ export type AnalyzeLoadingPhase =
   | "context"
   | "readiness"
   | "research"
+  | "wallet_profiles"
+  | "wallet_history"
+  | "wallet_consistency"
   | "preparing_samantha"
   | "sending_samantha"
   | "samantha_researching"
@@ -47,9 +50,13 @@ type AnalyzeProgressStep = {
     | "detecting_market"
     | "loading_polymarket"
     | "reviewing_wallets"
+    | "enriching_profiles"
+    | "building_wallet_history"
+    | "validating_wallet_consistency"
     | "preparing_samantha"
     | "ready";
   label: string;
+  optional?: boolean;
   phases: AnalyzeLoadingPhase[];
 };
 
@@ -88,8 +95,12 @@ type AnalyzeProgressPanelProps = {
   samanthaPending?: boolean;
 };
 
-function analysisProgressSteps(agentName: string): AnalyzeProgressStep[] {
-  return [
+function analysisProgressSteps(
+  agentName: string,
+  phase: AnalyzeLoadingPhase,
+  stepOverrides?: AnalyzeProgressStepOverrides,
+): AnalyzeProgressStep[] {
+  const steps: AnalyzeProgressStep[] = [
     {
       detail: "Validamos que sea un enlace seguro de Polymarket.",
       id: "reading_link",
@@ -115,6 +126,27 @@ function analysisProgressSteps(agentName: string): AnalyzeProgressStep[] {
       phases: ["research"],
     },
     {
+      detail: "Enriquecemos perfiles publicos cuando la fuente los entrega.",
+      id: "enriching_profiles",
+      label: "Enriqueciendo perfiles",
+      optional: true,
+      phases: ["wallet_profiles"],
+    },
+    {
+      detail: "Construimos historial por wallet solo con mercados cerrados publicos disponibles.",
+      id: "building_wallet_history",
+      label: "Construyendo historial de wallets",
+      optional: true,
+      phases: ["wallet_history"],
+    },
+    {
+      detail: "Comparamos capital, actividades y limites de fuente para evitar una lectura exagerada.",
+      id: "validating_wallet_consistency",
+      label: "Validando consistencia de capital",
+      optional: true,
+      phases: ["wallet_consistency"],
+    },
+    {
       detail: `${agentName} usa el puente automatico cuando esta configurado y reporta fuentes no disponibles.`,
       id: "preparing_samantha",
       label: `${agentName} analizando`,
@@ -127,6 +159,7 @@ function analysisProgressSteps(agentName: string): AnalyzeProgressStep[] {
       phases: ["ready_to_score", "preparing"],
     },
   ];
+  return steps.filter((step) => !step.optional || step.phases.includes(phase) || Boolean(stepOverrides?.[step.id]));
 }
 
 function activeStepIndex(phase: AnalyzeLoadingPhase, steps: AnalyzeProgressStep[]): number {
@@ -190,7 +223,7 @@ function statusForStep(
   if (issue && index === activeIndex) {
     return issue === "timeout" ? "attention" : "error";
   }
-  if (samanthaPending && index === 4) {
+  if (samanthaPending && step.id === "preparing_samantha") {
     return "attention";
   }
   if (index < activeIndex) {
@@ -202,6 +235,13 @@ function statusForStep(
     }
     if (step.id === "reviewing_wallets") {
       return "pending";
+    }
+    if (
+      step.id === "enriching_profiles" ||
+      step.id === "building_wallet_history" ||
+      step.id === "validating_wallet_consistency"
+    ) {
+      return "skipped";
     }
     if (step.id === "preparing_samantha") {
       return "running";
@@ -308,6 +348,30 @@ function runningOverrideForStep(
       summary: "La fuente puede devolver actividad, sin actividad o no disponible.",
     };
   }
+  if (step.id === "enriching_profiles") {
+    return {
+      detail: "Buscando datos publicos de perfil cuando hay wallet completa valida...",
+      status: "running",
+      statusLabel: "Enriqueciendo perfiles",
+      summary: "No inventamos nombres, avatares ni identidades.",
+    };
+  }
+  if (step.id === "building_wallet_history") {
+    return {
+      detail: "Revisando mercados cerrados publicos por wallet...",
+      status: "running",
+      statusLabel: "Construyendo historial",
+      summary: "Win rate y PnL solo aparecen si la fuente los entrega.",
+    };
+  }
+  if (step.id === "validating_wallet_consistency") {
+    return {
+      detail: "Comparando wallets relevantes, actividades y capital observado...",
+      status: "running",
+      statusLabel: "Validando consistencia",
+      summary: "Mercados grandes pueden quedar parciales si la fuente devuelve pocos datos.",
+    };
+  }
   if (step.id === "preparing_samantha") {
     return {
       detail: `${agentName} esta revisando fuentes automaticas disponibles...`,
@@ -353,7 +417,7 @@ export function AnalyzeProgressPanel({
   stepOverrides,
   samanthaPending = false,
 }: AnalyzeProgressPanelProps) {
-  const steps = useMemo(() => analysisProgressSteps(agentName), [agentName]);
+  const steps = useMemo(() => analysisProgressSteps(agentName, phase, stepOverrides), [agentName, phase, stepOverrides]);
   const activeIndex = activeStepIndex(phase, steps);
   const [visualStepIndex, setVisualStepIndex] = useState(0);
   const [visualStepStartedAt, setVisualStepStartedAt] = useState(() => Date.now());

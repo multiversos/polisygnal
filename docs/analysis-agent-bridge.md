@@ -135,6 +135,8 @@ Request:
     "neutralCapitalUsd": 42000,
     "largeTradesCount": 5,
     "largePositionsCount": 10,
+    "historyAvailableCount": 2,
+    "highlightedProfilesCount": 1,
     "notableWalletCount": 53,
     "observedActivities": [
       {
@@ -143,6 +145,10 @@ Request:
         "outcome": "Cavaliers",
         "amountUsd": 35829.07,
         "price": 0.61,
+        "hasPublicProfile": true,
+        "hasWalletHistory": true,
+        "closedMarkets": 64,
+        "winRate": 0.81,
         "source": "polymarket_data_api"
       }
     ]
@@ -257,3 +263,22 @@ Los botones `Ver datos` y `Ver billeteras` se habilitan solo cuando su etapa ya
 fue revelada. Los drawers siguen cerrados por defecto y se abren solamente por
 accion del usuario. Si Samantha tarda, el panel debe explicar que mercado,
 datos y billeteras ya fueron consultados y que se esta esperando al agente.
+
+## Perfiles de billeteras
+
+Wallet Intelligence puede enriquecer algunas wallets con perfil publico de
+Polymarket y posiciones cerradas publicas. El drawer `Ver billeteras` puede
+mostrar la direccion completa y el enlace `https://polymarket.com/profile/{wallet}`
+solo cuando la direccion valida `0x + 40 hex`. El brief al agente no recibe
+wallets completas; recibe conteos y short addresses sanitizadas.
+
+La nueva seccion `/profiles` guarda perfiles destacados solo en localStorage.
+La regla inicial es:
+
+- `winRate >= 80%`;
+- `closedMarkets >= 50`;
+- PnL real disponible o `observedCapitalUsd >= 100`.
+
+No se guardan perfiles con win rate nulo, historial de pocas muestras, PnL
+inventado o datos no verificables. La pagina advierte que historial pasado no
+garantiza resultados futuros y que no es recomendacion de copy-trading.

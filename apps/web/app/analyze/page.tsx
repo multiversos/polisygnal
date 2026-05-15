@@ -91,6 +91,7 @@ import {
   getPolymarketWalletIntelligence,
   unavailablePolymarketWalletIntelligenceSummary,
 } from "../lib/polymarketWalletIntelligence";
+import { saveHighlightedProfilesFromWalletSummary } from "../lib/highlightedProfiles";
 import {
   buildConservativePolySignalEstimate,
   type PolySignalEstimateResult,
@@ -407,6 +408,100 @@ function buildWalletProgress(summary: WalletIntelligenceSummary): AnalyzeProgres
     status: "completed_empty",
     statusLabel: "Sin actividad relevante",
     summary: "La fuente respondio, pero no encontro wallets utiles para una senal auxiliar.",
+  };
+}
+
+function shouldUseExpandedWalletAnalysis(item: MarketOverviewItem, summary: WalletIntelligenceSummary): boolean {
+  const volume = toNumber(item.latest_snapshot?.volume) ?? 0;
+  const liquidity = toNumber(item.latest_snapshot?.liquidity) ?? 0;
+  const observedCapital = toNumber(summary.analyzedCapitalUsd) ?? 0;
+  return volume >= 1_000_000 || liquidity >= 500_000 || observedCapital >= 50_000;
+}
+
+function buildWalletExpandedSummary(
+  item: MarketOverviewItem,
+  summary: WalletIntelligenceSummary,
+  savedProfilesCount: number,
+): WalletIntelligenceSummary {
+  const publicActivities = summary.publicActivities ?? [];
+  const profileCount = publicActivities.filter((activity) => activity.profile).length;
+  const historyAvailableCount =
+    summary.historyAvailableCount ??
+    publicActivities.filter(
+      (activity) => (activity.marketHistory?.length ?? 0) > 0 || typeof activity.closedMarkets === "number",
+    ).length;
+  const highlightedProfilesCount =
+    summary.highlightedProfilesCount ??
+    publicActivities.filter((activity) => activity.highlightedProfile).length;
+  const largeMarket = shouldUseExpandedWalletAnalysis(item, summary);
+  const consistencyWarnings: string[] = [];
+  if (largeMarket && summary.available && summary.relevantWalletsCount < 5) {
+    consistencyWarnings.push(
+      "El mercado tiene alto volumen, liquidez o capital observado, pero la fuente devolvio pocas wallets. Puede ser limite de fuente o datos incompletos.",
+    );
+  }
+  if (largeMarket && summary.available && publicActivities.length < Math.min(summary.relevantWalletsCount, 5)) {
+    consistencyWarnings.push(
+      "La fuente reporto billeteras relevantes, pero entrego pocas actividades detalladas para validarlas.",
+    );
+  }
+  return {
+    ...summary,
+    expandedAnalysis: {
+      consistencyWarnings,
+      highlightedProfilesCount: Math.max(highlightedProfilesCount, savedProfilesCount),
+      historyAvailableCount,
+      largeMarket,
+      profileCount,
+    },
+    highlightedProfilesCount: Math.max(highlightedProfilesCount, savedProfilesCount),
+    historyAvailableCount,
+    warnings: [...summary.warnings, ...consistencyWarnings].slice(0, 12),
+  };
+}
+
+function buildProfileProgress(summary: WalletIntelligenceSummary): AnalyzeProgressStepOverrides["enriching_profiles"] {
+  const count = summary.expandedAnalysis?.profileCount ?? 0;
+  return {
+    detail: count > 0
+      ? "La fuente entrego datos publicos de perfil para algunas wallets completas."
+      : "La fuente no entrego perfiles publicos enriquecidos para estas wallets.",
+    status: count > 0 ? "completed_with_data" : "completed_empty",
+    statusLabel: count > 0 ? "Perfiles publicos revisados" : "Sin perfiles enriquecidos",
+    summary: count > 0 ? `${count} perfil(es) publico(s) detectado(s).` : "No se inventan nombres, avatares ni pseudonimos.",
+  };
+}
+
+function buildWalletHistoryProgress(summary: WalletIntelligenceSummary): AnalyzeProgressStepOverrides["building_wallet_history"] {
+  const count = summary.expandedAnalysis?.historyAvailableCount ?? summary.historyAvailableCount ?? 0;
+  const highlighted = summary.expandedAnalysis?.highlightedProfilesCount ?? summary.highlightedProfilesCount ?? 0;
+  return {
+    detail: count > 0
+      ? "Se encontro historial publico cerrado para algunas wallets."
+      : "No hay historial publico cerrado suficiente desde la fuente actual.",
+    status: count > 0 ? "completed_with_data" : "completed_empty",
+    statusLabel: count > 0 ? "Historial revisado" : "Historial no disponible",
+    summary: count > 0
+      ? `${count} wallet(s) con historial; ${highlighted} perfil(es) destacado(s) guardado(s) o elegible(s).`
+      : "Win rate y PnL quedan como no disponibles si no vienen reales.",
+  };
+}
+
+function buildWalletConsistencyProgress(summary: WalletIntelligenceSummary): AnalyzeProgressStepOverrides["validating_wallet_consistency"] {
+  const warnings = summary.expandedAnalysis?.consistencyWarnings ?? [];
+  if (warnings.length > 0) {
+    return {
+      detail: warnings[0],
+      status: "warning",
+      statusLabel: "Datos limitados",
+      summary: "La lectura queda parcial por limite de fuente.",
+    };
+  }
+  return {
+    detail: "Capital observado, actividades y conteos de wallets son consistentes con lo que entrego la fuente.",
+    status: "completed_with_data",
+    statusLabel: "Consistencia revisada",
+    summary: `${summary.relevantWalletsCount} billetera(s), ${summary.publicActivities?.length ?? 0} actividad(es) publicas.`,
   };
 }
 
@@ -2423,6 +2518,24 @@ export default function AnalyzePage() {
       if (!isCurrentRun()) {
         return;
       }
+      const highlightedProfiles = saveHighlightedProfilesFromWalletSummary(walletSummary, {
+        observedCapitalUsd: walletSummary.analyzedCapitalUsd ?? null,
+        source: "Polymarket Data API / Wallet Intelligence",
+        sourceMarketSlug: enrichedMatch.item.market?.market_slug ?? null,
+        sourceMarketTitle: marketTitle(enrichedMatch.item),
+        sourceMarketUrl: normalizedUrl,
+      });
+      walletSummary = buildWalletExpandedSummary(enrichedMatch.item, walletSummary, highlightedProfiles.saved.length);
+      enrichedMatch = {
+        ...enrichedMatch,
+        item: {
+          ...enrichedMatch.item,
+          walletIntelligence: {
+            positions: walletSummary.topWallets ?? [],
+            summary: walletSummary,
+          },
+        },
+      };
       setProgressStepOverrides((current) => ({
         ...current,
         reviewing_wallets: buildWalletProgress(walletSummary),
@@ -2437,6 +2550,34 @@ export default function AnalyzePage() {
           warnings: walletSummary.warnings.slice(0, 4),
         }),
       );
+
+      if (walletSummary.expandedAnalysis?.largeMarket || (walletSummary.expandedAnalysis?.profileCount ?? 0) > 0) {
+        if (!(await advancePhase("wallet_profiles"))) {
+          return;
+        }
+        setProgressStepOverrides((current) => ({
+          ...current,
+          enriching_profiles: buildProfileProgress(walletSummary),
+        }));
+      }
+      if (walletSummary.expandedAnalysis?.largeMarket || (walletSummary.expandedAnalysis?.historyAvailableCount ?? 0) > 0) {
+        if (!(await advancePhase("wallet_history"))) {
+          return;
+        }
+        setProgressStepOverrides((current) => ({
+          ...current,
+          building_wallet_history: buildWalletHistoryProgress(walletSummary),
+        }));
+      }
+      if (walletSummary.expandedAnalysis?.largeMarket) {
+        if (!(await advancePhase("wallet_consistency"))) {
+          return;
+        }
+        setProgressStepOverrides((current) => ({
+          ...current,
+          validating_wallet_consistency: buildWalletConsistencyProgress(walletSummary),
+        }));
+      }
 
       if (!(await advancePhase("preparing_samantha"))) {
         return;
@@ -2876,6 +3017,11 @@ export default function AnalyzePage() {
         }}
         open={walletDetailsOpen}
         summary={walletDetailsSummary}
+        sourceMarketSlug={
+          state.status === "result" ? state.match.item.market?.market_slug ?? null : null
+        }
+        sourceMarketTitle={state.status === "result" ? marketTitle(state.match.item) : null}
+        sourceMarketUrl={analyzedNormalizedUrl || lastWorkingUrl || input}
       />
     </main>
   );

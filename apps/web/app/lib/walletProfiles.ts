@@ -1,4 +1,6 @@
 import type {
+  WalletPublicMarketHistoryItem,
+  WalletPublicProfile,
   WalletProfileSummary,
   WalletReliability,
   WalletSignalDirection,
@@ -6,17 +8,24 @@ import type {
 
 export type WalletPublicHistoryPosition = {
   conditionId?: string;
+  marketSlug?: string;
   marketTitle?: string;
+  marketUrl?: string;
+  outcome?: string;
   realizedPnlUsd?: number;
   side?: string;
+  timestamp?: string;
   volumeUsd?: number;
+  averagePrice?: number;
 };
 
 export type WalletProfileBuildInput = {
   closedPositions?: WalletPublicHistoryPosition[];
   currentSide?: WalletSignalDirection;
   observedCapitalUsd?: number;
+  profile?: WalletPublicProfile | null;
   shortAddress: string;
+  walletAddress?: string | null;
 };
 
 const MIN_RESOLVED_MARKETS_FOR_PROFILE = 5;
@@ -77,6 +86,37 @@ function volumeObserved(positions: WalletPublicHistoryPosition[], currentCapital
   return combined > 0 ? combined : undefined;
 }
 
+function resultFromPnl(value?: number): WalletPublicMarketHistoryItem["result"] {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "unknown";
+  }
+  if (value > 0) {
+    return "won";
+  }
+  if (value < 0) {
+    return "lost";
+  }
+  return "unknown";
+}
+
+export function buildWalletMarketHistoryItems(
+  positions: WalletPublicHistoryPosition[],
+): WalletPublicMarketHistoryItem[] {
+  return positions.slice(0, 25).map((position) => ({
+    amountUsd: normalizeNumber(position.volumeUsd) ?? null,
+    averagePrice: normalizeNumber(position.averagePrice) ?? null,
+    conditionId: position.conditionId ?? null,
+    marketSlug: position.marketSlug ?? null,
+    marketTitle: position.marketTitle ?? null,
+    marketUrl: position.marketUrl ?? null,
+    outcome: position.outcome ?? position.side ?? null,
+    realizedPnl: normalizeNumber(position.realizedPnlUsd) ?? null,
+    result: resultFromPnl(position.realizedPnlUsd),
+    source: "polymarket_data_api_closed_positions",
+    timestamp: position.timestamp ?? null,
+  }));
+}
+
 export function buildWalletProfileSummary(input: WalletProfileBuildInput): WalletProfileSummary {
   const closedPositions = input.closedPositions ?? [];
   const resolvedPositions = closedPositions.filter((position) => typeof position.realizedPnlUsd === "number");
@@ -99,11 +139,13 @@ export function buildWalletProfileSummary(input: WalletProfileBuildInput): Walle
     losses: resolvedMarketsCount > 0 ? losses : undefined,
     observedMarketsCount: observedMarketsCount > 0 ? observedMarketsCount : undefined,
     profileAvailable,
+    profile: input.profile ?? null,
     reason: profileAvailable
       ? "Perfil construido desde posiciones publicas cerradas de Polymarket."
       : "No hay historial publico suficiente para calificar esta billetera.",
     resolvedMarketsCount: resolvedMarketsCount > 0 ? resolvedMarketsCount : undefined,
     shortAddress: input.shortAddress,
+    walletAddress: input.walletAddress ?? null,
     volumeObservedUsd: volumeObserved(closedPositions, input.observedCapitalUsd),
     warnings,
     winRate: resolvedMarketsCount > 0 ? winRate : undefined,

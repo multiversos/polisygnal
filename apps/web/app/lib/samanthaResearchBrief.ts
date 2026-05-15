@@ -177,11 +177,16 @@ export function buildSamanthaResearchBrief(input: BuildSamanthaResearchBriefInpu
         bias: input.walletSummary ? normalizeWalletBias(input.walletSummary.signalDirection) : "UNKNOWN",
         largePositionsCount: input.walletSummary?.largePositions?.length,
         largeTradesCount: input.walletSummary?.largeTrades?.length,
+        highlightedProfilesCount: input.walletSummary?.highlightedProfilesCount,
+        historyAvailableCount: input.walletSummary?.historyAvailableCount,
         neutralCapitalUsd: input.walletSummary?.neutralCapitalUsd,
         notableWalletCount: input.walletSummary?.relevantWalletsCount,
         observedActivities: (input.walletSummary?.publicActivities ?? []).slice(0, 10).map((activity) => ({
           action: cleanText(activity.action),
           amountUsd: toNumber(activity.amountUsd),
+          closedMarkets: toNumber(activity.closedMarkets),
+          hasPublicProfile: Boolean(activity.profile),
+          hasWalletHistory: Boolean(activity.marketHistory?.length || activity.historySummary),
           outcome: cleanText(activity.outcome),
           price: toNumber(activity.price),
           shortAddress: cleanText(activity.shortAddress),
@@ -189,6 +194,12 @@ export function buildSamanthaResearchBrief(input: BuildSamanthaResearchBriefInpu
           source: cleanText(activity.source),
           tokenId: cleanText(activity.tokenId),
           type: cleanText(activity.activityType),
+          winRate:
+            typeof activity.winRate === "number" &&
+            typeof activity.closedMarkets === "number" &&
+            activity.closedMarkets >= 50
+              ? activity.winRate
+              : undefined,
         })),
         observedCapitalUsd: input.walletSummary?.analyzedCapitalUsd,
         noCapitalUsd: input.walletSummary?.noCapitalUsd,

@@ -22,6 +22,45 @@ export type WalletIntelligenceQueryStatus =
 
 export type PublicWalletActivityType = "notable_wallet" | "position" | "trade" | "unknown";
 
+export type WalletPublicProfile = {
+  avatarUrl?: string | null;
+  name?: string | null;
+  profileUrl?: string | null;
+  proxyWallet?: string | null;
+  pseudonym?: string | null;
+  verifiedBadge?: boolean | null;
+  xUsername?: string | null;
+};
+
+export type WalletPublicMarketHistoryResult = "lost" | "pending" | "unknown" | "won";
+
+export type WalletPublicMarketHistoryItem = {
+  amountUsd?: number | null;
+  averagePrice?: number | null;
+  conditionId?: string | null;
+  marketSlug?: string | null;
+  marketTitle?: string | null;
+  marketUrl?: string | null;
+  outcome?: string | null;
+  realizedPnl?: number | null;
+  result: WalletPublicMarketHistoryResult;
+  source: string;
+  timestamp?: string | null;
+};
+
+export type WalletPublicHistorySummary = {
+  closedMarkets?: number | null;
+  lastActivityAt?: string | null;
+  losses?: number | null;
+  marketsParticipated?: number | null;
+  realizedPnl?: number | null;
+  source: string;
+  unrealizedPnl?: number | null;
+  volumeObservedUsd?: number | null;
+  winRate?: number | null;
+  wins?: number | null;
+};
+
 export type WalletMarketPosition = {
   averageEntryPrice?: number;
   currentValueUsd?: number;
@@ -47,6 +86,10 @@ export type PublicWalletActivity = {
   losses?: number | null;
   marketsObserved?: number | null;
   marketId?: string | null;
+  profile?: WalletPublicProfile | null;
+  highlightedProfile?: boolean;
+  historySummary?: WalletPublicHistorySummary | null;
+  marketHistory?: WalletPublicMarketHistoryItem[];
   outcome?: string | null;
   positionSize?: number | null;
   price?: number | null;
@@ -89,9 +132,11 @@ export type WalletProfileSummary = {
   losses?: number;
   observedMarketsCount?: number;
   profileAvailable: boolean;
+  profile?: WalletPublicProfile | null;
   reason: string;
   resolvedMarketsCount?: number;
   shortAddress: string;
+  walletAddress?: string | null;
   volumeObservedUsd?: number;
   warnings: string[];
   winRate?: number;
@@ -110,6 +155,15 @@ export type WalletIntelligenceSummary = {
   notableWallets?: WalletMarketPosition[];
   noCapitalUsd?: number;
   neutralCapitalUsd?: number;
+  expandedAnalysis?: {
+    consistencyWarnings: string[];
+    highlightedProfilesCount: number;
+    historyAvailableCount: number;
+    largeMarket: boolean;
+    profileCount: number;
+  };
+  highlightedProfilesCount?: number;
+  historyAvailableCount?: number;
   profileSummaries?: WalletProfileSummary[];
   publicActivities?: PublicWalletActivity[];
   queryStatus?: WalletIntelligenceQueryStatus;

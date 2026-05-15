@@ -825,6 +825,9 @@ function validateAnalyzeLoadingPanelSource() {
     "Detectando mercado",
     "Cargando datos de Polymarket",
     "Revisando billeteras",
+    "Enriqueciendo perfiles",
+    "Construyendo historial de wallets",
+    "Validando consistencia de capital",
     "${agentName} analizando",
     "Preparando lectura",
   ];
@@ -862,7 +865,10 @@ function validateAnalyzeLoadingPanelSource() {
   assert(walletDetailsSource.includes("Copiar wallet"), "wallet drawer must allow copying public wallet addresses");
   assert(walletDetailsSource.includes("Wallet completa no disponible"), "wallet drawer must not treat short addresses as verifiable full wallets");
   assert(walletDetailsSource.includes("wallet-details-key-grid"), "wallet drawer must show a compact key-data view");
-  assert(walletDetailsSource.includes("<summary>Ver detalles</summary>"), "wallet technical fields must be collapsed by default");
+  assert(walletDetailsSource.includes("<summary>Datos tecnicos</summary>"), "wallet technical fields must be collapsed by default");
+  assert(walletDetailsSource.includes("Historial de esta wallet"), "wallet drawer must expose wallet history without inventing it");
+  assert(walletDetailsSource.includes("Perfil destacado"), "wallet drawer must mark highlighted profiles only when criteria pass");
+  assert(walletDetailsSource.includes("Guardar perfil"), "wallet drawer must allow explicit profile saves for eligible wallets");
   assert(walletDetailsSource.includes("wallet-technical-details"), "wallet drawer must keep technical raw fields collapsed");
   assert(walletDetailsSource.includes("<dt>tokenId</dt>"), "wallet technical details must include tokenId when available");
   assert(walletDetailsSource.includes("<dt>conditionId</dt>"), "wallet technical details must include conditionId when available");

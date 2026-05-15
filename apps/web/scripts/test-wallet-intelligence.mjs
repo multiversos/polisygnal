@@ -24,8 +24,12 @@ assert(walletDetailsSource.includes("Ver perfil en Polymarket"), "wallet drawer 
 assert(walletDetailsSource.includes("Perfil Polymarket no disponible"), "wallet drawer must handle missing profile URLs honestly");
 assert(walletDetailsSource.includes("Copiar wallet"), "wallet drawer must allow copying the public wallet address");
 assert(walletDetailsSource.includes("Wallet completa no disponible"), "wallet drawer must not pretend short addresses are verifiable full wallets");
-assert(walletDetailsSource.includes("<summary>Ver detalles</summary>"), "technical wallet details must be collapsed by default");
-assert(walletDetailsSource.indexOf("wallet-details-key-grid") < walletDetailsSource.indexOf("<summary>Ver detalles</summary>"), "technical details should appear after compact fields");
+assert(walletDetailsSource.includes("Perfil destacado"), "wallet drawer must show highlighted profile badges when criteria pass");
+assert(walletDetailsSource.includes("Guardar perfil"), "wallet drawer must allow eligible profiles to be saved");
+assert(walletDetailsSource.includes("Historial de esta wallet"), "wallet drawer must expose wallet history in a collapsed section");
+assert(walletDetailsSource.includes("Historial no disponible desde la fuente publica actual."), "wallet drawer must not invent unavailable history");
+assert(walletDetailsSource.includes("<summary>Datos tecnicos</summary>"), "technical wallet details must be collapsed by default");
+assert(walletDetailsSource.indexOf("wallet-details-key-grid") < walletDetailsSource.indexOf("<summary>Datos tecnicos</summary>"), "technical details should appear after compact fields");
 assert(walletDetailsSource.includes("<dt>tokenId</dt>"), "expanded details must include tokenId");
 assert(walletDetailsSource.includes("<dt>conditionId</dt>"), "expanded details must include conditionId");
 assert(walletDetailsSource.includes("<dt>marketId</dt>"), "expanded details must include marketId");

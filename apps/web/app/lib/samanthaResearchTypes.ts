@@ -25,6 +25,8 @@ export type SamanthaResearchBrief = {
     walletIntelligence?: {
       available: boolean;
       bias?: SamanthaDirection;
+      highlightedProfilesCount?: number;
+      historyAvailableCount?: number;
       largePositionsCount?: number;
       largeTradesCount?: number;
       neutralCapitalUsd?: number;
@@ -32,6 +34,9 @@ export type SamanthaResearchBrief = {
       observedActivities?: Array<{
         action?: string;
         amountUsd?: number;
+        closedMarkets?: number;
+        hasPublicProfile?: boolean;
+        hasWalletHistory?: boolean;
         outcome?: string;
         price?: number;
         side?: SamanthaDirection;
@@ -39,6 +44,7 @@ export type SamanthaResearchBrief = {
         shortAddress?: string;
         tokenId?: string;
         type?: string;
+        winRate?: number;
       }>;
       observedCapitalUsd?: number;
       noCapitalUsd?: number;

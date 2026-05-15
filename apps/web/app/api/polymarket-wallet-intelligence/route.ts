@@ -6,23 +6,31 @@ import {
   formatWalletAddress,
   getWalletIntelligenceSummary,
 } from "../../lib/walletIntelligence";
-import { buildWalletProfileSummaries, type WalletPublicHistoryPosition } from "../../lib/walletProfiles";
+import {
+  buildWalletMarketHistoryItems,
+  buildWalletProfileSummaries,
+  type WalletPublicHistoryPosition,
+} from "../../lib/walletProfiles";
 import type {
   PublicWalletActivity,
   PublicWalletActivityAction,
   WalletIntelligenceSummary,
   WalletMarketPosition,
+  WalletPublicProfile,
   WalletSide,
 } from "../../lib/walletIntelligenceTypes";
 
 const DATA_API_BASE_URL = "https://data-api.polymarket.com";
 const DATA_API_HOST = "data-api.polymarket.com";
+const GAMMA_API_BASE_URL = "https://gamma-api.polymarket.com";
+const GAMMA_API_HOST = "gamma-api.polymarket.com";
 const REQUEST_TIMEOUT_MS = 6_000;
 const MAX_REQUEST_BYTES = 16_000;
 const MAX_RESPONSE_BYTES = 512_000;
 const MAX_LIMIT = 50;
-const PROFILE_WALLET_LIMIT = 3;
+const PROFILE_WALLET_LIMIT = 5;
 const SAFE_PATHS = new Set(["/trades", "/v1/market-positions", "/closed-positions"]);
+const SAFE_GAMMA_PATHS = new Set(["/public-profile"]);
 const FULL_WALLET_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 
 type WalletRouteInput = {
@@ -61,6 +69,17 @@ type PublicPosition = Record<string, unknown> & {
   tokenId?: string | number | null;
   totalBought?: string | number | null;
   totalPnl?: string | number | null;
+};
+
+type PublicProfile = Record<string, unknown> & {
+  bio?: string | null;
+  displayUsernamePublic?: boolean | null;
+  name?: string | null;
+  profileImage?: string | null;
+  proxyWallet?: string | null;
+  pseudonym?: string | null;
+  username?: string | null;
+  xUsername?: string | null;
 };
 
 type InternalWalletPosition = {
@@ -259,8 +278,62 @@ function buildDataApiUrl(path: string, params: Record<string, string>): URL | nu
   return url;
 }
 
+function buildGammaApiUrl(path: string, params: Record<string, string>): URL | null {
+  if (!SAFE_GAMMA_PATHS.has(path)) {
+    return null;
+  }
+  const url = new URL(`${GAMMA_API_BASE_URL}${path}`);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.hostname !== GAMMA_API_HOST ||
+    url.username ||
+    url.password ||
+    url.port
+  ) {
+    return null;
+  }
+  return url;
+}
+
 async function fetchDataApiJson(path: string, params: Record<string, string>): Promise<unknown | null> {
   const url = buildDataApiUrl(path, params);
+  if (!url) {
+    return null;
+  }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      credentials: "omit",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "PolySignal Wallet Intelligence",
+      },
+      method: "GET",
+      redirect: "error",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const text = await response.text();
+    if (text.length > MAX_RESPONSE_BYTES) {
+      return null;
+    }
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function fetchGammaApiJson(path: string, params: Record<string, string>): Promise<unknown | null> {
+  const url = buildGammaApiUrl(path, params);
   if (!url) {
     return null;
   }
@@ -508,50 +581,171 @@ function neutralCapitalFor(items: WalletMarketPosition[]): number {
   return capitalFor(items.filter((item) => item.side !== "YES" && item.side !== "NO"));
 }
 
-async function loadClosedPositionsForProfiles(wallets: InternalWalletActivity[]): Promise<WalletIntelligenceSummary["profileSummaries"]> {
+function safePublicImageUrl(value: unknown): string | null {
+  const raw = cleanPublicString(value, 600);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.username || url.password) {
+      return null;
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function profileUrlForWallet(wallet: string): string {
+  return `https://polymarket.com/profile/${wallet}`;
+}
+
+function publicProfileFromPayload(payload: unknown, wallet: string): WalletPublicProfile | null {
+  const candidates = parseList(payload);
+  const record = (candidates[0] || (payload && typeof payload === "object" ? payload : null)) as PublicProfile | null;
+  if (!record) {
+    return null;
+  }
+  const pseudonym = firstPublicString(record, ["pseudonym", "username", "displayUsername", "displayName", "name"], 80);
+  const name = firstPublicString(record, ["name"], 80);
+  const xUsername = firstPublicString(record, ["xUsername", "twitterUsername", "twitter"], 80);
+  const proxyWallet = cleanPublicString(record.proxyWallet, 80);
+  return {
+    avatarUrl: safePublicImageUrl(record.profileImage ?? record.avatar ?? record.image),
+    name,
+    profileUrl: profileUrlForWallet(wallet),
+    proxyWallet: proxyWallet && FULL_WALLET_PATTERN.test(proxyWallet) ? proxyWallet : null,
+    pseudonym,
+    verifiedBadge: typeof record.verified === "boolean" ? record.verified : null,
+    xUsername,
+  };
+}
+
+function resultFieldsForClosedPosition(position: Record<string, unknown>): WalletPublicHistoryPosition {
+  return {
+    averagePrice: firstNumber(position, ["avgPrice", "averagePrice", "price"]),
+    conditionId: cleanIdentifier(position.conditionId ?? position.condition_id),
+    marketSlug: cleanIdentifier(position.marketSlug ?? position.market_slug ?? position.slug),
+    marketTitle: firstPublicString(position, ["title", "marketTitle", "question"], 160) ?? undefined,
+    marketUrl: cleanPublicString(position.marketUrl ?? position.url, 260) ?? undefined,
+    outcome: firstPublicString(position, ["outcome", "side"], 80) ?? undefined,
+    realizedPnlUsd: normalizeNumber(position.realizedPnl ?? position.realized_pnl ?? position.cashPnl),
+    side: firstPublicString(position, ["outcome", "side"], 80) ?? undefined,
+    timestamp: cleanPublicString(position.timestamp ?? position.updatedAt ?? position.createdAt, 80) ?? undefined,
+    volumeUsd: firstNumber(position, ["totalBought", "currentValue", "value", "volume", "amount"]),
+  };
+}
+
+async function loadClosedPositionsForProfiles(wallets: InternalWalletActivity[]): Promise<{
+  activities: PublicWalletActivity[];
+  profileSummaries: WalletIntelligenceSummary["profileSummaries"];
+}> {
   const uniqueWallets = [...new Map(wallets.map((wallet) => [wallet.fullWallet, wallet])).values()].slice(0, PROFILE_WALLET_LIMIT);
   const profileInputs = await Promise.all(
     uniqueWallets.map(async (wallet) => {
-      const payload = await fetchDataApiJson("/closed-positions", {
-        limit: "50",
-        offset: "0",
-        user: wallet.fullWallet,
-      });
-      const closedPositions: WalletPublicHistoryPosition[] = parseList(payload).map((position) => ({
-        conditionId: cleanIdentifier(position.conditionId ?? position.condition_id),
-        marketTitle: typeof position.title === "string" ? position.title.slice(0, 140) : undefined,
-        realizedPnlUsd: normalizeNumber(position.realizedPnl ?? position.realized_pnl ?? position.cashPnl),
-        side: typeof position.outcome === "string" ? position.outcome : undefined,
-        volumeUsd: normalizeNumber(position.totalBought ?? position.currentValue),
-      }));
+      const [payload, profilePayload] = await Promise.all([
+        fetchDataApiJson("/closed-positions", {
+          limit: "50",
+          offset: "0",
+          user: wallet.fullWallet,
+        }),
+        fetchGammaApiJson("/public-profile", {
+          address: wallet.fullWallet,
+        }),
+      ]);
+      const closedPositions = parseList(payload).map(resultFieldsForClosedPosition);
+      const profile = publicProfileFromPayload(profilePayload, wallet.fullWallet);
       return {
         closedPositions,
         currentSide: wallet.publicPosition.side,
         observedCapitalUsd: wallet.publicPosition.amountUsd,
+        profile,
         shortAddress: wallet.publicPosition.shortAddress,
+        walletAddress: wallet.fullWallet,
       };
     }),
   );
-  return buildWalletProfileSummaries(profileInputs);
+  const profileSummaries = buildWalletProfileSummaries(profileInputs);
+  const summaryByShort = new Map(profileSummaries.map((profile) => [profile.shortAddress, profile]));
+  const activities = uniqueWallets.map((wallet, index) => {
+    const profile = summaryByShort.get(wallet.publicPosition.shortAddress);
+    const marketHistory = buildWalletMarketHistoryItems(profileInputs[index]?.closedPositions ?? []);
+    const realizedPnlValues = marketHistory
+      .map((item) => item.realizedPnl)
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+    const realizedPnlTotal = realizedPnlValues.reduce((sum, value) => sum + value, 0);
+    const highlightedProfile = Boolean(
+      typeof profile?.winRate === "number" &&
+        profile.winRate >= 0.8 &&
+        (profile.resolvedMarketsCount ?? 0) >= 50 &&
+        (realizedPnlValues.length > 0 || (profile.volumeObservedUsd ?? wallet.publicPosition.amountUsd ?? 0) >= 100),
+    );
+    return {
+      action: "unknown" as const,
+      activityType: "notable_wallet" as const,
+      amountUsd: wallet.publicPosition.amountUsd ?? null,
+      closedMarkets: profile?.resolvedMarketsCount ?? null,
+      id: `profile-${wallet.publicPosition.shortAddress}`,
+      highlightedProfile,
+      limitations: [
+        "Perfil enriquecido con datos publicos cuando la fuente los entrega.",
+        "No convierte historial pasado en recomendacion ni prediccion garantizada.",
+      ],
+      losses: profile?.losses ?? null,
+      marketHistory,
+      outcome: wallet.publicPosition.side === "YES" || wallet.publicPosition.side === "NO" ? wallet.publicPosition.side : null,
+      profile: profile?.profile ?? null,
+      historySummary: {
+        closedMarkets: profile?.resolvedMarketsCount ?? null,
+        lastActivityAt: marketHistory.find((item) => item.timestamp)?.timestamp ?? null,
+        losses: profile?.losses ?? null,
+        marketsParticipated: profile?.observedMarketsCount ?? null,
+        realizedPnl: realizedPnlValues.length > 0 ? realizedPnlTotal : null,
+        source: "polymarket_data_api_closed_positions",
+        volumeObservedUsd: profile?.volumeObservedUsd ?? null,
+        winRate: profile?.winRate ?? null,
+        wins: profile?.wins ?? null,
+      },
+      price: wallet.publicActivity.price ?? null,
+      shortAddress: wallet.publicPosition.shortAddress,
+      side: wallet.publicPosition.side === "YES" || wallet.publicPosition.side === "NO" ? wallet.publicPosition.side : "UNKNOWN",
+      source: "polymarket_data_api",
+      walletAddress: wallet.fullWallet,
+      warnings: profile?.warnings ?? [
+        "No hay historial publico suficiente para calificar esta billetera.",
+      ],
+      winRate: profile?.winRate ?? null,
+      wins: profile?.wins ?? null,
+    } satisfies PublicWalletActivity;
+  });
+  return { activities, profileSummaries };
 }
 
 function mergeProfileDetails(
   activities: PublicWalletActivity[],
   profileSummaries: WalletIntelligenceSummary["profileSummaries"],
+  profileActivities: PublicWalletActivity[] = [],
 ): PublicWalletActivity[] {
   if (!Array.isArray(profileSummaries) || profileSummaries.length === 0) {
     return activities;
   }
   const byShort = new Map(profileSummaries.map((profile) => [profile.shortAddress, profile]));
+  const activityByShort = new Map(profileActivities.map((activity) => [activity.shortAddress, activity]));
   return activities.map((activity) => {
     const profile = activity.shortAddress ? byShort.get(activity.shortAddress) : undefined;
+    const profileActivity = activity.shortAddress ? activityByShort.get(activity.shortAddress) : undefined;
     if (!profile) {
       return activity;
     }
     return {
       ...activity,
       closedMarkets: profile.resolvedMarketsCount ?? null,
+      highlightedProfile: profileActivity?.highlightedProfile ?? false,
+      historySummary: profileActivity?.historySummary ?? activity.historySummary ?? null,
       losses: profile.losses ?? null,
+      marketHistory: profileActivity?.marketHistory ?? activity.marketHistory,
+      profile: profile.profile ?? activity.profile ?? null,
       warnings: [...activity.warnings, ...profile.warnings],
       winRate:
         typeof profile.winRate === "number" &&
@@ -651,14 +845,21 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const bias = calculateWalletSideBias(relevant, thresholdUsd);
-  const profileSummaries = await loadClosedPositionsForProfiles(relevantActivities);
+  const profileDetails = await loadClosedPositionsForProfiles(relevantActivities);
+  const profileSummaries = profileDetails.profileSummaries;
   const availableProfiles = (profileSummaries ?? []).filter((profile) => profile.profileAvailable).length;
   const publicActivities = mergeProfileDetails(
     relevantActivities.map((item) => item.publicActivity),
     profileSummaries,
+    profileDetails.activities,
   );
+  const enrichedPublicActivities = [...publicActivities, ...profileDetails.activities].slice(0, MAX_LIMIT);
   const observedCapitalUsd = capitalFor(relevant);
   const neutralCapitalUsd = neutralCapitalFor(relevant);
+  const highlightedProfilesCount = enrichedPublicActivities.filter((activity) => activity.highlightedProfile).length;
+  const historyAvailableCount = enrichedPublicActivities.filter(
+    (activity) => (activity.marketHistory?.length ?? 0) > 0 || typeof activity.closedMarkets === "number",
+  ).length;
 
   const summary: WalletIntelligenceSummary = {
     analyzedCapitalUsd: observedCapitalUsd,
@@ -671,8 +872,17 @@ export async function POST(request: Request): Promise<Response> {
     noCapitalUsd: bias.noCapitalUsd,
     neutralCapitalUsd,
     notableWallets: relevant.slice(0, 5),
+    highlightedProfilesCount,
+    historyAvailableCount,
+    expandedAnalysis: {
+      consistencyWarnings: [],
+      highlightedProfilesCount,
+      historyAvailableCount,
+      largeMarket: false,
+      profileCount: availableProfiles,
+    },
     profileSummaries,
-    publicActivities,
+    publicActivities: enrichedPublicActivities,
     queryStatus: "found",
     reason:
       "Actividad publica de billeteras detectada para este mercado desde Polymarket Data API. Es una senal auxiliar, no una decision final.",

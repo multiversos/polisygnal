@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type {
   PublicWalletActivity,
@@ -12,6 +12,14 @@ import {
   buildPolymarketWalletProfileUrl,
   isPolymarketWalletAddress,
 } from "../lib/polymarketWalletProfile";
+import {
+  buildHighlightedProfileFromActivity,
+  getHighlightedProfiles,
+  HIGHLIGHTED_PROFILES_STORAGE_EVENT,
+  isHighlightedWalletActivityCandidate,
+  saveHighlightedProfile,
+  type HighlightedProfileSourceContext,
+} from "../lib/highlightedProfiles";
 
 type WalletDetailsFilter =
   | "all"
@@ -34,6 +42,9 @@ type WalletIntelligenceDetailsProps = {
   onRetry?: () => void;
   open: boolean;
   summary?: WalletIntelligenceSummary | null;
+  sourceMarketSlug?: string | null;
+  sourceMarketTitle?: string | null;
+  sourceMarketUrl?: string | null;
 };
 
 function formatUsd(value: unknown): string {
@@ -68,6 +79,14 @@ function formatWalletDisplay(activity: PublicWalletActivity): string {
     return activity.walletAddress;
   }
   return activity.shortAddress || "Wallet no disponible";
+}
+
+function profileDisplayName(activity: PublicWalletActivity): string {
+  return activity.profile?.pseudonym || activity.profile?.name || activity.shortAddress || "Wallet publica";
+}
+
+function profileAvatarLetter(activity: PublicWalletActivity): string {
+  return profileDisplayName(activity).slice(0, 1).toUpperCase() || "W";
 }
 
 function getFullWalletAddress(activity: PublicWalletActivity): string | null {
@@ -167,11 +186,11 @@ function searchText(activity: PublicWalletActivity): string {
   return [
     activity.walletAddress,
     activity.shortAddress,
-    activity.tokenId,
-    activity.transactionHash,
-    activity.conditionId,
-    activity.marketId,
+    activity.profile?.pseudonym,
+    activity.profile?.name,
+    activity.profile?.xUsername,
     activity.outcome,
+    ...(activity.marketHistory ?? []).map((item) => item.marketTitle || item.marketSlug || item.outcome || ""),
   ].filter(Boolean).join(" ").toLowerCase();
 }
 
@@ -315,6 +334,9 @@ function activityCompleteness(activity: PublicWalletActivity): number {
     activity.conditionId,
     activity.transactionHash,
     activity.timestamp,
+    activity.profile,
+    activity.marketHistory?.length,
+    activity.highlightedProfile,
     typeof activity.realizedPnl === "number" || typeof activity.unrealizedPnl === "number",
     typeof activity.winRate === "number",
   ].filter(Boolean).length;
@@ -350,12 +372,23 @@ export function WalletIntelligenceDetails({
   onRetry,
   open,
   summary,
+  sourceMarketSlug,
+  sourceMarketTitle,
+  sourceMarketUrl,
 }: WalletIntelligenceDetailsProps) {
   const [copiedActivityId, setCopiedActivityId] = useState<string | null>(null);
   const [filter, setFilter] = useState<WalletDetailsFilter>("all");
   const [query, setQuery] = useState("");
+  const [savedProfileIds, setSavedProfileIds] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<WalletDetailsSort>("amount");
   const activities = useMemo(() => mergeActivities(summary), [summary]);
+  const profileSourceContext = useMemo<HighlightedProfileSourceContext>(() => ({
+    observedCapitalUsd: summary?.analyzedCapitalUsd ?? null,
+    source: sourceLabel(summary),
+    sourceMarketSlug: sourceMarketSlug ?? null,
+    sourceMarketTitle: sourceMarketTitle ?? null,
+    sourceMarketUrl: sourceMarketUrl ?? null,
+  }), [sourceMarketSlug, sourceMarketTitle, sourceMarketUrl, summary]);
   const threshold = summary?.thresholdUsd ?? 100;
   const overThresholdTradeCount = activities.filter(
     (activity) =>
@@ -374,11 +407,15 @@ export function WalletIntelligenceDetails({
   ).length;
   const historyCount = activities.filter(
     (activity) =>
+      (activity.marketHistory?.length ?? 0) > 0 ||
       typeof activity.winRate === "number" ||
       typeof activity.closedMarkets === "number" ||
       typeof activity.wins === "number" ||
       typeof activity.losses === "number",
   ).length;
+  const highlightedCount = activities.filter((activity) => activity.highlightedProfile).length ||
+    summary?.highlightedProfilesCount ||
+    0;
   const outcomeFilters = useMemo(
     () =>
       [...new Set(activities.map((activity) => sideOrOutcomeLabel(activity)).filter((label) => label && label !== "unknown"))]
@@ -401,6 +438,24 @@ export function WalletIntelligenceDetails({
   const hasBelowThreshold = activities.some(
     (activity) => typeof activity.amountUsd === "number" && activity.amountUsd < threshold,
   );
+
+  useEffect(() => {
+    const syncProfiles = () => {
+      setSavedProfileIds(new Set(getHighlightedProfiles().map((profile) => profile.id)));
+    };
+    syncProfiles();
+    window.addEventListener(HIGHLIGHTED_PROFILES_STORAGE_EVENT, syncProfiles);
+    return () => window.removeEventListener(HIGHLIGHTED_PROFILES_STORAGE_EVENT, syncProfiles);
+  }, [open]);
+
+  const saveProfile = (activity: PublicWalletActivity) => {
+    const profile = buildHighlightedProfileFromActivity(activity, profileSourceContext);
+    if (!profile) {
+      return;
+    }
+    const saved = saveHighlightedProfile(profile);
+    setSavedProfileIds((current) => new Set(current).add(saved.id));
+  };
   const copyWallet = async (activity: PublicWalletActivity) => {
     const wallet = activity.walletAddress;
     if (!wallet) {
@@ -463,6 +518,10 @@ export function WalletIntelligenceDetails({
           <div>
             <span>Con historial</span>
             <strong>{historyCount > 0 ? historyCount : "No disponible"}</strong>
+          </div>
+          <div>
+            <span>Perfiles destacados</span>
+            <strong>{highlightedCount > 0 ? highlightedCount : "No disponible"}</strong>
           </div>
           <div>
             <span>Capital observado</span>
@@ -537,7 +596,7 @@ export function WalletIntelligenceDetails({
         <div className="wallet-details-search">
           <input
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar wallet, tokenId o transaction hash"
+            placeholder="Buscar wallet, perfil, outcome o mercado"
             type="search"
             value={query}
           />
@@ -560,15 +619,29 @@ export function WalletIntelligenceDetails({
           <div className="wallet-details-list" role="list">
             {filteredActivities.map((activity) => {
               const fullWalletAddress = getFullWalletAddress(activity);
-              const profileUrl = buildPolymarketWalletProfileUrl(fullWalletAddress);
+              const profileUrl = activity.profile?.profileUrl || buildPolymarketWalletProfileUrl(fullWalletAddress);
+              const profileId = fullWalletAddress?.toLowerCase() ?? "";
+              const isSavedProfile = Boolean(profileId && savedProfileIds.has(profileId));
+              const isHighlightedProfile =
+                activity.highlightedProfile || isHighlightedWalletActivityCandidate(activity, profileSourceContext);
               return (
               <article className="wallet-details-card" key={activity.id} role="listitem">
                 <div className="wallet-details-card-heading">
-                  <div>
-                    <span>{activity.shortAddress || "wallet publica"}</span>
-                    <strong>{formatWalletDisplay(activity)}</strong>
+                  <div className="wallet-profile-heading">
+                    <span className="wallet-profile-avatar" aria-hidden="true">
+                      {activity.profile?.avatarUrl ? (
+                        <img alt="" src={activity.profile.avatarUrl} />
+                      ) : (
+                        profileAvatarLetter(activity)
+                      )}
+                    </span>
+                    <span>
+                      <span>{profileDisplayName(activity)}</span>
+                      <strong>{formatWalletDisplay(activity)}</strong>
+                    </span>
                   </div>
                   <div className="wallet-card-badges">
+                    {isHighlightedProfile ? <span className="wallet-featured-pill">Perfil destacado</span> : null}
                     <span className="wallet-type-pill">{activityTypeBadge(activity)}</span>
                     <span className={`wallet-side-pill ${activity.side.toLowerCase()}`}>{sideOrOutcomeLabel(activity)}</span>
                   </div>
@@ -592,6 +665,15 @@ export function WalletIntelligenceDetails({
                         ? "Copiar wallet"
                         : "Wallet completa no disponible"}
                   </button>
+                  {isHighlightedProfile ? (
+                    <button
+                      disabled={isSavedProfile}
+                      onClick={() => saveProfile(activity)}
+                      type="button"
+                    >
+                      {isSavedProfile ? "Guardado en Perfiles" : "Guardar perfil"}
+                    </button>
+                  ) : null}
                 </div>
                 <p className="wallet-verification-copy">
                   {profileUrl
@@ -614,9 +696,48 @@ export function WalletIntelligenceDetails({
                   <div><span>Wins/Losses</span><strong>{activity.wins ?? "No disponible"} / {activity.losses ?? "No disponible"}</strong></div>
                   <div><span>Fecha</span><strong>{formatDateTime(activity.timestamp)}</strong></div>
                 </div>
+                <details className="wallet-history-details">
+                  <summary>Historial de esta wallet</summary>
+                  {activity.historySummary || (activity.marketHistory?.length ?? 0) > 0 ? (
+                    <>
+                      <div className="wallet-history-summary">
+                        <div><span>Mercados participados</span><strong>{formatNumber(activity.historySummary?.marketsParticipated)}</strong></div>
+                        <div><span>Mercados cerrados</span><strong>{formatNumber(activity.closedMarkets ?? activity.historySummary?.closedMarkets)}</strong></div>
+                        <div><span>Wins/Losses</span><strong>{activity.wins ?? activity.historySummary?.wins ?? "No disponible"} / {activity.losses ?? activity.historySummary?.losses ?? "No disponible"}</strong></div>
+                        <div><span>Win rate real</span><strong>{formatPercent(activity.winRate ?? activity.historySummary?.winRate)}</strong></div>
+                        <div><span>Realized PnL real</span><strong>{formatUsd(activity.realizedPnl ?? activity.historySummary?.realizedPnl)}</strong></div>
+                        <div><span>Unrealized PnL real</span><strong>{formatUsd(activity.unrealizedPnl ?? activity.historySummary?.unrealizedPnl)}</strong></div>
+                        <div><span>Volumen/capital observado</span><strong>{formatUsd(activity.historySummary?.volumeObservedUsd ?? activity.amountUsd)}</strong></div>
+                        <div><span>Ultima actividad</span><strong>{formatDateTime(activity.historySummary?.lastActivityAt ?? activity.timestamp)}</strong></div>
+                      </div>
+                      {(activity.marketHistory?.length ?? 0) > 0 ? (
+                        <div className="wallet-history-list">
+                          {activity.marketHistory!.slice(0, 8).map((history, index) => (
+                            <div className="wallet-history-row" key={`${history.conditionId || history.marketTitle || "market"}-${index}`}>
+                              <strong>{history.marketTitle || history.marketSlug || "Mercado no disponible"}</strong>
+                              <span>{history.outcome || "Outcome no disponible"} · {history.result}</span>
+                              <small>
+                                {formatUsd(history.amountUsd)} · precio {formatNumber(history.averagePrice)} · PnL {formatUsd(history.realizedPnl)} · {formatDateTime(history.timestamp)}
+                              </small>
+                              {history.marketUrl ? (
+                                <a href={history.marketUrl} rel="noopener noreferrer" target="_blank">
+                                  Ver mercado
+                                </a>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p>La fuente entrega conteos publicos, pero no una lista de mercados para esta wallet.</p>
+                      )}
+                    </>
+                  ) : (
+                    <p>Historial no disponible desde la fuente publica actual.</p>
+                  )}
+                </details>
                 {hasTechnicalDetails(activity) ? (
                   <details className="wallet-technical-details">
-                    <summary>Ver detalles</summary>
+                    <summary>Datos tecnicos</summary>
                     <dl>
                       <div><dt>tokenId</dt><dd>{detailValue(activity.tokenId)}</dd></div>
                       <div><dt>conditionId</dt><dd>{detailValue(activity.conditionId)}</dd></div>

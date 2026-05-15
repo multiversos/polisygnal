@@ -36,6 +36,7 @@ Use these checks after a production deploy. Correct domains:
    - Inicio
    - Analizar enlace
    - Historial
+   - Perfiles
    - Rendimiento
    - Alertas
    - Metodologia
@@ -403,10 +404,20 @@ If this test fails, stop feature work and treat it as a production regression.
    wallet, type, outcome/position, amount, price, shares/contracts, position,
    real PnL/win rate only if present, closed markets and wins/losses if present.
    `tokenId`, `conditionId`, `marketId`, transaction hash, warnings,
-   limitations and raw useful fields must stay inside collapsed `Ver detalles`.
+   limitations and raw useful fields must stay inside collapsed `Datos tecnicos`.
 45f. Confirm `Ver perfil en Polymarket` appears only for valid full public
    wallet addresses. If no verified profile URL can be built, confirm the card
    says `Perfil Polymarket no disponible` and offers `Copiar wallet`.
+45g. Confirm `Historial de esta wallet` is collapsed by default. It may show
+   closed markets, wins/losses, real win rate, real PnL and market rows only if
+   the public source delivered them. Otherwise it says history is unavailable.
+45h. Confirm eligible wallets show `Perfil destacado` only when winRate is real,
+   closedMarkets is at least 50, and either real PnL or observed capital is
+   available. No 1/1 or 2/2 profile should be saved as highlighted.
+45i. Open `/profiles` after analyzing a market with eligible wallets. Confirm
+   it loads, says localStorage v1, shows saved public profiles, links to
+   Polymarket profiles, allows removing a saved profile, and warns that history
+   is not copy-trading or a guarantee.
 45a. In the progress panel, confirm `Cargando datos de Polymarket` shows an
    honest badge such as `Datos cargados`, `Datos basicos`, `Datos limitados`,
    `Fuente no disponible`, or `No respondio`, plus a `Ver datos` or

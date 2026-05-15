@@ -83,12 +83,26 @@ Estado visible verificado:
   tipo de actividad, outcome/posicion, monto, precio, shares/contratos,
   posicion, PnL/win rate solo si vienen reales, mercados cerrados y wins/losses
   cuando existen. `tokenId`, `conditionId`, `marketId`, hash de transaccion,
-  warnings, limitations y raw fields utiles quedan en `Ver detalles`, cerrado
-  por defecto.
+  warnings, limitations y raw fields utiles quedan en `Datos tecnicos`, cerrado
+  por defecto. El drawer tambien muestra `Historial de esta wallet` cuando la
+  fuente publica entrega mercados cerrados, PnL o conteos reales; si no, dice
+  `Historial no disponible desde la fuente publica actual`.
 - Las wallets con direccion `0x...` valida pueden abrir el perfil publico de
   Polymarket con `/profile/{wallet}`. Si solo hay short address o la direccion
   no valida el patron publico, la UI muestra `Perfil Polymarket no disponible`
   y permite copiar la direccion visible sin inventar enlaces.
+- `/profiles` esta disponible como seccion local `Perfiles`. Guarda en
+  localStorage v1 wallets publicas destacadas detectadas por Wallet
+  Intelligence. La regla inicial exige `winRate >= 80%`, `closedMarkets >= 50`
+  y PnL real disponible o capital observado relevante (`observedCapitalUsd >=
+  100`). No guarda perfiles 1/1, 2/2, sin win rate real ni sin datos publicos
+  verificables. Persistencia multi-dispositivo requiere backend/DB futuro; no
+  se toco Neon ni se creo migracion.
+- En mercados grandes, `/analyze` puede mostrar fases opcionales reales en el
+  progreso: `Enriqueciendo perfiles`, `Construyendo historial de wallets` y
+  `Validando consistencia de capital`. Se activan por datos reales de volumen,
+  liquidez o capital observado alto, y muestran warnings si la fuente devuelve
+  pocas wallets para un mercado grande.
 - `/history` conserva metadatos seguros del agente cuando se guarda una lectura:
   `agentName`, `agentStatus`, resumen, senales, riesgos, limitaciones, fuentes
   usadas, outcomes principales y resumen compacto de Wallet Intelligence. Una
