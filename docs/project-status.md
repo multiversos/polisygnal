@@ -47,6 +47,15 @@ Checkpoint Copy Trading:
 - Montos soportados: `$1`, `$5`, `$10`, `$20` y `Personalizado`.
 - Modo real queda preparado pero bloqueado con `real_trading_not_configured`; no firma ni envia ordenes.
 - Migracion preparada: `apps/api/alembic/versions/0018_copy_trading_wallets.py`. No aplicar contra produccion sin autorizacion explicita.
+- Incidente operativo documentado: la UI de Copy Trading ya incluia
+  `Auto-refresh`, `Ultima actualizacion`, `Refrescar ahora` y `Ventana de copia`,
+  pero produccion sirvio un deployment desfasado. Ademas, un deploy manual dejo
+  `/api/build-info` con `commit: null`, lo que confundio la validacion de
+  `smoke:production`.
+- Regla operativa nueva: preferir deploy automatico por push a `main`; despues
+  de cada merge verificar `Vercel READY`, `/api/build-info` con el commit
+  esperado, la UI afectada visible en produccion y `smoke:production` en verde
+  antes de asumir un bug de codigo.
 
 Estado visible verificado:
 

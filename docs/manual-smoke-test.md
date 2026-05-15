@@ -26,8 +26,20 @@ Use these checks after a production deploy. Correct domains:
 1. Open `https://polisygnal-web.vercel.app/api/build-info`.
 2. Confirm it returns `app: polisygnal-web`, `proxy: enabled`, and
    `api_host: polisygnal.onrender.com`.
-3. If the page looks stale, compare `commit` with the latest Vercel production
-   deployment, then hard refresh with `Ctrl+F5` or open an incognito window.
+3. Prefer automatic production deploys from pushes to `main`.
+4. Avoid manual deploys when they can leave `/api/build-info` with `commit:
+   null`, because that makes production verification and `smoke:production`
+   ambiguous.
+5. After every merge to `main`, confirm all of the following in order:
+   - Vercel production is `READY`.
+   - `/api/build-info` returns the expected `commit`.
+   - If the change touched Copy Trading, `/copy-trading` visibly reflects that
+     commit.
+   - `npm.cmd --workspace apps/web run smoke:production` passes.
+6. If production looks stale, first compare `/api/build-info` with the active
+   Vercel production deployment before assuming the code is missing.
+7. If the page still looks stale after the commit matches production, then hard
+   refresh with `Ctrl+F5` or open an incognito window.
 
 ## Public Navigation
 
@@ -831,13 +843,28 @@ secretos.
 1. Open `https://polisygnal-web.vercel.app/copy-trading`.
 2. Confirm the sidebar contains `Copiar Wallets`.
 3. Confirm the page shows `Demo activo` and `Real no conectado`.
-4. Confirm the add form has `Input wallet/perfil`, optional alias, and amount choices `$1`, `$5`, `$10`, `$20`, `Personalizado`.
-5. Select `Personalizado` and confirm `Monto personalizado USD` appears and rejects zero/negative values.
-6. Confirm the empty states for wallets, trades, demo orders, and events are calm and do not expose stack traces or raw payloads.
-7. Confirm real mode copy says it is blocked until credentials are configured and does not ask for private keys, seed phrases, or API secrets.
-8. Add a safe public `0x...` wallet only in a non-production test environment unless the backend is explicitly ready.
-9. Run `Ejecutar demo tick` and confirm the result summarizes scanned wallets, new trades, simulated orders, skipped orders, and errors without promising profit.
-10. Confirm no text recommends copying a trader, guarantees outcomes, or presents wallet activity as financial advice.
+4. Confirm the page also shows `Auto-refresh`, `Ultima actualizacion`, and
+   `Refrescar ahora`.
+5. Confirm the add form has `Input wallet/perfil`, optional alias, and amount
+   choices `$1`, `$5`, `$10`, `$20`, `Personalizado`.
+6. Confirm the form shows `Ventana de copia` with:
+   - `10 segundos`
+   - `30 segundos`
+   - `60 segundos`
+   - `5 minutos`
+7. Select `Personalizado` and confirm `Monto personalizado USD` appears and
+   rejects zero/negative values.
+8. Confirm the empty states for wallets, trades, demo orders, and events are
+   calm and do not expose stack traces or raw payloads.
+9. Confirm real mode copy says it is blocked until credentials are configured
+   and does not ask for private keys, seed phrases, or API secrets.
+10. Add a safe public `0x...` wallet only in a non-production test environment
+    unless the backend is explicitly ready.
+11. Run `Ejecutar demo tick` and confirm the result shows a visible human
+    summary such as no trades, historical trades, or simulated trades, without
+    promising profit.
+12. Confirm no text recommends copying a trader, guarantees outcomes, or
+    presents wallet activity as financial advice.
 
 ## Cache Troubleshooting
 
