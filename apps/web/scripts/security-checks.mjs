@@ -2450,7 +2450,7 @@ async function validateBackendProxy() {
       "expected internal proxy diagnostic header for upstream timeout",
     );
 
-    const blockedPost = await route.POST(
+    const blockedMarketsPost = await route.POST(
       new Request("https://example.test/api/backend/markets/overview", {
         body: JSON.stringify({ unsafe: true }),
         headers: { "content-type": "application/json" },
@@ -2458,13 +2458,62 @@ async function validateBackendProxy() {
       }),
       { params: Promise.resolve({ path: ["markets", "overview"] }) },
     );
-    assert(blockedPost.status === 404, `expected non-allowlisted POST to be blocked, got ${blockedPost.status}`);
+    assert(
+      blockedMarketsPost.status === 404,
+      `expected non-allowlisted POST to be blocked, got ${blockedMarketsPost.status}`,
+    );
+
+    globalThis.fetch = async (url, init) => {
+      calls.push({ init, url: String(url) });
+      return new Response(
+        JSON.stringify({ id: "wallet-1", proxy_wallet: "0x1111111111111111111111111111111111111111" }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 201,
+        },
+      );
+    };
+    const copyWalletPost = await route.POST(
+      new Request("https://example.test/api/backend/copy-trading/wallets", {
+        body: JSON.stringify({
+          copy_amount_mode: "preset",
+          copy_amount_usd: 5,
+          copy_buys: true,
+          copy_sells: true,
+          mode: "demo",
+          wallet_input: "0x1111111111111111111111111111111111111111",
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      }),
+      { params: Promise.resolve({ path: ["copy-trading", "wallets"] }) },
+    );
+    assert(copyWalletPost.status === 201, `expected copy trading POST proxy to pass, got ${copyWalletPost.status}`);
+    assert(
+      calls.at(-1).url === "https://polisygnal.onrender.com/copy-trading/wallets",
+      `unexpected copy trading POST upstream URL: ${calls.at(-1).url}`,
+    );
+    assert(calls.at(-1).init.method === "POST", "expected copy trading proxy to preserve POST method");
+    assert(!JSON.stringify(calls.at(-1).init.headers).includes("Authorization"), "copy trading proxy forwarded auth headers");
+
+    const blockedUnexpectedPost = await route.POST(
+      new Request("https://example.test/api/backend/admin/secrets", {
+        body: JSON.stringify({ test: true }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      }),
+      { params: Promise.resolve({ path: ["admin", "secrets"] }) },
+    );
+    assert(
+      blockedUnexpectedPost.status === 404,
+      `expected unexpected POST path to be blocked, got ${blockedUnexpectedPost.status}`,
+    );
     assert(route.PUT().status === 405, "expected PUT to be rejected");
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  return { proxy_checks: 8 };
+  return { proxy_checks: 10 };
 }
 
 function validateAnalyzerFirstProductSource() {
