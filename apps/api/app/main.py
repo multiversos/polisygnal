@@ -7,6 +7,7 @@ from app.api.routes import router
 from app.api.routes_backtesting import router as backtesting_router
 from app.api.routes_data_health import router as data_health_router
 from app.api.routes_external_signals import router as external_signals_router
+from app.api.routes_highlighted_profiles import router as highlighted_profiles_router
 from app.api.routes_investigation_status import router as investigation_status_router
 from app.api.routes_manual_evidence import router as manual_evidence_router
 from app.api.routes_market_decisions import router as market_decisions_router
@@ -41,6 +42,7 @@ app.include_router(data_health_router)
 app.include_router(research_router)
 app.include_router(research_packets_router)
 app.include_router(external_signals_router)
+app.include_router(highlighted_profiles_router)
 app.include_router(watchlist_router)
 app.include_router(investigation_status_router)
 app.include_router(manual_evidence_router)

@@ -21,6 +21,9 @@ Backend FastAPI del MVP de PolySignal.
 - `GET /markets/overview`
 - `GET /markets/{id}/prediction`
 - `GET /markets/{id}/predictions`
+- `GET /profiles/highlighted`
+- `GET /profiles/highlighted/{wallet}`
+- `POST /profiles/highlighted/upsert`
 - `POST /markets/{id}/resolve`
 - `GET /markets/{id}/snapshots`
 - `GET /evaluation/history`
