@@ -9100,7 +9100,13 @@ html:not([data-theme="dark"]) .app-sidebar {
   gap: 14px;
   align-items: flex-start;
   justify-content: space-between;
+  min-width: 0;
+  overflow: hidden;
   padding: 22px;
+}
+
+.profiles-hero > div {
+  min-width: 0;
 }
 
 .profiles-hero h1,
