@@ -17,6 +17,25 @@ export type SamanthaReliability = "high" | "low" | "medium" | "unknown";
 export type SamanthaResearchBrief = {
   createdAt: string;
   knownSignals: {
+    externalOddsComparison?: {
+      checkedAt?: string;
+      eventName?: string | null;
+      eventStartTime?: string | null;
+      league?: string | null;
+      limitations?: string[];
+      matchConfidence?: "high" | "low" | "medium" | "unknown";
+      matchedMarket?: boolean;
+      outcomes?: Array<{
+        impliedProbability?: number | null;
+        label: string;
+        priceAmerican?: number | null;
+        priceDecimal?: number | null;
+      }>;
+      providerName?: string;
+      sportsbook?: string;
+      status?: "available" | "disabled" | "error" | "no_match" | "partial" | "timeout" | "unavailable";
+      warnings?: string[];
+    };
     marketProbability?: {
       no?: number;
       outcomes?: Array<{ label: string; probability?: number }>;

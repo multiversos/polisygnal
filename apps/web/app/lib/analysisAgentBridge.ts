@@ -337,9 +337,31 @@ function parseAgentResponse(value: unknown, config: AnalysisAgentBridgeConfig): 
 export function buildAnalysisAgentMarketPayload(task: AnalysisAgentTask): AnalysisAgentRequest {
   const market = task.brief.market;
   const marketProbability = task.brief.knownSignals.marketProbability;
+  const externalOddsComparison = task.brief.knownSignals.externalOddsComparison;
   return {
     category: market.category ?? market.sport ?? null,
     eventSlug: market.eventSlug ?? null,
+    externalOddsComparison: externalOddsComparison
+      ? {
+          checkedAt: externalOddsComparison.checkedAt ?? null,
+          eventName: externalOddsComparison.eventName ?? null,
+          eventStartTime: externalOddsComparison.eventStartTime ?? null,
+          league: externalOddsComparison.league ?? null,
+          limitations: externalOddsComparison.limitations ?? [],
+          matchConfidence: externalOddsComparison.matchConfidence ?? "unknown",
+          matchedMarket: externalOddsComparison.matchedMarket === true,
+          outcomes: (externalOddsComparison.outcomes ?? []).map((outcome) => ({
+            impliedProbability: outcome.impliedProbability ?? null,
+            label: outcome.label,
+            priceAmerican: outcome.priceAmerican ?? null,
+            priceDecimal: outcome.priceDecimal ?? null,
+          })),
+          providerName: externalOddsComparison.providerName ?? null,
+          sportsbook: externalOddsComparison.sportsbook ?? null,
+          status: externalOddsComparison.status ?? "unavailable",
+          warnings: externalOddsComparison.warnings ?? [],
+        }
+      : null,
     liquidity: market.liquidity ?? null,
     marketId: market.conditionId ?? null,
     marketProbability:

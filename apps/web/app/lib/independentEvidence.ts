@@ -1,10 +1,13 @@
 import { getDisplayMarketPrices } from "./marketDataDisplay";
+import type { ExternalOddsComparison } from "./externalOddsTypes";
 import type { MarketOverviewItem } from "./marketOverview";
 import type { SamanthaResearchReport } from "./samanthaResearchTypes";
 import type { WalletIntelligenceSummary } from "./walletIntelligenceTypes";
 
 export type IndependentEvidenceStatus =
   | "available"
+  | "disabled"
+  | "no_match"
   | "partial"
   | "not_connected"
   | "unavailable"
@@ -50,6 +53,7 @@ export type IndependentEvidenceSummary = {
 
 type BuildIndependentEvidenceSummaryInput = {
   agentName?: string;
+  externalOddsComparison?: ExternalOddsComparison | null;
   item: MarketOverviewItem;
   samanthaStatus?: "completed" | "insufficient" | "partial" | "pending" | "unavailable";
   samanthaReport?: SamanthaResearchReport;
@@ -86,6 +90,12 @@ function compactUsd(value: unknown): string | null {
 function normalizeStatusLabel(status: IndependentEvidenceStatus): string {
   if (status === "available") {
     return "Disponible";
+  }
+  if (status === "disabled") {
+    return "Proveedor no configurado";
+  }
+  if (status === "no_match") {
+    return "Sin match claro";
   }
   if (status === "partial") {
     return "Parcial";
@@ -335,7 +345,73 @@ function buildSamanthaEvidence(input: BuildIndependentEvidenceSummaryInput): Ind
 }
 
 function buildExternalOddsEvidence(input: BuildIndependentEvidenceSummaryInput): IndependentEvidenceItem {
+  const directComparison = input.externalOddsComparison;
   const comparison = input.samanthaReport?.oddsComparison;
+  if (directComparison) {
+    const directStatus: IndependentEvidenceStatus =
+      directComparison.status === "available"
+        ? directComparison.matchedMarket &&
+          directComparison.outcomes.length >= 2 &&
+          (directComparison.matchConfidence === "high" || directComparison.matchConfidence === "medium")
+          ? "available"
+          : "partial"
+        : directComparison.status === "partial"
+          ? "partial"
+          : directComparison.status === "no_match"
+            ? "no_match"
+            : directComparison.status === "disabled"
+              ? "disabled"
+              : directComparison.status === "timeout"
+                ? "timeout"
+                : directComparison.status === "error"
+                  ? "unavailable"
+                  : "unavailable";
+    const directSummary =
+      directComparison.outcomes.length > 0
+        ? directComparison.outcomes
+            .map((outcome) =>
+              `${outcome.label} ${
+                typeof outcome.impliedProbability === "number"
+                  ? outcome.impliedProbability.toFixed(3)
+                  : "sin_dato"
+              }`,
+            )
+            .join(" / ")
+        : null;
+    return {
+      category: "external_odds",
+      checkedAt: directComparison.checkedAt || null,
+      confidence:
+        directComparison.matchConfidence === "high" ||
+        directComparison.matchConfidence === "medium" ||
+        directComparison.matchConfidence === "low"
+          ? directComparison.matchConfidence
+          : "unknown",
+      direction: "unknown",
+      id: "external_odds",
+      isIndependent: directStatus === "available",
+      label:
+        marketVertical(input.item) === "politics"
+          ? "Odds/mercados comparables"
+          : "Odds externas",
+      limitations: directComparison.limitations.slice(0, 4),
+      sourceName: `${directComparison.providerName} / ${directComparison.sportsbook}`,
+      sourceUrl: directComparison.bestSourceUrl,
+      status: directStatus,
+      summary:
+        directStatus === "available"
+          ? `${directComparison.providerName} (${directComparison.sportsbook}) comparo este mercado con match ${directComparison.matchConfidence}. ${directSummary || "Odds externas disponibles."}`
+          : directStatus === "partial"
+            ? `${directComparison.providerName} devolvio una comparacion parcial. ${directSummary || "Faltan lineas o match mas fuerte."}`
+            : directStatus === "no_match"
+              ? "No se encontro un equivalente claro en el proveedor externo."
+              : directStatus === "disabled"
+                ? "Proveedor de odds no configurado."
+                : directStatus === "timeout"
+                  ? "Odds externas no disponibles por timeout."
+                  : "Odds externas no disponibles ahora.",
+    };
+  }
   const available =
     comparison?.found &&
     comparison.direction !== "UNKNOWN" &&

@@ -14,6 +14,7 @@ export type AnalyzeLoadingPhase =
   | "matching"
   | "context"
   | "readiness"
+  | "external_odds"
   | "research"
   | "wallet_profiles"
   | "wallet_history"
@@ -49,6 +50,7 @@ type AnalyzeProgressStep = {
     | "reading_link"
     | "detecting_market"
     | "loading_polymarket"
+    | "checking_external_odds"
     | "reviewing_wallets"
     | "enriching_profiles"
     | "building_wallet_history"
@@ -137,6 +139,13 @@ function analysisProgressSteps(
       id: "loading_polymarket",
       label: "Cargando datos de Polymarket",
       phases: ["context", "readiness"],
+    },
+    {
+      detail: "Buscamos una comparacion externa read-only con el proveedor configurado.",
+      id: "checking_external_odds",
+      label: "Consultando odds externas",
+      optional: true,
+      phases: ["external_odds"],
     },
     {
       detail: "Revisamos actividad publica disponible sin identificar personas reales.",
@@ -255,6 +264,9 @@ function statusForStep(
     if (step.id === "loading_polymarket") {
       return "warning";
     }
+    if (step.id === "checking_external_odds") {
+      return "skipped";
+    }
     if (step.id === "reviewing_wallets") {
       return "pending";
     }
@@ -360,6 +372,14 @@ function runningOverrideForStep(
       status: "running",
       statusLabel: "Leyendo datos",
       summary: "Aun no se marca como cargado hasta tener respuesta real.",
+    };
+  }
+  if (step.id === "checking_external_odds") {
+    return {
+      detail: "Consultando proveedor externo de odds...",
+      status: "running",
+      statusLabel: "Consultando odds",
+      summary: "Solo aceptamos la comparacion si el match del evento es claro.",
     };
   }
   if (step.id === "reviewing_wallets") {

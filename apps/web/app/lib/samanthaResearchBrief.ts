@@ -1,4 +1,5 @@
 import type { MarketOverviewItem } from "./marketOverview";
+import type { ExternalOddsComparison } from "./externalOddsTypes";
 import { getMarketProbabilityPair } from "./marketEstimateQuality";
 import type {
   SamanthaDirection,
@@ -9,6 +10,7 @@ import { getWalletSignalSummary } from "./walletIntelligence";
 import type { WalletIntelligenceSummary } from "./walletIntelligenceTypes";
 
 type BuildSamanthaResearchBriefInput = {
+  externalOddsComparison?: ExternalOddsComparison | null;
   item: MarketOverviewItem;
   normalizedUrl: string;
   url?: string;
@@ -172,6 +174,27 @@ export function buildSamanthaResearchBrief(input: BuildSamanthaResearchBriefInpu
               })),
             }
           : undefined,
+      externalOddsComparison: input.externalOddsComparison
+        ? {
+            checkedAt: input.externalOddsComparison.checkedAt,
+            eventName: input.externalOddsComparison.eventName,
+            eventStartTime: input.externalOddsComparison.eventStartTime,
+            league: input.externalOddsComparison.league,
+            limitations: input.externalOddsComparison.limitations.slice(0, 4),
+            matchConfidence: input.externalOddsComparison.matchConfidence,
+            matchedMarket: input.externalOddsComparison.matchedMarket,
+            outcomes: input.externalOddsComparison.outcomes.slice(0, 4).map((outcome) => ({
+              impliedProbability: outcome.impliedProbability,
+              label: cleanText(outcome.label),
+              priceAmerican: outcome.priceAmerican,
+              priceDecimal: outcome.priceDecimal,
+            })),
+            providerName: cleanText(input.externalOddsComparison.providerName),
+            sportsbook: cleanText(input.externalOddsComparison.sportsbook),
+            status: input.externalOddsComparison.status,
+            warnings: input.externalOddsComparison.warnings.slice(0, 4),
+          }
+        : undefined,
       walletIntelligence: {
         available: Boolean(input.walletSummary?.available),
         bias: input.walletSummary ? normalizeWalletBias(input.walletSummary.signalDirection) : "UNKNOWN",

@@ -95,6 +95,12 @@ Estado visible verificado:
   sola para estimar y que fuentes como odds externas, noticias/lesiones o
   comparables politicos deben figurar como conectadas y verificadas antes de
   habilitar una estimacion propia.
+- Trial `OddsBlaze` v1 agregado como proveedor temporal server-side para NBA.
+  Se consulta solo desde `/api/external-odds/compare`, con API key en env
+  privada, `sportsbook` configurable y matching auditado por participantes +
+  fecha. Si no hay match claro, timeout o provider off, la UI muestra
+  `Sin match claro`, `Odds no disponibles` o `Proveedor no configurado`; no se
+  inventan odds ni se convierten en recomendacion automatica.
 - `Ver billeteras` usa una vista compacta por wallet: direccion publica,
   tipo de actividad, outcome/posicion, monto, precio, shares/contratos,
   posicion, PnL/win rate solo si vienen reales, mercados cerrados y wins/losses

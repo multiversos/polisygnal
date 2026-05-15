@@ -720,8 +720,9 @@ Use these quick checks when reviewing public pages:
 6. Confirm the final report shows `Evidencia independiente` and that it marks:
    - `Precio de mercado` as available reference only,
    - `Billeteras` as auxiliary only,
-   - `Odds externas` as `Fuente no conectada` unless a real comparable source
-     was returned,
+   - `Odds externas` as `Proveedor no configurado`, `Sin match claro`,
+     `Odds no disponibles` or `Disponible` according to the real provider
+     response,
    - `Noticias/lesiones` or `Noticias/encuestas` as missing when no provider is
      connected.
 7. Confirm `Que falta para estimar` explains why there is still no PolySignal
@@ -745,7 +746,12 @@ Use these quick checks when reviewing public pages:
    language, fake odds, fake news, fake injuries, or betting advice appear.
 12. Confirm no prediction is created unless validated Samantha output and the
    conservative PolySignal gates pass.
-13. Local debug-only manual report tooling may exist behind
+13. If `ODDS_PROVIDER_ENABLED=true`, test an NBA market such as
+   `nba-sas-min-2026-05-15` and confirm `/api/external-odds/compare` stays
+   same-origin, does not expose the API key, and only marks `Odds externas`
+   as independent when the provider returns a medium/high match with real
+   outcomes.
+14. Local debug-only manual report tooling may exist behind
    `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`; it is not part of the public
    production flow.
 

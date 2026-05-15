@@ -761,6 +761,18 @@ real source calls are enabled:
 - do not generate a percentage unless the estimator has sufficient real
   evidence and calibration.
 
+Temporary external odds trial rules:
+
+- `OddsBlaze` may run only server-side through an allowlisted same-origin route;
+- the provider key must stay in env only and never reach client bundles,
+  `NEXT_PUBLIC`, logs, drawers, history, or alert payloads;
+- supported v1 scope is NBA only;
+- unmatched or low-confidence events must stay `partial` or `no_match`;
+- provider output must be sanitized to compact event + outcome summaries, never
+  raw payload dumps;
+- external odds are comparison evidence only and must not become automatic
+  betting advice.
+
 See `docs/external-research-plan.md` for the implementation roadmap.
 
 ### Analyzer-First Controls

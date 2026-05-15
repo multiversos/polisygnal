@@ -48,6 +48,7 @@ import {
   buildIndependentEvidenceSummary,
   getIndependentEvidenceStatusLabel,
 } from "../lib/independentEvidence";
+import type { ExternalOddsComparison } from "../lib/externalOddsTypes";
 import type { MarketOverviewItem } from "../lib/marketOverview";
 import {
   formatProbability,
@@ -106,6 +107,7 @@ type AnalyzerReportProps = {
   analysisAgentName?: string;
   busy: boolean;
   deepAnalysisJob?: DeepAnalysisJob | null;
+  externalOddsComparison?: ExternalOddsComparison | null;
   initialSamanthaReportResult?: SamanthaResearchParseResult | null;
   item: AnalyzeMarketItem;
   matchScore: number;
@@ -683,6 +685,7 @@ export function AnalyzerReport({
   analysisAgentName = "Samantha",
   busy,
   deepAnalysisJob,
+  externalOddsComparison,
   initialSamanthaReportResult,
   item,
   matchScore,
@@ -803,6 +806,7 @@ export function AnalyzerReport({
   });
   const independentEvidence = buildIndependentEvidenceSummary({
     agentName: analysisAgentName,
+    externalOddsComparison,
     item,
     samanthaReport,
     samanthaStatus: samanthaReportUiStatus,

@@ -35,6 +35,8 @@ import {
   normalizeProbability,
 } from "../lib/marketProbabilities";
 import { getDisplayMarketPrices } from "../lib/marketDataDisplay";
+import type { ExternalOddsComparison } from "../lib/externalOddsTypes";
+import { buildSportsContextParticipants } from "../lib/sportsContext";
 import {
   getEstimateQuality,
   getEstimateQualityLabel,
@@ -69,6 +71,7 @@ import {
   markJobSendingToSamantha,
   markJobValidatingSamanthaReport,
   markJobWalletsAnalyzed,
+  updateDeepAnalysisJobStep,
   type DeepAnalysisJob,
 } from "../lib/deepAnalysisJob";
 import {
@@ -137,6 +140,7 @@ import type {
 } from "../lib/walletIntelligenceTypes";
 
 type AnalyzeMarketItem = MarketOverviewItem & {
+  externalOddsComparison?: ExternalOddsComparison | null;
   walletIntelligence?: {
     positions?: WalletMarketPosition[] | null;
     summary?: WalletIntelligenceSummary | null;
@@ -170,6 +174,7 @@ type SearchState =
       status: "needs_selection" | "no_exact_match";
     }
   | {
+      externalOddsComparison?: ExternalOddsComparison | null;
       match: MatchResult;
       message: string;
       normalizedUrl: string;
@@ -214,6 +219,7 @@ type AnalysisAgentDiagnosticsRouteResult = {
 
 const LINK_RESOLVE_TIMEOUT_MS = 45_000;
 const WALLET_INTELLIGENCE_TIMEOUT_MS = 45_000;
+const EXTERNAL_ODDS_TIMEOUT_MS = 15_000;
 const ANALYSIS_AGENT_TIMEOUT_MS = 45_000;
 const ANALYSIS_AGENT_STATUS_TIMEOUT_MS = 15_000;
 const ANALYSIS_AGENT_POLL_TIMEOUT_MS = 90_000;
@@ -448,6 +454,80 @@ async function pollAnalysisAgentResearchStatus(input: {
   };
 }
 
+async function fetchExternalOddsComparison(input: {
+  eventDate?: string | null;
+  eventSlug?: string | null;
+  item: AnalyzeMarketItem;
+  marketSlug?: string | null;
+  normalizedUrl: string;
+  signal: AbortSignal;
+}): Promise<ExternalOddsComparison> {
+  const sportsContext = buildSportsContextParticipants({
+    eventDate: input.eventDate ?? input.item.market?.close_time ?? input.item.market?.end_date ?? null,
+    eventSlug: input.eventSlug ?? input.item.market?.event_slug ?? null,
+    league: input.item.market?.sport_type ?? null,
+    marketSlug: input.marketSlug ?? input.item.market?.market_slug ?? null,
+    marketTitle: marketTitle(input.item),
+    outcomePrices: (input.item.market?.outcomes ?? []).map((outcome) => ({
+      label: outcome.label,
+      price: outcome.price,
+      side: outcome.side,
+    })),
+    participants: [],
+    sport: input.item.market?.sport_type ?? null,
+  });
+  const response = await withRequestTimeout(
+    EXTERNAL_ODDS_TIMEOUT_MS,
+    input.signal,
+    "external_odds_timeout",
+    (signal) =>
+      fetch("/api/external-odds/compare", {
+        body: JSON.stringify({
+          eventDate: sportsContext.eventDate,
+          eventSlug: input.eventSlug ?? input.item.market?.event_slug ?? null,
+          league: input.item.market?.sport_type ?? null,
+          marketSlug: input.marketSlug ?? input.item.market?.market_slug ?? null,
+          marketTitle: marketTitle(input.item),
+          outcomePrices: (input.item.market?.outcomes ?? []).map((outcome) => ({
+            label: outcome.label,
+            price: outcome.price,
+            side: outcome.side,
+          })),
+          participants: sportsContext.participants,
+          sport: input.item.market?.sport_type ?? null,
+        }),
+        cache: "no-store",
+        credentials: "omit",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        redirect: "error",
+        signal,
+      }),
+  );
+  const parsed = (await response.json().catch(() => null)) as ExternalOddsComparison | null;
+  if (!parsed) {
+    return {
+      bestSourceUrl: null,
+      checkedAt: new Date().toISOString(),
+      eventName: null,
+      eventStartTime: null,
+      league: input.item.market?.sport_type ?? null,
+      limitations: ["La ruta interna de odds no devolvio un payload usable."],
+      matchConfidence: "unknown",
+      matchedMarket: false,
+      outcomes: [],
+      providerName: "OddsBlaze",
+      sportsbook: "draftkings",
+      status: "error",
+      warnings: ["external_odds_invalid_json"],
+    };
+  }
+  return parsed;
+}
+
 function toNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -626,6 +706,67 @@ function buildWalletProgress(summary: WalletIntelligenceSummary): AnalyzeProgres
     status: "completed_empty",
     statusLabel: "Sin actividad relevante",
     summary: "La fuente respondio, pero no encontro wallets utiles para una senal auxiliar.",
+  };
+}
+
+function buildExternalOddsProgress(
+  comparison: ExternalOddsComparison,
+): AnalyzeProgressStepOverrides["checking_external_odds"] {
+  const outcomeSummary = comparison.outcomes
+    .slice(0, 2)
+    .map((outcome) =>
+      `${outcome.label} ${
+        typeof outcome.impliedProbability === "number"
+          ? outcome.impliedProbability.toFixed(3)
+          : "sin dato"
+      }`,
+    )
+    .join(" | ");
+  if (comparison.status === "available") {
+    return {
+      detail: `${comparison.providerName} devolvio odds comparables para este mercado NBA.`,
+      status: "completed_with_data",
+      statusLabel: "Odds encontradas",
+      summary: `${comparison.sportsbook} | ${comparison.eventName || "evento comparable"} | ${outcomeSummary || "lineas comparables"}`,
+    };
+  }
+  if (comparison.status === "partial") {
+    return {
+      detail: "El proveedor externo respondio, pero el match o las lineas quedaron parciales.",
+      status: "limited",
+      statusLabel: "Comparacion parcial",
+      summary: outcomeSummary || "La comparacion externa no quedo lista para usarse como soporte fuerte.",
+    };
+  }
+  if (comparison.status === "no_match") {
+    return {
+      detail: "OddsBlaze respondio, pero no encontro un equivalente claro para este mercado.",
+      status: "completed_empty",
+      statusLabel: "Sin match claro",
+      summary: "PolySignal no inventa comparaciones cuando no hay evento equivalente.",
+    };
+  }
+  if (comparison.status === "timeout") {
+    return {
+      detail: "OddsBlaze no respondio a tiempo para esta consulta.",
+      status: "timeout",
+      statusLabel: "No respondio a tiempo",
+      summary: "La lectura continua sin bloquear market data ni Wallet Intelligence.",
+    };
+  }
+  if (comparison.status === "disabled") {
+    return {
+      detail: "El proveedor temporal de odds no esta configurado para este entorno.",
+      status: "unavailable",
+      statusLabel: "Proveedor no configurado",
+      summary: "Si la trial no esta activa, PolySignal conserva la lectura sin odds externas.",
+    };
+  }
+  return {
+    detail: "Las odds externas no estuvieron disponibles en esta corrida.",
+    status: "unavailable",
+    statusLabel: "Odds no disponibles",
+    summary: "No se inventan lines ni probabilidades externas.",
   };
 }
 
@@ -2432,6 +2573,7 @@ export default function AnalyzePage() {
       }
       try {
         const brief = buildSamanthaResearchBrief({
+          externalOddsComparison: input.item.externalOddsComparison ?? undefined,
           item: input.item,
           normalizedUrl: input.normalizedUrl,
           url: input.normalizedUrl,
@@ -2938,6 +3080,102 @@ export default function AnalyzePage() {
         loading_polymarket: buildMarketDataProgress(match.item),
       }));
 
+      let externalOddsComparison: ExternalOddsComparison | null = null;
+      const marketSport = String(match.item.market?.sport_type || "").toLowerCase();
+      if (marketSport === "nba" || marketSport === "basketball") {
+        if (!(await advancePhase("external_odds"))) {
+          return;
+        }
+        job = persistDeepAnalysisJob(
+          updateDeepAnalysisJobStep(job, "checking_odds", {
+            status: "running",
+            summary: "Consultando OddsBlaze en modo read-only para comparar moneyline NBA.",
+          }),
+        );
+        setProgressStepOverrides((current) => ({
+          ...current,
+          checking_external_odds: {
+            detail: "Consultando provider externo temporal de odds para este mercado NBA.",
+            status: "running",
+            statusLabel: "Consultando odds",
+            summary: "Solo se aceptara como evidencia si el match del evento es claro.",
+          },
+        }));
+        try {
+          externalOddsComparison = await fetchExternalOddsComparison({
+            eventDate: match.item.market?.close_time ?? match.item.market?.end_date ?? null,
+            eventSlug: match.eventSlug ?? match.item.market?.event_slug ?? null,
+            item: match.item,
+            marketSlug: match.marketSlug ?? match.item.market?.market_slug ?? null,
+            normalizedUrl,
+            signal: runController.signal,
+          });
+        } catch (error) {
+          if (isAnalyzeCancelled(error)) {
+            return;
+          }
+          externalOddsComparison = {
+            bestSourceUrl: null,
+            checkedAt: new Date().toISOString(),
+            eventName: null,
+            eventStartTime: null,
+            league: match.item.market?.sport_type ?? null,
+            limitations: [
+              isAnalyzeTimeout(error)
+                ? "La consulta de odds externas supero el tiempo maximo."
+                : "La consulta de odds externas fallo de forma segura.",
+            ],
+            matchConfidence: "unknown",
+            matchedMarket: false,
+            outcomes: [],
+            providerName: "OddsBlaze",
+            sportsbook: "draftkings",
+            status: isAnalyzeTimeout(error) ? "timeout" : "error",
+            warnings: [isAnalyzeTimeout(error) ? "external_odds_timeout" : "external_odds_error"],
+          };
+        }
+        const finalizedExternalOdds =
+          externalOddsComparison || {
+            bestSourceUrl: null,
+            checkedAt: new Date().toISOString(),
+            eventName: null,
+            eventStartTime: null,
+            league: match.item.market?.sport_type ?? null,
+            limitations: ["La consulta de odds externas termino sin resultado usable."],
+            matchConfidence: "unknown" as const,
+            matchedMarket: false,
+            outcomes: [],
+            providerName: "OddsBlaze",
+            sportsbook: "draftkings",
+            status: "error" as const,
+            warnings: ["external_odds_missing_result"],
+          };
+        const externalOddsProgress =
+          buildExternalOddsProgress(finalizedExternalOdds) || {
+            detail: "Comparacion externa revisada.",
+            status: "limited" as const,
+            statusLabel: "Comparacion externa",
+            summary: "Comparacion externa revisada.",
+          };
+        job = persistDeepAnalysisJob(
+          updateDeepAnalysisJobStep(job, "checking_odds", {
+            status:
+              finalizedExternalOdds.status === "available"
+                ? "completed"
+                : finalizedExternalOdds.status === "partial" || finalizedExternalOdds.status === "no_match"
+                  ? "blocked"
+                  : "blocked",
+            summary: externalOddsProgress.summary || "Comparacion externa revisada.",
+            warnings: finalizedExternalOdds.warnings.slice(0, 4),
+          }),
+        );
+        setProgressStepOverrides((current) => ({
+          ...current,
+          checking_external_odds: externalOddsProgress,
+        }));
+        externalOddsComparison = finalizedExternalOdds;
+      }
+
       if (!(await advancePhase("research"))) {
         return;
       }
@@ -2976,6 +3214,7 @@ export default function AnalyzePage() {
           ...match,
           item: {
             ...match.item,
+            externalOddsComparison,
             walletIntelligence: {
               positions: [],
               summary: walletSummary,
@@ -3035,6 +3274,7 @@ export default function AnalyzePage() {
         ...enrichedMatch,
         item: {
           ...enrichedMatch.item,
+          externalOddsComparison,
           walletIntelligence: {
             positions: walletSummary.topWallets ?? [],
             summary: walletSummary,
@@ -3118,6 +3358,7 @@ export default function AnalyzePage() {
           return;
         }
         setState({
+          externalOddsComparison: enrichedMatch.item.externalOddsComparison ?? externalOddsComparison,
           match: enrichedMatch,
           message:
             existingBridgeTaskId
@@ -3172,6 +3413,7 @@ export default function AnalyzePage() {
         return;
       }
       setState({
+        externalOddsComparison: enrichedMatch.item.externalOddsComparison ?? externalOddsComparison,
         match: enrichedMatch,
         message:
           job.status === "completed"
@@ -3463,6 +3705,7 @@ export default function AnalyzePage() {
         }),
       }));
       setState({
+        externalOddsComparison: state.match.item.externalOddsComparison ?? state.externalOddsComparison ?? null,
         match: state.match,
         message:
           bridgeResult.job.status === "completed"
@@ -3649,6 +3892,7 @@ export default function AnalyzePage() {
                     busy={actionBusy}
                     deepAnalysisJob={deepAnalysisJob}
                     analysisAgentName={deepAnalysisJob?.analysisAgent?.agentName || analysisAgent.name}
+                    externalOddsComparison={state.externalOddsComparison ?? null}
                     initialSamanthaReportResult={samanthaAutoReportResult}
                     item={match.item}
                     matchScore={match.score}
