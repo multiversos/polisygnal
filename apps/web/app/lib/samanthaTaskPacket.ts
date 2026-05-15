@@ -17,7 +17,7 @@ export type SamanthaTaskPacket = {
   taskPacketJson: string;
 };
 
-const FULL_WALLET_ADDRESS_PATTERN = /0x[a-fA-F0-9]{40}/;
+const FULL_WALLET_ADDRESS_PATTERN = /\b0x[a-fA-F0-9]{40}\b/;
 const SECRET_MARKERS = [
   "api_key",
   "authorization:",

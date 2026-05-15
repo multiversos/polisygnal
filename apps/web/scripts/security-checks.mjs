@@ -981,7 +981,7 @@ function validateAnalyzerReportSource() {
     assert(source.includes(copy), `AnalyzerReport missing required copy: ${copy}`);
   }
   assert(!source.includes("wallet.walletAddress"), "AnalyzerReport must not render full wallet addresses");
-  assert(!/0x[a-fA-F0-9]{40}/.test(source), "AnalyzerReport source should not contain full wallet addresses");
+  assert(!/\b0x[a-fA-F0-9]{40}\b/.test(source), "AnalyzerReport source should not contain full wallet addresses");
   assert(!source.includes("win rate 100%"), "AnalyzerReport should not invent win-rate copy");
   assert(!source.includes("ROI 100%"), "AnalyzerReport should not invent ROI copy");
   assert(!source.includes("copy this trader"), "AnalyzerReport should not recommend copy-trading");
@@ -1036,11 +1036,22 @@ function validateSamanthaResearchRules() {
         no_price: 0.42,
       },
       market: {
+        condition_id: "0x7b461ba0d582c03577966cfdf0da2a5cb9696a26b954b5ed1890f82d6f2a3c88",
         event_slug: "nba-okc-lal-2026-05-11",
         market_slug: "nba-okc-lal-2026-05-11-lal",
         outcomes: [
-          { label: "YES", price: 0.58, side: "YES" },
-          { label: "NO", price: 0.42, side: "NO" },
+          {
+            label: "YES",
+            price: 0.58,
+            side: "YES",
+            token_id: "61329423403258718865520065423477646734746215825414612058431614589236294556849",
+          },
+          {
+            label: "NO",
+            price: 0.42,
+            side: "NO",
+            token_id: "31336121594291014914271611062289284423554618020629759821503694496084098706290",
+          },
         ],
         question: "Will the Lakers win?",
         sport_type: "nba",
@@ -1071,7 +1082,7 @@ function validateSamanthaResearchRules() {
   const briefValidation = validateResearchBrief(brief);
   assert(briefValidation.valid, `Samantha brief should be valid: ${briefValidation.errors.join(", ")}`);
   assert(!serializedBrief.includes("walletAddress"), "Samantha brief must not include raw wallet fields");
-  assert(!/0x[a-fA-F0-9]{40}/.test(serializedBrief), "Samantha brief must not include full wallet addresses");
+  assert(!/\b0x[a-fA-F0-9]{40}\b/.test(serializedBrief), "Samantha brief must not include full wallet addresses");
   assert(!serializedBrief.toLowerCase().includes("database_url="), "Samantha brief must not include secrets");
   assert(serializedBrief.includes("Do not invent sources"), "Samantha brief must include anti-invention rule");
   assert(serializedBrief.includes("Do not touch Neon"), "Samantha brief must include no-Neon rule");
@@ -1092,7 +1103,7 @@ function validateSamanthaResearchRules() {
   assert(taskPacket.samanthaInstructionsText.includes("Reddit and social content are weak signals"), "Samantha task packet must downgrade social evidence");
   assert(taskPacket.expectedReportSchema.includes('"evidence"'), "Samantha task packet must include expected report schema");
   assert(getExpectedSamanthaReportSchema().includes('"suggestedEstimate"'), "Samantha schema helper should include suggestedEstimate");
-  assert(!/0x[a-fA-F0-9]{40}/.test(taskPacketText), "Samantha task packet must not include full wallet addresses");
+  assert(!/\b0x[a-fA-F0-9]{40}\b/.test(taskPacketText), "Samantha task packet must not include full wallet addresses");
   assert(!taskPacketText.toLowerCase().includes("database_url="), "Samantha task packet must not include secrets");
   assert(!taskPacketSource.includes("fetch("), "Samantha task packet builder must not call external services");
   assert(analysisAgentTypesSource.includes("AnalysisAgentProvider"), "generic analysis agent provider contract is missing");
@@ -1648,7 +1659,7 @@ function validateDeepAnalysisJobRules() {
   assert(!historySource.includes("Cargar reporte manual"), "history should not expose manual report upload as a public action");
   assert(!historySource.includes("Necesita reporte manual"), "history should not label pending Samantha as manual report needed");
   assert(historySource.includes("bridgeTaskId"), "history should preserve Samantha task ids without raw payloads");
-  assert(!/0x[a-fA-F0-9]{40}/.test(historySource), "history source should not include full wallet literals");
+  assert(!/\b0x[a-fA-F0-9]{40}\b/.test(historySource), "history source should not include full wallet literals");
 
   return {
     awaiting_samantha_guard: true,

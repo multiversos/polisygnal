@@ -5,7 +5,7 @@ import type { DeepAnalysisJob, DeepAnalysisJobStep } from "./deepAnalysisJob";
 const DEEP_ANALYSIS_JOB_STORAGE_KEY = "polysignal-deep-analysis-jobs-v1";
 const DEEP_ANALYSIS_JOB_STORAGE_EVENT = "polysignal:deep-analysis-jobs-updated";
 const MAX_STORED_JOBS = 30;
-const FULL_WALLET_PATTERN = /0x[a-fA-F0-9]{40}/g;
+const FULL_WALLET_PATTERN = /\b0x[a-fA-F0-9]{40}\b/g;
 
 export { DEEP_ANALYSIS_JOB_STORAGE_EVENT };
 

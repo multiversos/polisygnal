@@ -15,7 +15,7 @@ import type {
 const MAX_EVIDENCE_ITEMS = 24;
 const MAX_TEXT_LENGTH = 900;
 const MAX_QUOTE_LENGTH = 280;
-const FULL_WALLET_ADDRESS_PATTERN = /0x[a-fA-F0-9]{40}/;
+const FULL_WALLET_ADDRESS_PATTERN = /\b0x[a-fA-F0-9]{40}\b/;
 const SECRET_PATTERNS = [
   /api[_-]?key/i,
   /authorization\s*:/i,

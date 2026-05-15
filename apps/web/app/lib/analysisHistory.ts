@@ -217,7 +217,7 @@ export type AnalysisHistoryStats = {
 
 const ANALYSIS_HISTORY_STORAGE_KEY = "polysignal-analysis-history-v1";
 export const ANALYSIS_HISTORY_STORAGE_EVENT = "polysignal:analysis-history-updated";
-const FULL_WALLET_PATTERN = /0x[a-fA-F0-9]{40}/g;
+const FULL_WALLET_PATTERN = /\b0x[a-fA-F0-9]{40}\b/g;
 
 function browserStorage(): Storage | null {
   if (typeof window === "undefined") {

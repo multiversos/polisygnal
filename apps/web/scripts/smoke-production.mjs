@@ -216,7 +216,7 @@ function assertTextExcludes(text, blocked, label) {
 }
 
 function assertNoFullWalletAddress(text, label) {
-  assert(!/0x[a-fA-F0-9]{40}/.test(text), `${label} rendered a full wallet address`);
+  assert(!/\b0x[a-fA-F0-9]{40}\b/.test(text), `${label} rendered a full wallet address`);
 }
 
 function assertSportIconsRendered(dom, label) {
