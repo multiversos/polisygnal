@@ -53,6 +53,14 @@ type OddsBlazeResponse = {
   updated?: string;
 };
 
+export type OddsBlazeNoMatchReason =
+  | "no_events_returned"
+  | "no_both_teams_candidate"
+  | "date_mismatch"
+  | "market_filter_excluded"
+  | "sportsbook_no_coverage"
+  | "provider_timeout";
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -371,11 +379,17 @@ function bestSourceUrlForEvent(event: OddsBlazeEvent): string | null {
 
 export async function fetchOddsBlazeComparison(
   input: ExternalOddsCompareInput,
-  config: ExternalOddsProviderConfig & { apiKey?: string | null; requestUrl: URL },
+  config: ExternalOddsProviderConfig & {
+    apiKey?: string | null;
+    queryVariantName?: string;
+    requestUrl: URL;
+  },
 ): Promise<ExternalOddsComparison> {
   const checkedAt = nowIso();
   if (!config.enabled) {
     return {
+      attemptedQueries: 1,
+      attemptedQueryVariants: config.queryVariantName ? [config.queryVariantName] : [],
       bestSourceUrl: null,
       checkedAt,
       eventName: null,
@@ -383,7 +397,9 @@ export async function fetchOddsBlazeComparison(
       league: config.league || null,
       limitations: ["Proveedor de odds no configurado."],
       matchConfidence: "unknown",
+      matchedQueryVariant: null,
       matchedMarket: false,
+      noMatchReasons: [],
       outcomes: [],
       providerName: config.name,
       sportsbook: config.sportsbook,
@@ -393,6 +409,8 @@ export async function fetchOddsBlazeComparison(
   }
   if (!config.apiKey) {
     return {
+      attemptedQueries: 1,
+      attemptedQueryVariants: config.queryVariantName ? [config.queryVariantName] : [],
       bestSourceUrl: null,
       checkedAt,
       eventName: null,
@@ -400,7 +418,9 @@ export async function fetchOddsBlazeComparison(
       league: config.league || null,
       limitations: ["Falta la API key server-side para el proveedor temporal de odds."],
       matchConfidence: "unknown",
+      matchedQueryVariant: null,
       matchedMarket: false,
+      noMatchReasons: [],
       outcomes: [],
       providerName: config.name,
       sportsbook: config.sportsbook,
@@ -423,6 +443,8 @@ export async function fetchOddsBlazeComparison(
     });
     if (!response.ok) {
       return {
+        attemptedQueries: 1,
+        attemptedQueryVariants: config.queryVariantName ? [config.queryVariantName] : [],
         bestSourceUrl: null,
         checkedAt,
         eventName: null,
@@ -430,7 +452,9 @@ export async function fetchOddsBlazeComparison(
         league: config.league || null,
         limitations: ["El proveedor externo no devolvio una respuesta usable."],
         matchConfidence: "unknown",
+        matchedQueryVariant: null,
         matchedMarket: false,
+        noMatchReasons: [],
         outcomes: [],
         providerName: config.name,
         sportsbook: config.sportsbook,
@@ -441,6 +465,8 @@ export async function fetchOddsBlazeComparison(
     const parsed = (await response.json().catch(() => null)) as OddsBlazeResponse | null;
     if (!parsed || !Array.isArray(parsed.events)) {
       return {
+        attemptedQueries: 1,
+        attemptedQueryVariants: config.queryVariantName ? [config.queryVariantName] : [],
         bestSourceUrl: null,
         checkedAt,
         eventName: null,
@@ -448,11 +474,13 @@ export async function fetchOddsBlazeComparison(
         league: parsed?.league?.name || config.league || null,
         limitations: ["El proveedor externo devolvio un payload sin eventos comparables."],
         matchConfidence: "unknown",
+        matchedQueryVariant: null,
         matchedMarket: false,
+        noMatchReasons: ["no_events_returned"],
         outcomes: [],
         providerName: config.name,
         sportsbook: parsed?.sportsbook?.name || config.sportsbook,
-        status: "partial",
+        status: "no_match",
         warnings: ["odds_provider_empty_events"],
       };
     }
@@ -460,7 +488,16 @@ export async function fetchOddsBlazeComparison(
     const best = pickBestEvent(parsed.events, input);
     if (!best.event || best.confidence === "unknown") {
       const diagnostics = buildNoMatchDiagnostics(parsed.events, input);
+      const noMatchReasons: OddsBlazeNoMatchReason[] = diagnostics.warnings.includes("odds_match_date_mismatch")
+        ? ["date_mismatch"]
+        : diagnostics.warnings.includes("odds_match_one_team_only")
+          ? ["no_both_teams_candidate"]
+          : parsed.events.length === 0
+            ? ["no_events_returned"]
+            : ["sportsbook_no_coverage", "market_filter_excluded", "no_both_teams_candidate"];
       return {
+        attemptedQueries: 1,
+        attemptedQueryVariants: config.queryVariantName ? [config.queryVariantName] : [],
         bestSourceUrl: null,
         checkedAt: parsed.updated || checkedAt,
         eventName: null,
@@ -471,7 +508,9 @@ export async function fetchOddsBlazeComparison(
           ...diagnostics.limitations,
         ],
         matchConfidence: "unknown",
+        matchedQueryVariant: null,
         matchedMarket: false,
+        noMatchReasons,
         outcomes: [],
         providerName: config.name,
         sportsbook: parsed.sportsbook?.name || config.sportsbook,
@@ -489,6 +528,8 @@ export async function fetchOddsBlazeComparison(
     const partialDiagnostics =
       matchedMarket ? null : buildPartialMatchDiagnostics(best.event, input, outcomes);
     return {
+      attemptedQueries: 1,
+      attemptedQueryVariants: config.queryVariantName ? [config.queryVariantName] : [],
       bestSourceUrl: bestSourceUrlForEvent(best.event),
       checkedAt: parsed.updated || checkedAt,
       eventName,
@@ -500,7 +541,13 @@ export async function fetchOddsBlazeComparison(
           : (partialDiagnostics?.limitations[0] ?? "La comparacion externa quedo parcial o sin match suficientemente claro."),
       ],
       matchConfidence: best.confidence,
+      matchedQueryVariant: matchedMarket ? config.queryVariantName || "primary" : null,
       matchedMarket,
+      noMatchReasons: matchedMarket ? [] : partialDiagnostics?.warnings.includes("odds_market_incomplete")
+        ? ["market_filter_excluded"]
+        : partialDiagnostics?.warnings.includes("odds_match_one_team_only")
+          ? ["no_both_teams_candidate"]
+          : [],
       outcomes,
       providerName: config.name,
       sportsbook: parsed.sportsbook?.name || config.sportsbook,
@@ -515,6 +562,8 @@ export async function fetchOddsBlazeComparison(
   } catch (error) {
     const timedOut = typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
     return {
+      attemptedQueries: 1,
+      attemptedQueryVariants: config.queryVariantName ? [config.queryVariantName] : [],
       bestSourceUrl: null,
       checkedAt,
       eventName: null,
@@ -522,7 +571,9 @@ export async function fetchOddsBlazeComparison(
       league: config.league || null,
       limitations: [timedOut ? "OddsBlaze no respondio a tiempo." : "No se pudo completar la consulta de odds externas."],
       matchConfidence: "unknown",
+      matchedQueryVariant: null,
       matchedMarket: false,
+      noMatchReasons: timedOut ? ["provider_timeout"] : [],
       outcomes: [],
       providerName: config.name,
       sportsbook: config.sportsbook,

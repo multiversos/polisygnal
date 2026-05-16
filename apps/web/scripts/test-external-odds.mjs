@@ -100,9 +100,52 @@ try {
     result.limitations.some((entry) => entry.includes("no devolvio un evento con ambos equipos")),
     "no_match should explain why the provider could not match both teams",
   );
+  assert(result.attemptedQueries === 4, `expected all safe variants to be attempted, got ${result.attemptedQueries}`);
+  assert(
+    Array.isArray(result.noMatchReasons) && result.noMatchReasons.length > 0,
+    "no_match should include normalized no-match reasons",
+  );
 
-  globalThis.fetch = async () =>
-    new Response(
+  const fallbackCalls = [];
+  globalThis.fetch = async (url) => {
+    const requestUrl = new URL(String(url));
+    fallbackCalls.push(requestUrl.search);
+    const withoutMain = !requestUrl.searchParams.has("main") && requestUrl.searchParams.get("market") === "moneyline";
+    if (withoutMain) {
+      return new Response(
+        JSON.stringify({
+          events: [
+            {
+              date: "2026-05-15T19:00:00.000Z",
+              live: false,
+              odds: [
+                {
+                  links: { desktop: "https://sportsbook.draftkings.com/event/fixture-det-cle" },
+                  market: "Moneyline",
+                  name: "Detroit Pistons",
+                  price: "0.4082",
+                },
+                {
+                  links: { desktop: "https://sportsbook.draftkings.com/event/fixture-det-cle" },
+                  market: "Moneyline",
+                  name: "Cleveland Cavaliers",
+                  price: "0.6364",
+                },
+              ],
+              teams: {
+                away: { abbreviation: "DET", name: "Detroit Pistons" },
+                home: { abbreviation: "CLE", name: "Cleveland Cavaliers" },
+              },
+            },
+          ],
+          league: { id: "nba", name: "NBA" },
+          sportsbook: { id: "draftkings", name: "DraftKings" },
+          updated: "2026-05-15T14:00:00.000Z",
+        }),
+        { headers: { "content-type": "application/json" }, status: 200 },
+      );
+    }
+    return new Response(
       JSON.stringify({
         events: [
           {
@@ -121,6 +164,7 @@ try {
       }),
       { headers: { "content-type": "application/json" }, status: 200 },
     );
+  };
   result = await compareExternalOdds({
     ...fixtureInput,
     eventSlug: "nba-det-cle-2026-05-15",
@@ -131,10 +175,12 @@ try {
       { label: "Cavaliers", price: 0.615, side: "UNKNOWN" },
     ],
   });
-  assert(result.status === "partial", `expected partial for one-team candidate, got ${result.status}`);
+  assert(result.status === "available", `expected available via fallback variant, got ${result.status}`);
+  assert(result.matchedQueryVariant === "without_main", `expected without_main fallback, got ${result.matchedQueryVariant}`);
+  assert(result.attemptedQueries === 2, `expected 2 attempts before fallback match, got ${result.attemptedQueries}`);
   assert(
-    result.warnings.includes("odds_match_one_team_only"),
-    "partial result should explain when only one team candidate was found",
+    fallbackCalls.length === 2,
+    `expected 2 network requests before fallback success, got ${fallbackCalls.length}`,
   );
 
   globalThis.fetch = async () =>
@@ -176,6 +222,7 @@ try {
   assert(result.status === "available", `expected available, got ${result.status}`);
   assert(result.matchedMarket === true, "matched NBA odds should mark matchedMarket=true");
   assert(result.outcomes.length === 2, `expected 2 outcomes, got ${result.outcomes.length}`);
+  assert(result.attemptedQueries === 1, `expected primary match in 1 query, got ${result.attemptedQueries}`);
   assert(!JSON.stringify(result).includes("fixture-secret"), "API key must not appear in the sanitized result");
 
   const requestUrl = buildOddsBlazeRequestUrl(fixtureInput);

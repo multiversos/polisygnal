@@ -18,6 +18,8 @@ export type ExternalOddsOutcome = {
 };
 
 export type ExternalOddsComparison = {
+  attemptedQueries?: number;
+  attemptedQueryVariants?: string[];
   bestSourceUrl: string | null;
   checkedAt: string;
   eventName: string | null;
@@ -25,7 +27,9 @@ export type ExternalOddsComparison = {
   league: string | null;
   limitations: string[];
   matchConfidence: ExternalOddsMatchConfidence;
+  matchedQueryVariant?: string | null;
   matchedMarket: boolean;
+  noMatchReasons?: string[];
   outcomes: ExternalOddsOutcome[];
   providerName: string;
   sportsbook: string;
