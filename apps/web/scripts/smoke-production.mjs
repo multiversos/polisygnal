@@ -1549,8 +1549,19 @@ async function main() {
   assertTextIncludesOneOf(copyTradingText, ["Actividad", "Sin wallets."], "copy trading activity summary");
   assertTextIncludesOneOf(
     copyTradingText,
-    ["Wallets lentas", "escanea todas las wallets activas cada 5s", "mantener el escaneo live"],
+    [
+      "Wallets lentas",
+      "Timeouts reales",
+      "Pendientes",
+      "escanea todas las wallets activas cada 5s",
+      "mantener el escaneo live",
+    ],
     "copy trading watcher health summary",
+  );
+  assertTextIncludesOneOf(
+    copyTradingText,
+    ["Escaneadas / pendientes", "Ciclo recortado por carga", "Timeouts reales", "Wallets lentas"],
+    "copy trading watcher pending semantics",
   );
   assertTextIncludesOneOf(copyTradingText, ["Demo", "Sin wallets."], "copy trading demo summary");
   assertTextIncludesOneOf(copyTradingText, ["Copiadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo copied summary");

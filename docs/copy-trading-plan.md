@@ -168,6 +168,43 @@ npm.cmd --workspace apps/web run smoke:production
 - Esto sigue siendo `demo`. No activa modo real, no firma ordenes y no usa CLOB real.
 - Para un modo real futuro se necesitara una arquitectura mas robusta: worker dedicado, cola persistente, mejor estado por wallet y posiblemente WebSocket o canal server-side mas cercano a tiempo real.
 
+## Watcher health semantics
+
+- `Timeout real`:
+  - la wallet o la API publica excedieron el timeout por wallet;
+  - cuenta como problema real de lectura;
+  - incrementa `timeout_count`;
+  - no debe confundirse con un ciclo recortado por budget.
+- `Wallet lenta`:
+  - la wallet termino de escanear;
+  - no hubo timeout;
+  - simplemente tardo mas de lo deseado para un ciclo live;
+  - incrementa `slow_wallet_count`.
+- `Pendiente por budget`:
+  - el watcher corto el ciclo para no seguir acumulando atraso;
+  - la wallet queda listada como pendiente para el proximo ciclo;
+  - incrementa `skipped_due_to_budget_count` y `pending_wallet_count`;
+  - no incrementa `timeout_count`.
+- `Pendiente por prioridad`:
+  - el watcher decidio dejar una wallet de baja prioridad para despues;
+  - se usa para proteger el live scan;
+  - incrementa `skipped_due_to_priority_count` y `pending_wallet_count`;
+  - no es error.
+- `Ciclo recortado por carga`:
+  - significa que el watcher uso su budget maximo;
+  - es una proteccion para mantener el loop mas corto y predecible en modo demo.
+- `Rotacion / fairness`:
+  - las wallets pendientes del ciclo anterior reciben prioridad adicional en el siguiente;
+  - tambien se usa cuanto tiempo lleva una wallet sin escanear;
+  - esto evita que siempre se escaneen las mismas wallets recientes.
+- Meta actual:
+  - mantener el watcher demo razonablemente rapido;
+  - explicar mejor por que una wallet no se escaneo en ese ciclo;
+  - aumentar cobertura efectiva entre ciclos sin volver a duraciones de `26-36s`.
+- Limitacion vigente:
+  - sigue siendo un watcher demo en memoria;
+  - para un modo real futuro hara falta worker dedicado, cola persistente y/o WebSocket mas robusto.
+
 ## Copy Trading tiempo real - ruta tecnica
 
 Fase actual:

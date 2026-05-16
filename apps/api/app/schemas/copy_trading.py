@@ -27,7 +27,15 @@ CopyOrderStatus = Literal[
 ]
 CopyEventLevel = Literal["info", "warning", "error"]
 CopyDemoPositionStatus = Literal["open", "closed", "price_pending"]
-CopyWatcherWalletScanStatus = Literal["ok", "slow", "timeout", "error", "skipped"]
+CopyWatcherWalletScanStatus = Literal[
+    "scanned_ok",
+    "slow",
+    "timeout",
+    "skipped_budget",
+    "skipped_priority",
+    "skipped_paused",
+    "error",
+]
 CopyWatcherWalletPriority = Literal["high", "normal", "low"]
 
 COPY_AMOUNT_PRESETS = {
@@ -263,6 +271,7 @@ class CopyTradingDemoPnlSummary(BaseModel):
 
 class CopyTradingTickResponse(BaseModel):
     wallets_scanned: int = 0
+    scanned_wallet_count: int = 0
     trades_detected: int = 0
     new_trades: int = 0
     orders_simulated: int = 0
@@ -279,10 +288,17 @@ class CopyTradingTickResponse(BaseModel):
     cycle_budget_exceeded: bool = False
     skipped_wallets_due_to_budget: int = 0
     pending_wallets: int = 0
+    slow_wallet_count: int = 0
+    timeout_count: int = 0
+    errored_wallet_count: int = 0
+    skipped_due_to_budget_count: int = 0
+    skipped_due_to_priority_count: int = 0
+    pending_wallet_count: int = 0
 
 
 class CopyTradingWatcherLastResult(BaseModel):
     wallets_scanned: int = 0
+    scanned_wallet_count: int = 0
     trades_detected: int = 0
     new_trades: int = 0
     orders_simulated: int = 0
@@ -299,13 +315,20 @@ class CopyTradingWatcherLastResult(BaseModel):
     cycle_budget_exceeded: bool = False
     skipped_wallets_due_to_budget: int = 0
     pending_wallets: int = 0
+    slow_wallet_count: int = 0
+    timeout_count: int = 0
+    errored_wallet_count: int = 0
+    skipped_due_to_budget_count: int = 0
+    skipped_due_to_priority_count: int = 0
+    pending_wallet_count: int = 0
 
 
 class CopyTradingWatcherWalletScanResult(BaseModel):
     wallet_id: str
     alias: str | None = None
     wallet_address_short: str
-    status: CopyWatcherWalletScanStatus = "ok"
+    status: CopyWatcherWalletScanStatus = "scanned_ok"
+    reason: str | None = None
     duration_ms: int | None = None
     trades_detected: int = 0
     new_trades: int = 0
@@ -317,6 +340,10 @@ class CopyTradingWatcherWalletScanResult(BaseModel):
     error_message: str | None = None
     priority: CopyWatcherWalletPriority = "normal"
     next_scan_hint: str | None = None
+    skipped_reason: str | None = None
+    last_scanned_at: datetime | None = None
+    consecutive_timeouts: int = 0
+    consecutive_slow_scans: int = 0
 
 
 class CopyTradingWatcherStatusResponse(BaseModel):
@@ -333,8 +360,13 @@ class CopyTradingWatcherStatusResponse(BaseModel):
     next_run_at: datetime | None = None
     last_result: CopyTradingWatcherLastResult | None = None
     error_count: int = 0
+    scanned_wallet_count: int = 0
     slow_wallet_count: int = 0
     timeout_count: int = 0
+    errored_wallet_count: int = 0
+    skipped_due_to_budget_count: int = 0
+    skipped_due_to_priority_count: int = 0
+    pending_wallet_count: int = 0
     is_over_interval: bool = False
     behind_by_seconds: int = 0
     last_error: str | None = None

@@ -37,11 +37,15 @@ export function CopyWatcherPanel({
       : "Watcher pausado";
   const walletScanResults = watcher.last_result?.wallet_scan_results ?? [];
   const topSlowWallets = walletScanResults
-    .filter((entry) => entry.status === "slow" || entry.status === "timeout")
+    .filter((entry) => entry.status === "slow")
     .sort((left, right) => (right.duration_ms ?? 0) - (left.duration_ms ?? 0))
     .slice(0, 3);
-  const scannedWallets = watcher.last_result?.wallets_scanned ?? 0;
-  const pendingWallets = watcher.last_result?.pending_wallets ?? 0;
+  const timeoutWallets = walletScanResults.filter((entry) => entry.status === "timeout").slice(0, 3);
+  const pendingWalletsList = walletScanResults
+    .filter((entry) => entry.status === "skipped_budget" || entry.status === "skipped_priority")
+    .slice(0, 4);
+  const scannedWallets = watcher.last_result?.scanned_wallet_count ?? watcher.scanned_wallet_count ?? 0;
+  const pendingWallets = watcher.last_result?.pending_wallet_count ?? watcher.pending_wallet_count ?? 0;
   const cycleMessage = watcher.last_result?.cycle_budget_exceeded
     ? "Ciclo recortado por carga"
     : watcher.is_over_interval
@@ -70,8 +74,13 @@ export function CopyWatcherPanel({
         <small>Promedio reciente: {formatDurationMs(watcher.average_run_duration_ms)}</small>
         <small>Proximo escaneo {nextRunLabel}</small>
         <small>Estado: {cycleMessage}</small>
-        <small>Wallets lentas {watcher.slow_wallet_count}</small>
-        <small>Timeouts {watcher.timeout_count}</small>
+        <small>Escaneadas: {scannedWallets}</small>
+        <small>Pendientes: {pendingWallets}</small>
+        <small>Wallets lentas: {watcher.slow_wallet_count}</small>
+        <small>Timeouts reales: {watcher.timeout_count}</small>
+        <small>Saltadas por budget: {watcher.skipped_due_to_budget_count}</small>
+        <small>Saltadas por prioridad: {watcher.skipped_due_to_priority_count}</small>
+        <small>Con aviso: {watcher.errored_wallet_count}</small>
         <small>Escaneadas / pendientes: {scannedWallets} / {pendingWallets}</small>
         {watcher.is_over_interval ? (
           <small>Atrasado por carga: {watcher.behind_by_seconds}s sobre el intervalo</small>
@@ -96,10 +105,35 @@ export function CopyWatcherPanel({
         </div>
       ) : null}
 
+      {timeoutWallets.length > 0 ? (
+        <div className="copy-wallet-subsection">
+          <span className="copy-wallet-subsection-title">Wallets con timeout real</span>
+          <div className="copy-wallet-details">
+            {timeoutWallets.map((wallet) => (
+              <small key={wallet.wallet_id}>{formatWalletScanLine(wallet)}</small>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {pendingWalletsList.length > 0 ? (
+        <div className="copy-wallet-subsection">
+          <span className="copy-wallet-subsection-title">Wallets pendientes para proximo ciclo</span>
+          <div className="copy-wallet-details">
+            {pendingWalletsList.map((wallet) => (
+              <small key={wallet.wallet_id}>{formatWalletScanLine(wallet)}</small>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="copy-status-strip">
         <span className="copy-badge subtle">El watcher priorizo wallets activas para mantener el escaneo live.</span>
+        {watcher.skipped_due_to_budget_count > 0 ? (
+          <span className="copy-badge warning">Pendiente por carga no es error: vuelve en el proximo ciclo.</span>
+        ) : null}
         {watcher.timeout_count > 0 ? (
-          <span className="copy-badge locked">Una wallet lenta fue saltada para no frenar el ciclo.</span>
+          <span className="copy-badge locked">Timeout real: una wallet o la API tardaron demasiado.</span>
         ) : null}
       </div>
 
@@ -139,13 +173,18 @@ function formatWalletScanLine(entry: CopyTradingWatcherWalletScanResult): string
   const duration = entry.duration_ms === null ? "sin tiempo" : formatDurationMs(entry.duration_ms);
   const status =
     entry.status === "timeout"
-      ? "Timeout"
+      ? "Timeout real"
       : entry.status === "slow"
         ? "Wallet lenta"
-        : entry.status === "skipped"
-          ? "Pendiente"
+        : entry.status === "skipped_budget"
+          ? "Pendiente por carga"
+          : entry.status === "skipped_priority"
+            ? "Pendiente por prioridad"
+            : entry.status === "skipped_paused"
+              ? "Pausada"
           : entry.status === "error"
             ? "Con aviso"
             : "Saludable";
-  return `${alias} | ${status} | ${duration}${entry.next_scan_hint ? ` | ${entry.next_scan_hint}` : ""}`;
+  const reason = entry.reason ? ` | ${entry.reason}` : "";
+  return `${alias} | ${status} | ${duration}${reason}${entry.next_scan_hint ? ` | ${entry.next_scan_hint}` : ""}`;
 }

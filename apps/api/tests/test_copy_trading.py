@@ -863,8 +863,13 @@ def test_watcher_status_initial() -> None:
     assert status.last_run_duration_ms is None
     assert status.average_run_duration_ms is None
     assert status.error_count == 0
+    assert status.scanned_wallet_count == 0
     assert status.slow_wallet_count == 0
     assert status.timeout_count == 0
+    assert status.errored_wallet_count == 0
+    assert status.skipped_due_to_budget_count == 0
+    assert status.skipped_due_to_priority_count == 0
+    assert status.pending_wallet_count == 0
     assert status.is_over_interval is False
     assert status.behind_by_seconds == 0
 
@@ -913,7 +918,8 @@ def test_watcher_run_once_executes_demo_tick_once(db_session: Session) -> None:
     assert result.status.last_result.buy_simulated == 1
     assert result.status.last_result.sell_simulated == 0
     assert len(result.status.last_result.wallet_scan_results) == 1
-    assert result.status.last_result.wallet_scan_results[0].status == "ok"
+    assert result.status.last_result.wallet_scan_results[0].status == "scanned_ok"
+    assert result.status.last_result.wallet_scan_results[0].reason == "Escaneada correctamente."
 
 
 def test_watcher_marks_wallet_as_slow(db_session: Session) -> None:
@@ -944,7 +950,10 @@ def test_watcher_marks_wallet_timeout_and_continues(db_session: Session) -> None
     assert result.status.last_result is not None
     assert result.status.last_result.wallets_scanned == 2
     assert any(entry.wallet_id == first.id and entry.status == "timeout" for entry in result.status.last_result.wallet_scan_results)
-    assert any(entry.wallet_id == second.id and entry.status in {"ok", "slow"} for entry in result.status.last_result.wallet_scan_results)
+    assert any(
+        entry.wallet_id == second.id and entry.status in {"scanned_ok", "slow"}
+        for entry in result.status.last_result.wallet_scan_results
+    )
 
 
 def test_watcher_live_scan_limit_caps_trades_per_wallet(db_session: Session) -> None:
@@ -1098,13 +1107,70 @@ def test_watcher_marks_over_interval_and_counts_timeout(db_session: Session) -> 
     assert result.status.last_run_duration_ms is not None
     assert result.status.last_run_duration_ms >= 1000
     assert result.status.is_over_interval is True
-    assert result.status.timeout_count == 1
-    assert result.status.slow_wallet_count >= 1
+    assert result.status.timeout_count == 0
+    assert result.status.slow_wallet_count == 1
+    assert result.status.skipped_due_to_budget_count == 1
+    assert result.status.pending_wallet_count == 1
     assert result.status.last_result is not None
     assert result.status.last_result.errors == ["Watcher demo recorto el ciclo para no acumular retraso."]
     assert result.status.last_result.cycle_budget_exceeded is True
     assert result.status.last_result.pending_wallets == 1
-    assert any(entry.status == "skipped" for entry in result.status.last_result.wallet_scan_results)
+    assert any(entry.status == "skipped_budget" for entry in result.status.last_result.wallet_scan_results)
+
+
+def test_watcher_timeout_count_only_tracks_real_timeout(db_session: Session) -> None:
+    first = _create_wallet(db_session, suffix="11")
+    _create_wallet(db_session, suffix="22")
+    watcher = _build_test_watcher()
+
+    result = watcher.run_once(
+        db=db_session,
+        data_client=TimeoutForOneWalletReader(first.proxy_wallet),
+        now=_now(),
+    )
+
+    assert result.executed is True
+    assert result.status.timeout_count == 1
+    assert result.status.last_result is not None
+    timeout_entries = [entry for entry in result.status.last_result.wallet_scan_results if entry.status == "timeout"]
+    assert len(timeout_entries) == 1
+    assert timeout_entries[0].wallet_id == first.id
+
+
+def test_watcher_pending_wallets_are_promoted_next_cycle(db_session: Session) -> None:
+    first = _create_wallet(db_session, suffix="11")
+    second = _create_wallet(db_session, suffix="22")
+    watcher = CopyTradingDemoWatcher(interval_seconds=1, cycle_timeout_seconds=1, live_limit=5)
+
+    first_run = watcher.run_once(db=db_session, data_client=SlowTradeReader(1.05), now=_now())
+
+    assert first_run.executed is True
+    assert first_run.status.last_result is not None
+    assert any(
+        entry.wallet_id == second.id and entry.status == "skipped_budget"
+        for entry in first_run.status.last_result.wallet_scan_results
+    )
+
+    reader = TrackingTradeReader({first.proxy_wallet: [], second.proxy_wallet: []})
+    second_run = watcher.run_once(db=db_session, data_client=reader, now=_now() + timedelta(minutes=1))
+
+    assert second_run.executed is True
+    assert reader.wallets_seen[0] == second.proxy_wallet
+
+
+def test_watcher_pending_results_include_reason_and_hint(db_session: Session) -> None:
+    _create_wallet(db_session, suffix="11")
+    _create_wallet(db_session, suffix="22")
+    watcher = CopyTradingDemoWatcher(interval_seconds=1, cycle_timeout_seconds=1, live_limit=5)
+
+    result = watcher.run_once(db=db_session, data_client=SlowTradeReader(1.05), now=_now())
+
+    assert result.executed is True
+    assert result.status.last_result is not None
+    pending_entries = [entry for entry in result.status.last_result.wallet_scan_results if entry.status == "skipped_budget"]
+    assert len(pending_entries) == 1
+    assert pending_entries[0].reason == "Pendiente: ciclo recortado por carga."
+    assert pending_entries[0].next_scan_hint == "Pendiente por carga. Volvera en el proximo ciclo."
 
 
 def test_watcher_run_once_route(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
