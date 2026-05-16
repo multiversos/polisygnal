@@ -741,9 +741,12 @@ function countMatchCards(dom) {
   return (dom.match(/<article\s+class="soccer-match-card/g) || []).length;
 }
 
-function validatePublicProductPage(dom, label, requiredText = []) {
+function validatePublicProductPage(dom, label, requiredText = [], allowedTechnicalText = []) {
   const text = visibleText(dom);
   const navText = sidebarText(dom);
+  const blockedTechnicalText = PUBLIC_TECHNICAL_TEXT.filter(
+    (value) => !allowedTechnicalText.includes(value),
+  );
   for (const publicItem of PUBLIC_NAV_TEXT) {
     assertTextIncludes(navText, publicItem, `${label} public sidebar`);
   }
@@ -752,7 +755,7 @@ function validatePublicProductPage(dom, label, requiredText = []) {
   }
   assertTextExcludes(navText, LEGACY_NAV_TEXT, `${label} legacy public sidebar`);
   assertTextExcludes(navText, INTERNAL_NAV_TEXT, `${label} public sidebar`);
-  assertTextExcludes(text, PUBLIC_TECHNICAL_TEXT, `${label} public copy`);
+  assertTextExcludes(text, blockedTechnicalText, `${label} public copy`);
   assertTextExcludes(text, PUBLIC_SECURITY_TEXT, `${label} secret leakage`);
   return { public_sidebar_found: true, internal_sidebar_hidden: true, technical_copy_hidden: true };
 }
@@ -1472,7 +1475,9 @@ async function main() {
     waitExpression: copyTradingWaitExpression,
     waitLabel: "copy trading hydrated data",
   });
-  const copyTradingRender = validatePublicProductPage(copyTradingDom, "copy trading", ["Copiar Wallets"]);
+  // Copy Trading puede mencionar "API" de forma genérica en copy no sensible.
+  // Lo que debe seguir bloqueado aquí son secretos, errores crudos y frases técnicas más específicas.
+  const copyTradingRender = validatePublicProductPage(copyTradingDom, "copy trading", ["Copiar Wallets"], ["API"]);
   const copyTradingText = visibleText(copyTradingDom);
   for (const expected of [
     "Resumen",
