@@ -40,12 +40,11 @@ export function CopyOpenDemoPositionsTable({
                   <small>{position.market_title || position.market_slug || "Mercado Polymarket"}</small>
                   <small>{position.outcome || "Outcome no informado"}</small>
                   <div className="copy-status-strip">
-                    <span className={`copy-badge ${position.status === "price_pending" ? "locked" : "success"}`}>
-                      {position.status === "price_pending" ? "Precio actual pendiente" : "Abierta"}
-                    </span>
+                    <span className={`copy-badge ${getOpenPositionTone(position.status)}`}>{getOpenPositionLabel(position.status)}</span>
                     <span className="copy-badge">Entrada {Number(position.entry_price).toFixed(3)}</span>
                     <span className="copy-badge">Capital {formatUsd(position.entry_amount_usd)}</span>
                     <span className="copy-badge">Tiempo {formatTradeAge(ageSecondsFromNow(position.opened_at))}</span>
+                    {position.resolution_source ? <span className="copy-badge subtle">Fuente {formatResolutionSource(position.resolution_source)}</span> : null}
                   </div>
                 </div>
                 <div className="copy-feed-numbers">
@@ -53,6 +52,7 @@ export function CopyOpenDemoPositionsTable({
                   <span>Valor actual {position.current_value_usd !== null ? formatUsd(position.current_value_usd) : "Pendiente"}</span>
                   <span className={getPnlClassName(position.unrealized_pnl_usd)}>PnL actual {formatPnl(position.unrealized_pnl_usd)}</span>
                   <span className={getPnlClassName(position.unrealized_pnl_percent)}>PnL % {formatPercent(position.unrealized_pnl_percent)}</span>
+                  <span>{getOpenPositionDescription(position.status)}</span>
                   <small>{formatDateTime(position.opened_at)}</small>
                 </div>
               </article>
@@ -121,4 +121,52 @@ function pnlTone(value: string | null): "positive" | "negative" | "neutral" | "w
     return "negative";
   }
   return "neutral";
+}
+
+function getOpenPositionLabel(status: CopyDemoPosition["status"]): string {
+  switch (status) {
+    case "waiting_resolution":
+      return "Esperando resolucion";
+    case "unknown_resolution":
+      return "Resultado no confiable";
+    case "price_pending":
+      return "Precio actual pendiente";
+    default:
+      return "Abierta";
+  }
+}
+
+function getOpenPositionTone(status: CopyDemoPosition["status"]): string {
+  switch (status) {
+    case "waiting_resolution":
+      return "historical";
+    case "unknown_resolution":
+    case "price_pending":
+      return "locked";
+    default:
+      return "success";
+  }
+}
+
+function getOpenPositionDescription(status: CopyDemoPosition["status"]): string {
+  switch (status) {
+    case "waiting_resolution":
+      return "Mercado vencido. Esperando resolucion confiable.";
+    case "unknown_resolution":
+      return "No pudimos confirmar un resultado confiable todavia.";
+    case "price_pending":
+      return "Sin precio actual confiable por ahora.";
+    default:
+      return "Mercado activo o sin cierre detectado todavia.";
+  }
+}
+
+function formatResolutionSource(value: string): string {
+  if (value === "local_market_outcome") {
+    return "PolySignal";
+  }
+  if (value === "polymarket_gamma_read_only") {
+    return "Polymarket";
+  }
+  return value.replaceAll("_", " ");
 }

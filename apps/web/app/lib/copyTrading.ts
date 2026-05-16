@@ -2,6 +2,7 @@ import { fetchApiJson } from "./api";
 import type {
   CopyTradingDashboardData,
   CopyTradingDemoPnlSummary,
+  CopyTradingDemoSettlementResponse,
   CopyDemoPosition,
   CopyTradingStatus,
   CopyTradingTickSummary,
@@ -139,6 +140,12 @@ export async function scanCopyWallet(walletId: string): Promise<CopyTradingTickS
 
 export async function runCopyTradingDemoTick(): Promise<CopyTradingTickSummary> {
   return fetchApiJson<CopyTradingTickSummary>("/copy-trading/demo/tick", {
+    method: "POST",
+  });
+}
+
+export async function runCopyTradingDemoSettlementOnce(): Promise<CopyTradingDemoSettlementResponse> {
+  return fetchApiJson<CopyTradingDemoSettlementResponse>("/copy-trading/demo/settlement/run-once", {
     method: "POST",
   });
 }

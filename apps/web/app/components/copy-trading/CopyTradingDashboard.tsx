@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getCopyTradingPrimaryData,
   getCopyTradingSupplementalData,
+  runCopyTradingDemoSettlementOnce,
   runCopyTradingDemoTick,
   runCopyTradingWatcherOnce,
   startCopyTradingWatcher,
@@ -70,6 +71,7 @@ export function CopyTradingDashboard() {
   const [notice, setNotice] = useState<string | null>(null);
   const [tickSummary, setTickSummary] = useState<CopyTradingTickSummary | null>(null);
   const [runningTick, setRunningTick] = useState(false);
+  const [runningSettlement, setRunningSettlement] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [supplementalLoading, setSupplementalLoading] = useState(true);
   const [supplementalRefreshing, setSupplementalRefreshing] = useState(false);
@@ -268,6 +270,26 @@ export function CopyTradingDashboard() {
     await refresh();
   }
 
+  async function handleDemoSettlement() {
+    setRunningSettlement(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await runCopyTradingDemoSettlementOnce();
+      setNotice(
+        `Settlement demo reviso ${result.summary.checked_positions} posiciones. ` +
+          `Cerro ${result.summary.closed_by_market_resolution}, ` +
+          `esperando ${result.summary.waiting_resolution}, ` +
+          `canceladas ${result.summary.cancelled}.`,
+      );
+      await refresh();
+    } catch {
+      setError("No pudimos revisar resoluciones demo ahora.");
+    } finally {
+      setRunningSettlement(false);
+    }
+  }
+
   async function handleWatcherStart() {
     setWatcherBusyAction("start");
     setError(null);
@@ -394,6 +416,14 @@ export function CopyTradingDashboard() {
             </button>
             <button className="copy-action-button" disabled={runningTick || loading} onClick={handleDemoTick} type="button">
               {runningTick ? "Ejecutando..." : "Demo tick manual"}
+            </button>
+            <button
+              className="copy-secondary-button"
+              disabled={runningSettlement || loading}
+              onClick={handleDemoSettlement}
+              type="button"
+            >
+              {runningSettlement ? "Revisando..." : "Revisar resoluciones demo"}
             </button>
           </div>
         </section>

@@ -258,28 +258,37 @@ Fase real:
   - modelado de slippage y fees;
   - worker dedicado para watcher y valuacion.
 
-## Migracion 0019 - demo positions
+## Migracion 0020 - demo position resolution
 
-- El PR de `demo positions + PnL` requiere la migracion
-  `0019_copy_trading_demo_positions`.
+- El PR de settlement demo por resolucion requiere la migracion
+  `0020_copy_trading_demo_settle`.
 - Despues del merge a `main`, no ejecutar pasos manuales con secretos desde una
   consola local.
 - Usar el workflow manual:
   `.github/workflows/copy-trading-demo-positions-migration.yml`.
-- La confirmacion requerida es exacta:
-  `apply-copy-trading-0019`.
+- La confirmacion requerida debe referenciar la migracion nueva del sprint.
 - El workflow hace:
   - checkout del repo;
   - instalacion del backend;
   - `check_database_config --connect`;
   - `alembic current`;
   - `alembic heads`;
-  - `alembic upgrade 0019_copy_trading_demo_positions`.
+- `alembic upgrade 0020_copy_trading_demo_settle`.
 - El workflow usa secretos existentes de GitHub Actions y no imprime
   `DATABASE_URL` ni credenciales.
 - Despues de correr la migracion:
-  - confirmar que Alembic head sea `0019_copy_trading_demo_positions`;
+- confirmar que Alembic head sea `0020_copy_trading_demo_settle`;
   - validar `/copy-trading`;
   - correr `npm.cmd --workspace apps/web run smoke:production`.
 - Mantener la regla operativa ya documentada: evitar deploys manuales que
   puedan dejar `/api/build-info` con `commit: null`.
+
+## Demo market resolution settlement
+
+- Una posicion demo puede cerrarse por `wallet_sell` o por `market_resolved`.
+- Si el mercado ya vencio o cerro pero no hay resultado confiable, la posicion pasa a `waiting_resolution`.
+- Si existe una senal de resolucion pero no podemos mapear el outcome de la posicion con seguridad, queda en `unknown_resolution`.
+- Si el mercado fue cancelado o invalido, en demo devolvemos el capital sin inventar una ganancia o perdida adicional.
+- La fuente principal de resolucion es `MarketOutcome` local; Gamma read-only se usa para estado y fechas del mercado.
+- El watcher demo puede ejecutar settlement liviano con throttle para no bloquear el live scan.
+- El modo real sigue bloqueado. Para un futuro modo real hara falta settlement, reconciliacion y auditoria mas robustos.

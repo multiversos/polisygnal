@@ -85,11 +85,13 @@ export function CopyClosedDemoPositionsTable({
                       <span className="copy-badge">Entrada {Number(position.entry_price).toFixed(3)}</span>
                       <span className="copy-badge">Salida {position.exit_price ? Number(position.exit_price).toFixed(3) : "-"}</span>
                       <span className="copy-badge">Monto {formatUsd(position.entry_amount_usd)}</span>
+                      {position.resolution_source ? <span className="copy-badge subtle">Fuente {formatResolutionSource(position.resolution_source)}</span> : null}
                     </div>
                   </div>
                   <div className="copy-feed-numbers">
                     <span className={getPnlClassName(position.realized_pnl_usd)}>PnL final {formatPnl(position.realized_pnl_usd)}</span>
-                    <span>Cierre {position.close_reason === "wallet_sell" ? "Wallet vendio" : "Cierre demo"}</span>
+                    <span>Cierre {getCloseReasonLabel(position.close_reason)}</span>
+                    <span>Resultado {getResolvedOutcomeLabel(position)}</span>
                     <span>Duracion {formatTradeAge(durationSeconds(position.opened_at, position.closed_at))}</span>
                     <small>{formatDateTime(position.closed_at || position.updated_at)}</small>
                   </div>
@@ -182,4 +184,41 @@ function pnlTone(value: string | null): "positive" | "negative" | "neutral" | "w
     return "negative";
   }
   return "neutral";
+}
+
+function getCloseReasonLabel(reason: string | null): string {
+  switch (reason) {
+    case "wallet_sell":
+      return "Wallet vendio";
+    case "market_resolved":
+      return "Mercado resuelto";
+    case "market_cancelled":
+      return "Mercado cancelado";
+    default:
+      return "Cierre demo";
+  }
+}
+
+function getResolvedOutcomeLabel(position: CopyDemoPosition): string {
+  if (position.status === "cancelled" || position.close_reason === "market_cancelled") {
+    return "Cancelado";
+  }
+  const exitPrice = position.exit_price === null ? null : Number(position.exit_price);
+  if (exitPrice === 1) {
+    return "Gano";
+  }
+  if (exitPrice === 0) {
+    return "Perdio";
+  }
+  return "Pendiente";
+}
+
+function formatResolutionSource(value: string): string {
+  if (value === "local_market_outcome") {
+    return "PolySignal";
+  }
+  if (value === "polymarket_gamma_read_only") {
+    return "Polymarket";
+  }
+  return value.replaceAll("_", " ");
 }

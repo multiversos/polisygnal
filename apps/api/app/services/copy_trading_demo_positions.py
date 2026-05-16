@@ -144,7 +144,7 @@ def list_open_demo_positions(db: Session) -> list[CopyDemoPosition]:
         db.scalars(
             select(CopyDemoPosition)
             .options(joinedload(CopyDemoPosition.wallet))
-            .where(CopyDemoPosition.status == "open")
+            .where(CopyDemoPosition.status.in_(("open", "waiting_resolution", "unknown_resolution")))
             .order_by(CopyDemoPosition.opened_at.desc())
         ).all()
     )
@@ -155,7 +155,7 @@ def list_closed_demo_positions(db: Session, *, limit: int = 100) -> list[CopyDem
         db.scalars(
             select(CopyDemoPosition)
             .options(joinedload(CopyDemoPosition.wallet))
-            .where(CopyDemoPosition.status == "closed")
+            .where(CopyDemoPosition.status.in_(("closed", "cancelled")))
             .order_by(CopyDemoPosition.closed_at.desc(), CopyDemoPosition.opened_at.desc())
             .limit(limit)
         ).all()
@@ -179,14 +179,17 @@ def build_open_demo_positions_read(
         current_value = None
         unrealized_pnl = None
         unrealized_pnl_percent = None
-        status = "open"
+        status = position.status
         if current_price is None:
-            status = "price_pending"
+            if position.status == "open":
+                status = "price_pending"
         else:
             current_value = _quantize_usd(position.entry_size * current_price)
             unrealized_pnl = _quantize_usd(current_value - position.entry_amount_usd)
             if position.entry_amount_usd > 0:
                 unrealized_pnl_percent = _quantize_percent((unrealized_pnl / position.entry_amount_usd) * Decimal("100"))
+        if position.status == "open" and current_price is None:
+            status = "price_pending"
         reads.append(
             CopyDemoPositionRead(
                 id=position.id,
@@ -212,7 +215,8 @@ def build_open_demo_positions_read(
                 exit_price=position.exit_price,
                 exit_value_usd=position.exit_value_usd,
                 close_reason=position.close_reason,
-                status=status,
+                resolution_source=position.resolution_source,
+                status=status,  # type: ignore[arg-type]
                 opened_at=_normalize_datetime(position.opened_at),
                 closed_at=position.closed_at,
                 updated_at=_normalize_datetime(position.updated_at),
@@ -251,7 +255,8 @@ def build_closed_demo_positions_read(
                 exit_price=position.exit_price,
                 exit_value_usd=position.exit_value_usd,
                 close_reason=position.close_reason,
-                status="closed",
+                resolution_source=position.resolution_source,
+                status=position.status,  # type: ignore[arg-type]
                 opened_at=_normalize_datetime(position.opened_at),
                 closed_at=position.closed_at,
                 updated_at=_normalize_datetime(position.updated_at),

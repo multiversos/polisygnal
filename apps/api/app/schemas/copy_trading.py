@@ -26,7 +26,14 @@ CopyOrderStatus = Literal[
     "failed",
 ]
 CopyEventLevel = Literal["info", "warning", "error"]
-CopyDemoPositionStatus = Literal["open", "closed", "price_pending"]
+CopyDemoPositionStatus = Literal[
+    "open",
+    "waiting_resolution",
+    "unknown_resolution",
+    "closed",
+    "cancelled",
+    "price_pending",
+]
 CopyWatcherWalletScanStatus = Literal[
     "scanned_ok",
     "slow",
@@ -241,6 +248,7 @@ class CopyDemoPositionRead(BaseModel):
     exit_price: Decimal | None = None
     exit_value_usd: Decimal | None = None
     close_reason: str | None = None
+    resolution_source: str | None = None
     status: CopyDemoPositionStatus
     opened_at: datetime
     closed_at: datetime | None = None
@@ -395,6 +403,35 @@ class CopyTradingDemoPositionsResponse(BaseModel):
 
 class CopyTradingDemoPnlSummaryResponse(BaseModel):
     summary: CopyTradingDemoPnlSummary
+
+
+class CopyTradingDemoSettlementPositionResult(BaseModel):
+    position_id: str
+    wallet_alias: str | None = None
+    market_title: str | None = None
+    outcome: str | None = None
+    previous_status: CopyDemoPositionStatus
+    new_status: CopyDemoPositionStatus
+    close_reason: str | None = None
+    realized_pnl_usd: Decimal | None = None
+    resolution_source: str | None = None
+    reason: str
+
+
+class CopyTradingDemoSettlementSummary(BaseModel):
+    checked_positions: int = 0
+    closed_by_market_resolution: int = 0
+    waiting_resolution: int = 0
+    still_open: int = 0
+    cancelled: int = 0
+    unknown_resolution: int = 0
+    errors: int = 0
+
+
+class CopyTradingDemoSettlementResponse(BaseModel):
+    summary: CopyTradingDemoSettlementSummary
+    positions: list[CopyTradingDemoSettlementPositionResult] = Field(default_factory=list)
+    ran_at: datetime
 
 
 def _validate_copy_amount(value: Decimal) -> Decimal:

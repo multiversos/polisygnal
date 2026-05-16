@@ -344,6 +344,52 @@ class PolymarketGammaClient:
 
         return markets_by_id
 
+    def fetch_markets_by_condition_ids(
+        self,
+        condition_ids: list[str],
+    ) -> dict[str, PolymarketMarketDetailsPayload]:
+        if not condition_ids:
+            return {}
+
+        payload = self._get_json(
+            "/markets",
+            params=[("condition_ids", condition_id) for condition_id in condition_ids],
+        )
+        if not isinstance(payload, list):
+            raise PolymarketClientError("La API de Polymarket devolvio un payload invalido para /markets.")
+
+        markets_by_condition_id: dict[str, PolymarketMarketDetailsPayload] = {}
+        for index, raw_market in enumerate(payload):
+            try:
+                market = PolymarketMarketDetailsPayload.model_validate(raw_market)
+            except ValidationError as exc:
+                raise PolymarketClientError(
+                    f"Error parseando mercado en /markets index={index}: {exc.errors()[0]['msg']}"
+                ) from exc
+            if market.condition_id:
+                markets_by_condition_id[market.condition_id] = market
+        return markets_by_condition_id
+
+    def fetch_market_by_condition_id(self, condition_id: str) -> PolymarketMarketDetailsPayload | None:
+        markets = self.fetch_markets_by_condition_ids([condition_id])
+        return markets.get(condition_id)
+
+    def fetch_market_by_slug(self, slug: str) -> PolymarketMarketDetailsPayload | None:
+        payload = self._get_json(
+            "/markets",
+            params={"slug": slug},
+        )
+        if not isinstance(payload, list):
+            raise PolymarketClientError("La API de Polymarket devolvio un payload invalido para /markets.")
+        if len(payload) == 0:
+            return None
+        try:
+            return PolymarketMarketDetailsPayload.model_validate(payload[0])
+        except ValidationError as exc:
+            raise PolymarketClientError(
+                f"Error parseando mercado en /markets slug={slug}: {exc.errors()[0]['msg']}"
+            ) from exc
+
     def _get_json(self, path: str, *, params: dict[str, object] | list[tuple[str, object]]) -> object:
         try:
             response = self._client.get(path, params=params)

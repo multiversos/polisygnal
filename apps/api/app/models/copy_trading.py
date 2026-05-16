@@ -214,7 +214,10 @@ class CopyDemoPosition(Base):
     __tablename__ = "copy_demo_positions"
     __table_args__ = (
         CheckConstraint("entry_action in ('buy', 'sell')", name="ck_copy_demo_positions_entry_action"),
-        CheckConstraint("status in ('open', 'closed')", name="ck_copy_demo_positions_status"),
+        CheckConstraint(
+            "status in ('open', 'waiting_resolution', 'unknown_resolution', 'closed', 'cancelled')",
+            name="ck_copy_demo_positions_status",
+        ),
         CheckConstraint("entry_amount_usd > 0", name="ck_copy_demo_positions_entry_amount_positive"),
         CheckConstraint("entry_size > 0", name="ck_copy_demo_positions_entry_size_positive"),
         CheckConstraint("entry_price > 0", name="ck_copy_demo_positions_entry_price_positive"),
@@ -255,6 +258,7 @@ class CopyDemoPosition(Base):
     exit_value_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     realized_pnl_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     close_reason: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    resolution_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="open", server_default="open", nullable=False)
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -9,6 +9,7 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.clients.polymarket import PolymarketGammaClient
 from app.clients.polymarket_data import PolymarketDataClient
 from app.core.config import get_settings
 from app.db.session import SessionLocal
@@ -20,6 +21,7 @@ from app.schemas.copy_trading import (
     CopyTradingWatcherWalletScanResult,
 )
 from app.services.copy_trading_demo_engine import scan_copy_wallet
+from app.services.copy_trading_demo_settlement import settle_open_demo_positions
 from app.services.copy_trading_service import add_copy_event
 
 
@@ -30,6 +32,11 @@ class SessionFactory(Protocol):
 
 class DataClientFactory(Protocol):
     def __call__(self) -> PolymarketDataClient:
+        ...
+
+
+class GammaClientFactory(Protocol):
+    def __call__(self) -> PolymarketGammaClient:
         ...
 
 
@@ -56,6 +63,11 @@ def _default_data_client_factory() -> PolymarketDataClient:
         timeout_seconds=min(settings.polymarket_data_timeout_seconds, 4.5),
         user_agent=settings.polymarket_user_agent,
     )
+
+
+def _default_gamma_client_factory() -> PolymarketGammaClient:
+    settings = get_settings()
+    return PolymarketGammaClient.from_settings(settings)
 
 
 @dataclass(slots=True)
@@ -86,16 +98,20 @@ class CopyTradingDemoWatcher:
         limit: int = 50,
         cycle_timeout_seconds: int | None = None,
         live_limit: int = 25,
+        settlement_interval_seconds: int = 120,
         session_factory: SessionFactory = SessionLocal,
         data_client_factory: DataClientFactory = _default_data_client_factory,
+        gamma_client_factory: GammaClientFactory = _default_gamma_client_factory,
         tick_runner: TickRunner = scan_copy_wallet,
     ) -> None:
         self._interval_seconds = interval_seconds
         self._limit = limit
         self._live_limit = max(1, min(live_limit, limit))
         self._cycle_timeout_seconds = max(cycle_timeout_seconds or (interval_seconds + 3), interval_seconds)
+        self._settlement_interval_seconds = max(settlement_interval_seconds, 30)
         self._session_factory = session_factory
         self._data_client_factory = data_client_factory
+        self._gamma_client_factory = gamma_client_factory
         self._tick_runner = tick_runner
         self._lock = RLock()
         self._enabled = False
@@ -111,6 +127,7 @@ class CopyTradingDemoWatcher:
         self._run_count = 0
         self._next_run_at: datetime | None = None
         self._last_result: CopyTradingWatcherLastResult | None = None
+        self._last_settlement_run_at: datetime | None = None
         self._error_count = 0
         self._scanned_wallet_count = 0
         self._slow_wallet_count = 0
@@ -218,6 +235,7 @@ class CopyTradingDemoWatcher:
                 data_client=client,
                 started_at=current_time,
             )
+            self._maybe_run_demo_settlement(session, current_time=current_time)
             if owns_db:
                 session.commit()
             result = CopyTradingWatcherLastResult.model_validate(tick_result.model_dump())
@@ -280,6 +298,7 @@ class CopyTradingDemoWatcher:
             self._run_count = 0
             self._next_run_at = None
             self._last_result = None
+            self._last_settlement_run_at = None
             self._error_count = 0
             self._scanned_wallet_count = 0
             self._slow_wallet_count = 0
@@ -485,6 +504,27 @@ class CopyTradingDemoWatcher:
         response.pending_wallets = response.pending_wallet_count
         response.skipped_wallets_due_to_budget = response.skipped_due_to_budget_count
         return response
+
+    def _maybe_run_demo_settlement(self, db: Session, *, current_time: datetime) -> None:
+        with self._lock:
+            last_run = self._last_settlement_run_at
+        if last_run is not None and current_time < last_run + timedelta(seconds=self._settlement_interval_seconds):
+            return
+        gamma_client = self._gamma_client_factory()
+        try:
+            settle_open_demo_positions(db, gamma_client=gamma_client, now=current_time, limit=20)
+            with self._lock:
+                self._last_settlement_run_at = current_time
+        except Exception:
+            add_copy_event(
+                db,
+                wallet_id=None,
+                level="warning",
+                event_type="demo_settlement_failed",
+                message="No pudimos revisar resoluciones demo en este ciclo.",
+            )
+        finally:
+            gamma_client.close()
 
     def _prioritize_wallets(self, wallets: list[CopyWallet], *, reference_time: datetime) -> list[CopyWallet]:
         return sorted(
