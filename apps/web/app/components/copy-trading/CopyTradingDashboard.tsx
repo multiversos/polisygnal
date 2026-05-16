@@ -11,7 +11,10 @@ import {
 import type { CopyTradingDashboardData, CopyTradingTickSummary } from "../../lib/copyTradingTypes";
 import { AddCopyWalletForm } from "./AddCopyWalletForm";
 import { CopyBotEvents } from "./CopyBotEvents";
+import { CopyClosedDemoPositionsTable } from "./CopyClosedDemoPositionsTable";
+import { CopyDemoPnlSummaryPanel } from "./CopyDemoPnlSummaryPanel";
 import { CopyOrdersTable } from "./CopyOrdersTable";
+import { CopyOpenDemoPositionsTable } from "./CopyOpenDemoPositionsTable";
 import { CopyTradesTable } from "./CopyTradesTable";
 import { CopyTradingHeader } from "./CopyTradingHeader";
 import { CopyTradingMetrics } from "./CopyTradingMetrics";
@@ -319,6 +322,13 @@ export function CopyTradingDashboard() {
         onNotice={setNotice}
         wallets={data?.wallets ?? []}
       />
+
+      <div className="copy-dashboard-grid two">
+        <CopyDemoPnlSummaryPanel summary={data?.demo_pnl_summary ?? null} />
+        <CopyOpenDemoPositionsTable positions={data?.open_demo_positions ?? []} />
+      </div>
+
+      <CopyClosedDemoPositionsTable positions={data?.closed_demo_positions ?? []} />
 
       <div className="copy-dashboard-grid three">
         <CopyTradesTable trades={data?.trades ?? []} />

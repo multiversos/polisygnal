@@ -11,7 +11,14 @@ from sqlalchemy.orm import Session
 from app.api import routes_copy_trading
 from app.models.copy_trading import CopyWallet
 from app.schemas.copy_trading import CopyWalletCreate, CopyWalletUpdate
-from app.services.copy_trading_demo_engine import normalize_public_trade, run_demo_tick
+from app.services.copy_trading_demo_engine import normalize_public_trade, run_demo_tick, scan_copy_wallet
+from app.services.copy_trading_demo_positions import (
+    build_closed_demo_positions_read,
+    build_demo_pnl_summary,
+    build_open_demo_positions_read,
+    list_closed_demo_positions,
+    list_open_demo_positions,
+)
 from app.services.copy_trading_risk_rules import CopyTradeForRules, evaluate_demo_trade
 from app.services.copy_trading_service import (
     DuplicateCopyWalletError,
@@ -71,6 +78,30 @@ class SlowTradeReader:
 
         time.sleep(self.delay_seconds)
         return self.trades[:limit]
+
+
+class FakeMarketPosition:
+    def __init__(self, *, asset: str | None, outcome: str | None, curr_price: Decimal | None) -> None:
+        self.asset = asset
+        self.outcome = outcome
+        self.curr_price = curr_price
+
+
+class PriceAwareDataClient:
+    def __init__(
+        self,
+        *,
+        positions_by_condition: dict[str, list[FakeMarketPosition]] | None = None,
+        trades_by_condition: dict[str, list[dict[str, object]]] | None = None,
+    ) -> None:
+        self.positions_by_condition = positions_by_condition or {}
+        self.trades_by_condition = trades_by_condition or {}
+
+    def get_positions_for_market(self, condition_id: str, *, limit: int = 100) -> list[FakeMarketPosition]:
+        return self.positions_by_condition.get(condition_id, [])[:limit]
+
+    def get_trades_for_market(self, condition_id: str, *, limit: int = 25, offset: int = 0) -> list[dict[str, object]]:
+        return self.trades_by_condition.get(condition_id, [])[offset : offset + limit]
 
 
 class DummySession:
@@ -541,6 +572,189 @@ def test_demo_tick_counts_recent_trades_outside_window(db_session: Session) -> N
     assert orders[0].reason == "trade_too_old"
 
 
+def test_demo_tick_buy_opens_demo_position(db_session: Session) -> None:
+    _create_wallet(db_session, amount=Decimal("10"))
+
+    response = run_demo_tick(db_session, data_client=FakeTradeReader([_trade("0xposition-open", price="0.40")]), now=_now())
+    positions = list_open_demo_positions(db_session)
+
+    assert response.orders_simulated == 1
+    assert len(positions) == 1
+    assert positions[0].status == "open"
+    assert positions[0].entry_price == Decimal("0.40000000")
+    assert positions[0].entry_amount_usd == Decimal("10.00")
+    assert positions[0].entry_size == Decimal("25.00000000")
+
+
+def test_demo_tick_skipped_buy_does_not_open_demo_position(db_session: Session) -> None:
+    _create_wallet(db_session, amount=Decimal("10"))
+    old_trade = _trade("0xposition-skipped", price="0.40") | {"timestamp": (_now() - timedelta(minutes=10)).isoformat()}
+
+    response = run_demo_tick(db_session, data_client=FakeTradeReader([old_trade]), now=_now())
+
+    assert response.orders_skipped == 1
+    assert list_open_demo_positions(db_session) == []
+
+
+def test_demo_tick_sell_closes_open_demo_position(db_session: Session) -> None:
+    _create_wallet(db_session, amount=Decimal("5"))
+
+    run_demo_tick(db_session, data_client=FakeTradeReader([_trade("0xposition-buy", price="0.50")]), now=_now())
+    response = run_demo_tick(
+        db_session,
+        data_client=FakeTradeReader([_trade("0xposition-sell", side="SELL", price="0.60")]),
+        now=_now(),
+    )
+    open_positions = list_open_demo_positions(db_session)
+    closed_positions = list_closed_demo_positions(db_session)
+
+    assert response.orders_simulated == 1
+    assert open_positions == []
+    assert len(closed_positions) == 1
+    assert closed_positions[0].status == "closed"
+    assert closed_positions[0].exit_price == Decimal("0.60000000")
+    assert closed_positions[0].exit_value_usd == Decimal("6.00")
+    assert closed_positions[0].realized_pnl_usd == Decimal("1.00")
+    assert closed_positions[0].close_reason == "wallet_sell"
+
+
+def test_demo_tick_sell_without_open_position_does_not_break(db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("5"))
+
+    response = run_demo_tick(
+        db_session,
+        data_client=FakeTradeReader([_trade("0xunmatched-sell", side="SELL", price="0.60")]),
+        now=_now(),
+    )
+    events = list_copy_events(db_session, limit=10)
+
+    assert response.orders_simulated == 1
+    assert list_open_demo_positions(db_session) == []
+    assert list_closed_demo_positions(db_session) == []
+    assert any(
+        event.wallet_id == wallet.id and event.event_type == "demo_position_unmatched_sell"
+        for event in events
+    )
+
+
+def test_open_demo_positions_read_calculates_unrealized_pnl(db_session: Session) -> None:
+    _create_wallet(db_session, amount=Decimal("10"))
+    trade = _trade("0xposition-pnl", price="0.40") | {"conditionId": "cond-pnl", "asset": "asset-yes"}
+
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    positions = list_open_demo_positions(db_session)
+    reads = build_open_demo_positions_read(
+        positions,
+        data_client=PriceAwareDataClient(
+            positions_by_condition={
+                "cond-pnl": [FakeMarketPosition(asset="asset-yes", outcome="YES", curr_price=Decimal("0.55"))]
+            }
+        ),
+        now=_now(),
+    )
+
+    assert len(reads) == 1
+    assert reads[0].status == "open"
+    assert reads[0].current_price == Decimal("0.55")
+    assert reads[0].current_value_usd == Decimal("13.75")
+    assert reads[0].unrealized_pnl_usd == Decimal("3.75")
+    assert reads[0].unrealized_pnl_percent == Decimal("37.50")
+
+
+def test_open_demo_positions_read_marks_price_pending_when_market_price_missing(db_session: Session) -> None:
+    _create_wallet(db_session, amount=Decimal("10"))
+    trade = _trade("0xposition-pending", price="0.40") | {"conditionId": "cond-pending", "asset": "asset-yes"}
+
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    positions = list_open_demo_positions(db_session)
+    reads = build_open_demo_positions_read(positions, data_client=PriceAwareDataClient(), now=_now())
+
+    assert len(reads) == 1
+    assert reads[0].status == "price_pending"
+    assert reads[0].current_price is None
+    assert reads[0].unrealized_pnl_usd is None
+    assert reads[0].unrealized_pnl_percent is None
+
+
+def test_demo_pnl_summary_counts_open_and_closed_positions(db_session: Session) -> None:
+    first = _create_wallet(db_session, amount=Decimal("10"), suffix="11")
+    second = _create_wallet(db_session, amount=Decimal("5"), suffix="22")
+
+    scan_copy_wallet(
+        db_session,
+        wallet_id=first.id,
+        data_client=FakeTradeReader([_trade("0xwallet1-buy", price="0.40", wallet=first.proxy_wallet) | {"conditionId": "cond-open", "asset": "asset-open"}]),
+        now=_now(),
+    )
+    scan_copy_wallet(
+        db_session,
+        wallet_id=second.id,
+        data_client=FakeTradeReader([_trade("0xwallet2-buy", price="0.50", wallet=second.proxy_wallet) | {"conditionId": "cond-closed", "asset": "asset-closed"}]),
+        now=_now(),
+    )
+    scan_copy_wallet(
+        db_session,
+        wallet_id=second.id,
+        data_client=FakeTradeReader([_trade("0xwallet2-sell", side="SELL", price="0.65", wallet=second.proxy_wallet) | {"conditionId": "cond-closed", "asset": "asset-closed"}]),
+        now=_now(),
+    )
+
+    open_reads = build_open_demo_positions_read(
+        list_open_demo_positions(db_session),
+        data_client=PriceAwareDataClient(
+            positions_by_condition={
+                "cond-open": [FakeMarketPosition(asset="asset-open", outcome="YES", curr_price=Decimal("0.55"))]
+            }
+        ),
+        now=_now(),
+    )
+    closed_reads = build_closed_demo_positions_read(list_closed_demo_positions(db_session))
+    summary = build_demo_pnl_summary(open_reads, closed_reads)
+
+    assert summary.open_positions_count == 1
+    assert summary.closed_positions_count == 1
+    assert summary.open_pnl_usd == Decimal("3.75")
+    assert summary.realized_pnl_usd == Decimal("1.50")
+    assert summary.total_demo_pnl_usd == Decimal("5.25")
+    assert summary.winning_closed_count == 1
+    assert summary.losing_closed_count == 0
+    assert summary.price_pending_count == 0
+
+
+def test_demo_positions_do_not_mix_wallets(db_session: Session) -> None:
+    first = _create_wallet(db_session, amount=Decimal("5"), suffix="11")
+    second = _create_wallet(db_session, amount=Decimal("5"), suffix="22")
+
+    scan_copy_wallet(
+        db_session,
+        wallet_id=first.id,
+        data_client=FakeTradeReader([_trade("0xfirst-buy", price="0.50", wallet=first.proxy_wallet) | {"conditionId": "cond-shared", "asset": "asset-first"}]),
+        now=_now(),
+    )
+    scan_copy_wallet(
+        db_session,
+        wallet_id=second.id,
+        data_client=FakeTradeReader([_trade("0xsecond-buy", price="0.50", wallet=second.proxy_wallet) | {"conditionId": "cond-shared", "asset": "asset-second"}]),
+        now=_now(),
+    )
+    scan_copy_wallet(
+        db_session,
+        wallet_id=first.id,
+        data_client=FakeTradeReader([_trade("0xfirst-sell", side="SELL", price="0.60", wallet=first.proxy_wallet) | {"conditionId": "cond-shared", "asset": "asset-first"}]),
+        now=_now(),
+    )
+
+    open_positions = list_open_demo_positions(db_session)
+    closed_positions = list_closed_demo_positions(db_session)
+
+    assert len(open_positions) == 1
+    assert open_positions[0].wallet_id == second.id
+    assert open_positions[0].asset == "asset-second"
+    assert len(closed_positions) == 1
+    assert closed_positions[0].wallet_id == first.id
+    assert closed_positions[0].asset == "asset-first"
+
+
 def test_demo_tick_scans_multiple_wallets_without_trades(db_session: Session) -> None:
     first = _create_wallet(db_session, suffix="11")
     second = _create_wallet(db_session, suffix="22")
@@ -809,12 +1023,19 @@ def _create_wallet(
     return wallet
 
 
-def _trade(transaction_hash: str, *, side: str = "BUY") -> dict[str, object]:
+def _trade(
+    transaction_hash: str,
+    *,
+    side: str = "BUY",
+    price: str = "0.50",
+    size: str = "100",
+    wallet: str = WALLET,
+) -> dict[str, object]:
     return {
-        "proxyWallet": WALLET,
+        "proxyWallet": wallet,
         "side": side,
-        "price": "0.50",
-        "size": "100",
+        "price": price,
+        "size": size,
         "timestamp": _now().isoformat(),
         "title": "Will test market resolve yes?",
         "slug": "test-market",

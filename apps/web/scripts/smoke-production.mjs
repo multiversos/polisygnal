@@ -1180,6 +1180,16 @@ async function main() {
   assertTextIncludesOneOf(copyTradingText, ["Demo", "Sin wallets."], "copy trading demo summary");
   assertTextIncludesOneOf(copyTradingText, ["Copiadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo copied summary");
   assertTextIncludesOneOf(copyTradingText, ["Saltadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo skipped summary");
+  assertTextIncludesOneOf(copyTradingText, ["Copias demo abiertas", "Sin copias demo abiertas todavia"], "copy trading open demo positions");
+  assertTextIncludesOneOf(copyTradingText, ["Historial de copias demo", "Sin historial de copias demo todavia"], "copy trading closed demo history");
+  assertTextIncludesOneOf(copyTradingText, ["Resumen PnL demo", "Sin resumen demo todavia"], "copy trading pnl summary");
+  assertTextIncludesOneOf(copyTradingText, ["PnL abierto", "Sin resumen demo todavia"], "copy trading open pnl");
+  assertTextIncludesOneOf(copyTradingText, ["PnL total", "Sin resumen demo todavia"], "copy trading total pnl");
+  assertTextIncludesOneOf(
+    copyTradingText,
+    ["Precio actual pendiente", "PnL actual", "Sin copias demo abiertas todavia"],
+    "copy trading open position pricing",
+  );
   assertTextExcludes(
     copyTradingText,
     [

@@ -26,6 +26,7 @@ CopyOrderStatus = Literal[
     "failed",
 ]
 CopyEventLevel = Literal["info", "warning", "error"]
+CopyDemoPositionStatus = Literal["open", "closed", "price_pending"]
 
 COPY_AMOUNT_PRESETS = {
     Decimal("1"),
@@ -206,6 +207,49 @@ class CopyTradingStatusResponse(BaseModel):
     last_scan_at: datetime | None = None
 
 
+class CopyDemoPositionRead(BaseModel):
+    id: str
+    wallet_id: str
+    wallet_label: str | None = None
+    proxy_wallet: str | None = None
+    opening_order_id: str
+    closing_order_id: str | None = None
+    condition_id: str | None = None
+    asset: str | None = None
+    outcome: str | None = None
+    market_title: str | None = None
+    market_slug: str | None = None
+    entry_action: CopyTradeSide
+    entry_price: Decimal
+    entry_amount_usd: Decimal
+    entry_size: Decimal
+    current_price: Decimal | None = None
+    current_value_usd: Decimal | None = None
+    unrealized_pnl_usd: Decimal | None = None
+    unrealized_pnl_percent: Decimal | None = None
+    realized_pnl_usd: Decimal | None = None
+    exit_price: Decimal | None = None
+    exit_value_usd: Decimal | None = None
+    close_reason: str | None = None
+    status: CopyDemoPositionStatus
+    opened_at: datetime
+    closed_at: datetime | None = None
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CopyTradingDemoPnlSummary(BaseModel):
+    open_positions_count: int = 0
+    closed_positions_count: int = 0
+    open_pnl_usd: Decimal | None = None
+    realized_pnl_usd: Decimal | None = None
+    total_demo_pnl_usd: Decimal | None = None
+    winning_closed_count: int = 0
+    losing_closed_count: int = 0
+    price_pending_count: int = 0
+
+
 class CopyTradingTickResponse(BaseModel):
     wallets_scanned: int = 0
     trades_detected: int = 0
@@ -273,6 +317,14 @@ class CopyTradingOrdersResponse(BaseModel):
 
 class CopyTradingEventsResponse(BaseModel):
     events: list[CopyBotEventRead] = Field(default_factory=list)
+
+
+class CopyTradingDemoPositionsResponse(BaseModel):
+    positions: list[CopyDemoPositionRead] = Field(default_factory=list)
+
+
+class CopyTradingDemoPnlSummaryResponse(BaseModel):
+    summary: CopyTradingDemoPnlSummary
 
 
 def _validate_copy_amount(value: Decimal) -> Decimal:

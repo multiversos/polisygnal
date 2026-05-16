@@ -176,3 +176,52 @@ Fase real:
 - auditoria;
 - emergency stop;
 - modo real sigue bloqueado hasta sprint especifico.
+
+## Demo positions and PnL
+
+- Cada BUY demo `simulated` abre una posicion demo si hay precio, monto y outcome suficientes.
+- Cada SELL demo `simulated` intenta cerrar la posicion abierta mas reciente de la misma wallet y del mismo asset/outcome.
+- Las posiciones abiertas muestran `PnL actual` usando precio publico de mercado si esta disponible.
+- Si no hay precio actual confiable, la UI muestra `Precio actual pendiente` y no inventa profit ni perdida.
+- Las posiciones cerradas guardan `PnL final` y pasan al historial de copias demo.
+- El dashboard expone:
+  - `Copias demo abiertas`
+  - `Historial de copias demo`
+  - `Resumen PnL demo`
+- La fuente de precio actual es de solo lectura publica. No ejecuta operaciones reales, no firma ordenes y no usa credenciales privadas.
+- Limitaciones del MVP:
+  - cierre parcial todavia no tiene ledger avanzado;
+  - slippage, fees y best bid/ask no se modelan todavia;
+  - si llega un SELL sin posicion abierta, se registra un evento limpio y el sistema sigue vivo.
+- Siguiente evolucion natural:
+  - ledger demo mas robusto;
+  - PnL por wallet mas detallado;
+  - precios en tiempo real por canal mas estable;
+  - modelado de slippage y fees;
+  - worker dedicado para watcher y valuacion.
+
+## Migracion 0019 - demo positions
+
+- El PR de `demo positions + PnL` requiere la migracion
+  `0019_copy_trading_demo_positions`.
+- Despues del merge a `main`, no ejecutar pasos manuales con secretos desde una
+  consola local.
+- Usar el workflow manual:
+  `.github/workflows/copy-trading-demo-positions-migration.yml`.
+- La confirmacion requerida es exacta:
+  `apply-copy-trading-0019`.
+- El workflow hace:
+  - checkout del repo;
+  - instalacion del backend;
+  - `check_database_config --connect`;
+  - `alembic current`;
+  - `alembic heads`;
+  - `alembic upgrade 0019_copy_trading_demo_positions`.
+- El workflow usa secretos existentes de GitHub Actions y no imprime
+  `DATABASE_URL` ni credenciales.
+- Despues de correr la migracion:
+  - confirmar que Alembic head sea `0019_copy_trading_demo_positions`;
+  - validar `/copy-trading`;
+  - correr `npm.cmd --workspace apps/web run smoke:production`.
+- Mantener la regla operativa ya documentada: evitar deploys manuales que
+  puedan dejar `/api/build-info` con `commit: null`.

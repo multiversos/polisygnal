@@ -2624,6 +2624,18 @@ function validateAnalyzerFirstProductSource() {
     resolve(appRoot, "app/components/copy-trading/CopyBotEvents.tsx"),
     "utf8",
   );
+  const copyDemoPnlSummaryPanel = readFileSync(
+    resolve(appRoot, "app/components/copy-trading/CopyDemoPnlSummaryPanel.tsx"),
+    "utf8",
+  );
+  const copyOpenDemoPositionsTable = readFileSync(
+    resolve(appRoot, "app/components/copy-trading/CopyOpenDemoPositionsTable.tsx"),
+    "utf8",
+  );
+  const copyClosedDemoPositionsTable = readFileSync(
+    resolve(appRoot, "app/components/copy-trading/CopyClosedDemoPositionsTable.tsx"),
+    "utf8",
+  );
 
   for (const item of ["Analizar enlace", "Historial", "Rendimiento", "Alertas", "Metodologia", "Copiar Wallets"]) {
     assert(shell.includes(item), `expected analyzer-first nav item: ${item}`);
@@ -2721,6 +2733,17 @@ function validateAnalyzerFirstProductSource() {
   assert(copyWalletsTable.includes("Copiadas"), "wallet table should expose copied demo count");
   assert(copyWalletsTable.includes("Saltadas"), "wallet table should expose skipped demo count");
   assert(copyWalletsTable.includes("Ultima copia demo"), "wallet table should expose last demo copy details");
+  assert(copyDemoPnlSummaryPanel.includes("Resumen PnL demo"), "demo pnl panel should be visible");
+  assert(copyDemoPnlSummaryPanel.includes("PnL abierto"), "demo pnl panel should expose open pnl");
+  assert(copyDemoPnlSummaryPanel.includes("PnL realizado"), "demo pnl panel should expose realized pnl");
+  assert(copyDemoPnlSummaryPanel.includes("PnL total"), "demo pnl panel should expose total pnl");
+  assert(copyOpenDemoPositionsTable.includes("Copias demo abiertas"), "open demo positions table should be visible");
+  assert(copyOpenDemoPositionsTable.includes("Precio actual pendiente"), "open demo positions table should handle pending price");
+  assert(copyOpenDemoPositionsTable.includes("PnL actual"), "open demo positions table should label current pnl");
+  assert(copyOpenDemoPositionsTable.includes("PnL %"), "open demo positions table should label pnl percent");
+  assert(copyClosedDemoPositionsTable.includes("Historial de copias demo"), "closed demo history should be visible");
+  assert(copyClosedDemoPositionsTable.includes("PnL final"), "closed demo history should label final pnl");
+  assert(copyClosedDemoPositionsTable.includes("Wallet vendio"), "closed demo history should explain wallet-driven closes");
   assert(copyWalletsTable.includes("Escaneando..."), "wallet scan button should show loading state");
   assert(copyWalletsTable.includes("Pausando..."), "wallet pause button should show loading state");
   assert(copyWalletsTable.includes("Eliminando..."), "wallet delete button should show loading state");
@@ -2746,7 +2769,7 @@ function validateAnalyzerFirstProductSource() {
   assert(copyTradingDashboard.includes("live_candidates"), "demo tick summary should expose live readiness counts");
   assert(copyTradingDashboard.includes("historical_trades"), "demo tick summary should expose historical trade counts");
   assertTextExcludes(
-    `${copyTradingSource}\n${copyAmountSelector}\n${copyOrdersTable}\n${copyBotEvents}`,
+    `${copyTradingSource}\n${copyAmountSelector}\n${copyOrdersTable}\n${copyBotEvents}\n${copyDemoPnlSummaryPanel}\n${copyOpenDemoPositionsTable}\n${copyClosedDemoPositionsTable}`,
     [
       "Conectar Phantom",
       "Conectar MetaMask",
