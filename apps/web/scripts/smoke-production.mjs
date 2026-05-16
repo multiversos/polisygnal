@@ -1140,45 +1140,40 @@ async function main() {
   const copyTradingRender = validatePublicProductPage(copyTradingDom, "copy trading", ["Copiar Wallets"]);
   const copyTradingText = visibleText(copyTradingDom);
   for (const expected of [
-    "$1",
-    "$5",
-    "$10",
-    "$20",
-    "Personalizado",
-    "Mi wallet de ejecución",
     "Resumen",
     "Wallets",
     "Copias abiertas",
     "Historial de trades",
     "Auditoria",
-    "Conectar wallet",
-    "Wallet que quieres copiar",
-    "Perfil o wallet pública",
     "Ultima actualizacion",
     "Auto-refresh",
     "Refrescar ahora",
-    "Ventana de copia",
-    "10 segundos",
-    "30 segundos",
-    "1 minuto",
-    "2 minutos",
-    "5 minutos",
     "Watcher demo",
     "5 segundos",
     "Iniciar watcher demo",
     "Pausar watcher",
     "Ejecutar una vez",
     "Prueba manual de un solo escaneo.",
-    "Usa Escanear para revisar una wallet puntual.",
     "escanea todas las wallets activas cada 5s",
     "No ejecuta operaciones reales",
+    "Wallets seguidas",
+    "Escanear wallets",
+    "Agregar wallet",
+    "Buscar por alias o wallet",
+    "Ordenar por",
+    "Copias abiertas",
+    "PnL total demo",
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
   }
   assert(copyTradingDom.includes("Escanea esta wallet una vez ahora."), "copy trading scan button helper missing");
   assertTextExcludes(copyTradingText, ["Editar modo"], "copy trading legacy edit label");
   assertTextIncludesOneOf(copyTradingText, ["Demo activo", "Real no conectado"], "copy trading mode badges");
-  assertTextIncludes(copyTradingText, "Bloqueado hasta configurar credenciales", "copy trading real lock");
+  assertTextIncludesOneOf(
+    copyTradingText,
+    ["Bloqueado hasta configurar credenciales", "Real bloqueado"],
+    "copy trading real lock",
+  );
   assertTextIncludesOneOf(copyTradingText, ["Estado actual", "Sin wallets."], "copy trading current status summary");
   assertTextIncludesOneOf(copyTradingText, ["Ultimo trade", "Sin wallets."], "copy trading last trade summary");
   assertTextIncludesOneOf(copyTradingText, ["Actividad", "Sin wallets."], "copy trading activity summary");

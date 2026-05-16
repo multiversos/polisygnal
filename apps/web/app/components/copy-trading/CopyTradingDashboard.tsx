@@ -13,7 +13,6 @@ import type {
   CopyTradingTickSummary,
   CopyTradingWatcherStatus,
 } from "../../lib/copyTradingTypes";
-import { AddCopyWalletForm } from "./AddCopyWalletForm";
 import { CopyBotEvents } from "./CopyBotEvents";
 import { CopyClosedDemoPositionsTable } from "./CopyClosedDemoPositionsTable";
 import { CopyDemoPnlSummaryPanel } from "./CopyDemoPnlSummaryPanel";
@@ -24,7 +23,6 @@ import { CopyTradingHeader } from "./CopyTradingHeader";
 import { CopyTradingMetrics } from "./CopyTradingMetrics";
 import { CopyWatcherPanel } from "./CopyWatcherPanel";
 import { CopyWalletsTable } from "./CopyWalletsTable";
-import { ExecutionWalletCard } from "./ExecutionWalletCard";
 
 const AUTO_REFRESH_INTERVAL_MS = 5_000;
 const DASHBOARD_TABS = [
@@ -329,37 +327,19 @@ export function CopyTradingDashboard() {
       </section>
 
       <section className="copy-tab-panel" hidden={activeTab !== "wallets"}>
-        <div className="copy-dashboard-grid">
-          <AddCopyWalletForm
-            onCreated={async () => {
-              await refresh();
-            }}
-            wallets={data?.wallets ?? []}
-          />
-          <ExecutionWalletCard />
-          <section className="copy-panel copy-real-lock">
-            <div className="copy-panel-heading">
-              <span>Modo real</span>
-              <strong>Real no conectado</strong>
-            </div>
-            <p>
-              Conecta tu wallet de ejecucion para preparar el modo real. Bloqueado hasta configurar credenciales,
-              permisos y firma de ordenes.
-            </p>
-            <div className="copy-lock-list">
-              <span>Sin clave privada</span>
-              <span>Sin firma de ordenes</span>
-              <span>Sin envio a CLOB</span>
-            </div>
-          </section>
-        </div>
-
         <CopyWalletsTable
+          closedPositions={data?.closed_demo_positions ?? []}
           onChanged={async () => {
             await refresh();
           }}
           onNotice={setNotice}
+          onScanAll={handleWatcherRunOnce}
+          openPositions={data?.open_demo_positions ?? []}
+          scanAllBusy={watcherBusyAction === "run-once"}
+          summary={data?.demo_pnl_summary ?? null}
+          trades={data?.trades ?? []}
           wallets={data?.wallets ?? []}
+          watcherIntervalSeconds={data?.watcher.interval_seconds ?? DEFAULT_WATCHER.interval_seconds}
         />
       </section>
 
