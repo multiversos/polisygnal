@@ -1162,6 +1162,7 @@ async function main() {
     "60 segundos",
     "5 minutos",
     "Watcher demo",
+    "5 segundos",
     "Iniciar watcher demo",
     "Pausar watcher",
     "Ejecutar una vez",

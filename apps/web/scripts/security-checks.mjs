@@ -2634,7 +2634,7 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["Ultima actualizacion", "Auto-refresh", "Refrescar ahora", "Pausar auto"]) {
     assert(copyTradingDashboard.includes(text), `copy trading auto-refresh controls missing text: ${text}`);
   }
-  for (const text of ["Watcher demo", "Iniciar watcher demo", "Pausar watcher", "Ejecutar una vez"]) {
+  for (const text of ["Watcher demo", "Intervalo:", "interval_seconds", "Iniciar watcher demo", "Pausar watcher", "Ejecutar una vez"]) {
     assert(copyWatcherPanel.includes(text), `copy watcher panel missing text: ${text}`);
   }
   assert(

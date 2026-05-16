@@ -865,8 +865,8 @@ secretos.
     promising profit.
 12. Confirm no text recommends copying a trader, guarantees outcomes, or
     presents wallet activity as financial advice.
-13. Confirm `Watcher demo` is visible and explains that it does not execute
-    real operations.
+13. Confirm `Watcher demo` is visible, shows an interval of `5 segundos`,
+    and explains that it does not execute real operations.
 14. Confirm the page shows:
     - `Iniciar watcher demo`
     - `Pausar watcher`

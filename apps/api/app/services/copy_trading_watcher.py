@@ -55,7 +55,7 @@ class CopyTradingDemoWatcher:
     def __init__(
         self,
         *,
-        interval_seconds: int = 10,
+        interval_seconds: int = 5,
         limit: int = 50,
         session_factory: SessionFactory = SessionLocal,
         data_client_factory: DataClientFactory = _default_data_client_factory,

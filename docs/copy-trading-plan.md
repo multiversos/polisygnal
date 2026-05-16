@@ -134,16 +134,18 @@ npm.cmd --workspace apps/web run smoke:production
 
 ## Watcher demo automatico
 
-- El watcher demo escanea wallets activas en modo `demo` cada `10 segundos`.
-- Reutiliza la misma logica segura de `demo tick`: lectura publica, dedupe, ordenes `simulated` o `skipped`, y eventos auditables.
+- El watcher demo escanea wallets activas en modo `demo` cada `5 segundos`.
+- Reutiliza la misma logica segura de `demo tick`: lectura publica, dedupe, deteccion de BUY/SELL, ordenes demo `simulated` o `skipped`, y eventos auditables.
 - No ejecuta operaciones reales, no firma ordenes, no usa private keys y no llama CLOB real.
 - `Auto-refresh` de frontend y `watcher demo` son cosas distintas:
   - `Auto-refresh` solo vuelve a leer status, wallets, trades, orders y events.
-  - `Watcher demo` busca trades nuevos y actualiza resultados desde backend.
+  - `Watcher demo` busca trades nuevos y crea compras/ventas demo automaticamente desde backend.
 - El watcher puede iniciarse, pausarse o correrse una vez mediante endpoints controlados.
 - Usa un lock interno para evitar ejecuciones solapadas y no arranca un segundo loop si ya hay uno activo.
 - Si una wallet falla, registra error limpio y sigue con las demas.
 - Esta version en memoria es suficiente para demo inicial. La siguiente etapa natural es moverlo a worker o scheduler dedicado.
+- Si el trade entra dentro de la ventana configurada por wallet, se marca como `Copiable ahora` y crea simulacion demo automatica.
+- Si el trade llega tarde o ya es historico, queda registrado con texto humano y sin tratarse como error grave.
 
 ## Copy Trading tiempo real - ruta tecnica
 
@@ -151,7 +153,7 @@ Fase actual:
 
 - Auto-refresh frontend cada 5s.
 - Demo tick manual.
-- Watcher demo backend cada 10s con control start/stop/run-once.
+- Watcher demo backend cada 5s con control start/stop/run-once.
 - Lectura publica por backend/proxy.
 
 Fase siguiente:

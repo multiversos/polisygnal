@@ -193,6 +193,8 @@ class CopyTradingTickResponse(BaseModel):
     trades_detected: int = 0
     new_trades: int = 0
     orders_simulated: int = 0
+    buy_simulated: int = 0
+    sell_simulated: int = 0
     orders_skipped: int = 0
     orders_blocked: int = 0
     live_candidates: int = 0
@@ -207,6 +209,8 @@ class CopyTradingWatcherLastResult(BaseModel):
     trades_detected: int = 0
     new_trades: int = 0
     orders_simulated: int = 0
+    buy_simulated: int = 0
+    sell_simulated: int = 0
     orders_skipped: int = 0
     orders_blocked: int = 0
     live_candidates: int = 0

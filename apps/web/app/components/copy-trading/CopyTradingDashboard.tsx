@@ -210,7 +210,7 @@ export function CopyTradingDashboard() {
       <section className="copy-control-bar" aria-label="Controles del modo demo">
         <div className="copy-control-copy">
           <span>Modo demo funcional</span>
-          <strong>Escanea wallets seguidas y simula copias con monto fijo.</strong>
+          <strong>Escanea wallets seguidas y simula copias demo con monto fijo.</strong>
           <div className="copy-status-strip">
             <span className="copy-badge">Ultima actualizacion {lastUpdatedLabel}</span>
             <span className={`copy-badge ${autoRefreshEnabled && pageVisible ? "success" : "locked"}`}>
@@ -245,6 +245,8 @@ export function CopyTradingDashboard() {
           <span>Wallets escaneadas {tickSummary.wallets_scanned}</span>
           <span>Trades nuevos {tickSummary.new_trades}</span>
           <span>Copiables {tickSummary.live_candidates}</span>
+          <span>Compras demo {tickSummary.buy_simulated ?? 0}</span>
+          <span>Ventas demo {tickSummary.sell_simulated ?? 0}</span>
           <span>Fuera de ventana {tickSummary.recent_outside_window}</span>
           <span>Historicos {tickSummary.historical_trades}</span>
           <span>Simuladas {tickSummary.orders_simulated}</span>
@@ -272,7 +274,7 @@ export function CopyTradingDashboard() {
             data?.watcher ?? {
               enabled: false,
               running: false,
-              interval_seconds: 10,
+              interval_seconds: 5,
               last_run_at: null,
               next_run_at: null,
               last_result: null,
@@ -327,7 +329,7 @@ function getDemoTickMessage(summary: CopyTradingTickSummary): string {
     return "Escaneo completado. No se detectaron trades nuevos.";
   }
   if (summary.live_candidates > 0) {
-    return `Escaneo completado. ${summary.live_candidates} trades copiables, ${summary.orders_simulated} simulaciones creadas, ${summary.historical_trades} historicos.`;
+    return `Escaneo completado. ${summary.live_candidates} trades copiables, ${summary.buy_simulated ?? 0} compras demo, ${summary.sell_simulated ?? 0} ventas demo, ${summary.historical_trades} historicos.`;
   }
   if (summary.recent_outside_window > 0 && summary.historical_trades === 0) {
     return `Escaneo completado. Se detectaron ${summary.recent_outside_window} trades recientes, pero llegaron fuera de la ventana de copia en vivo.`;

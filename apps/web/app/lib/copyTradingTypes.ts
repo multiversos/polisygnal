@@ -115,6 +115,8 @@ export type CopyTradingTickSummary = {
   trades_detected: number;
   new_trades: number;
   orders_simulated: number;
+  buy_simulated: number;
+  sell_simulated: number;
   orders_skipped: number;
   orders_blocked: number;
   live_candidates: number;

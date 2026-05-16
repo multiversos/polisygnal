@@ -212,6 +212,10 @@ def _scan_wallet(
         )
         if order.status == "simulated":
             response.orders_simulated += 1
+            if order.action == "buy":
+                response.buy_simulated += 1
+            elif order.action == "sell":
+                response.sell_simulated += 1
             add_copy_event(
                 db,
                 wallet_id=wallet.id,

@@ -304,11 +304,27 @@ def test_demo_tick_creates_simulated_order_for_valid_trade(db_session: Session) 
     orders = list_copy_orders(db_session)
 
     assert response.orders_simulated == 1
+    assert response.buy_simulated == 1
+    assert response.sell_simulated == 0
     assert response.live_candidates == 1
     assert response.recent_outside_window == 0
     assert orders[0].status == "simulated"
     assert orders[0].intended_amount_usd == Decimal("5.00")
     assert orders[0].intended_size == Decimal("10.00000000")
+
+
+def test_demo_tick_creates_simulated_sell_order_for_valid_trade(db_session: Session) -> None:
+    _create_wallet(db_session, amount=Decimal("5"))
+    reader = FakeTradeReader([_trade("0xsell", side="SELL")])
+
+    response = run_demo_tick(db_session, data_client=reader, now=_now())
+    orders = list_copy_orders(db_session)
+
+    assert response.orders_simulated == 1
+    assert response.buy_simulated == 0
+    assert response.sell_simulated == 1
+    assert orders[0].action == "sell"
+    assert orders[0].status == "simulated"
 
 
 def test_demo_tick_does_not_duplicate_processed_trade(db_session: Session) -> None:
@@ -431,7 +447,7 @@ def test_watcher_status_initial() -> None:
 
     assert status.enabled is False
     assert status.running is False
-    assert status.interval_seconds == 10
+    assert status.interval_seconds == 5
     assert status.last_result is None
     assert status.error_count == 0
 
@@ -477,6 +493,21 @@ def test_watcher_run_once_executes_demo_tick_once(db_session: Session) -> None:
     assert result.status.last_result is not None
     assert result.status.last_result.new_trades == 1
     assert result.status.last_result.orders_simulated == 1
+    assert result.status.last_result.buy_simulated == 1
+    assert result.status.last_result.sell_simulated == 0
+
+
+def test_watcher_run_once_auto_copies_sell_trade(db_session: Session) -> None:
+    _create_wallet(db_session)
+    watcher = _build_test_watcher()
+
+    result = watcher.run_once(db=db_session, data_client=FakeTradeReader([_trade("0xwatcher-sell", side="SELL")]), now=_now())
+
+    assert result.executed is True
+    assert result.status.last_result is not None
+    assert result.status.last_result.orders_simulated == 1
+    assert result.status.last_result.buy_simulated == 0
+    assert result.status.last_result.sell_simulated == 1
 
 
 def test_watcher_run_once_without_wallets_returns_safe_result(db_session: Session) -> None:
@@ -531,6 +562,7 @@ def test_watcher_saves_last_result(db_session: Session) -> None:
 
     assert status.last_result is not None
     assert status.last_result.orders_simulated == 1
+    assert status.last_result.buy_simulated == 1
 
 
 def test_watcher_run_once_route(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -576,10 +608,10 @@ def _create_wallet(
     return wallet
 
 
-def _trade(transaction_hash: str) -> dict[str, object]:
+def _trade(transaction_hash: str, *, side: str = "BUY") -> dict[str, object]:
     return {
         "proxyWallet": WALLET,
-        "side": "BUY",
+        "side": side,
         "price": "0.50",
         "size": "100",
         "timestamp": _now().isoformat(),
@@ -592,7 +624,7 @@ def _trade(transaction_hash: str) -> dict[str, object]:
 
 def _build_test_watcher() -> CopyTradingDemoWatcher:
     return CopyTradingDemoWatcher(
-        interval_seconds=10,
+        interval_seconds=5,
         session_factory=DummySession,
         data_client_factory=DummyDataClient,
         tick_runner=run_demo_tick,
