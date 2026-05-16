@@ -8,7 +8,11 @@ import {
   startCopyTradingWatcher,
   stopCopyTradingWatcher,
 } from "../../lib/copyTrading";
-import type { CopyTradingDashboardData, CopyTradingTickSummary } from "../../lib/copyTradingTypes";
+import type {
+  CopyTradingDashboardData,
+  CopyTradingTickSummary,
+  CopyTradingWatcherStatus,
+} from "../../lib/copyTradingTypes";
 import { AddCopyWalletForm } from "./AddCopyWalletForm";
 import { CopyBotEvents } from "./CopyBotEvents";
 import { CopyClosedDemoPositionsTable } from "./CopyClosedDemoPositionsTable";
@@ -23,6 +27,36 @@ import { CopyWalletsTable } from "./CopyWalletsTable";
 import { ExecutionWalletCard } from "./ExecutionWalletCard";
 
 const AUTO_REFRESH_INTERVAL_MS = 5_000;
+const DASHBOARD_TABS = [
+  { id: "summary", label: "Resumen" },
+  { id: "wallets", label: "Wallets" },
+  { id: "open", label: "Copias abiertas" },
+  { id: "history", label: "Historial de trades" },
+  { id: "audit", label: "Auditoria" },
+] as const;
+
+type CopyTradingDashboardTab = (typeof DASHBOARD_TABS)[number]["id"];
+
+const DEFAULT_WATCHER: CopyTradingWatcherStatus = {
+  enabled: false,
+  running: false,
+  interval_seconds: 5,
+  current_run_started_at: null,
+  last_run_started_at: null,
+  last_run_at: null,
+  last_run_finished_at: null,
+  last_run_duration_ms: null,
+  average_run_duration_ms: null,
+  next_run_at: null,
+  last_result: null,
+  error_count: 0,
+  slow_wallet_count: 0,
+  timeout_count: 0,
+  is_over_interval: false,
+  behind_by_seconds: 0,
+  last_error: null,
+  message: null,
+};
 
 export function CopyTradingDashboard() {
   const [data, setData] = useState<CopyTradingDashboardData | null>(null);
@@ -37,6 +71,7 @@ export function CopyTradingDashboard() {
   const [pageVisible, setPageVisible] = useState(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastUpdatedLabel, setLastUpdatedLabel] = useState("Sin datos todavia");
+  const [activeTab, setActiveTab] = useState<CopyTradingDashboardTab>("summary");
   const isRefreshingRef = useRef(false);
 
   const refresh = useCallback(async (options?: { isBackground?: boolean }) => {
@@ -208,133 +243,141 @@ export function CopyTradingDashboard() {
   return (
     <main className="copy-trading-page">
       <CopyTradingHeader status={data?.status ?? null} />
-      <CopyTradingMetrics status={data?.status ?? null} />
 
-      <section className="copy-control-bar" aria-label="Controles del modo demo">
-        <div className="copy-control-copy">
-          <span>Modo demo funcional</span>
-          <strong>Auto-refresh actualiza la pantalla. Con el watcher activo, el auto-copy demo ocurre automaticamente cada 5 segundos.</strong>
-          <div className="copy-status-strip">
-            <span className="copy-badge">Ultima actualizacion {lastUpdatedLabel}</span>
-            <span className={`copy-badge ${autoRefreshEnabled && pageVisible ? "success" : "locked"}`}>
-              Auto-refresh {autoRefreshStatus}
-            </span>
-          </div>
-        </div>
-        <div className="copy-action-row">
+      <nav className="copy-tabs" aria-label="Navegacion interna de Copy Trading">
+        {DASHBOARD_TABS.map((tab) => (
           <button
-            className="copy-primary-button"
-            disabled={loading || refreshing}
-            onClick={handleManualRefresh}
+            aria-pressed={activeTab === tab.id}
+            className={`copy-tab-button ${activeTab === tab.id ? "active" : ""}`}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
             type="button"
           >
-            {refreshing ? "Actualizando..." : "Refrescar ahora"}
+            {tab.label}
           </button>
-          <button
-            className="copy-secondary-button"
-            disabled={runningTick || loading}
-            onClick={() => setAutoRefreshEnabled((current) => !current)}
-            type="button"
-          >
-            {autoRefreshEnabled ? "Pausar auto" : "Reanudar auto"}
-          </button>
-          <button className="copy-action-button" disabled={runningTick || loading} onClick={handleDemoTick} type="button">
-            {runningTick ? "Ejecutando..." : "Demo tick manual"}
-          </button>
-        </div>
-      </section>
-
-      {tickSummary ? (
-        <section className="copy-tick-summary" aria-label="Resultado del ultimo demo tick">
-          <span>Wallets escaneadas {tickSummary.wallets_scanned}</span>
-          <span>Trades nuevos {tickSummary.new_trades}</span>
-          <span>Copiables {tickSummary.live_candidates}</span>
-          <span>Compras demo {tickSummary.buy_simulated ?? 0}</span>
-          <span>Ventas demo {tickSummary.sell_simulated ?? 0}</span>
-          <span>Fuera de ventana {tickSummary.recent_outside_window}</span>
-          <span>Historicos {tickSummary.historical_trades}</span>
-          <span>Simuladas {tickSummary.orders_simulated}</span>
-          <span>Saltadas {tickSummary.orders_skipped}</span>
-        </section>
-      ) : null}
+        ))}
+      </nav>
 
       {error ? <div className="copy-error-state">{error}</div> : null}
       {notice ? <div className="copy-empty-state">{notice}</div> : null}
       {loading ? <div className="copy-empty-state">Cargando modulo Copiar Wallets...</div> : null}
 
-      <div className="copy-dashboard-grid">
-        <AddCopyWalletForm
-          onCreated={async () => {
-            await refresh();
-          }}
-          wallets={data?.wallets ?? []}
-        />
-        <CopyWatcherPanel
-          busyAction={watcherBusyAction}
-          onRunOnce={handleWatcherRunOnce}
-          onStart={handleWatcherStart}
-          onStop={handleWatcherStop}
-          watcher={
-            data?.watcher ?? {
-              enabled: false,
-              running: false,
-              interval_seconds: 5,
-              current_run_started_at: null,
-              last_run_started_at: null,
-              last_run_at: null,
-              last_run_finished_at: null,
-              last_run_duration_ms: null,
-              average_run_duration_ms: null,
-              next_run_at: null,
-              last_result: null,
-              error_count: 0,
-              slow_wallet_count: 0,
-              timeout_count: 0,
-              is_over_interval: false,
-              behind_by_seconds: 0,
-              last_error: null,
-              message: null,
-            }
-          }
-        />
-        <ExecutionWalletCard />
-        <section className="copy-panel copy-real-lock">
-          <div className="copy-panel-heading">
-            <span>Modo real</span>
-            <strong>Real no conectado</strong>
+      <section className="copy-tab-panel" hidden={activeTab !== "summary"}>
+        <CopyTradingMetrics status={data?.status ?? null} />
+
+        <section className="copy-control-bar" aria-label="Controles del modo demo">
+          <div className="copy-control-copy">
+            <span>Modo demo funcional</span>
+            <strong>
+              Auto-refresh actualiza la pantalla. Con el watcher activo, el auto-copy demo ocurre automaticamente cada
+              5 segundos.
+            </strong>
+            <div className="copy-status-strip">
+              <span className="copy-badge">Ultima actualizacion {lastUpdatedLabel}</span>
+              <span className={`copy-badge ${autoRefreshEnabled && pageVisible ? "success" : "locked"}`}>
+                Auto-refresh {autoRefreshStatus}
+              </span>
+            </div>
           </div>
-          <p>
-            Conecta tu wallet de ejecución para preparar el modo real. Bloqueado hasta configurar credenciales,
-            permisos y firma de órdenes.
-          </p>
-          <div className="copy-lock-list">
-            <span>Sin clave privada</span>
-            <span>Sin firma de órdenes</span>
-            <span>Sin envío a CLOB</span>
+          <div className="copy-action-row">
+            <button
+              className="copy-primary-button"
+              disabled={loading || refreshing}
+              onClick={handleManualRefresh}
+              type="button"
+            >
+              {refreshing ? "Actualizando..." : "Refrescar ahora"}
+            </button>
+            <button
+              className="copy-secondary-button"
+              disabled={runningTick || loading}
+              onClick={() => setAutoRefreshEnabled((current) => !current)}
+              type="button"
+            >
+              {autoRefreshEnabled ? "Pausar auto" : "Reanudar auto"}
+            </button>
+            <button className="copy-action-button" disabled={runningTick || loading} onClick={handleDemoTick} type="button">
+              {runningTick ? "Ejecutando..." : "Demo tick manual"}
+            </button>
           </div>
         </section>
-      </div>
 
-      <CopyWalletsTable
-        onChanged={async () => {
-          await refresh();
-        }}
-        onNotice={setNotice}
-        wallets={data?.wallets ?? []}
-      />
+        {tickSummary ? (
+          <section className="copy-tick-summary" aria-label="Resultado del ultimo demo tick">
+            <span>Wallets escaneadas {tickSummary.wallets_scanned}</span>
+            <span>Trades nuevos {tickSummary.new_trades}</span>
+            <span>Copiables {tickSummary.live_candidates}</span>
+            <span>Compras demo {tickSummary.buy_simulated ?? 0}</span>
+            <span>Ventas demo {tickSummary.sell_simulated ?? 0}</span>
+            <span>Fuera de ventana {tickSummary.recent_outside_window}</span>
+            <span>Historicos {tickSummary.historical_trades}</span>
+            <span>Simuladas {tickSummary.orders_simulated}</span>
+            <span>Saltadas {tickSummary.orders_skipped}</span>
+          </section>
+        ) : null}
 
-      <div className="copy-dashboard-grid two">
-        <CopyDemoPnlSummaryPanel summary={data?.demo_pnl_summary ?? null} />
-        <CopyOpenDemoPositionsTable positions={data?.open_demo_positions ?? []} />
-      </div>
+        <div className="copy-dashboard-grid two copy-summary-layout">
+          <CopyDemoPnlSummaryPanel summary={data?.demo_pnl_summary ?? null} />
+          <CopyWatcherPanel
+            busyAction={watcherBusyAction}
+            onRunOnce={handleWatcherRunOnce}
+            onStart={handleWatcherStart}
+            onStop={handleWatcherStop}
+            watcher={data?.watcher ?? DEFAULT_WATCHER}
+          />
+        </div>
+      </section>
 
-      <CopyClosedDemoPositionsTable positions={data?.closed_demo_positions ?? []} />
+      <section className="copy-tab-panel" hidden={activeTab !== "wallets"}>
+        <div className="copy-dashboard-grid">
+          <AddCopyWalletForm
+            onCreated={async () => {
+              await refresh();
+            }}
+            wallets={data?.wallets ?? []}
+          />
+          <ExecutionWalletCard />
+          <section className="copy-panel copy-real-lock">
+            <div className="copy-panel-heading">
+              <span>Modo real</span>
+              <strong>Real no conectado</strong>
+            </div>
+            <p>
+              Conecta tu wallet de ejecucion para preparar el modo real. Bloqueado hasta configurar credenciales,
+              permisos y firma de ordenes.
+            </p>
+            <div className="copy-lock-list">
+              <span>Sin clave privada</span>
+              <span>Sin firma de ordenes</span>
+              <span>Sin envio a CLOB</span>
+            </div>
+          </section>
+        </div>
 
-      <div className="copy-dashboard-grid three">
-        <CopyTradesTable trades={data?.trades ?? []} />
-        <CopyOrdersTable orders={data?.orders ?? []} />
+        <CopyWalletsTable
+          onChanged={async () => {
+            await refresh();
+          }}
+          onNotice={setNotice}
+          wallets={data?.wallets ?? []}
+        />
+      </section>
+
+      <section className="copy-tab-panel" hidden={activeTab !== "open"}>
+        <CopyOpenDemoPositionsTable positions={data?.open_demo_positions ?? []} summary={data?.demo_pnl_summary ?? null} />
+      </section>
+
+      <section className="copy-tab-panel" hidden={activeTab !== "history"}>
+        <CopyClosedDemoPositionsTable positions={data?.closed_demo_positions ?? []} summary={data?.demo_pnl_summary ?? null} />
+        <div className="copy-dashboard-grid two copy-history-grid">
+          <CopyTradesTable trades={data?.trades ?? []} />
+          <CopyOrdersTable orders={data?.orders ?? []} />
+        </div>
+      </section>
+
+      <section className="copy-tab-panel" hidden={activeTab !== "audit"}>
         <CopyBotEvents events={data?.events ?? []} />
-      </div>
+      </section>
     </main>
   );
 }

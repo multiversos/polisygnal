@@ -139,9 +139,18 @@ export type CopyDemoPosition = {
 export type CopyTradingDemoPnlSummary = {
   open_positions_count: number;
   closed_positions_count: number;
+  capital_demo_used_usd: string | null;
+  open_capital_usd: string | null;
+  closed_capital_usd: string | null;
+  open_current_value_usd: string | null;
   open_pnl_usd: string | null;
   realized_pnl_usd: string | null;
   total_demo_pnl_usd: string | null;
+  demo_roi_percent: string | null;
+  win_rate_percent: string | null;
+  average_closed_pnl_usd: string | null;
+  best_closed_pnl_usd: string | null;
+  worst_closed_pnl_usd: string | null;
   winning_closed_count: number;
   losing_closed_count: number;
   price_pending_count: number;

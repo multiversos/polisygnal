@@ -1,46 +1,83 @@
 "use client";
 
 import { formatDateTime, formatPercent, formatPnl, formatTradeAge, formatUsd, formatWalletAddress } from "../../lib/copyTrading";
-import type { CopyDemoPosition } from "../../lib/copyTradingTypes";
+import type { CopyDemoPosition, CopyTradingDemoPnlSummary } from "../../lib/copyTradingTypes";
 
-export function CopyOpenDemoPositionsTable({ positions }: { positions: CopyDemoPosition[] }) {
+export function CopyOpenDemoPositionsTable({
+  positions,
+  summary,
+}: {
+  positions: CopyDemoPosition[];
+  summary: CopyTradingDemoPnlSummary | null;
+}) {
   return (
     <section className="copy-panel">
       <div className="copy-panel-heading">
         <span>Modo demo</span>
         <strong>Copias demo abiertas</strong>
       </div>
+      <p className="copy-field-helper">
+        Posiciones demo que siguen abiertas. Si el precio actual no esta disponible, mostramos estado pendiente sin
+        inventar PnL.
+      </p>
       {positions.length === 0 ? (
-        <div className="copy-empty-state">Sin copias demo abiertas todavia.</div>
+        <div className="copy-empty-state">Todavia no hay copias demo abiertas.</div>
       ) : (
-        <div className="copy-feed">
-          {positions.map((position) => (
-            <article className="copy-feed-item" key={position.id}>
-              <div>
-                <span className={`copy-side ${position.entry_action}`}>{position.entry_action.toUpperCase()}</span>
-                <strong>{position.wallet_label || formatWalletAddress(position.proxy_wallet || position.wallet_id)}</strong>
-                <small>{position.market_title || position.market_slug || "Mercado Polymarket"}</small>
-                <small>{position.outcome || "Outcome no informado"}</small>
-                <div className="copy-status-strip">
-                  <span className={`copy-badge ${position.status === "price_pending" ? "locked" : "success"}`}>
-                    {position.status === "price_pending" ? "Precio actual pendiente" : "Abierta"}
-                  </span>
-                  <span className="copy-badge">Entrada {Number(position.entry_price).toFixed(3)}</span>
-                  <span className="copy-badge">Monto {formatUsd(position.entry_amount_usd)}</span>
-                  <span className="copy-badge">Tiempo {formatTradeAge(ageSecondsFromNow(position.opened_at))}</span>
+        <>
+          <div className="copy-performance-mini-grid copy-open-summary-grid">
+            <MiniStat label="Abiertas" value={String(summary?.open_positions_count ?? positions.length)} />
+            <MiniStat label="Capital abierto" value={formatUsd(summary?.open_capital_usd ?? null)} />
+            <MiniStat label="Valor actual abierto" value={formatUsd(summary?.open_current_value_usd ?? null)} />
+            <MiniStat label="PnL abierto" value={formatPnl(summary?.open_pnl_usd ?? null)} tone={pnlTone(summary?.open_pnl_usd ?? null)} />
+            <MiniStat label="Precio pendiente" value={String(summary?.price_pending_count ?? 0)} tone={(summary?.price_pending_count ?? 0) > 0 ? "warning" : "neutral"} />
+          </div>
+          <div className="copy-feed">
+            {positions.map((position) => (
+              <article className="copy-feed-item copy-position-item" key={position.id}>
+                <div>
+                  <span className={`copy-side ${position.entry_action}`}>{position.entry_action.toUpperCase()}</span>
+                  <strong>{position.wallet_label || formatWalletAddress(position.proxy_wallet || position.wallet_id)}</strong>
+                  <small>{position.market_title || position.market_slug || "Mercado Polymarket"}</small>
+                  <small>{position.outcome || "Outcome no informado"}</small>
+                  <div className="copy-status-strip">
+                    <span className={`copy-badge ${position.status === "price_pending" ? "locked" : "success"}`}>
+                      {position.status === "price_pending" ? "Precio actual pendiente" : "Abierta"}
+                    </span>
+                    <span className="copy-badge">Entrada {Number(position.entry_price).toFixed(3)}</span>
+                    <span className="copy-badge">Capital {formatUsd(position.entry_amount_usd)}</span>
+                    <span className="copy-badge">Tiempo {formatTradeAge(ageSecondsFromNow(position.opened_at))}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="copy-feed-numbers">
-                <span>Precio actual {position.current_price !== null ? Number(position.current_price).toFixed(3) : "Pendiente"}</span>
-                <span className={getPnlClassName(position.unrealized_pnl_usd)}>PnL actual {formatPnl(position.unrealized_pnl_usd)}</span>
-                <span className={getPnlClassName(position.unrealized_pnl_percent)}>PnL % {formatPercent(position.unrealized_pnl_percent)}</span>
-                <small>{formatDateTime(position.opened_at)}</small>
-              </div>
-            </article>
-          ))}
-        </div>
+                <div className="copy-feed-numbers">
+                  <span>Precio actual {position.current_price !== null ? Number(position.current_price).toFixed(3) : "Pendiente"}</span>
+                  <span>Valor actual {position.current_value_usd !== null ? formatUsd(position.current_value_usd) : "Pendiente"}</span>
+                  <span className={getPnlClassName(position.unrealized_pnl_usd)}>PnL actual {formatPnl(position.unrealized_pnl_usd)}</span>
+                  <span className={getPnlClassName(position.unrealized_pnl_percent)}>PnL % {formatPercent(position.unrealized_pnl_percent)}</span>
+                  <small>{formatDateTime(position.opened_at)}</small>
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
       )}
     </section>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "positive" | "negative" | "neutral" | "warning";
+}) {
+  return (
+    <div className={`copy-performance-mini ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
@@ -67,4 +104,21 @@ function getPnlClassName(value: string | null): string {
     return "copy-pnl-negative";
   }
   return "copy-pnl-neutral";
+}
+
+function pnlTone(value: string | null): "positive" | "negative" | "neutral" | "warning" {
+  if (value === null) {
+    return "warning";
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "warning";
+  }
+  if (numeric > 0) {
+    return "positive";
+  }
+  if (numeric < 0) {
+    return "negative";
+  }
+  return "neutral";
 }

@@ -242,9 +242,18 @@ class CopyDemoPositionRead(BaseModel):
 class CopyTradingDemoPnlSummary(BaseModel):
     open_positions_count: int = 0
     closed_positions_count: int = 0
+    capital_demo_used_usd: Decimal | None = None
+    open_capital_usd: Decimal | None = None
+    closed_capital_usd: Decimal | None = None
+    open_current_value_usd: Decimal | None = None
     open_pnl_usd: Decimal | None = None
     realized_pnl_usd: Decimal | None = None
     total_demo_pnl_usd: Decimal | None = None
+    demo_roi_percent: Decimal | None = None
+    win_rate_percent: Decimal | None = None
+    average_closed_pnl_usd: Decimal | None = None
+    best_closed_pnl_usd: Decimal | None = None
+    worst_closed_pnl_usd: Decimal | None = None
     winning_closed_count: int = 0
     losing_closed_count: int = 0
     price_pending_count: int = 0

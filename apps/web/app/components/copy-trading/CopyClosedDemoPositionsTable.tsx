@@ -1,44 +1,143 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { formatDateTime, formatPnl, formatTradeAge, formatUsd, formatWalletAddress } from "../../lib/copyTrading";
-import type { CopyDemoPosition } from "../../lib/copyTradingTypes";
+import type { CopyDemoPosition, CopyTradingDemoPnlSummary } from "../../lib/copyTradingTypes";
 
-export function CopyClosedDemoPositionsTable({ positions }: { positions: CopyDemoPosition[] }) {
+type HistoryFilter = "all" | "winners" | "losers";
+type SideFilter = "all" | "buy" | "sell";
+
+export function CopyClosedDemoPositionsTable({
+  positions,
+  summary,
+}: {
+  positions: CopyDemoPosition[];
+  summary: CopyTradingDemoPnlSummary | null;
+}) {
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
+  const [sideFilter, setSideFilter] = useState<SideFilter>("all");
+
+  const filteredPositions = useMemo(() => {
+    return positions.filter((position) => {
+      const pnl = Number(position.realized_pnl_usd ?? 0);
+      const historyMatches =
+        historyFilter === "all" ||
+        (historyFilter === "winners" && pnl > 0) ||
+        (historyFilter === "losers" && pnl < 0);
+      const sideMatches = sideFilter === "all" || position.entry_action === sideFilter;
+      return historyMatches && sideMatches;
+    });
+  }, [historyFilter, positions, sideFilter]);
+
   return (
     <section className="copy-panel">
       <div className="copy-panel-heading">
         <span>Modo demo</span>
-        <strong>Historial de copias demo</strong>
+        <strong>Historial de trades</strong>
       </div>
+      <p className="copy-field-helper">
+        Historial largo de copias demo cerradas, con filtros rapidos para revisar resultado y sesgo del bot.
+      </p>
+
       {positions.length === 0 ? (
-        <div className="copy-empty-state">Sin historial de copias demo todavia.</div>
+        <div className="copy-empty-state">Todavia no hay copias demo cerradas.</div>
       ) : (
-        <div className="copy-feed">
-          {positions.map((position) => (
-            <article className="copy-feed-item" key={position.id}>
-              <div>
-                <span className={`copy-side ${position.entry_action}`}>{position.entry_action.toUpperCase()}</span>
-                <strong>{position.wallet_label || formatWalletAddress(position.proxy_wallet || position.wallet_id)}</strong>
-                <small>{position.market_title || position.market_slug || "Mercado Polymarket"}</small>
-                <small>{position.outcome || "Outcome no informado"}</small>
-                <div className="copy-status-strip">
-                  <span className="copy-badge historical">Cerrada</span>
-                  <span className="copy-badge">Entrada {Number(position.entry_price).toFixed(3)}</span>
-                  <span className="copy-badge">Salida {position.exit_price ? Number(position.exit_price).toFixed(3) : "-"}</span>
-                  <span className="copy-badge">Monto {formatUsd(position.entry_amount_usd)}</span>
-                </div>
+        <>
+          <div className="copy-performance-mini-grid copy-history-summary-grid">
+            <MiniStat label="Cerradas" value={String(summary?.closed_positions_count ?? positions.length)} />
+            <MiniStat label="Ganadoras" value={String(summary?.winning_closed_count ?? 0)} tone={(summary?.winning_closed_count ?? 0) > 0 ? "positive" : "neutral"} />
+            <MiniStat label="Perdedoras" value={String(summary?.losing_closed_count ?? 0)} tone={(summary?.losing_closed_count ?? 0) > 0 ? "negative" : "neutral"} />
+            <MiniStat label="PnL realizado" value={formatPnl(summary?.realized_pnl_usd ?? null)} tone={pnlTone(summary?.realized_pnl_usd ?? null)} />
+          </div>
+
+          <div className="copy-filter-row" aria-label="Filtros del historial demo">
+            <div className="copy-filter-group">
+              <span>Resultado</span>
+              <div className="copy-action-row">
+                <FilterButton active={historyFilter === "all"} label="Todas" onClick={() => setHistoryFilter("all")} />
+                <FilterButton active={historyFilter === "winners"} label="Ganadoras" onClick={() => setHistoryFilter("winners")} />
+                <FilterButton active={historyFilter === "losers"} label="Perdedoras" onClick={() => setHistoryFilter("losers")} />
               </div>
-              <div className="copy-feed-numbers">
-                <span className={getPnlClassName(position.realized_pnl_usd)}>PnL final {formatPnl(position.realized_pnl_usd)}</span>
-                <span>Cierre {position.close_reason === "wallet_sell" ? "Wallet vendio" : "Cierre demo"}</span>
-                <span>Duracion {formatTradeAge(durationSeconds(position.opened_at, position.closed_at))}</span>
-                <small>{formatDateTime(position.closed_at || position.updated_at)}</small>
+            </div>
+            <div className="copy-filter-group">
+              <span>Lado</span>
+              <div className="copy-action-row">
+                <FilterButton active={sideFilter === "all"} label="Todas" onClick={() => setSideFilter("all")} />
+                <FilterButton active={sideFilter === "buy"} label="BUY" onClick={() => setSideFilter("buy")} />
+                <FilterButton active={sideFilter === "sell"} label="SELL" onClick={() => setSideFilter("sell")} />
               </div>
-            </article>
-          ))}
-        </div>
+            </div>
+          </div>
+
+          {filteredPositions.length === 0 ? (
+            <div className="copy-empty-state">No hay copias demo cerradas para ese filtro.</div>
+          ) : (
+            <div className="copy-feed">
+              {filteredPositions.map((position) => (
+                <article className="copy-feed-item copy-position-item" key={position.id}>
+                  <div>
+                    <span className={`copy-side ${position.entry_action}`}>{position.entry_action.toUpperCase()}</span>
+                    <strong>{position.wallet_label || formatWalletAddress(position.proxy_wallet || position.wallet_id)}</strong>
+                    <small>{position.market_title || position.market_slug || "Mercado Polymarket"}</small>
+                    <small>{position.outcome || "Outcome no informado"}</small>
+                    <div className="copy-status-strip">
+                      <span className="copy-badge historical">Cerrada</span>
+                      <span className="copy-badge">Entrada {Number(position.entry_price).toFixed(3)}</span>
+                      <span className="copy-badge">Salida {position.exit_price ? Number(position.exit_price).toFixed(3) : "-"}</span>
+                      <span className="copy-badge">Monto {formatUsd(position.entry_amount_usd)}</span>
+                    </div>
+                  </div>
+                  <div className="copy-feed-numbers">
+                    <span className={getPnlClassName(position.realized_pnl_usd)}>PnL final {formatPnl(position.realized_pnl_usd)}</span>
+                    <span>Cierre {position.close_reason === "wallet_sell" ? "Wallet vendio" : "Cierre demo"}</span>
+                    <span>Duracion {formatTradeAge(durationSeconds(position.opened_at, position.closed_at))}</span>
+                    <small>{formatDateTime(position.closed_at || position.updated_at)}</small>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </section>
+  );
+}
+
+function FilterButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={`copy-pill-button ${active ? "active" : ""}`}
+      onClick={onClick}
+      type="button"
+    >
+      {label}
+    </button>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "positive" | "negative" | "neutral" | "warning";
+}) {
+  return (
+    <div className={`copy-performance-mini ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
@@ -66,4 +165,21 @@ function getPnlClassName(value: string | null): string {
     return "copy-pnl-negative";
   }
   return "copy-pnl-neutral";
+}
+
+function pnlTone(value: string | null): "positive" | "negative" | "neutral" | "warning" {
+  if (value === null) {
+    return "warning";
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "warning";
+  }
+  if (numeric > 0) {
+    return "positive";
+  }
+  if (numeric < 0) {
+    return "negative";
+  }
+  return "neutral";
 }
