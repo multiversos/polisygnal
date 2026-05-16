@@ -66,6 +66,8 @@ export function CopyTradingDashboard() {
   const [runningTick, setRunningTick] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [supplementalLoading, setSupplementalLoading] = useState(true);
+  const [supplementalRefreshing, setSupplementalRefreshing] = useState(false);
+  const [supplementalError, setSupplementalError] = useState<string | null>(null);
   const [watcherBusyAction, setWatcherBusyAction] = useState<"run-once" | "start" | "stop" | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [pageVisible, setPageVisible] = useState(true);
@@ -73,6 +75,69 @@ export function CopyTradingDashboard() {
   const [lastUpdatedLabel, setLastUpdatedLabel] = useState("Sin datos todavia");
   const [activeTab, setActiveTab] = useState<CopyTradingDashboardTab>("summary");
   const isRefreshingRef = useRef(false);
+  const supplementalRefreshInFlightRef = useRef(false);
+  const hasLoadedSupplementalOnceRef = useRef(false);
+  const dataRef = useRef<CopyTradingDashboardData | null>(null);
+
+  const setDashboardData = useCallback(
+    (updater: CopyTradingDashboardData | null | ((current: CopyTradingDashboardData | null) => CopyTradingDashboardData | null)) => {
+      setData((current) => {
+        const nextValue = typeof updater === "function" ? updater(current) : updater;
+        dataRef.current = nextValue;
+        return nextValue;
+      });
+    },
+    [],
+  );
+
+  const refreshSupplemental = useCallback(async () => {
+    if (supplementalRefreshInFlightRef.current) {
+      return false;
+    }
+    supplementalRefreshInFlightRef.current = true;
+    const currentData = dataRef.current;
+    const hasExistingSupplementalData = Boolean(
+      currentData?.demo_pnl_summary ||
+        (currentData?.open_demo_positions.length ?? 0) > 0 ||
+        (currentData?.closed_demo_positions.length ?? 0) > 0,
+    );
+    setSupplementalError(null);
+    if (hasExistingSupplementalData || hasLoadedSupplementalOnceRef.current) {
+      setSupplementalRefreshing(true);
+      setSupplementalLoading(false);
+    } else {
+      setSupplementalLoading(true);
+      setSupplementalRefreshing(false);
+    }
+
+    try {
+      const supplemental = await getCopyTradingSupplementalData();
+      if (Object.keys(supplemental).length > 0) {
+        hasLoadedSupplementalOnceRef.current = true;
+        setDashboardData((current) =>
+          current
+            ? {
+                ...current,
+                ...supplemental,
+                open_demo_positions: supplemental.open_demo_positions ?? current.open_demo_positions,
+                closed_demo_positions: supplemental.closed_demo_positions ?? current.closed_demo_positions,
+                demo_pnl_summary: supplemental.demo_pnl_summary ?? current.demo_pnl_summary,
+              }
+            : current,
+        );
+      } else if (!hasExistingSupplementalData) {
+        hasLoadedSupplementalOnceRef.current = true;
+      }
+      return true;
+    } catch {
+      setSupplementalError("No pudimos actualizar metricas demo ahora. Mostrando ultimo dato disponible.");
+      return false;
+    } finally {
+      supplementalRefreshInFlightRef.current = false;
+      setSupplementalLoading(false);
+      setSupplementalRefreshing(false);
+    }
+  }, [setDashboardData]);
 
   const refresh = useCallback(async (options?: { isBackground?: boolean }) => {
     if (isRefreshingRef.current) {
@@ -80,15 +145,12 @@ export function CopyTradingDashboard() {
     }
     isRefreshingRef.current = true;
     setRefreshing(true);
-    setSupplementalLoading(true);
     if (!options?.isBackground) {
       setError(null);
     }
-    let primaryData: CopyTradingDashboardData | null = null;
     try {
       const loadedPrimaryData = await getCopyTradingPrimaryData();
-      primaryData = loadedPrimaryData;
-      setData((current) => ({
+      setDashboardData((current) => ({
         ...loadedPrimaryData,
         open_demo_positions: current?.open_demo_positions ?? loadedPrimaryData.open_demo_positions,
         closed_demo_positions: current?.closed_demo_positions ?? loadedPrimaryData.closed_demo_positions,
@@ -103,35 +165,13 @@ export function CopyTradingDashboard() {
       return false;
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      isRefreshingRef.current = false;
     }
 
-    try {
-      const supplemental = await getCopyTradingSupplementalData();
-      if (Object.keys(supplemental).length > 0) {
-        setData((current) =>
-          current
-            ? { ...current, ...supplemental }
-            : primaryData
-              ? {
-                  ...primaryData,
-                  ...supplemental,
-                  open_demo_positions:
-                    supplemental.open_demo_positions ?? primaryData.open_demo_positions,
-                  closed_demo_positions:
-                    supplemental.closed_demo_positions ?? primaryData.closed_demo_positions,
-                  demo_pnl_summary:
-                    supplemental.demo_pnl_summary ?? primaryData.demo_pnl_summary,
-                }
-              : current,
-        );
-      }
-      return true;
-    } finally {
-      isRefreshingRef.current = false;
-      setRefreshing(false);
-      setSupplementalLoading(false);
-    }
-  }, []);
+    void refreshSupplemental();
+    return true;
+  }, [refreshSupplemental, setDashboardData]);
 
   useEffect(() => {
     void refresh();
@@ -323,11 +363,15 @@ export function CopyTradingDashboard() {
                 Auto-refresh {autoRefreshStatus}
               </span>
               {supplementalLoading && !loading ? <span className="copy-badge subtle">Metricas demo cargando...</span> : null}
+              {supplementalRefreshing ? <span className="copy-badge subtle">Actualizando metricas...</span> : null}
+              {supplementalError ? <span className="copy-badge locked">{supplementalError}</span> : null}
             </div>
           </div>
           <div className="copy-action-row">
             <button
+              aria-label={refreshing ? "Actualizando Copy Trading" : "Refrescar Copy Trading ahora"}
               className="copy-primary-button"
+              data-testid="copy-refresh-now"
               disabled={loading || refreshing}
               onClick={handleManualRefresh}
               type="button"
@@ -363,7 +407,12 @@ export function CopyTradingDashboard() {
         ) : null}
 
         <div className="copy-dashboard-grid two copy-summary-layout">
-          <CopyDemoPnlSummaryPanel loading={supplementalLoading} summary={data?.demo_pnl_summary ?? null} />
+          <CopyDemoPnlSummaryPanel
+            loading={supplementalLoading}
+            refreshing={supplementalRefreshing}
+            statusMessage={supplementalError}
+            summary={data?.demo_pnl_summary ?? null}
+          />
           <CopyWatcherPanel
             busyAction={watcherBusyAction}
             onRunOnce={handleWatcherRunOnce}
