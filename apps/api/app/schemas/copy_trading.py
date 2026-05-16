@@ -33,6 +33,7 @@ COPY_AMOUNT_PRESETS = {
     Decimal("10"),
     Decimal("20"),
 }
+COPY_WINDOW_SECONDS_ALLOWED = {10, 30, 60, 120, 300}
 
 
 class CopyWalletCreate(BaseModel):
@@ -53,6 +54,11 @@ class CopyWalletCreate(BaseModel):
     @classmethod
     def validate_copy_amount(cls, value: Decimal) -> Decimal:
         return _validate_copy_amount(value)
+
+    @field_validator("max_delay_seconds")
+    @classmethod
+    def validate_copy_window(cls, value: int | None) -> int | None:
+        return _validate_copy_window_seconds(value)
 
     @model_validator(mode="after")
     def validate_preset_amount(self) -> CopyWalletCreate:
@@ -81,6 +87,11 @@ class CopyWalletUpdate(BaseModel):
         if value is None:
             return None
         return _validate_copy_amount(value)
+
+    @field_validator("max_delay_seconds")
+    @classmethod
+    def validate_copy_window(cls, value: int | None) -> int | None:
+        return _validate_copy_window_seconds(value)
 
 
 class CopyWalletRead(BaseModel):
@@ -260,4 +271,12 @@ class CopyTradingEventsResponse(BaseModel):
 def _validate_copy_amount(value: Decimal) -> Decimal:
     if not value.is_finite() or value <= 0:
         raise ValueError("copy_amount_usd debe ser positivo.")
+    return value
+
+
+def _validate_copy_window_seconds(value: int | None) -> int | None:
+    if value is None:
+        return None
+    if value not in COPY_WINDOW_SECONDS_ALLOWED:
+        raise ValueError("max_delay_seconds debe ser 10, 30, 60, 120 o 300.")
     return value

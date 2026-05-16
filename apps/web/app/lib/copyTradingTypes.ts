@@ -166,3 +166,18 @@ export type CopyWalletCreateInput = {
   copy_sells: boolean;
   max_delay_seconds?: number;
 };
+
+export type CopyWalletUpdateInput = Partial<
+  Pick<
+    CopyWallet,
+    | "copy_amount_mode"
+    | "copy_buys"
+    | "copy_sells"
+    | "enabled"
+    | "label"
+    | "max_delay_seconds"
+    | "mode"
+  >
+> & {
+  copy_amount_usd?: number;
+};

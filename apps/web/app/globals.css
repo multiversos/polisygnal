@@ -445,6 +445,39 @@
   overflow-wrap: anywhere;
 }
 
+.copy-inline-editor-cell {
+  padding: 0 0 14px !important;
+}
+
+.copy-inline-editor {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-radius: 8px;
+  background: rgba(10, 18, 31, 0.82);
+}
+
+.copy-inline-editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.copy-inline-editor-header .copy-panel-heading {
+  margin-bottom: 0;
+}
+
+.copy-inline-editor-meta {
+  display: grid;
+  gap: 6px;
+}
+
+.copy-inline-editor-meta small {
+  color: var(--muted-foreground);
+}
+
 .copy-table th {
   color: var(--muted-foreground);
   font-size: 0.76rem;
@@ -619,6 +652,10 @@
 
   .copy-table td {
     border: 0;
+  }
+
+  .copy-inline-editor-cell {
+    padding: 10px 0 0 !important;
   }
 
   .copy-feed-numbers {

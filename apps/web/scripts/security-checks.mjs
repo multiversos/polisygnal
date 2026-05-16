@@ -2612,6 +2612,10 @@ function validateAnalyzerFirstProductSource() {
     resolve(appRoot, "app/components/copy-trading/CopyWalletsTable.tsx"),
     "utf8",
   );
+  const editCopyWalletForm = readFileSync(
+    resolve(appRoot, "app/components/copy-trading/EditCopyWalletForm.tsx"),
+    "utf8",
+  );
   const copyOrdersTable = readFileSync(
     resolve(appRoot, "app/components/copy-trading/CopyOrdersTable.tsx"),
     "utf8",
@@ -2681,6 +2685,8 @@ function validateAnalyzerFirstProductSource() {
     copyWalletForm.includes("Ventana de copia en vivo"),
     "copy wallet form should keep copy window visible",
   );
+  assert(copyWalletForm.includes("1 minuto"), "copy wallet form should expose 1-minute window");
+  assert(copyWalletForm.includes("2 minutos"), "copy wallet form should expose 2-minute window");
   assert(
     copyTradingDashboard.includes("auto-copy demo ocurre automaticamente cada 5 segundos"),
     "copy trading dashboard should explain that auto-copy is the primary flow",
@@ -2706,10 +2712,18 @@ function validateAnalyzerFirstProductSource() {
     "copy wallet form should keep add wallet CTA visible",
   );
   assert(copyWalletsTable.includes("Escanea esta wallet una vez ahora."), "scan button should explain manual single-wallet scans");
+  assert(copyWalletsTable.includes("Editar configuracion de esta wallet"), "edit button should explain wallet settings editing");
+  assert(!copyWalletsTable.includes("Editar modo"), "legacy edit mode label should be removed");
   assert(copyWalletsTable.includes("Escaneando..."), "wallet scan button should show loading state");
   assert(copyWalletsTable.includes("Pausando..."), "wallet pause button should show loading state");
   assert(copyWalletsTable.includes("Eliminando..."), "wallet delete button should show loading state");
-  assert(copyWalletsTable.includes("Actualizando..."), "wallet mode button should show loading state");
+  assert(copyWalletsTable.includes("Editando..."), "wallet edit button should show loading state");
+  assert(editCopyWalletForm.includes("Guardar cambios"), "wallet editor should expose save action");
+  assert(editCopyWalletForm.includes("Cancelar"), "wallet editor should expose cancel action");
+  assert(editCopyWalletForm.includes("Ventana de copia"), "wallet editor should expose copy window field");
+  assert(editCopyWalletForm.includes("1 minuto"), "wallet editor should expose 1-minute window");
+  assert(editCopyWalletForm.includes("2 minutos"), "wallet editor should expose 2-minute window");
+  assert(editCopyWalletForm.includes("5 minutos"), "wallet editor should expose 5-minute window");
   assert(copyTradingDashboard.includes("visibilityState"), "copy trading auto-refresh should respect hidden tabs");
   assert(copyTradingDashboard.includes("isRefreshingRef"), "copy trading auto-refresh should avoid overlapping refresh requests");
   assert(copyOrdersTable.includes("formatCopyOrderReason"), "copy orders should translate technical reasons");
