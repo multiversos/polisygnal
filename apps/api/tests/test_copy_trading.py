@@ -16,6 +16,7 @@ from app.services.copy_trading_risk_rules import CopyTradeForRules, evaluate_dem
 from app.services.copy_trading_service import (
     DuplicateCopyWalletError,
     InvalidCopyWalletInputError,
+    list_copy_events,
     build_copy_trade_read,
     create_copy_wallet,
     list_copy_orders,
@@ -56,6 +57,18 @@ class FailingForOneWalletReader:
         if wallet == self.failing_wallet:
             raise RuntimeError("upstream unavailable")
         return []
+
+
+class SlowTradeReader:
+    def __init__(self, delay_seconds: float, trades: list[dict[str, object]] | None = None) -> None:
+        self.delay_seconds = delay_seconds
+        self.trades = trades or []
+
+    def get_trades_for_user(self, wallet: str, *, limit: int = 50, offset: int = 0) -> list[dict[str, object]]:
+        import time
+
+        time.sleep(self.delay_seconds)
+        return self.trades[:limit]
 
 
 class DummySession:
@@ -448,8 +461,16 @@ def test_watcher_status_initial() -> None:
     assert status.enabled is False
     assert status.running is False
     assert status.interval_seconds == 5
+    assert status.current_run_started_at is None
+    assert status.last_run_started_at is None
     assert status.last_result is None
+    assert status.last_run_duration_ms is None
+    assert status.average_run_duration_ms is None
     assert status.error_count == 0
+    assert status.slow_wallet_count == 0
+    assert status.timeout_count == 0
+    assert status.is_over_interval is False
+    assert status.behind_by_seconds == 0
 
 
 def test_watcher_start_changes_state() -> None:
@@ -563,6 +584,50 @@ def test_watcher_saves_last_result(db_session: Session) -> None:
     assert status.last_result is not None
     assert status.last_result.orders_simulated == 1
     assert status.last_result.buy_simulated == 1
+    assert status.last_run_started_at == _now()
+    assert status.last_run_finished_at == _now()
+    assert status.last_run_duration_ms is not None
+    assert status.last_run_duration_ms >= 0
+    assert status.average_run_duration_ms is not None
+    assert status.average_run_duration_ms >= 0
+
+
+def test_watcher_groups_repeated_historical_skip_events(db_session: Session) -> None:
+    _create_wallet(db_session)
+    watcher = _build_test_watcher()
+    old_trade = {
+        **_trade("0xold-1"),
+        "timestamp": (_now() - timedelta(minutes=20)).isoformat(),
+    }
+
+    watcher.run_once(
+        db=db_session,
+        data_client=FakeTradeReader([old_trade, {**old_trade, "transactionHash": "0xold-2"}, {**old_trade, "transactionHash": "0xold-3"}]),
+        now=_now(),
+    )
+    events = list_copy_events(db_session, limit=10)
+
+    grouped = [event for event in events if event.event_type == "demo_order_skipped_grouped"]
+    assert len(grouped) == 1
+    assert grouped[0].message == "Trades historicos detectados fuera de la ventana de copia."
+    assert grouped[0].event_metadata["count"] == 3
+
+
+def test_watcher_marks_over_interval_and_counts_timeout(db_session: Session) -> None:
+    _create_wallet(db_session, suffix="11")
+    _create_wallet(db_session, suffix="22")
+    watcher = CopyTradingDemoWatcher(interval_seconds=1, cycle_timeout_seconds=1)
+
+    result = watcher.run_once(db=db_session, data_client=SlowTradeReader(1.05), now=None)
+
+    assert result.executed is True
+    assert result.status.last_run_duration_ms is not None
+    assert result.status.last_run_duration_ms >= 1000
+    assert result.status.is_over_interval is True
+    assert result.status.timeout_count == 1
+    assert result.status.slow_wallet_count >= 1
+    assert result.status.last_result is not None
+    assert result.status.last_result.errors == ["Watcher demo recorto el ciclo para no acumular retraso."]
 
 
 def test_watcher_run_once_route(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -627,7 +692,6 @@ def _build_test_watcher() -> CopyTradingDemoWatcher:
         interval_seconds=5,
         session_factory=DummySession,
         data_client_factory=DummyDataClient,
-        tick_runner=run_demo_tick,
     )
 
 

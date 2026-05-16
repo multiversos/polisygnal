@@ -224,10 +224,19 @@ class CopyTradingWatcherStatusResponse(BaseModel):
     enabled: bool
     running: bool
     interval_seconds: int
+    current_run_started_at: datetime | None = None
+    last_run_started_at: datetime | None = None
     last_run_at: datetime | None = None
+    last_run_finished_at: datetime | None = None
+    last_run_duration_ms: int | None = None
+    average_run_duration_ms: int | None = None
     next_run_at: datetime | None = None
     last_result: CopyTradingWatcherLastResult | None = None
     error_count: int = 0
+    slow_wallet_count: int = 0
+    timeout_count: int = 0
+    is_over_interval: bool = False
+    behind_by_seconds: int = 0
     last_error: str | None = None
     message: str | None = None
 
