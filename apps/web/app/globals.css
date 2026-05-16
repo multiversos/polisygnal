@@ -188,14 +188,14 @@
 .copy-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
-  padding: 3px 8px;
-  border: 1px solid rgba(47, 63, 86, 0.8);
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid rgba(56, 72, 95, 0.58);
   border-radius: 999px;
   color: #94a3b8;
-  font-size: 0.71rem;
-  font-weight: 750;
-  background: rgba(10, 20, 36, 0.86);
+  font-size: 0.68rem;
+  font-weight: 740;
+  background: rgba(10, 20, 36, 0.78);
 }
 
 .copy-status-pill.success,
@@ -258,12 +258,12 @@
 .copy-tick-summary,
 .copy-error-state,
 .copy-empty-state {
-  border: 1px solid rgba(40, 54, 74, 0.9);
-  border-radius: 10px;
+  border: 1px solid rgba(44, 58, 81, 0.72);
+  border-radius: 9px;
   background:
     linear-gradient(180deg, rgba(11, 21, 38, 0.96), rgba(9, 18, 33, 0.92)),
     rgba(8, 17, 31, 0.94);
-  box-shadow: 0 12px 28px rgba(1, 8, 20, 0.2);
+  box-shadow: 0 10px 22px rgba(1, 8, 20, 0.14);
 }
 
 .copy-metric {
@@ -284,7 +284,7 @@
 
 .copy-panel,
 .copy-control-bar {
-  padding: 16px;
+  padding: 14px;
 }
 
 .copy-wide-panel {
@@ -300,8 +300,8 @@
 
 .copy-panel-heading {
   display: grid;
-  gap: 3px;
-  margin-bottom: 10px;
+  gap: 2px;
+  margin-bottom: 8px;
 }
 
 .copy-control-copy {
@@ -326,19 +326,19 @@
 }
 
 .copy-field-helper {
-  margin-bottom: 12px;
-  line-height: 1.42;
-  font-size: 0.88rem;
+  margin-bottom: 10px;
+  line-height: 1.35;
+  font-size: 0.84rem;
 }
 
 .copy-field input,
 .copy-custom-amount input,
 .copy-select {
   width: 100%;
-  min-height: 38px;
-  padding: 8px 11px;
-  border: 1px solid rgba(40, 54, 74, 0.9);
-  border-radius: 9px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid rgba(44, 58, 81, 0.74);
+  border-radius: 8px;
   background: rgba(6, 14, 26, 0.92);
   color: var(--foreground);
 }
@@ -362,15 +362,15 @@
 .copy-danger-button,
 .copy-pill-button,
 .copy-action-button {
-  min-height: 34px;
-  padding: 7px 10px;
-  border: 1px solid rgba(40, 54, 74, 0.9);
-  border-radius: 9px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid rgba(44, 58, 81, 0.74);
+  border-radius: 8px;
   background: rgba(12, 22, 38, 0.94);
   color: var(--foreground);
   cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 720;
+  font-size: 0.8rem;
+  font-weight: 700;
   white-space: nowrap;
   transition:
     border-color 140ms ease,
@@ -410,7 +410,7 @@
 .copy-action-button:hover:not(:disabled) {
   border-color: rgba(29, 155, 240, 0.48);
   background: rgba(15, 28, 47, 0.98);
-  box-shadow: 0 10px 20px rgba(6, 14, 26, 0.26);
+  box-shadow: 0 6px 16px rgba(6, 14, 26, 0.18);
   transform: translateY(-1px);
 }
 
@@ -890,8 +890,8 @@
 
 .copy-wallets-master-detail {
   display: grid;
-  grid-template-columns: minmax(320px, 0.8fr) minmax(460px, 1.2fr);
-  gap: 14px;
+  grid-template-columns: minmax(320px, 0.76fr) minmax(480px, 1.24fr);
+  gap: 12px;
   align-items: start;
 }
 
@@ -899,7 +899,7 @@
 .copy-wallet-detail-panel {
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -910,7 +910,7 @@
 .copy-wallet-toolbar {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
 }
 
 .copy-wallet-toolbar-search {
@@ -923,17 +923,17 @@
 
 .copy-wallet-rows {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .copy-wallet-row {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
   overflow: hidden;
-  padding: 11px 12px;
-  border: 1px solid rgba(40, 54, 74, 0.88);
-  border-radius: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(43, 58, 81, 0.68);
+  border-radius: 9px;
   background:
     linear-gradient(180deg, rgba(10, 19, 34, 0.96), rgba(8, 17, 31, 0.92)),
     rgba(8, 17, 31, 0.9);
@@ -948,7 +948,7 @@
 .copy-wallet-row:hover,
 .copy-wallet-row:focus-visible {
   border-color: rgba(34, 211, 238, 0.28);
-  box-shadow: 0 10px 20px rgba(2, 12, 29, 0.18);
+  box-shadow: 0 8px 18px rgba(2, 12, 29, 0.14);
   transform: translateY(-1px);
 }
 
@@ -958,8 +958,8 @@
     linear-gradient(180deg, rgba(12, 25, 44, 0.98), rgba(8, 17, 31, 0.94)),
     rgba(8, 17, 31, 0.9);
   box-shadow:
-    inset 0 0 0 1px rgba(34, 211, 238, 0.14),
-    0 12px 24px rgba(2, 12, 29, 0.18);
+    inset 0 0 0 1px rgba(34, 211, 238, 0.1),
+    0 10px 20px rgba(2, 12, 29, 0.14);
 }
 
 .copy-wallet-row-top,
@@ -972,13 +972,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .copy-wallet-row-copy,
 .copy-wallet-detail-heading {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -986,7 +986,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .copy-wallet-row-title-line strong {
@@ -994,13 +994,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.96rem;
+  font-size: 0.92rem;
 }
 
 .copy-wallet-row-copy .copy-mono,
 .copy-wallet-detail-heading .copy-mono {
   color: var(--muted-foreground);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
 }
 
 .copy-wallet-identity {
@@ -1009,71 +1009,77 @@
 }
 
 .copy-wallet-row-trailing {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 28px;
   align-items: center;
-  gap: 8px;
+  gap: 2px 8px;
+  justify-items: end;
   flex: 0 0 auto;
 }
 
 .copy-wallet-row-pnl {
-  font-size: 0.94rem;
+  grid-column: 1;
+  font-size: 0.9rem;
   font-weight: 760;
   white-space: nowrap;
+  line-height: 1.1;
 }
 
 .copy-wallet-row-freshness {
+  grid-column: 1;
   color: var(--muted-foreground);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   white-space: nowrap;
+  line-height: 1.1;
 }
 
 .copy-wallet-avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
-  border: 1px solid rgba(96, 165, 250, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.16);
   background: linear-gradient(180deg, rgba(59, 130, 246, 0.28), rgba(29, 78, 216, 0.22));
   color: #dbeafe;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   font-weight: 800;
   flex: 0 0 auto;
 }
 
 .copy-wallet-avatar.large {
-  width: 48px;
-  height: 48px;
-  font-size: 1rem;
+  width: 42px;
+  height: 42px;
+  font-size: 0.92rem;
 }
 
 .copy-wallet-row-badges {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: 5px;
+  gap: 4px;
 }
 
 .copy-wallet-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
 }
 
 .copy-wallet-row-meta {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(40, 54, 74, 0.7);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(40, 54, 74, 0.56);
 }
 
 .copy-wallet-row-meta-item,
 .copy-wallet-stat {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -1084,45 +1090,48 @@
 }
 
 .copy-wallet-stat {
-  padding: 9px 10px;
-  border: 1px solid rgba(40, 54, 74, 0.86);
-  border-radius: 9px;
-  background: rgba(10, 18, 33, 0.74);
+  padding: 8px 9px;
+  border: 1px solid rgba(42, 56, 79, 0.66);
+  border-radius: 8px;
+  background: rgba(10, 18, 33, 0.68);
 }
 
 .copy-wallet-row-meta-item strong,
 .copy-wallet-stat span,
 .copy-wallet-subsection-title {
   color: var(--muted-foreground);
-  font-size: 0.7rem;
-  font-weight: 780;
+  font-size: 0.64rem;
+  font-weight: 760;
   text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .copy-wallet-stat strong {
   min-width: 0;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   overflow-wrap: anywhere;
 }
 
 .copy-wallet-row-meta-item {
   color: #d8e5f5;
-  font-size: 0.78rem;
+  font-size: 0.73rem;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.24;
 }
 
 .copy-icon-button {
-  min-width: 30px;
-  width: 30px;
-  height: 30px;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border: 1px solid rgba(40, 54, 74, 0.86);
-  border-radius: 9px;
+  border: 1px solid rgba(42, 56, 79, 0.66);
+  border-radius: 8px;
   background: rgba(10, 18, 33, 0.9);
   color: #b8c7da;
   cursor: pointer;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
   font-weight: 800;
   line-height: 1;
 }
@@ -1157,7 +1166,7 @@
 
 .copy-wallet-detail {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -1169,14 +1178,14 @@
 .copy-wallet-detail-hero {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
 .copy-wallet-detail-meta {
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 6px;
 }
 
 .copy-wallet-link {
@@ -1189,17 +1198,17 @@
 .copy-wallet-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
 .copy-wallet-detail-card {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  padding: 13px;
-  border: 1px solid rgba(40, 54, 74, 0.86);
-  border-radius: 10px;
+  padding: 11px;
+  border: 1px solid rgba(42, 56, 79, 0.66);
+  border-radius: 9px;
   background:
     linear-gradient(180deg, rgba(10, 19, 34, 0.96), rgba(9, 18, 33, 0.92)),
     rgba(15, 23, 42, 0.72);
@@ -1217,7 +1226,7 @@
 
 .copy-wallet-subsection {
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .copy-wallet-stat-grid-metrics {
@@ -1242,21 +1251,21 @@
 
 .copy-wallet-last-copy-highlight {
   display: grid;
-  gap: 5px;
-  padding: 12px;
-  border: 1px solid rgba(40, 54, 74, 0.86);
-  border-radius: 10px;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgba(42, 56, 79, 0.66);
+  border-radius: 8px;
   background: linear-gradient(135deg, rgba(8, 28, 24, 0.88), rgba(10, 20, 36, 0.92));
 }
 
 .copy-wallet-last-copy-highlight strong {
-  font-size: 1.08rem;
+  font-size: 1rem;
   color: #86efac;
 }
 
 .copy-wallet-last-copy-highlight span {
   color: var(--muted-foreground);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
 }
 
 .copy-window-pill {
@@ -1266,13 +1275,13 @@
 .copy-wallet-detail-footer {
   flex-wrap: wrap;
   justify-content: space-between;
-  padding-top: 8px;
-  border-top: 1px solid rgba(40, 54, 74, 0.82);
+  padding-top: 6px;
+  border-top: 1px solid rgba(40, 54, 74, 0.58);
 }
 
 .copy-wallet-detail-footer span {
   color: var(--muted-foreground);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .copy-wallet-activity-card {
@@ -1281,20 +1290,20 @@
 
 .copy-wallet-activity-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
 .copy-wallet-activity-item {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1.8fr) minmax(108px, 0.7fr);
+  grid-template-columns: 58px minmax(0, 1.8fr) minmax(96px, 0.72fr);
   align-items: start;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  padding: 11px 12px;
-  border: 1px solid rgba(40, 54, 74, 0.82);
-  border-radius: 10px;
-  background: rgba(9, 18, 33, 0.82);
+  padding: 9px 10px;
+  border: 1px solid rgba(42, 56, 79, 0.62);
+  border-radius: 8px;
+  background: rgba(9, 18, 33, 0.7);
 }
 
 .copy-wallet-activity-item.warning {
@@ -1311,53 +1320,53 @@
 
 .copy-wallet-activity-item > div {
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .copy-wallet-activity-rail {
   position: relative;
   align-items: start;
   justify-items: start;
-  gap: 6px;
+  gap: 4px;
 }
 
 .copy-wallet-activity-dot {
   position: relative;
   z-index: 1;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
   background: #64748b;
-  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.1);
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.08);
 }
 
 .copy-wallet-activity-dot.positive {
   background: #22c55e;
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.08);
 }
 
 .copy-wallet-activity-dot.negative {
   background: #f43f5e;
-  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.1);
+  box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.08);
 }
 
 .copy-wallet-activity-dot.warning {
   background: #fbbf24;
-  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.1);
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.08);
 }
 
 .copy-wallet-activity-line {
   position: absolute;
-  top: 9px;
+  top: 22px;
   left: 3px;
-  bottom: 24px;
+  bottom: 2px;
   width: 1px;
-  background: rgba(71, 85, 105, 0.5);
+  background: rgba(71, 85, 105, 0.38);
 }
 
 .copy-wallet-activity-time {
   color: var(--muted-foreground);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
 }
 
@@ -1368,7 +1377,7 @@
 .copy-wallet-activity-heading {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -1380,13 +1389,13 @@
 
 .copy-wallet-activity-heading strong {
   min-width: 0;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   overflow-wrap: anywhere;
 }
 
 .copy-wallet-activity-market {
   color: var(--muted-foreground);
-  font-size: 0.76rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
@@ -1394,30 +1403,30 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 5px;
+  gap: 4px;
 }
 
 .copy-wallet-activity-copy small {
   color: #9eb1c8;
-  font-size: 0.78rem;
-  line-height: 1.38;
+  font-size: 0.74rem;
+  line-height: 1.32;
 }
 
 .copy-wallet-activity-numbers {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   justify-items: end;
   text-align: right;
 }
 
 .copy-wallet-activity-numbers span {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 760;
 }
 
 .copy-wallet-activity-numbers small {
   color: var(--muted-foreground);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
 }
 
 .copy-loading-shell {
@@ -1516,7 +1525,7 @@
   }
 
   .copy-wallet-row-meta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .copy-wallets-master-detail {
@@ -1533,19 +1542,23 @@
 
   .copy-wallet-detail-header {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+    grid-template-columns: minmax(0, 1fr) minmax(232px, 248px);
     align-items: start;
+    gap: 10px;
   }
 
   .copy-wallet-detail-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: 7px;
     justify-self: end;
   }
 
   .copy-wallet-detail-actions button {
     width: 100%;
+    min-height: 30px;
+    padding-inline: 8px;
+    font-size: 0.76rem;
   }
 
   .copy-metrics-grid .copy-metric:last-child {
@@ -1601,12 +1614,12 @@
 
   .copy-wallet-row-title-line {
     align-items: flex-start;
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .copy-wallet-row-trailing {
     width: 100%;
-    justify-content: space-between;
+    justify-items: end;
   }
 
   .copy-wallet-activity-item {
@@ -1623,6 +1636,10 @@
     justify-items: start;
     justify-content: flex-start;
     text-align: left;
+  }
+
+  .copy-wallet-row-meta {
+    grid-template-columns: 1fr;
   }
 
   .copy-loading-grid,
