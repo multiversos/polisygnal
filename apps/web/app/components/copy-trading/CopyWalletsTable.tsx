@@ -6,6 +6,7 @@ import {
   formatCopyWindow,
   formatDateTime,
   formatFreshnessLabel,
+  formatTradeAge,
   formatUsd,
   formatWalletAddress,
   freshnessBadgeClass,
@@ -116,7 +117,7 @@ export function CopyWalletsTable({ onChanged, onNotice, wallets }: CopyWalletsTa
                 const isEditing = editingWalletId === wallet.id;
                 return (
                   <Fragment key={wallet.id}>
-                    <tr key={wallet.id}>
+                    <tr>
                       <td>{wallet.label || "Sin alias"}</td>
                       <td className="copy-mono">{formatWalletAddress(wallet.proxy_wallet)}</td>
                       <td>
@@ -129,17 +130,34 @@ export function CopyWalletsTable({ onChanged, onNotice, wallets }: CopyWalletsTa
                       <td>{`${wallet.copy_buys ? "BUY" : "-"} / ${wallet.copy_sells ? "SELL" : "-"}`}</td>
                       <td>
                         <div className="copy-wallet-details">
+                          <small className="copy-wallet-detail-label">Estado actual</small>
                           <span className={`copy-badge ${freshnessBadgeClass(wallet.last_trade_freshness_status)}`}>
                             {wallet.last_trade_freshness_label
                               ? formatFreshnessLabel(wallet.last_trade_freshness_status, wallet.last_trade_freshness_label)
                               : "Sin actividad reciente"}
                           </span>
-                          <small>Ultimo trade {formatDateTime(wallet.last_trade_at)}</small>
-                          <small>{formatCopyWindow(wallet.copy_window_seconds)}</small>
                           <small>
-                            Recientes {wallet.recent_trades} · Historicos {wallet.historical_trades} · Copiables {wallet.live_candidates}
+                            <span className="copy-wallet-detail-label">Ultimo trade</span> {formatDateTime(wallet.last_trade_at)}
                           </small>
-                          <small>Ultimo escaneo {formatDateTime(wallet.last_scan_at)}</small>
+                          <small>
+                            <span className="copy-wallet-detail-label">Ventana</span> {formatCopyWindowValue(wallet.copy_window_seconds)}
+                          </small>
+                          <small>
+                            <span className="copy-wallet-detail-label">Actividad</span> Recientes {wallet.recent_trades} · Historicos{" "}
+                            {wallet.historical_trades}
+                            {wallet.live_candidates > 0 ? ` · Copiables ${wallet.live_candidates}` : ""}
+                          </small>
+                          <small>
+                            <span className="copy-wallet-detail-label">Demo</span> {formatDemoSummary(wallet)}
+                          </small>
+                          {wallet.last_demo_copy_at ? (
+                            <small>
+                              <span className="copy-wallet-detail-label">Ultima copia demo</span> {formatLastDemoCopy(wallet)}
+                            </small>
+                          ) : null}
+                          <small>
+                            <span className="copy-wallet-detail-label">Ultimo escaneo</span> {formatDateTime(wallet.last_scan_at)}
+                          </small>
                         </div>
                       </td>
                       <td>
@@ -150,7 +168,13 @@ export function CopyWalletsTable({ onChanged, onNotice, wallets }: CopyWalletsTa
                             onClick={() => handlePause(wallet)}
                             type="button"
                           >
-                            {pendingAction === "pause" ? (wallet.enabled ? "Pausando..." : "Activando...") : wallet.enabled ? "Pausar" : "Activar"}
+                            {pendingAction === "pause"
+                              ? wallet.enabled
+                                ? "Pausando..."
+                                : "Activando..."
+                              : wallet.enabled
+                                ? "Pausar"
+                                : "Activar"}
                           </button>
                           <button
                             aria-label="Escanea esta wallet una vez ahora."
@@ -211,6 +235,41 @@ export function CopyWalletsTable({ onChanged, onNotice, wallets }: CopyWalletsTa
       )}
     </section>
   );
+}
+
+function formatCopyWindowValue(copyWindowSeconds: number | null): string {
+  const fullValue = formatCopyWindow(copyWindowSeconds);
+  return fullValue.replace(/^Ventana\s+/i, "");
+}
+
+function formatDemoSummary(wallet: CopyWallet): string {
+  if (wallet.demo_copied_count === 0) {
+    return wallet.demo_skipped_count > 0
+      ? `Sin copias demo todavia · Saltadas ${wallet.demo_skipped_count}`
+      : "Sin copias demo todavia";
+  }
+  return `Copiadas ${wallet.demo_copied_count} · BUY ${wallet.demo_buy_count} · SELL ${wallet.demo_sell_count} · Saltadas ${wallet.demo_skipped_count}`;
+}
+
+function formatLastDemoCopy(wallet: CopyWallet): string {
+  if (!wallet.last_demo_copy_at) {
+    return "-";
+  }
+  const action = wallet.last_demo_copy_action ? wallet.last_demo_copy_action.toUpperCase() : "DEMO";
+  const amount = wallet.last_demo_copy_amount_usd ? formatUsd(wallet.last_demo_copy_amount_usd) : "-";
+  const age = formatTradeAge(ageSecondsFromNow(wallet.last_demo_copy_at));
+  return `${action} · ${amount} · ${age}`;
+}
+
+function ageSecondsFromNow(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000));
 }
 
 function getWalletScanMessage(summary: CopyTradingTickSummary): string {

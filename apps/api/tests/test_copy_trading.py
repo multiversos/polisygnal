@@ -17,6 +17,7 @@ from app.services.copy_trading_service import (
     DuplicateCopyWalletError,
     InvalidCopyWalletInputError,
     build_copy_trade_read,
+    build_copy_wallet_read,
     create_copy_wallet,
     list_copy_events,
     list_copy_orders,
@@ -290,6 +291,50 @@ def test_demo_tick_uses_updated_copy_window(db_session: Session) -> None:
     assert response.live_candidates == 1
     assert response.orders_simulated == 1
     assert response.historical_trades == 0
+
+
+def test_wallet_demo_summary_defaults_without_orders(db_session: Session) -> None:
+    wallet = _create_wallet(db_session)
+
+    summary = build_copy_wallet_read(wallet, now=_now())
+
+    assert summary.demo_copied_count == 0
+    assert summary.demo_buy_count == 0
+    assert summary.demo_sell_count == 0
+    assert summary.demo_skipped_count == 0
+    assert summary.last_demo_copy_at is None
+
+
+def test_wallet_demo_summary_counts_simulated_buy_and_sell(db_session: Session) -> None:
+    wallet = _create_wallet(db_session)
+    reader = FakeTradeReader([_trade("0xbuy"), _trade("0xsell", side="SELL")])
+
+    run_demo_tick(db_session, data_client=reader, now=_now())
+    db_session.refresh(wallet)
+    summary = build_copy_wallet_read(wallet, now=_now())
+
+    assert summary.demo_copied_count == 2
+    assert summary.demo_buy_count == 1
+    assert summary.demo_sell_count == 1
+    assert summary.demo_skipped_count == 0
+    assert summary.last_demo_copy_at is not None
+    assert summary.last_demo_copy_action == "sell"
+    assert summary.last_demo_copy_amount_usd == Decimal("5.00")
+
+
+def test_wallet_demo_summary_counts_skipped_orders(db_session: Session) -> None:
+    wallet = _create_wallet(db_session)
+    old_trade = _trade("0xhistorical-summary") | {"timestamp": (_now() - timedelta(seconds=90)).isoformat()}
+
+    run_demo_tick(db_session, data_client=FakeTradeReader([old_trade]), now=_now())
+    db_session.refresh(wallet)
+    summary = build_copy_wallet_read(wallet, now=_now())
+
+    assert summary.demo_copied_count == 0
+    assert summary.demo_buy_count == 0
+    assert summary.demo_sell_count == 0
+    assert summary.demo_skipped_count == 1
+    assert summary.last_demo_copy_at is None
 
 
 def test_buy_trade_normalizes() -> None:

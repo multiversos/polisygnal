@@ -117,6 +117,13 @@ class CopyWalletRead(BaseModel):
     recent_trades: int = 0
     historical_trades: int = 0
     live_candidates: int = 0
+    demo_copied_count: int = 0
+    demo_buy_count: int = 0
+    demo_sell_count: int = 0
+    demo_skipped_count: int = 0
+    last_demo_copy_at: datetime | None = None
+    last_demo_copy_action: CopyTradeSide | None = None
+    last_demo_copy_amount_usd: Decimal | None = None
     last_trade_freshness_status: CopyTradeFreshnessStatus | None = None
     last_trade_freshness_label: str | None = None
     created_at: datetime

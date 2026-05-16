@@ -494,6 +494,12 @@
   color: var(--muted-foreground);
 }
 
+.copy-wallet-detail-label {
+  color: var(--foreground);
+  font-weight: 600;
+  margin-right: 6px;
+}
+
 .copy-mono {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }

@@ -40,6 +40,13 @@ export type CopyWallet = {
   recent_trades: number;
   historical_trades: number;
   live_candidates: number;
+  demo_copied_count: number;
+  demo_buy_count: number;
+  demo_sell_count: number;
+  demo_skipped_count: number;
+  last_demo_copy_at: string | null;
+  last_demo_copy_action: CopyTradeSide | null;
+  last_demo_copy_amount_usd: string | null;
   last_trade_freshness_status: CopyTradeFreshnessStatus | null;
   last_trade_freshness_label: string | null;
   created_at: string;

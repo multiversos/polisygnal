@@ -1174,6 +1174,12 @@ async function main() {
   assertTextExcludes(copyTradingText, ["Editar modo"], "copy trading legacy edit label");
   assertTextIncludesOneOf(copyTradingText, ["Demo activo", "Real no conectado"], "copy trading mode badges");
   assertTextIncludes(copyTradingText, "Bloqueado hasta configurar credenciales", "copy trading real lock");
+  assertTextIncludesOneOf(copyTradingText, ["Estado actual", "Sin wallets."], "copy trading current status summary");
+  assertTextIncludesOneOf(copyTradingText, ["Ultimo trade", "Sin wallets."], "copy trading last trade summary");
+  assertTextIncludesOneOf(copyTradingText, ["Actividad", "Sin wallets."], "copy trading activity summary");
+  assertTextIncludesOneOf(copyTradingText, ["Demo", "Sin wallets."], "copy trading demo summary");
+  assertTextIncludesOneOf(copyTradingText, ["Copiadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo copied summary");
+  assertTextIncludesOneOf(copyTradingText, ["Saltadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo skipped summary");
   assertTextExcludes(
     copyTradingText,
     [
