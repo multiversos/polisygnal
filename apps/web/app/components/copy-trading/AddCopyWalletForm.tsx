@@ -21,7 +21,8 @@ const SAVE_WALLET_ERROR_MESSAGE = "No pudimos guardar esta wallet. Intenta nueva
 const COPY_WINDOW_OPTIONS = [
   { label: "10 segundos", value: 10 },
   { label: "30 segundos", value: 30 },
-  { label: "60 segundos", value: 60 },
+  { label: "1 minuto", value: 60 },
+  { label: "2 minutos", value: 120 },
   { label: "5 minutos", value: 300 },
 ];
 

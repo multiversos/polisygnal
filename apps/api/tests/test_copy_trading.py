@@ -10,18 +10,19 @@ from sqlalchemy.orm import Session
 
 from app.api import routes_copy_trading
 from app.models.copy_trading import CopyWallet
-from app.schemas.copy_trading import CopyWalletCreate
+from app.schemas.copy_trading import CopyWalletCreate, CopyWalletUpdate
 from app.services.copy_trading_demo_engine import normalize_public_trade, run_demo_tick
 from app.services.copy_trading_risk_rules import CopyTradeForRules, evaluate_demo_trade
 from app.services.copy_trading_service import (
     DuplicateCopyWalletError,
     InvalidCopyWalletInputError,
-    list_copy_events,
     build_copy_trade_read,
     create_copy_wallet,
+    list_copy_events,
     list_copy_orders,
     list_copy_trades,
     resolve_copy_wallet_input,
+    update_copy_wallet,
 )
 from app.services.copy_trading_watcher import CopyTradingDemoWatcher
 
@@ -199,6 +200,96 @@ def test_duplicate_wallet_request_does_not_block_next_different_wallet(client: T
     assert duplicate.json()["detail"] == "Esta wallet ya esta en seguimiento."
     assert second.status_code == 201
     assert second.json()["proxy_wallet"] == WALLET_B
+
+
+@pytest.mark.parametrize("next_window", [30, 60, 120, 300])
+def test_patch_wallet_updates_copy_window(client: TestClient, next_window: int) -> None:
+    created = client.post(
+        "/copy-trading/wallets",
+        json={
+            "wallet_input": WALLET,
+            "label": "qa-edit-window",
+            "mode": "demo",
+            "copy_amount_mode": "preset",
+            "copy_amount_usd": "5",
+            "copy_buys": True,
+            "copy_sells": True,
+        },
+    )
+
+    response = client.patch(
+        f"/copy-trading/wallets/{created.json()['id']}",
+        json={"max_delay_seconds": next_window},
+    )
+
+    assert created.status_code == 201
+    assert response.status_code == 200
+    assert response.json()["max_delay_seconds"] == next_window
+    assert response.json()["copy_window_seconds"] == next_window
+
+
+def test_patch_wallet_rejects_invalid_copy_window(client: TestClient) -> None:
+    created = client.post(
+        "/copy-trading/wallets",
+        json={
+            "wallet_input": WALLET,
+            "label": "qa-invalid-window",
+            "mode": "demo",
+            "copy_amount_mode": "preset",
+            "copy_amount_usd": "5",
+            "copy_buys": True,
+            "copy_sells": True,
+        },
+    )
+
+    response = client.patch(
+        f"/copy-trading/wallets/{created.json()['id']}",
+        json={"max_delay_seconds": 45},
+    )
+
+    assert created.status_code == 201
+    assert response.status_code == 422
+    assert "max_delay_seconds" in response.text
+
+
+def test_patch_wallet_updates_copy_rules_and_amount(db_session: Session) -> None:
+    wallet = _create_wallet(db_session)
+
+    updated = update_copy_wallet(
+        db_session,
+        wallet.id,
+        CopyWalletUpdate(
+            copy_amount_mode="custom",
+            copy_amount_usd=Decimal("25"),
+            copy_buys=False,
+            copy_sells=True,
+            max_delay_seconds=120,
+        ),
+    )
+
+    assert updated.copy_amount_mode == "custom"
+    assert updated.copy_amount_usd == Decimal("25")
+    assert updated.copy_buys is False
+    assert updated.copy_sells is True
+    assert updated.max_delay_seconds == 120
+    assert updated.real_trading_enabled is False
+
+
+def test_demo_tick_uses_updated_copy_window(db_session: Session) -> None:
+    wallet = _create_wallet(db_session)
+    update_copy_wallet(
+        db_session,
+        wallet.id,
+        CopyWalletUpdate(max_delay_seconds=300),
+    )
+    db_session.commit()
+
+    recent_trade = _trade("0xupdated-window") | {"timestamp": (_now() - timedelta(seconds=240)).isoformat()}
+    response = run_demo_tick(db_session, data_client=FakeTradeReader([recent_trade]), now=_now())
+
+    assert response.live_candidates == 1
+    assert response.orders_simulated == 1
+    assert response.historical_trades == 0
 
 
 def test_buy_trade_normalizes() -> None:

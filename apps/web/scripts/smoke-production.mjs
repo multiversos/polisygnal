@@ -1155,7 +1155,8 @@ async function main() {
     "Ventana de copia",
     "10 segundos",
     "30 segundos",
-    "60 segundos",
+    "1 minuto",
+    "2 minutos",
     "5 minutos",
     "Watcher demo",
     "5 segundos",
@@ -1170,6 +1171,7 @@ async function main() {
     assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
   }
   assert(copyTradingDom.includes("Escanea esta wallet una vez ahora."), "copy trading scan button helper missing");
+  assertTextExcludes(copyTradingText, ["Editar modo"], "copy trading legacy edit label");
   assertTextIncludesOneOf(copyTradingText, ["Demo activo", "Real no conectado"], "copy trading mode badges");
   assertTextIncludes(copyTradingText, "Bloqueado hasta configurar credenciales", "copy trading real lock");
   assertTextExcludes(

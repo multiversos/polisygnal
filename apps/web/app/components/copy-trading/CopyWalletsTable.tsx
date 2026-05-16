@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   deleteCopyWallet,
   formatCopyWindow,
@@ -13,6 +13,7 @@ import {
   updateCopyWallet,
 } from "../../lib/copyTrading";
 import type { CopyTradingTickSummary, CopyWallet } from "../../lib/copyTradingTypes";
+import { EditCopyWalletForm } from "./EditCopyWalletForm";
 
 type CopyWalletsTableProps = {
   onChanged: () => Promise<void> | void;
@@ -20,10 +21,11 @@ type CopyWalletsTableProps = {
   wallets: CopyWallet[];
 };
 
-type RowAction = "delete" | "mode" | "pause" | "scan" | null;
+type RowAction = "delete" | "pause" | "scan" | null;
 
 export function CopyWalletsTable({ onChanged, onNotice, wallets }: CopyWalletsTableProps) {
   const [pendingActionByWallet, setPendingActionByWallet] = useState<Record<string, RowAction>>({});
+  const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
 
   function setPendingAction(walletId: string, action: RowAction) {
     setPendingActionByWallet((current) => ({ ...current, [walletId]: action }));
@@ -50,17 +52,9 @@ export function CopyWalletsTable({ onChanged, onNotice, wallets }: CopyWalletsTa
     }
   }
 
-  async function handleMode(wallet: CopyWallet) {
-    setPendingAction(wallet.id, "mode");
-    try {
-      await updateCopyWallet(wallet.id, { mode: wallet.mode === "demo" ? "real" : "demo" });
-      onNotice?.("Modo de esta wallet actualizado.");
-      await onChanged();
-    } catch {
-      onNotice?.("No pudimos actualizar esta wallet ahora.");
-    } finally {
-      clearPendingAction(wallet.id);
-    }
+  function handleEdit(wallet: CopyWallet) {
+    setEditingWalletId(wallet.id);
+    onNotice?.("Edita la configuracion de esta wallet y guarda los cambios.");
   }
 
   async function handleDelete(wallet: CopyWallet) {
@@ -119,72 +113,96 @@ export function CopyWalletsTable({ onChanged, onNotice, wallets }: CopyWalletsTa
             <tbody>
               {wallets.map((wallet) => {
                 const pendingAction = pendingActionByWallet[wallet.id] ?? null;
+                const isEditing = editingWalletId === wallet.id;
                 return (
-                  <tr key={wallet.id}>
-                    <td>{wallet.label || "Sin alias"}</td>
-                    <td className="copy-mono">{formatWalletAddress(wallet.proxy_wallet)}</td>
-                    <td>
-                      <span className={`copy-badge ${wallet.mode === "demo" ? "success" : "locked"}`}>
-                        {wallet.mode === "demo" ? "Demo" : "Real bloqueado"}
-                      </span>
-                    </td>
-                    <td>{wallet.enabled ? "Activa" : "Pausada"}</td>
-                    <td>{formatUsd(wallet.copy_amount_usd)}</td>
-                    <td>{`${wallet.copy_buys ? "BUY" : "-"} / ${wallet.copy_sells ? "SELL" : "-"}`}</td>
-                    <td>
-                      <div className="copy-wallet-details">
-                        <span className={`copy-badge ${freshnessBadgeClass(wallet.last_trade_freshness_status)}`}>
-                          {wallet.last_trade_freshness_label
-                            ? formatFreshnessLabel(wallet.last_trade_freshness_status, wallet.last_trade_freshness_label)
-                            : "Sin actividad reciente"}
+                  <Fragment key={wallet.id}>
+                    <tr key={wallet.id}>
+                      <td>{wallet.label || "Sin alias"}</td>
+                      <td className="copy-mono">{formatWalletAddress(wallet.proxy_wallet)}</td>
+                      <td>
+                        <span className={`copy-badge ${wallet.mode === "demo" ? "success" : "locked"}`}>
+                          {wallet.mode === "demo" ? "Demo" : "Real bloqueado"}
                         </span>
-                        <small>Ultimo trade {formatDateTime(wallet.last_trade_at)}</small>
-                        <small>{formatCopyWindow(wallet.copy_window_seconds)}</small>
-                        <small>
-                          Recientes {wallet.recent_trades} · Historicos {wallet.historical_trades} · Copiables {wallet.live_candidates}
-                        </small>
-                        <small>Ultimo escaneo {formatDateTime(wallet.last_scan_at)}</small>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="copy-action-row">
-                        <button
-                          className="copy-secondary-button"
-                          disabled={pendingAction !== null}
-                          onClick={() => handlePause(wallet)}
-                          type="button"
-                        >
-                          {pendingAction === "pause" ? (wallet.enabled ? "Pausando..." : "Activando...") : wallet.enabled ? "Pausar" : "Activar"}
-                        </button>
-                        <button
-                          aria-label="Escanea esta wallet una vez ahora."
-                          className="copy-action-button"
-                          disabled={pendingAction !== null}
-                          onClick={() => handleScan(wallet)}
-                          title="Escanea esta wallet una vez ahora."
-                          type="button"
-                        >
-                          {pendingAction === "scan" ? "Escaneando..." : "Escanear"}
-                        </button>
-                        <button
-                          className="copy-secondary-button"
-                          disabled={pendingAction !== null}
-                          onClick={() => handleMode(wallet)}
-                          type="button"
-                        >
-                          {pendingAction === "mode" ? "Actualizando..." : "Editar modo"}
-                        </button>
-                        <button
-                          className="copy-danger-button"
-                          disabled={pendingAction !== null}
-                          onClick={() => handleDelete(wallet)}
-                          type="button"
-                        >
-                          {pendingAction === "delete" ? "Eliminando..." : "Eliminar"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                      <td>{wallet.enabled ? "Activa" : "Pausada"}</td>
+                      <td>{formatUsd(wallet.copy_amount_usd)}</td>
+                      <td>{`${wallet.copy_buys ? "BUY" : "-"} / ${wallet.copy_sells ? "SELL" : "-"}`}</td>
+                      <td>
+                        <div className="copy-wallet-details">
+                          <span className={`copy-badge ${freshnessBadgeClass(wallet.last_trade_freshness_status)}`}>
+                            {wallet.last_trade_freshness_label
+                              ? formatFreshnessLabel(wallet.last_trade_freshness_status, wallet.last_trade_freshness_label)
+                              : "Sin actividad reciente"}
+                          </span>
+                          <small>Ultimo trade {formatDateTime(wallet.last_trade_at)}</small>
+                          <small>{formatCopyWindow(wallet.copy_window_seconds)}</small>
+                          <small>
+                            Recientes {wallet.recent_trades} · Historicos {wallet.historical_trades} · Copiables {wallet.live_candidates}
+                          </small>
+                          <small>Ultimo escaneo {formatDateTime(wallet.last_scan_at)}</small>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="copy-action-row">
+                          <button
+                            className="copy-secondary-button"
+                            disabled={pendingAction !== null}
+                            onClick={() => handlePause(wallet)}
+                            type="button"
+                          >
+                            {pendingAction === "pause" ? (wallet.enabled ? "Pausando..." : "Activando...") : wallet.enabled ? "Pausar" : "Activar"}
+                          </button>
+                          <button
+                            aria-label="Escanea esta wallet una vez ahora."
+                            className="copy-action-button"
+                            disabled={pendingAction !== null}
+                            onClick={() => handleScan(wallet)}
+                            title="Escanea esta wallet una vez ahora."
+                            type="button"
+                          >
+                            {pendingAction === "scan" ? "Escaneando..." : "Escanear"}
+                          </button>
+                          <button
+                            aria-label="Editar configuracion de esta wallet"
+                            className="copy-secondary-button"
+                            disabled={pendingAction !== null}
+                            onClick={() => handleEdit(wallet)}
+                            title="Editar configuracion de esta wallet"
+                            type="button"
+                          >
+                            {isEditing ? "Editando..." : "Editar"}
+                          </button>
+                          <button
+                            className="copy-danger-button"
+                            disabled={pendingAction !== null}
+                            onClick={() => handleDelete(wallet)}
+                            type="button"
+                          >
+                            {pendingAction === "delete" ? "Eliminando..." : "Eliminar"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {isEditing ? (
+                      <tr>
+                        <td className="copy-inline-editor-cell" colSpan={8}>
+                          <EditCopyWalletForm
+                            onCancel={() => {
+                              clearPendingAction(wallet.id);
+                              setEditingWalletId(null);
+                            }}
+                            onSaved={async (message) => {
+                              clearPendingAction(wallet.id);
+                              setEditingWalletId(null);
+                              onNotice?.(message);
+                              await onChanged();
+                            }}
+                            wallet={wallet}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>

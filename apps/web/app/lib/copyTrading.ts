@@ -6,6 +6,7 @@ import type {
   CopyTradingWatcherStatus,
   CopyWallet,
   CopyWalletCreateInput,
+  CopyWalletUpdateInput,
   CopyBotEvent,
   CopyDetectedTrade,
   CopyOrder,
@@ -45,7 +46,7 @@ export async function createCopyWallet(input: CopyWalletCreateInput): Promise<Co
 
 export async function updateCopyWallet(
   walletId: string,
-  input: Partial<Pick<CopyWallet, "enabled" | "copy_buys" | "copy_sells" | "mode">>,
+  input: CopyWalletUpdateInput,
 ): Promise<CopyWallet> {
   return fetchApiJson<CopyWallet>(`/copy-trading/wallets/${encodeURIComponent(walletId)}`, {
     body: JSON.stringify(input),
@@ -155,9 +156,9 @@ export function formatCopyWindow(copyWindowSeconds: number | null | undefined): 
   }
   const minutes = copyWindowSeconds / 60;
   if (Number.isInteger(minutes)) {
-    return `Ventana ${minutes}m`;
+    return `Ventana ${minutes}min`;
   }
-  return `Ventana ${minutes.toFixed(1)}m`;
+  return `Ventana ${minutes.toFixed(1)}min`;
 }
 
 export function formatFreshnessLabel(
