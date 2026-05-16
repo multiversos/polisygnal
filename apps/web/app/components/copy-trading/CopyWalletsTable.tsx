@@ -396,24 +396,36 @@ export function CopyWalletsTable({
                             <div className="copy-wallet-row-copy">
                               <div className="copy-wallet-row-title-line">
                                 <strong>{row.wallet.label || "Sin alias"}</strong>
-                                <span className={walletPnlClassName(walletPnlTone)}>{formatPnl(row.analytics.totalPnlUsd)}</span>
+                                <span className="copy-wallet-row-freshness">
+                                  {row.wallet.last_trade_freshness_label
+                                    ? formatFreshnessLabel(
+                                        row.wallet.last_trade_freshness_status,
+                                        row.wallet.last_trade_freshness_label,
+                                      )
+                                    : "Sin actividad"}
+                                </span>
                               </div>
                               <span className="copy-mono">{formatWalletAddress(row.wallet.proxy_wallet)}</span>
                             </div>
                           </div>
-                          <button
-                            aria-label="Ver detalle de esta wallet"
-                            className="copy-icon-button"
-                            disabled={pendingAction !== null}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedWalletId(row.wallet.id);
-                            }}
-                            title="Ver detalle de esta wallet"
-                            type="button"
-                          >
-                            ...
-                          </button>
+                          <div className="copy-wallet-row-trailing">
+                            <span className={`copy-wallet-row-pnl ${walletPnlClassName(walletPnlTone)}`}>
+                              {formatPnl(row.analytics.totalPnlUsd)}
+                            </span>
+                            <button
+                              aria-label="Ver detalle de esta wallet"
+                              className="copy-icon-button"
+                              disabled={pendingAction !== null}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedWalletId(row.wallet.id);
+                              }}
+                              title="Ver detalle de esta wallet"
+                              type="button"
+                            >
+                              ...
+                            </button>
+                          </div>
                         </div>
 
                         <div className="copy-wallet-row-badges">
@@ -427,7 +439,7 @@ export function CopyWalletsTable({
                         </div>
 
                         <div className="copy-wallet-row-meta">
-                          <span>
+                          <div className="copy-wallet-row-meta-item">
                             <strong>Estado actual</strong>
                             {row.wallet.last_trade_freshness_label
                               ? formatFreshnessLabel(
@@ -435,19 +447,19 @@ export function CopyWalletsTable({
                                   row.wallet.last_trade_freshness_label,
                                 )
                               : "Sin actividad"}
-                          </span>
-                          <span>
+                          </div>
+                          <div className="copy-wallet-row-meta-item">
                             <strong>Ultimo trade</strong>
                             {formatTradeAge(ageSecondsFromNow(row.latestTradeAt))}
-                          </span>
-                          <span>
+                          </div>
+                          <div className="copy-wallet-row-meta-item">
                             <strong>Copiadas</strong>
                             {row.wallet.demo_copied_count}
-                          </span>
-                          <span>
+                          </div>
+                          <div className="copy-wallet-row-meta-item">
                             <strong>Estado</strong>
                             {row.wallet.enabled ? "Lista para copiar" : "Pausada"}
-                          </span>
+                          </div>
                         </div>
                       </article>
                     );
@@ -637,7 +649,7 @@ function WalletDetailPanel({
             </div>
           </div>
         </div>
-        <div className="copy-action-row">
+        <div className="copy-action-row copy-wallet-detail-actions">
           <button
             aria-label="Editar configuracion de esta wallet"
             className="copy-secondary-button"
@@ -795,12 +807,16 @@ function WalletDetailPanel({
                 <article className={`copy-wallet-activity-item ${event.tone}`} key={event.id}>
                   <div className="copy-wallet-activity-rail">
                     <span className={`copy-wallet-activity-dot ${event.tone}`} />
+                    <span className="copy-wallet-activity-line" />
                     <span className="copy-wallet-activity-time">{event.ageLabel}</span>
                   </div>
                   <div className="copy-wallet-activity-copy">
                     <div className="copy-wallet-activity-heading">
-                      <strong>{event.title}</strong>
-                      <div className="copy-action-row">
+                      <div className="copy-wallet-activity-headline">
+                        <strong>{event.title}</strong>
+                        <span className="copy-wallet-activity-market">{event.valueLabel}</span>
+                      </div>
+                      <div className="copy-wallet-activity-tags">
                         {event.side ? <span className={`copy-side ${event.side}`}>{event.side.toUpperCase()}</span> : null}
                         {event.amountLabel ? <span className="copy-badge subtle">{event.amountLabel}</span> : null}
                         {event.windowLabel ? <span className="copy-badge subtle">{event.windowLabel}</span> : null}
@@ -808,9 +824,9 @@ function WalletDetailPanel({
                     </div>
                     <small>{event.description}</small>
                   </div>
-                  <div className="copy-feed-numbers">
-                    <span className={walletPnlClassName(event.valueTone)}>{event.valueLabel}</span>
-                    <small>{event.priceLabel}</small>
+                  <div className="copy-wallet-activity-numbers">
+                    <span className={walletPnlClassName(event.valueTone)}>{event.priceLabel}</span>
+                    <small>{event.amountLabel ?? "Sin monto"}</small>
                   </div>
                 </article>
               ))}

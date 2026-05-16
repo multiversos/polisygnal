@@ -41,132 +41,132 @@
   "visualMetrics": {
     "desktop": {
       "activity": {
-        "bottom": 1498,
-        "height": 346,
-        "left": 799,
-        "right": 1397,
-        "top": 1152,
-        "width": 598
+        "bottom": 1286,
+        "height": 330,
+        "left": 762,
+        "right": 1399,
+        "top": 956,
+        "width": 637
       },
       "activityItems": 3,
       "bodyTextIncludesNegative": true,
       "bodyTextIncludesPositive": true,
       "detail": {
-        "bottom": 1517,
-        "height": 1517,
-        "left": 780,
+        "bottom": 1303,
+        "height": 1303,
+        "left": 745,
         "right": 1416,
         "top": 0,
-        "width": 636
+        "width": 671
       },
       "detailBelowList": false,
       "firstRows": [
-        "AEAlpha Edge+$110x1111...1111...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 51mCopiadas3EstadoLista para copiar",
-        "NSNorth Star+$14.40x2222...2222...DemoReal bloqueadoActivaEstado actualFuera de ventanaUltimo tradeHace 53mCopiadas4EstadoLista para copiar",
-        "QWQuiet Whale-$6.80x3333...3333...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 54mCopiadas0EstadoLista para copiar",
-        "PVPaused Value-$14.40x4444...4444...DemoReal bloqueadoPausadaEstado actualSin hora confiableUltimo tradeHace 55mCopiadas6EstadoPausada"
+        "AEAlpha EdgeCopiable ahora0x1111...1111+$11...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 1hCopiadas3EstadoLista para copiar",
+        "NSNorth StarFuera de ventana0x2222...2222+$14.4...DemoReal bloqueadoActivaEstado actualFuera de ventanaUltimo tradeHace 1hCopiadas4EstadoLista para copiar",
+        "QWQuiet WhaleHistorico0x3333...3333-$6.8...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas0EstadoLista para copiar",
+        "PVPaused ValueSin hora confiable0x4444...4444-$14.4...DemoReal bloqueadoPausadaEstado actualSin hora confiableUltimo tradeHace 1hCopiadas6EstadoPausada"
       ],
       "horizontalOverflow": false,
       "innerWidth": 1440,
       "list": {
-        "bottom": 4391,
-        "height": 4391,
+        "bottom": 3143,
+        "height": 3143,
         "left": 284,
-        "right": 764,
+        "right": 731,
         "top": 0,
-        "width": 480
+        "width": 447
       },
       "rowCount": 15,
       "scrollWidth": 1440,
       "selected": {
-        "bottom": 660,
-        "height": 246,
-        "left": 303,
-        "right": 745,
-        "top": 414,
-        "width": 442
+        "bottom": 523,
+        "height": 174,
+        "left": 301,
+        "right": 714,
+        "top": 349,
+        "width": 413
       },
       "selectedLabel": "Alpha Edge",
       "walletToolbarVisible": true
     },
     "filter": {
       "activity": {
-        "bottom": 1498,
-        "height": 346,
-        "left": 799,
-        "right": 1397,
-        "top": 1152,
-        "width": 598
+        "bottom": 1286,
+        "height": 330,
+        "left": 762,
+        "right": 1399,
+        "top": 956,
+        "width": 637
       },
       "activityItems": 3,
       "bodyTextIncludesNegative": true,
       "bodyTextIncludesPositive": true,
       "detail": {
-        "bottom": 1517,
-        "height": 1517,
-        "left": 780,
+        "bottom": 1303,
+        "height": 1303,
+        "left": 745,
         "right": 1416,
         "top": 0,
-        "width": 636
+        "width": 671
       },
       "detailBelowList": false,
       "firstRows": [
-        "BDBlue Delta-$19.80x7777...7777...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 59mCopiadas9EstadoLista para copiar",
-        "BLBlue LedgerPendiente0x2222...2229...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31EstadoLista para copiar"
+        "BDBlue DeltaHistorico0x7777...7777-$19.8...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas9EstadoLista para copiar",
+        "BLBlue LedgerCopiable ahora0x2222...2229Pendiente...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31EstadoLista para copiar"
       ],
       "horizontalOverflow": false,
       "innerWidth": 1440,
       "list": {
-        "bottom": 1063,
-        "height": 1063,
+        "bottom": 828,
+        "height": 828,
         "left": 284,
-        "right": 764,
+        "right": 731,
         "top": 0,
-        "width": 480
+        "width": 447
       },
       "rowCount": 2,
       "scrollWidth": 1440,
       "selected": {
-        "bottom": 660,
-        "height": 246,
-        "left": 303,
-        "right": 745,
-        "top": 414,
-        "width": 442
+        "bottom": 508,
+        "height": 159,
+        "left": 301,
+        "right": 714,
+        "top": 349,
+        "width": 413
       },
       "selectedLabel": "Blue Delta",
       "walletToolbarVisible": true
     },
     "mobile": {
       "activity": {
-        "bottom": 4590,
-        "height": 739,
-        "left": 33,
-        "right": 357,
-        "top": 3851,
-        "width": 324
+        "bottom": 3928,
+        "height": 678,
+        "left": 31,
+        "right": 359,
+        "top": 3251,
+        "width": 328
       },
       "activityItems": 3,
       "bodyTextIncludesNegative": true,
       "bodyTextIncludesPositive": true,
       "detail": {
-        "bottom": 4609,
-        "height": 2905,
+        "bottom": 3945,
+        "height": 2508,
         "left": 14,
         "right": 376,
-        "top": 1704,
+        "top": 1437,
         "width": 362
       },
       "detailBelowList": true,
       "firstRows": [
-        "BDBlue Delta-$19.80x7777...7777...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas9EstadoLista para copiar",
-        "BLBlue LedgerPendiente0x2222...2229...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31EstadoLista para copiar"
+        "BDBlue DeltaHistorico0x7777...7777-$19.8...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas9EstadoLista para copiar",
+        "BLBlue LedgerCopiable ahora0x2222...2229Pendiente...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31EstadoLista para copiar"
       ],
       "horizontalOverflow": false,
       "innerWidth": 390,
       "list": {
-        "bottom": 1688,
-        "height": 1689,
+        "bottom": 1423,
+        "height": 1423,
         "left": 14,
         "right": 376,
         "top": 0,
@@ -175,96 +175,96 @@
       "rowCount": 2,
       "scrollWidth": 390,
       "selected": {
-        "bottom": 993,
-        "height": 430,
-        "left": 33,
-        "right": 357,
-        "top": 563,
-        "width": 324
+        "bottom": 838,
+        "height": 333,
+        "left": 31,
+        "right": 359,
+        "top": 505,
+        "width": 328
       },
       "selectedLabel": "Blue Delta",
       "walletToolbarVisible": true
     },
     "selected": {
       "activity": {
-        "bottom": 1479,
-        "height": 346,
-        "left": 799,
-        "right": 1397,
-        "top": 1133,
-        "width": 598
+        "bottom": 1286,
+        "height": 330,
+        "left": 762,
+        "right": 1399,
+        "top": 956,
+        "width": 637
       },
       "activityItems": 3,
       "bodyTextIncludesNegative": true,
       "bodyTextIncludesPositive": true,
       "detail": {
-        "bottom": 1498,
-        "height": 1498,
-        "left": 780,
+        "bottom": 1303,
+        "height": 1303,
+        "left": 745,
         "right": 1416,
         "top": 0,
-        "width": 636
+        "width": 671
       },
       "detailBelowList": false,
       "firstRows": [
-        "AEAlpha Edge+$110x1111...1111...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 51mCopiadas3EstadoLista para copiar",
-        "NSNorth Star+$14.40x2222...2222...DemoReal bloqueadoActivaEstado actualFuera de ventanaUltimo tradeHace 53mCopiadas4EstadoLista para copiar",
-        "QWQuiet Whale-$6.80x3333...3333...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 54mCopiadas0EstadoLista para copiar",
-        "PVPaused Value-$14.40x4444...4444...DemoReal bloqueadoPausadaEstado actualSin hora confiableUltimo tradeHace 55mCopiadas6EstadoPausada"
+        "AEAlpha EdgeCopiable ahora0x1111...1111+$11...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 1hCopiadas3EstadoLista para copiar",
+        "NSNorth StarFuera de ventana0x2222...2222+$14.4...DemoReal bloqueadoActivaEstado actualFuera de ventanaUltimo tradeHace 1hCopiadas4EstadoLista para copiar",
+        "QWQuiet WhaleHistorico0x3333...3333-$6.8...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas0EstadoLista para copiar",
+        "PVPaused ValueSin hora confiable0x4444...4444-$14.4...DemoReal bloqueadoPausadaEstado actualSin hora confiableUltimo tradeHace 1hCopiadas6EstadoPausada"
       ],
       "horizontalOverflow": false,
       "innerWidth": 1440,
       "list": {
-        "bottom": 4391,
-        "height": 4391,
+        "bottom": 3143,
+        "height": 3143,
         "left": 284,
-        "right": 764,
+        "right": 731,
         "top": 0,
-        "width": 480
+        "width": 447
       },
       "rowCount": 15,
       "scrollWidth": 1440,
       "selected": {
-        "bottom": 1940,
-        "height": 246,
-        "left": 303,
-        "right": 745,
-        "top": 1694,
-        "width": 442
+        "bottom": 1416,
+        "height": 174,
+        "left": 301,
+        "right": 714,
+        "top": 1242,
+        "width": 413
       },
       "selectedLabel": "Hedge Scout",
       "walletToolbarVisible": true
     },
     "tablet": {
       "activity": {
-        "bottom": 2830,
-        "height": 590,
-        "left": 43,
-        "right": 444,
-        "top": 2240,
-        "width": 401
+        "bottom": 2442,
+        "height": 585,
+        "left": 41,
+        "right": 445,
+        "top": 1857,
+        "width": 404
       },
       "activityItems": 3,
       "bodyTextIncludesNegative": true,
       "bodyTextIncludesPositive": true,
       "detail": {
-        "bottom": 2849,
-        "height": 1838,
+        "bottom": 2459,
+        "height": 1641,
         "left": 24,
         "right": 876,
-        "top": 1011,
+        "top": 818,
         "width": 852
       },
       "detailBelowList": true,
       "firstRows": [
-        "BDBlue Delta-$19.80x7777...7777...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 59mCopiadas9EstadoLista para copiar",
-        "BLBlue LedgerPendiente0x2222...2229...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31EstadoLista para copiar"
+        "BDBlue DeltaHistorico0x7777...7777-$19.8...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas9EstadoLista para copiar",
+        "BLBlue LedgerCopiable ahora0x2222...2229Pendiente...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31EstadoLista para copiar"
       ],
       "horizontalOverflow": false,
       "innerWidth": 900,
       "list": {
-        "bottom": 995,
-        "height": 995,
+        "bottom": 804,
+        "height": 804,
         "left": 24,
         "right": 876,
         "top": 0,
@@ -273,12 +273,12 @@
       "rowCount": 2,
       "scrollWidth": 900,
       "selected": {
-        "bottom": 636,
-        "height": 246,
-        "left": 43,
-        "right": 857,
-        "top": 390,
-        "width": 814
+        "bottom": 514,
+        "height": 186,
+        "left": 41,
+        "right": 859,
+        "top": 329,
+        "width": 818
       },
       "selectedLabel": "Blue Delta",
       "walletToolbarVisible": true
