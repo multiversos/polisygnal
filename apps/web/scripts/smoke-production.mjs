@@ -656,7 +656,7 @@ function validateAnalyzeLoadingPanelSource() {
     "analyze report does not include product center summary",
   );
   assert(
-    analyzePage.includes("Capas revisadas") || reportSource.includes("Capas revisadas"),
+    analyzePage.includes("Detalles avanzados del analisis") || reportSource.includes("Detalles avanzados del analisis"),
     "analyze report does not include reviewed layers",
   );
   assert(
@@ -664,30 +664,26 @@ function validateAnalyzeLoadingPanelSource() {
     "analyze report does not include related history",
   );
   assert(analyzePage.includes("AnalyzerReport"), "analyze page does not render AnalyzerReport");
-  assert(reportSource.includes("Resumen del analisis"), "AnalyzerReport missing executive summary");
-  assert(reportSource.includes("Progreso del analisis"), "AnalyzerReport missing human progress copy");
-  assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport missing accessible deep job state");
+  assert(reportSource.includes("Resultado del analisis"), "AnalyzerReport missing executive summary");
+  assert(reportSource.includes("Detalles avanzados del analisis"), "AnalyzerReport missing human progress copy");
+  assert(reportSource.includes("Estado del motor"), "AnalyzerReport missing accessible deep job state");
   assert(reportSource.includes("{analysisAgentName} automatico"), "AnalyzerReport missing dynamic automatic agent state");
   assert(reportSource.includes("Fuente automatica no disponible"), "AnalyzerReport missing automatic-source unavailable state");
   assert(reportSource.includes("Lectura parcial automatica"), "AnalyzerReport should label partial automatic readings");
   assert(reportSource.includes("Evidencia usada"), "AnalyzerReport should show verifiable evidence used");
-  assert(reportSource.includes("Datos reales revisados para esta lectura"), "AnalyzerReport should explain evidence cards");
+  assert(reportSource.includes("Resumen compacto de las capas revisadas"), "AnalyzerReport should explain evidence cards");
   assert(reportSource.includes("Evidencia independiente"), "AnalyzerReport should explain independent evidence");
-  assert(reportSource.includes("Que falta para estimar"), "AnalyzerReport should explain what is missing for an estimate");
-  assert(reportSource.includes("Fuente no conectada"), "AnalyzerReport should label disconnected evidence providers honestly");
-  assert(reportSource.includes("Dato real"), "AnalyzerReport key signals should badge real data");
+  assert(reportSource.includes("Que falta para generar estimacion propia"), "AnalyzerReport should explain what is missing for an estimate");
   assert(reportSource.includes("getDisplayMarketPrices"), "AnalyzerReport should use flexible outcome price summaries");
-  assert(reportSource.includes("Senales principales"), "AnalyzerReport should expose agent key signals");
-  assert(reportSource.includes("Riesgos"), "AnalyzerReport should expose agent risks");
-  assert(reportSource.includes("Limitaciones"), "AnalyzerReport should expose agent limitations");
+  assert(reportSource.includes("Senales visibles"), "AnalyzerReport should expose agent key signals");
+  assert(reportSource.includes("Riesgos y limitaciones"), "AnalyzerReport should expose agent risks");
   assert(reportSource.includes("Que revisar primero"), "AnalyzerReport should explain what to review first");
   assert(reportSource.includes("No hay estimacion propia de PolySignal"), "AnalyzerReport should not show market price as PolySignal estimate");
-  assert(reportSource.includes("Analisis profundo"), "AnalyzerReport missing deep analysis section");
   assert(reportSource.includes("Capas del motor"), "AnalyzerReport missing deep analyzer layers");
   assert(reportSource.includes("Pendiente de integracion"), "AnalyzerReport should label future layers as pending");
   assert(reportSource.includes("Lectura rapida de"), "AnalyzerReport missing public agent reading workflow");
   assert(reportSource.includes("NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS"), "AnalyzerReport should gate manual debug tools");
-  assert(reportSource.includes("Guardar y continuar despues"), "AnalyzerReport missing save-and-continue action");
+  assert(reportSource.includes("Guardar como seguimiento"), "AnalyzerReport missing save/follow-up action");
   assert(reportSource.includes("parseSamanthaResearchReport"), "AnalyzerReport missing Samantha report validation");
   assert(reportSource.includes("buildSamanthaTaskPacket"), "AnalyzerReport missing Samantha task packet builder");
   assert(reportSource.includes("/api/analysis-agent/research-status"), "AnalyzerReport should query agent status only through same-origin route");
@@ -705,7 +701,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(!bridgeRouteSource.includes("request.nextUrl"), "Samantha bridge route must not act as an open proxy");
   assert(bridgeStatusRouteSource.includes("../../analysis-agent/research-status/route"), "legacy Samantha status route must alias generic route");
   assert(!bridgeStatusRouteSource.includes("SAMANTHA_BRIDGE_TOKEN"), "Samantha status route must not expose bridge token");
-  assert(reportSource.includes("Fuentes del analisis"), "AnalyzerReport missing source block");
+  assert(reportSource.includes("Fuentes visibles completas"), "AnalyzerReport missing source block");
   assert(reportSource.includes("Que puedes hacer ahora"), "AnalyzerReport missing next actions");
   assert(reportSource.includes("Analizar otro enlace"), "AnalyzerReport missing analyze another link action");
   assert(reportSource.includes("Ver todas las billeteras analizadas"), "AnalyzerReport missing wallet drilldown");
@@ -1464,12 +1460,12 @@ async function main() {
     assertTextIncludesOneOf(validAnalyzeText, ["Analizar este mercado", "Lectura del mercado"], "analyze confirm-before-deep-analysis");
     assertTextIncludesOneOf(validAnalyzeText, ["Lectura del mercado", "Precio Si", "Precio Sí"], "analyze market reading");
     assertTextIncludesOneOf(validAnalyzeText, ["Centro de analisis", "Selecciona que mercado", "Lectura del mercado"], "analyze product center summary");
-    assertTextIncludesOneOf(validAnalyzeText, ["Analisis profundo", "Selecciona que mercado"], "analyze deep analyzer readiness");
-    assertTextIncludesOneOf(validAnalyzeText, ["Pendiente de integracion", "Selecciona que mercado"], "analyze future layers are not presented as active");
-    assertTextIncludesOneOf(validAnalyzeText, ["Que encontro PolySignal", "Preparacion de estimacion PolySignal", "Selecciona que mercado"], "analyze found summary");
+    assertTextIncludesOneOf(validAnalyzeText, ["Detalles avanzados del analisis", "Selecciona que mercado"], "analyze deep analyzer readiness");
+    assertTextIncludesOneOf(validAnalyzeText, ["Pendiente de integracion", "Detalles avanzados del analisis", "Selecciona que mercado"], "analyze future layers are not presented as active");
+    assertTextIncludesOneOf(validAnalyzeText, ["Resultado del analisis", "Preparacion de estimacion PolySignal", "Selecciona que mercado"], "analyze found summary");
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Capas revisadas", "Lectura por capas", "Selecciona que mercado", "Preparacion de datos", "Preparación de datos"],
+      ["Detalles avanzados del analisis", "Lectura por capas", "Selecciona que mercado", "Preparacion de datos", "Preparación de datos"],
       "analyze reviewed layers",
     );
     assertTextIncludesOneOf(validAnalyzeText, ["Historial relacionado", "Guardar analisis", "Analizar este mercado"], "analyze related history layer");
