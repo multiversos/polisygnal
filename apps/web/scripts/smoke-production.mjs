@@ -1,4 +1,4 @@
-﻿import { execFile } from "node:child_process";
+import { execFile } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -198,6 +198,10 @@ function visibleText(dom) {
     .replace(/&quot;/g, '"')
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function assertDomIncludes(dom, expected, label) {
+  assert(dom.includes(expected), `${label} did not render expected DOM content: ${expected}`);
 }
 
 function sidebarText(dom) {
@@ -408,7 +412,7 @@ async function dumpDom(url) {
         "--disable-extensions",
         "--no-first-run",
         `--user-data-dir=${userDataDir}`,
-        "--virtual-time-budget=15000",
+        "--virtual-time-budget=20000",
         "--dump-dom",
         url,
       ],
@@ -1159,13 +1163,27 @@ async function main() {
     "Wallets seguidas",
     "Escanear wallets",
     "Agregar wallet",
-    "Buscar por alias o wallet",
     "Ordenar por",
     "Copias abiertas",
     "PnL total demo",
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
   }
+  assertDomIncludes(
+    copyTradingDom,
+    'placeholder="Buscar por alias o wallet"',
+    "copy trading amount/input search placeholder",
+  );
+  assertTextIncludesOneOf(
+    copyTradingText,
+    [
+      "Cargando modulo Copiar Wallets...",
+      "Lista compacta",
+      "Sin wallets. Agrega una direccion publica para iniciar el modo demo.",
+      "Selecciona una wallet para ver su detalle.",
+    ],
+    "copy trading loading/master-detail state",
+  );
   assert(copyTradingDom.includes("Escanea esta wallet una vez ahora."), "copy trading scan button helper missing");
   assertTextExcludes(copyTradingText, ["Editar modo"], "copy trading legacy edit label");
   assertTextIncludesOneOf(copyTradingText, ["Demo activo", "Real no conectado"], "copy trading mode badges");
