@@ -210,7 +210,7 @@ export function CopyTradingDashboard() {
       <section className="copy-control-bar" aria-label="Controles del modo demo">
         <div className="copy-control-copy">
           <span>Modo demo funcional</span>
-          <strong>Escanea wallets seguidas y simula copias demo con monto fijo.</strong>
+          <strong>Auto-refresh actualiza la pantalla. Con el watcher activo, el auto-copy demo ocurre automaticamente cada 5 segundos.</strong>
           <div className="copy-status-strip">
             <span className="copy-badge">Ultima actualizacion {lastUpdatedLabel}</span>
             <span className={`copy-badge ${autoRefreshEnabled && pageVisible ? "success" : "locked"}`}>
@@ -234,8 +234,8 @@ export function CopyTradingDashboard() {
           >
             {autoRefreshEnabled ? "Pausar auto" : "Reanudar auto"}
           </button>
-          <button className="copy-primary-button" disabled={runningTick || loading} onClick={handleDemoTick} type="button">
-            {runningTick ? "Ejecutando..." : "Ejecutar demo tick"}
+          <button disabled={runningTick || loading} onClick={handleDemoTick} type="button">
+            {runningTick ? "Ejecutando..." : "Demo tick manual"}
           </button>
         </div>
       </section>

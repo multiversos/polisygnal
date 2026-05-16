@@ -29,6 +29,9 @@ const SAFE_WRITE_RULES = [
   { method: "DELETE", pattern: /^\/copy-trading\/wallets\/[^/]+$/ },
   { method: "POST", pattern: /^\/copy-trading\/wallets\/[^/]+\/scan$/ },
   { method: "POST", pattern: /^\/copy-trading\/demo\/tick$/ },
+  { method: "POST", pattern: /^\/copy-trading\/watcher\/start$/ },
+  { method: "POST", pattern: /^\/copy-trading\/watcher\/stop$/ },
+  { method: "POST", pattern: /^\/copy-trading\/watcher\/run-once$/ },
 ];
 
 type RouteContext = {

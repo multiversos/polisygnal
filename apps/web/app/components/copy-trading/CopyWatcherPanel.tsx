@@ -13,6 +13,7 @@ type CopyWatcherPanelProps = {
 
 export function CopyWatcherPanel({ busy, onRunOnce, onStart, onStop, watcher }: CopyWatcherPanelProps) {
   const stateLabel = watcher.enabled ? (watcher.running ? "Escaneando" : "Activo") : "Pausado";
+  const autoCopyLabel = watcher.enabled ? "Auto-copy demo activo" : "Auto-copy demo pausado";
   const nextRunLabel = watcher.enabled ? formatDateTime(watcher.next_run_at) : "Watcher pausado";
   const stateSummary = watcher.last_result?.errors.length ? "Error parcial" : stateLabel;
   const resultSummary = watcher.last_result
@@ -23,7 +24,7 @@ export function CopyWatcherPanel({ busy, onRunOnce, onStart, onStop, watcher }: 
     <section className="copy-panel copy-watcher-panel">
       <div className="copy-panel-heading">
         <span>Watcher demo</span>
-        <strong>{stateLabel}</strong>
+        <strong>{autoCopyLabel}</strong>
       </div>
       <p>Escanea wallets activas cada 5s y crea compras/ventas demo automaticamente. No ejecuta operaciones reales.</p>
       <div className="copy-wallet-details">
@@ -32,6 +33,7 @@ export function CopyWatcherPanel({ busy, onRunOnce, onStart, onStop, watcher }: 
         <small>Proximo escaneo {nextRunLabel}</small>
         <small>Error count {watcher.error_count}</small>
         <small>Estado: {stateSummary}</small>
+        <small>Con el watcher activo, el escaneo ocurre automaticamente cada 5 segundos.</small>
         <small>{resultSummary}</small>
         {watcher.last_error ? <small>Ultimo error: {watcher.last_error}</small> : null}
       </div>
@@ -47,10 +49,11 @@ export function CopyWatcherPanel({ busy, onRunOnce, onStart, onStop, watcher }: 
         <button disabled={busy || !watcher.enabled} onClick={() => void onStop()} type="button">
           Pausar watcher
         </button>
-        <button className="copy-primary-button" disabled={busy} onClick={() => void onRunOnce()} type="button">
+        <button disabled={busy} onClick={() => void onRunOnce()} type="button">
           Ejecutar una vez
         </button>
       </div>
+      <small>Prueba manual de un solo escaneo.</small>
     </section>
   );
 }

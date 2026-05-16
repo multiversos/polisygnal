@@ -2527,6 +2527,40 @@ async function validateBackendProxy() {
     assert(calls.at(-1).init.method === "POST", "expected copy trading proxy to preserve POST method");
     assert(!JSON.stringify(calls.at(-1).init.headers).includes("Authorization"), "copy trading proxy forwarded auth headers");
 
+    globalThis.fetch = async (url, init) => {
+      calls.push({ init, url: String(url) });
+      return new Response(
+        JSON.stringify({
+          enabled: true,
+          running: false,
+          interval_seconds: 5,
+          last_run_at: null,
+          next_run_at: null,
+          last_result: null,
+          error_count: 0,
+          last_error: null,
+          message: "Watcher demo iniciado.",
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        },
+      );
+    };
+    const watcherStartPost = await route.POST(
+      new Request("https://example.test/api/backend/copy-trading/watcher/start", {
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      }),
+      { params: Promise.resolve({ path: ["copy-trading", "watcher", "start"] }) },
+    );
+    assert(watcherStartPost.status === 200, `expected watcher start POST proxy to pass, got ${watcherStartPost.status}`);
+    assert(
+      calls.at(-1).url === "https://polisygnal.onrender.com/copy-trading/watcher/start",
+      `unexpected watcher start upstream URL: ${calls.at(-1).url}`,
+    );
+    assert(calls.at(-1).init.method === "POST", "expected watcher start proxy to preserve POST method");
+
     const blockedUnexpectedPost = await route.POST(
       new Request("https://example.test/api/backend/admin/secrets", {
         body: JSON.stringify({ test: true }),
@@ -2544,7 +2578,7 @@ async function validateBackendProxy() {
     globalThis.fetch = originalFetch;
   }
 
-  return { proxy_checks: 10 };
+  return { proxy_checks: 11 };
 }
 
 function validateAnalyzerFirstProductSource() {
@@ -2641,6 +2675,8 @@ function validateAnalyzerFirstProductSource() {
     copyWatcherPanel.includes("No ejecuta operaciones reales"),
     "copy watcher panel must state that it does not execute real operations",
   );
+  assert(copyWatcherPanel.includes("Prueba manual de un solo escaneo."), "copy watcher panel should frame run once as manual debug");
+  assert(copyWatcherPanel.includes("Auto-copy demo"), "copy watcher panel should make automatic demo copying explicit");
   assert(copyTradingDashboard.includes("visibilityState"), "copy trading auto-refresh should respect hidden tabs");
   assert(copyTradingDashboard.includes("isRefreshingRef"), "copy trading auto-refresh should avoid overlapping refresh requests");
   assert(copyOrdersTable.includes("formatCopyOrderReason"), "copy orders should translate technical reasons");

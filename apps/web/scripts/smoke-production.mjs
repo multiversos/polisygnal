@@ -1166,6 +1166,7 @@ async function main() {
     "Iniciar watcher demo",
     "Pausar watcher",
     "Ejecutar una vez",
+    "Prueba manual de un solo escaneo.",
     "No ejecuta operaciones reales",
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
