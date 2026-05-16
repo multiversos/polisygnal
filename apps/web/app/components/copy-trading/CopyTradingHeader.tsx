@@ -6,7 +6,7 @@ export function CopyTradingHeader({ status }: { status: CopyTradingStatus | null
       <div>
         <span className="copy-section-kicker">Read-only wallet automation</span>
         <h1>Copiar Wallets</h1>
-        <p>Sigue wallets publicas y simula copias con monto fijo.</p>
+        <p>Sigue wallets publicas y simula copias con monto fijo. Bloqueado hasta configurar credenciales.</p>
       </div>
       <div className="copy-status-strip" aria-label="Estado del modulo">
         <span className="copy-status-pill success">Demo activo</span>

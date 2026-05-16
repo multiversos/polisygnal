@@ -9,6 +9,8 @@ import { CopyAmountSelector } from "./CopyAmountSelector";
 
 type AddCopyWalletFormProps = {
   onCreated: () => Promise<void> | void;
+  onCancel?: () => void;
+  submitLabel?: string;
   wallets: CopyWallet[];
 };
 
@@ -30,7 +32,12 @@ type WalletInputValidation =
   | { normalizedWallet: string | null; ok: true; value: string }
   | { ok: false; message: string };
 
-export function AddCopyWalletForm({ onCreated, wallets }: AddCopyWalletFormProps) {
+export function AddCopyWalletForm({
+  onCancel,
+  onCreated,
+  submitLabel = "Agregar wallet",
+  wallets,
+}: AddCopyWalletFormProps) {
   const [walletInput, setWalletInput] = useState("");
   const [label, setLabel] = useState("");
   const [amountMode, setAmountMode] = useState<CopyAmountMode>("preset");
@@ -183,9 +190,16 @@ export function AddCopyWalletForm({ onCreated, wallets }: AddCopyWalletFormProps
         </label>
       </div>
       {formError ? <p className="copy-form-error">{formError}</p> : null}
-      <button className="copy-primary-button" disabled={saving || Boolean(amountError)} type="submit">
-        {saving ? "Agregando..." : "Agregar wallet"}
-      </button>
+      <div className="copy-action-row">
+        <button className="copy-primary-button" disabled={saving || Boolean(amountError)} type="submit">
+          {saving ? "Agregando..." : submitLabel}
+        </button>
+        {onCancel ? (
+          <button className="copy-secondary-button" disabled={saving} onClick={onCancel} type="button">
+            Cancelar
+          </button>
+        ) : null}
+      </div>
     </form>
   );
 }
