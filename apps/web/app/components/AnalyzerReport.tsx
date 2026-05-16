@@ -231,7 +231,10 @@ function formatDifferencePoints(value: number | null): string {
   if (value === null || !Number.isFinite(value)) {
     return "No comparable";
   }
-  const sign = value > 0 ? "+" : value < 0 ? "" : "";
+  if (Math.abs(value) < 0.05) {
+    return "0.0 pts";
+  }
+  const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)} pts`;
 }
 
