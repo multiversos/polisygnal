@@ -1163,10 +1163,13 @@ async function main() {
     "Pausar watcher",
     "Ejecutar una vez",
     "Prueba manual de un solo escaneo.",
+    "Usa Escanear para revisar una wallet puntual.",
+    "escanea todas las wallets activas cada 5s",
     "No ejecuta operaciones reales",
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
   }
+  assert(copyTradingDom.includes("Escanea esta wallet una vez ahora."), "copy trading scan button helper missing");
   assertTextIncludesOneOf(copyTradingText, ["Demo activo", "Real no conectado"], "copy trading mode badges");
   assertTextIncludes(copyTradingText, "Bloqueado hasta configurar credenciales", "copy trading real lock");
   assertTextExcludes(

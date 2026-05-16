@@ -4,14 +4,15 @@ import type { CopyTradingWatcherStatus } from "../../lib/copyTradingTypes";
 import { formatDateTime, formatDurationMs } from "../../lib/copyTrading";
 
 type CopyWatcherPanelProps = {
-  busy: boolean;
+  busyAction: "run-once" | "start" | "stop" | null;
   onRunOnce: () => Promise<void> | void;
   onStart: () => Promise<void> | void;
   onStop: () => Promise<void> | void;
   watcher: CopyTradingWatcherStatus;
 };
 
-export function CopyWatcherPanel({ busy, onRunOnce, onStart, onStop, watcher }: CopyWatcherPanelProps) {
+export function CopyWatcherPanel({ busyAction, onRunOnce, onStart, onStop, watcher }: CopyWatcherPanelProps) {
+  const busy = busyAction !== null;
   const stateLabel = watcher.enabled ? (watcher.running ? "Escaneando" : "Activo") : watcher.running ? "Pausando" : "Pausado";
   const autoCopyLabel = watcher.enabled ? "Auto-copy demo activo" : "Auto-copy demo pausado";
   const nextRunLabel = watcher.enabled ? formatDateTime(watcher.next_run_at) : watcher.running ? "Terminando ciclo actual" : "Watcher pausado";
@@ -30,7 +31,10 @@ export function CopyWatcherPanel({ busy, onRunOnce, onStart, onStop, watcher }: 
         <span>Watcher demo</span>
         <strong>{autoCopyLabel}</strong>
       </div>
-      <p>Escanea wallets activas cada 5s y crea compras/ventas demo automaticamente. No ejecuta operaciones reales.</p>
+      <p>
+        Con el watcher activo, PolySignal escanea todas las wallets activas cada 5s y crea compras/ventas demo
+        automaticamente. No ejecuta operaciones reales.
+      </p>
       <div className="copy-wallet-details">
         <small>Intervalo: {watcher.interval_seconds} segundos</small>
         <small>Ciclo en curso desde {formatDateTime(watcher.current_run_started_at)}</small>
@@ -55,13 +59,23 @@ export function CopyWatcherPanel({ busy, onRunOnce, onStart, onStop, watcher }: 
           onClick={() => void onStart()}
           type="button"
         >
-          Iniciar watcher demo
+          {busyAction === "start" ? "Iniciando..." : "Iniciar watcher demo"}
         </button>
-        <button disabled={busy || !watcher.enabled} onClick={() => void onStop()} type="button">
-          Pausar watcher
+        <button
+          className="copy-secondary-button"
+          disabled={busy || !watcher.enabled}
+          onClick={() => void onStop()}
+          type="button"
+        >
+          {busyAction === "stop" ? "Pausando..." : "Pausar watcher"}
         </button>
-        <button disabled={busy} onClick={() => void onRunOnce()} type="button">
-          Ejecutar una vez
+        <button
+          className="copy-action-button"
+          disabled={busy}
+          onClick={() => void onRunOnce()}
+          type="button"
+        >
+          {busyAction === "run-once" ? "Ejecutando..." : "Ejecutar una vez"}
         </button>
       </div>
       <small>Prueba manual de un solo escaneo.</small>
