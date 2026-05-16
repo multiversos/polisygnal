@@ -258,7 +258,20 @@ export function CopyTradingDashboard() {
 
       {error ? <div className="copy-error-state">{error}</div> : null}
       {notice ? <div className="copy-empty-state">{notice}</div> : null}
-      {loading ? <div className="copy-empty-state">Cargando modulo Copiar Wallets...</div> : null}
+      {loading ? (
+        <section className="copy-loading-shell" aria-label="Cargando Copy Trading">
+          <div className="copy-loading-card copy-loading-card-hero">
+            <span className="copy-section-kicker">Cargando wallets y posiciones demo</span>
+            <strong>Preparando el dashboard de Copy Trading...</strong>
+            <p>Las posiciones demo y el PnL pueden tardar algunos segundos mas en llegar.</p>
+          </div>
+          <div className="copy-loading-grid">
+            <div className="copy-loading-card" />
+            <div className="copy-loading-card" />
+            <div className="copy-loading-card" />
+          </div>
+        </section>
+      ) : null}
 
       <section className="copy-tab-panel" hidden={activeTab !== "summary"}>
         <CopyTradingMetrics status={data?.status ?? null} />

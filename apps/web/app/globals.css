@@ -50,11 +50,18 @@
   gap: 18px;
   padding: 24px;
   color: var(--foreground);
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.11), transparent 26%),
+    radial-gradient(circle at top right, rgba(6, 182, 212, 0.08), transparent 24%);
 }
 
 .copy-tab-panel {
   display: grid;
   gap: 18px;
+}
+
+.copy-tab-panel[hidden] {
+  display: none !important;
 }
 
 .copy-tabs {
@@ -102,12 +109,43 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
-  padding: 24px;
-  border: 1px solid rgba(34, 211, 238, 0.18);
-  border-radius: 8px;
+  padding: 22px 24px;
+  border: 1px solid rgba(30, 42, 61, 0.98);
+  border-radius: 12px;
   background:
-    linear-gradient(135deg, rgba(8, 18, 32, 0.95), rgba(12, 34, 40, 0.9)),
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 30%),
+    linear-gradient(145deg, rgba(5, 11, 20, 0.98), rgba(7, 17, 31, 0.94)),
     var(--surface);
+}
+
+.copy-trading-header-copy {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.copy-trading-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: #d9e7fb;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.copy-trading-brand-mark {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.copy-trading-brand-slash {
+  color: rgba(148, 163, 184, 0.6);
+}
+
+.copy-trading-brand-section {
+  color: #d9e7fb;
 }
 
 .copy-section-kicker,
@@ -150,41 +188,49 @@
 .copy-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 26px;
-  padding: 4px 9px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid rgba(56, 72, 95, 0.58);
   border-radius: 999px;
-  color: var(--muted-foreground);
-  font-size: 0.78rem;
-  font-weight: 700;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  font-weight: 740;
+  background: rgba(10, 20, 36, 0.78);
 }
 
 .copy-status-pill.success,
 .copy-badge.success,
 .copy-badge.simulated {
-  border-color: rgba(34, 197, 94, 0.36);
-  background: rgba(34, 197, 94, 0.12);
-  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.25);
+  background: rgba(34, 197, 94, 0.14);
+  color: #7ee19d;
 }
 
 .copy-status-pill.locked,
 .copy-badge.locked,
 .copy-badge.blocked {
-  border-color: rgba(250, 204, 21, 0.34);
-  background: rgba(250, 204, 21, 0.1);
-  color: #fde68a;
+  border-color: rgba(251, 191, 36, 0.25);
+  background: rgba(251, 191, 36, 0.12);
+  color: #f2d06d;
+}
+
+.copy-status-pill.subtle,
+.copy-badge.subtle {
+  border-color: rgba(56, 189, 248, 0.18);
+  background: rgba(12, 24, 40, 0.92);
+  color: #b6c7db;
 }
 
 .copy-badge.skipped {
-  border-color: rgba(251, 113, 133, 0.3);
-  background: rgba(251, 113, 133, 0.1);
-  color: #fda4af;
+  border-color: rgba(244, 63, 94, 0.25);
+  background: rgba(244, 63, 94, 0.1);
+  color: #f8a1b4;
 }
 
 .copy-badge.historical {
-  border-color: rgba(34, 211, 238, 0.28);
-  background: rgba(34, 211, 238, 0.1);
-  color: #67e8f9;
+  border-color: rgba(6, 182, 212, 0.24);
+  background: rgba(6, 182, 212, 0.12);
+  color: #91ebfa;
 }
 
 .copy-metrics-grid,
@@ -212,10 +258,12 @@
 .copy-tick-summary,
 .copy-error-state,
 .copy-empty-state {
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 8px;
-  background: rgba(8, 17, 31, 0.86);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(44, 58, 81, 0.72);
+  border-radius: 9px;
+  background:
+    linear-gradient(180deg, rgba(12, 23, 41, 0.98), rgba(10, 19, 35, 0.94)),
+    rgba(8, 17, 31, 0.94);
+  box-shadow: 0 10px 22px rgba(1, 8, 20, 0.14);
 }
 
 .copy-metric {
@@ -236,7 +284,7 @@
 
 .copy-panel,
 .copy-control-bar {
-  padding: 18px;
+  padding: 14px;
 }
 
 .copy-wide-panel {
@@ -252,8 +300,8 @@
 
 .copy-panel-heading {
   display: grid;
-  gap: 4px;
-  margin-bottom: 14px;
+  gap: 2px;
+  margin-bottom: 8px;
 }
 
 .copy-control-copy {
@@ -264,33 +312,34 @@
 
 .copy-panel-heading strong,
 .copy-control-bar strong {
-  font-size: 1.08rem;
+  font-size: 1rem;
 }
 
 .copy-field,
 .copy-custom-amount {
   display: grid;
-  gap: 7px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 10px;
   color: var(--muted-foreground);
-  font-size: 0.86rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
 .copy-field-helper {
-  margin-bottom: 14px;
-  line-height: 1.45;
+  margin-bottom: 10px;
+  line-height: 1.35;
+  font-size: 0.84rem;
 }
 
 .copy-field input,
 .copy-custom-amount input,
 .copy-select {
   width: 100%;
-  min-height: 42px;
-  padding: 10px 12px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid rgba(44, 58, 81, 0.74);
   border-radius: 8px;
-  background: rgba(2, 6, 23, 0.55);
+  background: rgba(6, 14, 26, 0.92);
   color: var(--foreground);
 }
 
@@ -313,13 +362,14 @@
 .copy-danger-button,
 .copy-pill-button,
 .copy-action-button {
-  min-height: 38px;
-  padding: 8px 11px;
-  border: 1px solid rgba(34, 211, 238, 0.2);
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid rgba(44, 58, 81, 0.74);
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.88);
+  background: rgba(12, 22, 38, 0.94);
   color: var(--foreground);
   cursor: pointer;
+  font-size: 0.8rem;
   font-weight: 700;
   white-space: nowrap;
   transition:
@@ -334,21 +384,21 @@
 .copy-amount-presets button.active,
 .copy-pill-button.active,
 .copy-primary-button {
-  border-color: rgba(34, 211, 238, 0.48);
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.22), rgba(34, 197, 94, 0.16));
+  border-color: rgba(40, 166, 255, 0.62);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.24), rgba(14, 165, 233, 0.14));
 }
 
 .copy-secondary-button,
 .copy-action-button,
 .copy-pill-button {
-  border-color: rgba(96, 165, 250, 0.22);
-  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(44, 60, 85, 0.82);
+  background: linear-gradient(180deg, rgba(12, 22, 38, 0.92), rgba(10, 18, 32, 0.88));
 }
 
 .copy-danger-button {
-  border-color: rgba(251, 113, 133, 0.3);
+  border-color: rgba(244, 63, 94, 0.4);
   color: #fda4af;
-  background: rgba(61, 10, 20, 0.52);
+  background: linear-gradient(180deg, rgba(54, 14, 24, 0.74), rgba(35, 10, 18, 0.7));
 }
 
 .copy-amount-presets button:hover:not(:disabled),
@@ -358,14 +408,14 @@
 .copy-danger-button:hover:not(:disabled),
 .copy-pill-button:hover:not(:disabled),
 .copy-action-button:hover:not(:disabled) {
-  border-color: rgba(34, 211, 238, 0.5);
-  background: rgba(22, 34, 54, 0.96);
-  box-shadow: 0 10px 22px rgba(8, 145, 178, 0.18);
+  border-color: rgba(29, 155, 240, 0.48);
+  background: rgba(15, 28, 47, 0.98);
+  box-shadow: 0 6px 16px rgba(6, 14, 26, 0.18);
   transform: translateY(-1px);
 }
 
 .copy-primary-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.28), rgba(34, 197, 94, 0.2));
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.34), rgba(6, 182, 212, 0.2));
 }
 
 .copy-danger-button:hover:not(:disabled) {
@@ -623,11 +673,11 @@
 }
 
 .copy-pnl-positive {
-  color: #86efac;
+  color: #4ade80;
 }
 
 .copy-pnl-negative {
-  color: #fda4af;
+  color: #fb7185;
 }
 
 .copy-pnl-neutral {
@@ -779,18 +829,18 @@
 
 .copy-wallets-shell {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .copy-wallets-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
   overflow: hidden;
   background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.16), transparent 34%),
-    linear-gradient(145deg, rgba(6, 13, 25, 0.98), rgba(11, 23, 40, 0.92));
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.14), transparent 32%),
+    linear-gradient(145deg, rgba(5, 11, 20, 0.98), rgba(7, 17, 31, 0.94));
 }
 
 .copy-wallets-header-copy {
@@ -801,8 +851,8 @@
 .copy-wallets-header-copy h2,
 .copy-wallet-detail-heading h3 {
   margin: 0;
-  font-size: clamp(1.65rem, 2vw, 2.15rem);
-  line-height: 1.05;
+  font-size: clamp(1.72rem, 2vw, 2.18rem);
+  line-height: 1.08;
 }
 
 .copy-wallets-header-copy p {
@@ -818,10 +868,10 @@
 }
 
 .copy-wallet-kpi {
-  min-height: 108px;
+  min-height: 94px;
   background:
-    linear-gradient(180deg, rgba(9, 18, 32, 0.95), rgba(11, 24, 41, 0.88)),
-    rgba(8, 17, 31, 0.86);
+    linear-gradient(180deg, rgba(10, 19, 34, 0.95), rgba(9, 18, 33, 0.9)),
+    rgba(8, 17, 31, 0.9);
 }
 
 .copy-wallet-kpi small {
@@ -840,8 +890,8 @@
 
 .copy-wallets-master-detail {
   display: grid;
-  grid-template-columns: minmax(320px, 0.95fr) minmax(380px, 1.15fr);
-  gap: 14px;
+  grid-template-columns: minmax(320px, 0.76fr) minmax(480px, 1.24fr);
+  gap: 12px;
   align-items: start;
 }
 
@@ -849,14 +899,22 @@
 .copy-wallet-detail-panel {
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
+}
+
+.copy-wallets-list-panel {
+  overflow: hidden;
 }
 
 .copy-wallet-toolbar {
   display: grid;
-  grid-template-columns: minmax(200px, 1.35fr) repeat(4, minmax(130px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.copy-wallet-toolbar-search {
+  grid-column: 1 / -1;
 }
 
 .copy-wallet-toolbar .copy-field {
@@ -865,16 +923,20 @@
 
 .copy-wallet-rows {
   display: grid;
-  gap: 10px;
+  gap: 7px;
 }
 
 .copy-wallet-row {
   display: grid;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 10px;
-  background: rgba(8, 17, 31, 0.78);
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 9px 10px;
+  border: 1px solid rgba(43, 58, 81, 0.72);
+  border-radius: 9px;
+  background:
+    linear-gradient(180deg, rgba(12, 22, 38, 0.96), rgba(9, 17, 31, 0.92)),
+    rgba(8, 17, 31, 0.9);
   cursor: pointer;
   transition:
     border-color 140ms ease,
@@ -885,23 +947,23 @@
 
 .copy-wallet-row:hover,
 .copy-wallet-row:focus-visible {
-  border-color: rgba(34, 211, 238, 0.32);
-  box-shadow: 0 14px 30px rgba(2, 12, 29, 0.28);
+  border-color: rgba(34, 211, 238, 0.28);
+  box-shadow: 0 8px 18px rgba(2, 12, 29, 0.14);
   transform: translateY(-1px);
 }
 
 .copy-wallet-row.selected {
-  border-color: rgba(59, 130, 246, 0.62);
+  border-color: rgba(43, 170, 255, 0.76);
   background:
-    linear-gradient(180deg, rgba(11, 25, 45, 0.98), rgba(8, 17, 31, 0.92)),
-    rgba(8, 17, 31, 0.86);
+    linear-gradient(180deg, rgba(13, 28, 49, 0.99), rgba(9, 19, 34, 0.95)),
+    rgba(8, 17, 31, 0.9);
   box-shadow:
-    inset 0 0 0 1px rgba(34, 211, 238, 0.16),
-    0 18px 36px rgba(2, 12, 29, 0.28);
+    inset 0 0 0 1px rgba(67, 193, 255, 0.18),
+    0 12px 24px rgba(2, 12, 29, 0.16);
 }
 
-.copy-wallet-row-main,
-.copy-wallet-row-actions,
+.copy-wallet-row-top,
+.copy-wallet-identity,
 .copy-wallet-detail-header,
 .copy-wallet-detail-meta,
 .copy-wallet-detail-footer,
@@ -910,77 +972,183 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
-.copy-wallet-row-main > div:first-child,
+.copy-wallet-row-copy,
 .copy-wallet-detail-heading {
   display: grid;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
 }
 
-.copy-wallet-row-main strong {
-  font-size: 1rem;
+.copy-wallet-row-title-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 
-.copy-wallet-row-main .copy-mono,
+.copy-wallet-row-title-line strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+}
+
+.copy-wallet-row-copy .copy-mono,
 .copy-wallet-detail-heading .copy-mono {
   color: var(--muted-foreground);
+  font-size: 0.76rem;
+}
+
+.copy-wallet-identity {
+  align-items: center;
+  min-width: 0;
+}
+
+.copy-wallet-row-trailing {
+  display: grid;
+  grid-template-columns: auto 28px;
+  align-items: center;
+  gap: 2px 8px;
+  justify-items: end;
+  flex: 0 0 auto;
+}
+
+.copy-wallet-row-pnl {
+  grid-column: 1;
+  font-size: 0.9rem;
+  font-weight: 760;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.copy-wallet-row-freshness {
+  grid-column: 1;
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.copy-wallet-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.16);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.28), rgba(29, 78, 216, 0.22));
+  color: #dbeafe;
+  font-size: 0.74rem;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.copy-wallet-avatar.large {
+  width: 42px;
+  height: 42px;
+  font-size: 0.92rem;
 }
 
 .copy-wallet-row-badges {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 4px;
 }
 
-.copy-wallet-row-grid,
 .copy-wallet-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 7px;
 }
 
-.copy-wallet-row-grid > div,
+.copy-wallet-row-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(40, 54, 74, 0.56);
+}
+
+.copy-wallet-row-meta-item,
 .copy-wallet-stat {
   display: grid;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.54);
 }
 
-.copy-wallet-row-label,
+.copy-wallet-row-meta-item {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.copy-wallet-stat {
+  padding: 8px 9px;
+  border: 1px solid rgba(42, 56, 79, 0.66);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(13, 22, 38, 0.84), rgba(10, 18, 32, 0.72)),
+    rgba(10, 18, 33, 0.68);
+  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.03);
+}
+
+.copy-wallet-row-meta-item strong,
 .copy-wallet-stat span,
 .copy-wallet-subsection-title {
   color: var(--muted-foreground);
-  font-size: 0.76rem;
-  font-weight: 800;
+  font-size: 0.64rem;
+  font-weight: 760;
   text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
-.copy-wallet-row-grid strong,
 .copy-wallet-stat strong {
   min-width: 0;
-  font-size: 0.94rem;
+  font-size: 0.86rem;
   overflow-wrap: anywhere;
 }
 
-.copy-wallet-row-actions {
-  justify-content: flex-end;
+.copy-wallet-row-meta-item {
+  color: #d8e5f5;
+  font-size: 0.73rem;
+  font-weight: 600;
+  line-height: 1.24;
 }
 
-.copy-wallet-row-actions button {
-  min-width: 92px;
+.copy-icon-button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(42, 56, 79, 0.66);
+  border-radius: 8px;
+  background: rgba(10, 18, 33, 0.9);
+  color: #b8c7da;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.copy-icon-button:hover,
+.copy-icon-button:focus-visible {
+  border-color: rgba(29, 155, 240, 0.48);
+  color: #f8fafc;
+  outline: none;
 }
 
 .copy-wallet-pagination {
   flex-wrap: wrap;
-  padding-top: 4px;
+  padding-top: 6px;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
@@ -1001,16 +1169,26 @@
 
 .copy-wallet-detail {
   display: grid;
-  gap: 14px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .copy-wallet-detail-header {
   align-items: flex-start;
+  min-width: 0;
+}
+
+.copy-wallet-detail-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
 }
 
 .copy-wallet-detail-meta {
   flex-wrap: wrap;
   justify-content: flex-start;
+  gap: 6px;
 }
 
 .copy-wallet-link {
@@ -1023,27 +1201,74 @@
 .copy-wallet-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .copy-wallet-detail-card {
   display: grid;
-  gap: 14px;
-  padding: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 10px;
+  gap: 8px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid rgba(42, 56, 79, 0.7);
+  border-radius: 9px;
   background:
-    linear-gradient(180deg, rgba(10, 18, 31, 0.92), rgba(10, 18, 31, 0.8)),
-    rgba(15, 23, 42, 0.56);
+    linear-gradient(180deg, rgba(12, 22, 38, 0.97), rgba(9, 18, 33, 0.92)),
+    rgba(15, 23, 42, 0.72);
 }
 
 .copy-wallet-detail-card .copy-panel-heading {
   margin-bottom: 0;
 }
 
+.copy-wallet-metrics-card,
+.copy-wallet-config-card,
+.copy-wallet-subsection {
+  grid-column: 1 / -1;
+}
+
 .copy-wallet-subsection {
   display: grid;
-  gap: 8px;
+  gap: 6px;
+}
+
+.copy-wallet-stat-grid-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.copy-wallet-trade-card .copy-wallet-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.copy-wallet-stat.positive {
+  border-color: rgba(34, 197, 94, 0.22);
+}
+
+.copy-wallet-stat.negative {
+  border-color: rgba(244, 63, 94, 0.22);
+}
+
+.copy-wallet-stat.warning {
+  border-color: rgba(251, 191, 36, 0.22);
+}
+
+.copy-wallet-last-copy-highlight {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgba(42, 56, 79, 0.66);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(8, 31, 26, 0.9), rgba(10, 20, 36, 0.94));
+}
+
+.copy-wallet-last-copy-highlight strong {
+  font-size: 1rem;
+  color: #86efac;
+}
+
+.copy-wallet-last-copy-highlight span {
+  color: var(--muted-foreground);
+  font-size: 0.76rem;
 }
 
 .copy-window-pill {
@@ -1053,70 +1278,206 @@
 .copy-wallet-detail-footer {
   flex-wrap: wrap;
   justify-content: space-between;
-  padding-top: 10px;
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  padding-top: 6px;
+  border-top: 1px solid rgba(40, 54, 74, 0.58);
 }
 
 .copy-wallet-detail-footer span {
   color: var(--muted-foreground);
-  font-size: 0.82rem;
+  font-size: 0.72rem;
 }
 
 .copy-wallet-activity-card {
   grid-column: 1 / -1;
 }
 
-.copy-wallet-activity-chart {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  align-items: end;
-  gap: 10px;
-  min-height: 120px;
-  padding: 10px 0 4px;
-}
-
-.copy-wallet-activity-bar-wrap {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  height: 100%;
-  min-height: 88px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.42));
-}
-
-.copy-wallet-activity-bar {
-  width: 100%;
-  border-radius: 999px 999px 6px 6px;
-}
-
-.copy-wallet-activity-bar.positive {
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.34), rgba(34, 197, 94, 0.88));
-}
-
-.copy-wallet-activity-bar.negative {
-  background: linear-gradient(180deg, rgba(251, 113, 133, 0.32), rgba(239, 68, 68, 0.9));
-}
-
 .copy-wallet-activity-list {
   display: grid;
-  gap: 10px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .copy-wallet-activity-item {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1.8fr) minmax(96px, 0.72fr);
+  align-items: start;
   gap: 10px;
-  padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(42, 56, 79, 0.6);
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.46);
+  background: linear-gradient(180deg, rgba(10, 18, 32, 0.76), rgba(9, 17, 31, 0.68));
+}
+
+.copy-wallet-activity-item.warning {
+  border-color: rgba(251, 191, 36, 0.18);
+}
+
+.copy-wallet-activity-item.positive {
+  border-color: rgba(34, 197, 94, 0.18);
+}
+
+.copy-wallet-activity-item.negative {
+  border-color: rgba(244, 63, 94, 0.18);
 }
 
 .copy-wallet-activity-item > div {
   display: grid;
+  gap: 3px;
+}
+
+.copy-wallet-activity-rail {
+  position: relative;
+  align-items: start;
+  justify-items: start;
   gap: 4px;
+}
+
+.copy-wallet-activity-dot {
+  position: relative;
+  z-index: 1;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #64748b;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.08);
+}
+
+.copy-wallet-activity-dot.positive {
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.08);
+}
+
+.copy-wallet-activity-dot.negative {
+  background: #f43f5e;
+  box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.08);
+}
+
+.copy-wallet-activity-dot.warning {
+  background: #fbbf24;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.08);
+}
+
+.copy-wallet-activity-line {
+  position: absolute;
+  top: 22px;
+  left: 3px;
+  bottom: 2px;
+  width: 1px;
+  background: rgba(71, 85, 105, 0.38);
+}
+
+.copy-wallet-activity-time {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.copy-wallet-activity-copy {
+  min-width: 0;
+}
+
+.copy-wallet-activity-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.copy-wallet-activity-headline {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.copy-wallet-activity-heading strong {
+  min-width: 0;
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.copy-wallet-activity-market {
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.copy-wallet-activity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.copy-wallet-activity-copy small {
+  color: #9eb1c8;
+  font-size: 0.74rem;
+  line-height: 1.32;
+}
+
+.copy-wallet-activity-numbers {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  text-align: right;
+}
+
+.copy-wallet-activity-numbers span {
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+.copy-wallet-activity-numbers small {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+}
+
+.copy-loading-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.copy-loading-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.copy-loading-card {
+  min-height: 120px;
+  border: 1px solid rgba(30, 42, 61, 0.98);
+  border-radius: 12px;
+  background:
+    linear-gradient(110deg, rgba(10, 18, 32, 0.92) 20%, rgba(16, 27, 46, 0.96) 38%, rgba(10, 18, 32, 0.92) 58%);
+  background-size: 220% 100%;
+  box-shadow: 0 18px 42px rgba(1, 8, 20, 0.22);
+  animation: copy-loading-shimmer 1.8s linear infinite;
+}
+
+.copy-loading-card-hero {
+  display: grid;
+  gap: 8px;
+  min-height: 140px;
+  padding: 18px;
+}
+
+.copy-loading-card-hero strong {
+  font-size: 1.2rem;
+}
+
+.copy-loading-card-hero p {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+
+@keyframes copy-loading-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -20% 0;
+  }
 }
 
 .copy-overlay {
@@ -1144,6 +1505,12 @@
 }
 
 @media (max-width: 1100px) {
+  .copy-trading-page {
+    width: 100vw;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
   .copy-metrics-grid,
   .copy-dashboard-grid,
   .copy-dashboard-grid.two,
@@ -1155,10 +1522,17 @@
   .copy-performance-row,
   .copy-performance-mini-grid,
   .copy-wallets-kpi-grid,
-  .copy-wallets-master-detail,
   .copy-wallet-detail-grid,
-  .copy-wallet-row-grid {
+  .copy-wallet-stat-grid-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .copy-wallet-row-meta {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .copy-wallets-master-detail {
+    grid-template-columns: 1fr;
   }
 
   .copy-wallet-toolbar {
@@ -1167,6 +1541,27 @@
 
   .copy-wallet-activity-card {
     grid-column: auto;
+  }
+
+  .copy-wallet-detail-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(232px, 248px);
+    align-items: start;
+    gap: 10px;
+  }
+
+  .copy-wallet-detail-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    justify-self: end;
+  }
+
+  .copy-wallet-detail-actions button {
+    width: 100%;
+    min-height: 30px;
+    padding-inline: 8px;
+    font-size: 0.76rem;
   }
 
   .copy-metrics-grid .copy-metric:last-child {
@@ -1183,7 +1578,7 @@
   .copy-control-bar,
   .copy-feed-item,
   .copy-wallets-header,
-  .copy-wallet-row-main,
+  .copy-wallet-row-top,
   .copy-wallet-detail-header,
   .copy-wallet-pagination,
   .copy-wallet-pagination-meta,
@@ -1204,7 +1599,8 @@
   .copy-wallets-master-detail,
   .copy-wallet-toolbar,
   .copy-wallet-detail-grid,
-  .copy-wallet-row-grid,
+  .copy-wallet-row-meta,
+  .copy-wallet-stat-grid-metrics,
   .copy-wallet-stat-grid {
     grid-template-columns: 1fr;
   }
@@ -1219,7 +1615,37 @@
     justify-content: flex-start;
   }
 
-  .copy-wallet-row-actions button,
+  .copy-wallet-row-title-line {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
+  .copy-wallet-row-trailing {
+    width: 100%;
+    justify-items: end;
+  }
+
+  .copy-wallet-activity-item {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-wallet-activity-heading,
+  .copy-wallet-detail-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-wallet-activity-tags,
+  .copy-wallet-activity-numbers {
+    justify-items: start;
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .copy-wallet-row-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-loading-grid,
   .copy-action-row button {
     width: 100%;
   }

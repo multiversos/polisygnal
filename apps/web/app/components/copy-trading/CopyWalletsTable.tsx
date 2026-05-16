@@ -21,6 +21,7 @@ import type {
   CopyDetectedTrade,
   CopyTradingDemoPnlSummary,
   CopyTradingTickSummary,
+  CopyTradeSide,
   CopyWallet,
 } from "../../lib/copyTradingTypes";
 import { AddCopyWalletForm } from "./AddCopyWalletForm";
@@ -389,80 +390,72 @@ export function CopyWalletsTable({
                           }
                         }}
                       >
-                        <div className="copy-wallet-row-main">
-                          <div>
-                            <strong>{row.wallet.label || "Sin alias"}</strong>
-                            <span className="copy-mono">{formatWalletAddress(row.wallet.proxy_wallet)}</span>
+                        <div className="copy-wallet-row-top">
+                          <div className="copy-wallet-identity">
+                            <div className="copy-wallet-avatar">{walletInitials(row.wallet)}</div>
+                            <div className="copy-wallet-row-copy">
+                              <div className="copy-wallet-row-title-line">
+                                <strong>{row.wallet.label || "Sin alias"}</strong>
+                              </div>
+                              <span className="copy-mono">{formatWalletAddress(row.wallet.proxy_wallet)}</span>
+                            </div>
                           </div>
-                          <div className="copy-wallet-row-badges">
-                            <span className={`copy-badge ${row.wallet.mode === "demo" ? "success" : "locked"}`}>
-                              {row.wallet.mode === "demo" ? "Demo" : "Real"}
+                          <div className="copy-wallet-row-trailing">
+                            <span className={`copy-wallet-row-pnl ${walletPnlClassName(walletPnlTone)}`}>
+                              {formatPnl(row.analytics.totalPnlUsd)}
                             </span>
-                            {!row.wallet.real_trading_enabled ? (
-                              <span className="copy-badge locked">Real bloqueado</span>
-                            ) : null}
-                            <span className={`copy-badge ${row.wallet.enabled ? "success" : "skipped"}`}>
-                              {row.wallet.enabled ? "Activa" : "Pausada"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="copy-wallet-row-grid">
-                          <div>
-                            <span className="copy-wallet-row-label">Ultimo trade</span>
-                            <strong>{formatDateTime(row.latestTradeAt)}</strong>
-                          </div>
-                          <div>
-                            <span className="copy-wallet-row-label">Estado actual</span>
-                            <span className={`copy-badge ${freshnessBadgeClass(row.wallet.last_trade_freshness_status)}`}>
+                            <span className="copy-wallet-row-freshness">
                               {row.wallet.last_trade_freshness_label
                                 ? formatFreshnessLabel(
                                     row.wallet.last_trade_freshness_status,
                                     row.wallet.last_trade_freshness_label,
                                   )
-                                : "Sin actividad reciente"}
+                                : "Sin actividad"}
                             </span>
-                          </div>
-                          <div>
-                            <span className="copy-wallet-row-label">Demo</span>
-                            <strong className={walletPnlClassName(walletPnlTone)}>
-                              {formatPnl(row.analytics.totalPnlUsd)}
-                            </strong>
-                          </div>
-                          <div>
-                            <span className="copy-wallet-row-label">Copiadas</span>
-                            <strong>{row.wallet.demo_copied_count}</strong>
+                            <button
+                              aria-label="Ver detalle de esta wallet"
+                              className="copy-icon-button"
+                              disabled={pendingAction !== null}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedWalletId(row.wallet.id);
+                              }}
+                              title="Ver detalle de esta wallet"
+                              type="button"
+                            >
+                              ...
+                            </button>
                           </div>
                         </div>
 
-                        <div className="copy-wallet-row-actions">
-                          <button
-                            aria-label="Escanea esta wallet una vez ahora."
-                            className="copy-action-button"
-                            disabled={pendingAction !== null}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handleScan(row.wallet);
-                            }}
-                            title="Escanea esta wallet una vez ahora."
-                            type="button"
-                          >
-                            {pendingAction === "scan" ? "Escaneando..." : "Escanear"}
-                          </button>
-                          <button
-                            aria-label="Editar configuracion de esta wallet"
-                            className="copy-secondary-button"
-                            disabled={pendingAction !== null}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setEditingWalletId(row.wallet.id);
-                              onNotice?.("Edita la configuracion de esta wallet y guarda los cambios.");
-                            }}
-                            title="Editar configuracion de esta wallet"
-                            type="button"
-                          >
-                            {editingWalletId === row.wallet.id ? "Editando..." : "Editar"}
-                          </button>
+                        <div className="copy-wallet-row-badges">
+                          <span className={`copy-badge ${row.wallet.mode === "demo" ? "success" : "locked"}`}>
+                            {row.wallet.mode === "demo" ? "Demo" : "Real"}
+                          </span>
+                          {!row.wallet.real_trading_enabled ? <span className="copy-badge locked">Real bloqueado</span> : null}
+                          <span className={`copy-badge ${row.wallet.enabled ? "success" : "skipped"}`}>
+                            {row.wallet.enabled ? "Activa" : "Pausada"}
+                          </span>
+                        </div>
+
+                        <div className="copy-wallet-row-meta">
+                          <div className="copy-wallet-row-meta-item">
+                            <strong>Estado actual</strong>
+                            {row.wallet.last_trade_freshness_label
+                              ? formatFreshnessLabel(
+                                  row.wallet.last_trade_freshness_status,
+                                  row.wallet.last_trade_freshness_label,
+                                )
+                              : "Sin actividad"}
+                          </div>
+                          <div className="copy-wallet-row-meta-item">
+                            <strong>Ultimo trade</strong>
+                            {formatTradeAge(ageSecondsFromNow(row.latestTradeAt))}
+                          </div>
+                          <div className="copy-wallet-row-meta-item">
+                            <strong>Copiadas</strong>
+                            {row.wallet.demo_copied_count}
+                          </div>
                         </div>
                       </article>
                     );
@@ -605,49 +598,54 @@ function WalletDetailPanel({
   const latestAction = latestTrade?.side ? latestTrade.side.toUpperCase() : row.wallet.last_demo_copy_action?.toUpperCase() ?? "-";
   const latestAmount = latestTrade?.source_amount_usd ?? row.wallet.last_demo_copy_amount_usd ?? null;
   const latestPrice = latestTrade?.source_price ?? null;
-  const recentActivity = row.positions.slice(0, 6);
+  const recentActivity = buildRecentActivity(row);
+  const walletPnl = pnlTone(row.analytics.totalPnlUsd);
+  const walletRoi = pnlTone(row.analytics.totalPnlPercent);
 
   return (
     <div className="copy-wallet-detail">
       <header className="copy-wallet-detail-header">
-        <div className="copy-wallet-detail-heading">
-          <span className="copy-section-kicker">Wallet seleccionada</span>
-          <h3>{row.wallet.label || "Sin alias"}</h3>
-          <div className="copy-wallet-detail-meta">
-            <span className="copy-mono">{formatWalletAddress(row.wallet.proxy_wallet)}</span>
-            <button className="copy-pill-button" onClick={() => void onCopyAddress(row.wallet)} type="button">
-              Copiar direccion
-            </button>
-            {row.wallet.profile_url ? (
+        <div className="copy-wallet-detail-hero">
+          <div className="copy-wallet-avatar large">{walletInitials(row.wallet)}</div>
+          <div className="copy-wallet-detail-heading">
+            <span className="copy-section-kicker">Wallet seleccionada</span>
+            <h3>{row.wallet.label || "Sin alias"}</h3>
+            <div className="copy-wallet-detail-meta">
+              <span className="copy-mono">{formatWalletAddress(row.wallet.proxy_wallet)}</span>
+              <button className="copy-pill-button" onClick={() => void onCopyAddress(row.wallet)} type="button">
+                Copiar direccion
+              </button>
+              {row.wallet.profile_url ? (
+                <a
+                  className="copy-pill-button copy-wallet-link"
+                  href={row.wallet.profile_url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Ver perfil
+                </a>
+              ) : null}
               <a
                 className="copy-pill-button copy-wallet-link"
-                href={row.wallet.profile_url}
+                href={`https://polygonscan.com/address/${row.wallet.proxy_wallet}`}
                 rel="noreferrer"
                 target="_blank"
               >
-                Ver perfil
+                Ver en explorador
               </a>
-            ) : null}
-            <a
-              className="copy-pill-button copy-wallet-link"
-              href={`https://polygonscan.com/address/${row.wallet.proxy_wallet}`}
-              rel="noreferrer"
-              target="_blank"
-            >
-              Ver en explorador
-            </a>
-          </div>
-          <div className="copy-status-strip">
-            <span className={`copy-badge ${row.wallet.mode === "demo" ? "success" : "locked"}`}>
-              {row.wallet.mode === "demo" ? "Demo" : "Real"}
-            </span>
-            {!row.wallet.real_trading_enabled ? <span className="copy-badge locked">Real bloqueado</span> : null}
-            <span className={`copy-badge ${row.wallet.enabled ? "success" : "skipped"}`}>
-              {row.wallet.enabled ? "Activa" : "Pausada"}
-            </span>
+            </div>
+            <div className="copy-status-strip">
+              <span className={`copy-badge ${row.wallet.mode === "demo" ? "success" : "locked"}`}>
+                {row.wallet.mode === "demo" ? "Demo" : "Real"}
+              </span>
+              {!row.wallet.real_trading_enabled ? <span className="copy-badge locked">Real bloqueado</span> : null}
+              <span className={`copy-badge ${row.wallet.enabled ? "success" : "skipped"}`}>
+                {row.wallet.enabled ? "Activa" : "Pausada"}
+              </span>
+            </div>
           </div>
         </div>
-        <div className="copy-action-row">
+        <div className="copy-action-row copy-wallet-detail-actions">
           <button
             aria-label="Editar configuracion de esta wallet"
             className="copy-secondary-button"
@@ -689,10 +687,37 @@ function WalletDetailPanel({
       </header>
 
       <section className="copy-wallet-detail-grid">
-        <article className="copy-wallet-detail-card">
+        <article className="copy-wallet-detail-card copy-wallet-metrics-card">
           <div className="copy-panel-heading">
-            <span>Configuracion</span>
-            <strong>Copia activa</strong>
+            <span>Demo</span>
+            <strong>Metricas de seguimiento</strong>
+          </div>
+          <div className="copy-wallet-stat-grid copy-wallet-stat-grid-metrics">
+            <StatPair
+              cardClassName={walletPnl}
+              label="PnL demo"
+              value={formatPnl(row.analytics.totalPnlUsd)}
+              valueClassName={walletPnlClassName(walletPnl)}
+            />
+            <StatPair
+              cardClassName={walletRoi}
+              label="PnL %"
+              value={formatPercent(row.analytics.totalPnlPercent)}
+              valueClassName={walletPnlClassName(walletRoi)}
+            />
+            <StatPair label="Trades copiados" value={String(row.wallet.demo_copied_count)} />
+            <StatPair cardClassName="success" label="BUY" value={String(row.wallet.demo_buy_count)} />
+            <StatPair cardClassName="negative" label="SELL" value={String(row.wallet.demo_sell_count)} />
+            <StatPair cardClassName="warning" label="Saltadas" value={String(row.wallet.demo_skipped_count)} />
+            <StatPair label="Win rate" value={formatPercent(row.analytics.winRatePercent)} />
+            <StatPair label="Monto operado" value={formatUsd(row.analytics.totalVolumeUsd)} />
+          </div>
+        </article>
+
+        <article className="copy-wallet-detail-card copy-wallet-config-card">
+          <div className="copy-panel-heading">
+            <span>Configuracion de copia</span>
+            <strong>Modo y ventana</strong>
           </div>
           <div className="copy-wallet-stat-grid">
             <StatPair label="Monto por trade" value={formatUsd(row.wallet.copy_amount_usd)} />
@@ -701,6 +726,7 @@ function WalletDetailPanel({
               label="BUY / SELL"
               value={`${row.wallet.copy_buys ? "BUY" : "-"} / ${row.wallet.copy_sells ? "SELL" : "-"}`}
             />
+            <StatPair label="Ventana" value={formatCopyWindow(row.wallet.copy_window_seconds ?? row.wallet.max_delay_seconds)} />
             <StatPair label="Estado" value={row.wallet.enabled ? "Activa" : "Pausada"} />
           </div>
           <div className="copy-wallet-subsection">
@@ -718,7 +744,7 @@ function WalletDetailPanel({
           </div>
         </article>
 
-        <article className="copy-wallet-detail-card">
+        <article className="copy-wallet-detail-card copy-wallet-trade-card">
           <div className="copy-panel-heading">
             <span>Ultimo trade</span>
             <strong>Lectura publica</strong>
@@ -739,24 +765,26 @@ function WalletDetailPanel({
           </div>
         </article>
 
-        <article className="copy-wallet-detail-card">
+        <article className="copy-wallet-detail-card copy-wallet-last-copy-card">
           <div className="copy-panel-heading">
-            <span>Demo</span>
-            <strong>Estadisticas demo</strong>
+            <span>Ultima copia demo</span>
+            <strong>Resumen demo</strong>
           </div>
-          <div className="copy-wallet-stat-grid">
-            <StatPair label="PnL demo" value={formatPnl(row.analytics.totalPnlUsd)} valueClassName={walletPnlClassName(pnlTone(row.analytics.totalPnlUsd))} />
-            <StatPair label="PnL %" value={formatPercent(row.analytics.totalPnlPercent)} valueClassName={walletPnlClassName(pnlTone(row.analytics.totalPnlPercent))} />
-            <StatPair label="Trades copiados" value={String(row.wallet.demo_copied_count)} />
-            <StatPair label="BUY" value={String(row.wallet.demo_buy_count)} />
-            <StatPair label="SELL" value={String(row.wallet.demo_sell_count)} />
-            <StatPair label="Saltadas" value={String(row.wallet.demo_skipped_count)} />
-            <StatPair label="Monto operado" value={formatUsd(row.analytics.totalVolumeUsd)} />
-            <StatPair label="Win rate" value={formatPercent(row.analytics.winRatePercent)} />
+          <div className="copy-wallet-last-copy-highlight">
+            <strong>{formatLastDemoCopy(row.wallet)}</strong>
+            <span>
+              {row.wallet.last_scan_at
+                ? `Ultimo escaneo ${formatTradeAge(ageSecondsFromNow(row.wallet.last_scan_at))}`
+                : "Pendiente de escaneo"}
+            </span>
           </div>
           <div className="copy-wallet-detail-footer">
-            <span>Ultima copia demo</span>
-            <strong>{formatLastDemoCopy(row.wallet)}</strong>
+            <span>Freshness actual</span>
+            <strong className={`copy-badge ${freshnessBadgeClass(row.wallet.last_trade_freshness_status)}`}>
+              {row.wallet.last_trade_freshness_label
+                ? formatFreshnessLabel(row.wallet.last_trade_freshness_status, row.wallet.last_trade_freshness_label)
+                : "Sin actividad reciente"}
+            </strong>
           </div>
         </article>
 
@@ -770,39 +798,35 @@ function WalletDetailPanel({
               La actividad aparecera cuando haya suficientes copias demo.
             </div>
           ) : (
-            <>
-              <div className="copy-wallet-activity-chart" aria-label="Actividad reciente demo">
-                {recentActivity.map((position) => {
-                  const pnlValue = Number(position.realized_pnl_usd ?? position.unrealized_pnl_usd ?? 0);
-                  const scale = Math.min(100, Math.max(24, Math.round(Math.abs(pnlValue) * 8)));
-                  return (
-                    <div className="copy-wallet-activity-bar-wrap" key={position.id}>
-                      <span
-                        className={`copy-wallet-activity-bar ${pnlValue >= 0 ? "positive" : "negative"}`}
-                        style={{ height: `${scale}%` }}
-                      />
+            <div className="copy-wallet-activity-list">
+              {recentActivity.map((event) => (
+                <article className={`copy-wallet-activity-item ${event.tone}`} key={event.id}>
+                  <div className="copy-wallet-activity-rail">
+                    <span className="copy-wallet-activity-time">{event.ageLabel}</span>
+                    <span className={`copy-wallet-activity-dot ${event.tone}`} />
+                    <span className="copy-wallet-activity-line" />
+                  </div>
+                  <div className="copy-wallet-activity-copy">
+                    <div className="copy-wallet-activity-heading">
+                      <div className="copy-wallet-activity-headline">
+                        <strong>{event.title}</strong>
+                        <span className="copy-wallet-activity-market">{event.valueLabel}</span>
+                      </div>
+                      <div className="copy-wallet-activity-tags">
+                        {event.side ? <span className={`copy-side ${event.side}`}>{event.side.toUpperCase()}</span> : null}
+                        {event.amountLabel ? <span className="copy-badge subtle">{event.amountLabel}</span> : null}
+                        {event.windowLabel ? <span className="copy-badge subtle">{event.windowLabel}</span> : null}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-              <div className="copy-wallet-activity-list">
-                {recentActivity.map((position) => (
-                  <article className="copy-wallet-activity-item" key={position.id}>
-                    <div>
-                      <span className={`copy-side ${position.entry_action}`}>{position.entry_action.toUpperCase()}</span>
-                      <strong>{position.market_title || position.market_slug || "Mercado Polymarket"}</strong>
-                      <small>{position.outcome || "Outcome no informado"}</small>
-                    </div>
-                    <div className="copy-feed-numbers">
-                      <span className={walletPnlClassName(pnlTone(position.realized_pnl_usd ?? position.unrealized_pnl_usd ?? null))}>
-                        {formatPnl(position.realized_pnl_usd ?? position.unrealized_pnl_usd)}
-                      </span>
-                      <small>{formatDateTime(position.closed_at || position.updated_at)}</small>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </>
+                    <small>{event.description}</small>
+                  </div>
+                  <div className="copy-wallet-activity-numbers">
+                    <span className={walletPnlClassName(event.valueTone)}>{event.priceLabel}</span>
+                    <small>{event.amountLabel ?? "Sin monto"}</small>
+                  </div>
+                </article>
+              ))}
+            </div>
           )}
         </article>
       </section>
@@ -831,16 +855,18 @@ function MetricCard({
 }
 
 function StatPair({
+  cardClassName,
   label,
   value,
   valueClassName,
 }: {
+  cardClassName?: string;
   label: string;
   value: string;
   valueClassName?: string;
 }) {
   return (
-    <div className="copy-wallet-stat">
+    <div className={`copy-wallet-stat ${cardClassName ?? ""}`.trim()}>
       <span>{label}</span>
       <strong className={valueClassName}>{value}</strong>
     </div>
@@ -861,6 +887,20 @@ type WalletAnalytics = {
   totalPnlUsd: number | null;
   totalVolumeUsd: number | null;
   winRatePercent: number | null;
+};
+
+type WalletActivityEvent = {
+  ageLabel: string;
+  amountLabel: string | null;
+  description: string;
+  id: string;
+  priceLabel: string;
+  side: CopyTradeSide | null;
+  title: string;
+  tone: "positive" | "negative" | "neutral" | "warning";
+  valueLabel: string;
+  valueTone: "positive" | "negative" | "neutral" | "warning";
+  windowLabel: string | null;
 };
 
 function buildWalletAnalytics(positions: CopyDemoPosition[]): WalletAnalytics {
@@ -956,6 +996,18 @@ function normalizeAlias(wallet: CopyWallet): string {
   return (wallet.label || wallet.proxy_wallet).toLowerCase();
 }
 
+function walletInitials(wallet: CopyWallet): string {
+  const source = (wallet.label || formatWalletAddress(wallet.proxy_wallet)).trim();
+  const chunks = source.split(/\s+/).filter(Boolean);
+  if (chunks.length === 0) {
+    return "WL";
+  }
+  return chunks
+    .slice(0, 2)
+    .map((chunk) => chunk[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 function setPendingAction(
   walletId: string,
   action: RowAction,
@@ -1036,6 +1088,51 @@ function tradeTimestamp(trade: CopyDetectedTrade): string {
 
 function activityTimestamp(position: CopyDemoPosition): string {
   return position.closed_at ?? position.updated_at ?? position.opened_at;
+}
+
+function buildRecentActivity(row: WalletRow): WalletActivityEvent[] {
+  const events: Array<WalletActivityEvent & { timestamp: string | null }> = [];
+
+  if (row.latestTrade) {
+    events.push({
+      ageLabel: formatTradeAge(ageSecondsFromNow(tradeTimestamp(row.latestTrade))),
+      amountLabel: formatUsd(row.latestTrade.source_amount_usd),
+      description: row.latestTrade.market_title || row.latestTrade.market_slug || "Nueva senal detectada en la wallet publica.",
+      id: `trade-${row.latestTrade.id}`,
+      priceLabel: row.latestTrade.source_price ? `Precio ${Number(row.latestTrade.source_price).toFixed(3)}` : "Precio pendiente",
+      side: row.latestTrade.side,
+      timestamp: tradeTimestamp(row.latestTrade),
+      title: "Trade detectado",
+      tone: row.latestTrade.is_live_candidate ? "positive" : row.latestTrade.freshness_status === "historical" ? "warning" : "neutral",
+      valueLabel: row.latestTrade.outcome || "Mercado publico",
+      valueTone: "neutral",
+      windowLabel: row.latestTrade.copy_window_seconds ? formatCopyWindowChip(row.latestTrade.copy_window_seconds) : null,
+    });
+  }
+
+  for (const position of row.positions.slice(0, 6)) {
+    const pnlValue = position.realized_pnl_usd ?? position.unrealized_pnl_usd ?? null;
+    const positionTone = pnlTone(pnlValue);
+    events.push({
+      ageLabel: formatTradeAge(ageSecondsFromNow(activityTimestamp(position))),
+      amountLabel: formatUsd(position.entry_amount_usd),
+      description: position.market_title || position.market_slug || "Copia demo ejecutada correctamente.",
+      id: `position-${position.id}`,
+      priceLabel: position.entry_price ? `Precio ${Number(position.entry_price).toFixed(3)}` : "Precio pendiente",
+      side: position.entry_action,
+      timestamp: activityTimestamp(position),
+      title: position.status === "closed" ? "Copia cerrada" : position.status === "price_pending" ? "Precio pendiente" : "Copia ejecutada",
+      tone: position.status === "price_pending" ? "warning" : positionTone,
+      valueLabel: formatPnl(pnlValue),
+      valueTone: positionTone,
+      windowLabel: row.wallet.max_delay_seconds ? formatCopyWindowChip(row.wallet.max_delay_seconds) : null,
+    });
+  }
+
+  return events
+    .sort((left, right) => compareNullableString(right.timestamp, left.timestamp))
+    .slice(0, 6)
+    .map(({ timestamp: _timestamp, ...event }) => event);
 }
 
 function getWalletScanMessage(summary: CopyTradingTickSummary): string {
