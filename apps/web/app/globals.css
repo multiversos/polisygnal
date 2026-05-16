@@ -261,7 +261,7 @@
   border: 1px solid rgba(44, 58, 81, 0.72);
   border-radius: 9px;
   background:
-    linear-gradient(180deg, rgba(11, 21, 38, 0.96), rgba(9, 18, 33, 0.92)),
+    linear-gradient(180deg, rgba(12, 23, 41, 0.98), rgba(10, 19, 35, 0.94)),
     rgba(8, 17, 31, 0.94);
   box-shadow: 0 10px 22px rgba(1, 8, 20, 0.14);
 }
@@ -384,21 +384,21 @@
 .copy-amount-presets button.active,
 .copy-pill-button.active,
 .copy-primary-button {
-  border-color: rgba(29, 155, 240, 0.55);
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.28), rgba(6, 182, 212, 0.18));
+  border-color: rgba(40, 166, 255, 0.62);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.24), rgba(14, 165, 233, 0.14));
 }
 
 .copy-secondary-button,
 .copy-action-button,
 .copy-pill-button {
-  border-color: rgba(30, 42, 61, 0.98);
-  background: rgba(10, 19, 33, 0.92);
+  border-color: rgba(44, 60, 85, 0.82);
+  background: linear-gradient(180deg, rgba(12, 22, 38, 0.92), rgba(10, 18, 32, 0.88));
 }
 
 .copy-danger-button {
-  border-color: rgba(244, 63, 94, 0.32);
+  border-color: rgba(244, 63, 94, 0.4);
   color: #fda4af;
-  background: rgba(47, 10, 20, 0.72);
+  background: linear-gradient(180deg, rgba(54, 14, 24, 0.74), rgba(35, 10, 18, 0.7));
 }
 
 .copy-amount-presets button:hover:not(:disabled),
@@ -932,10 +932,10 @@
   min-width: 0;
   overflow: hidden;
   padding: 9px 10px;
-  border: 1px solid rgba(43, 58, 81, 0.68);
+  border: 1px solid rgba(43, 58, 81, 0.72);
   border-radius: 9px;
   background:
-    linear-gradient(180deg, rgba(10, 19, 34, 0.96), rgba(8, 17, 31, 0.92)),
+    linear-gradient(180deg, rgba(12, 22, 38, 0.96), rgba(9, 17, 31, 0.92)),
     rgba(8, 17, 31, 0.9);
   cursor: pointer;
   transition:
@@ -953,13 +953,13 @@
 }
 
 .copy-wallet-row.selected {
-  border-color: rgba(29, 155, 240, 0.62);
+  border-color: rgba(43, 170, 255, 0.76);
   background:
-    linear-gradient(180deg, rgba(12, 25, 44, 0.98), rgba(8, 17, 31, 0.94)),
+    linear-gradient(180deg, rgba(13, 28, 49, 0.99), rgba(9, 19, 34, 0.95)),
     rgba(8, 17, 31, 0.9);
   box-shadow:
-    inset 0 0 0 1px rgba(34, 211, 238, 0.1),
-    0 10px 20px rgba(2, 12, 29, 0.14);
+    inset 0 0 0 1px rgba(67, 193, 255, 0.18),
+    0 12px 24px rgba(2, 12, 29, 0.16);
 }
 
 .copy-wallet-row-top,
@@ -1093,7 +1093,10 @@
   padding: 8px 9px;
   border: 1px solid rgba(42, 56, 79, 0.66);
   border-radius: 8px;
-  background: rgba(10, 18, 33, 0.68);
+  background:
+    linear-gradient(180deg, rgba(13, 22, 38, 0.84), rgba(10, 18, 32, 0.72)),
+    rgba(10, 18, 33, 0.68);
+  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.03);
 }
 
 .copy-wallet-row-meta-item strong,
@@ -1207,10 +1210,10 @@
   gap: 8px;
   min-width: 0;
   padding: 11px;
-  border: 1px solid rgba(42, 56, 79, 0.66);
+  border: 1px solid rgba(42, 56, 79, 0.7);
   border-radius: 9px;
   background:
-    linear-gradient(180deg, rgba(10, 19, 34, 0.96), rgba(9, 18, 33, 0.92)),
+    linear-gradient(180deg, rgba(12, 22, 38, 0.97), rgba(9, 18, 33, 0.92)),
     rgba(15, 23, 42, 0.72);
 }
 
@@ -1255,7 +1258,7 @@
   padding: 10px;
   border: 1px solid rgba(42, 56, 79, 0.66);
   border-radius: 8px;
-  background: linear-gradient(135deg, rgba(8, 28, 24, 0.88), rgba(10, 20, 36, 0.92));
+  background: linear-gradient(135deg, rgba(8, 31, 26, 0.9), rgba(10, 20, 36, 0.94));
 }
 
 .copy-wallet-last-copy-highlight strong {
@@ -1301,9 +1304,9 @@
   gap: 10px;
   min-width: 0;
   padding: 9px 10px;
-  border: 1px solid rgba(42, 56, 79, 0.62);
+  border: 1px solid rgba(42, 56, 79, 0.6);
   border-radius: 8px;
-  background: rgba(9, 18, 33, 0.7);
+  background: linear-gradient(180deg, rgba(10, 18, 32, 0.76), rgba(9, 17, 31, 0.68));
 }
 
 .copy-wallet-activity-item.warning {
