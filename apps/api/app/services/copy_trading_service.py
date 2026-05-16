@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.copy_trading import CopyBotEvent, CopyDetectedTrade, CopyOrder, CopyWallet
 from app.schemas.copy_trading import (
@@ -142,7 +142,14 @@ def create_copy_wallet(db: Session, payload: CopyWalletCreate) -> CopyWallet:
 
 
 def list_copy_wallets(db: Session) -> list[CopyWallet]:
-    stmt = select(CopyWallet).order_by(CopyWallet.updated_at.desc(), CopyWallet.created_at.desc())
+    stmt = (
+        select(CopyWallet)
+        .options(
+            selectinload(CopyWallet.detected_trades),
+            selectinload(CopyWallet.orders),
+        )
+        .order_by(CopyWallet.updated_at.desc(), CopyWallet.created_at.desc())
+    )
     return list(db.scalars(stmt).all())
 
 
@@ -411,9 +418,17 @@ def build_copy_wallet_read(
 ) -> CopyWalletRead:
     current_time = _normalize_datetime(now or datetime.now(tz=UTC))
     trades = list(detected_trades or wallet.detected_trades)
+    orders = list(wallet.orders)
     recent_trades = 0
     historical_trades = 0
     live_candidates = 0
+    demo_copied_count = 0
+    demo_buy_count = 0
+    demo_sell_count = 0
+    demo_skipped_count = 0
+    last_demo_copy_at = None
+    last_demo_copy_action = None
+    last_demo_copy_amount_usd = None
     last_trade_freshness_status = None
     last_trade_freshness_label = None
 
@@ -440,6 +455,23 @@ def build_copy_wallet_read(
         last_trade_freshness_status = latest_freshness.status
         last_trade_freshness_label = latest_freshness.label
 
+    for order in orders:
+        if order.mode != "demo":
+            continue
+        if order.status == "simulated":
+            demo_copied_count += 1
+            if order.action == "buy":
+                demo_buy_count += 1
+            elif order.action == "sell":
+                demo_sell_count += 1
+            order_created_at = _normalize_datetime(order.created_at)
+            if last_demo_copy_at is None or order_created_at >= _normalize_datetime(last_demo_copy_at):
+                last_demo_copy_at = order.created_at
+                last_demo_copy_action = order.action
+                last_demo_copy_amount_usd = order.intended_amount_usd
+        elif order.status == "skipped":
+            demo_skipped_count += 1
+
     return CopyWalletRead(
         id=wallet.id,
         label=wallet.label,
@@ -463,6 +495,13 @@ def build_copy_wallet_read(
         recent_trades=recent_trades,
         historical_trades=historical_trades,
         live_candidates=live_candidates,
+        demo_copied_count=demo_copied_count,
+        demo_buy_count=demo_buy_count,
+        demo_sell_count=demo_sell_count,
+        demo_skipped_count=demo_skipped_count,
+        last_demo_copy_at=last_demo_copy_at,
+        last_demo_copy_action=last_demo_copy_action,
+        last_demo_copy_amount_usd=last_demo_copy_amount_usd,
         last_trade_freshness_status=last_trade_freshness_status,
         last_trade_freshness_label=last_trade_freshness_label,
         created_at=wallet.created_at,

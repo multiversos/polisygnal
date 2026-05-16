@@ -2714,6 +2714,13 @@ function validateAnalyzerFirstProductSource() {
   assert(copyWalletsTable.includes("Escanea esta wallet una vez ahora."), "scan button should explain manual single-wallet scans");
   assert(copyWalletsTable.includes("Editar configuracion de esta wallet"), "edit button should explain wallet settings editing");
   assert(!copyWalletsTable.includes("Editar modo"), "legacy edit mode label should be removed");
+  assert(copyWalletsTable.includes("Estado actual"), "wallet table should label current trade status");
+  assert(copyWalletsTable.includes("Ultimo trade"), "wallet table should label last trade");
+  assert(copyWalletsTable.includes("Actividad"), "wallet table should label public activity");
+  assert(copyWalletsTable.includes("Demo"), "wallet table should label demo summary");
+  assert(copyWalletsTable.includes("Copiadas"), "wallet table should expose copied demo count");
+  assert(copyWalletsTable.includes("Saltadas"), "wallet table should expose skipped demo count");
+  assert(copyWalletsTable.includes("Ultima copia demo"), "wallet table should expose last demo copy details");
   assert(copyWalletsTable.includes("Escaneando..."), "wallet scan button should show loading state");
   assert(copyWalletsTable.includes("Pausando..."), "wallet pause button should show loading state");
   assert(copyWalletsTable.includes("Eliminando..."), "wallet delete button should show loading state");
