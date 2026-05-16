@@ -970,35 +970,28 @@ function validateAnalyzerReportSource() {
   const source = readFileSync(resolve(appRoot, "app/components/AnalyzerReport.tsx"), "utf8");
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
   const requiredCopy = [
-    "Resumen del analisis",
-    "Fuentes del analisis",
-    "Estado del analisis profundo",
-    "Analisis profundo",
+    "Resultado del analisis",
     "Capas del motor",
-    "Pendiente de integracion",
     "{analysisAgentName} automatico",
     "Evidencia usada",
-    "Datos reales revisados para esta lectura",
-    "Dato real",
+    "Resumen compacto de las capas revisadas",
     "Lectura rapida de",
-    "Lectura parcial automatica",
-    "Senales principales",
-    "Riesgos",
-    "Limitaciones",
+    "Detalles avanzados del analisis",
+    "Evidencia independiente",
+    "Diagnostico de odds",
+    "Senales visibles",
+    "Riesgos y limitaciones",
     "Que revisar primero",
+    "Que falta para generar estimacion propia",
     "No hay estimacion propia de PolySignal",
     "Fuente automatica no disponible",
-    "Actualizar lectura automatica",
-    "Guardar y continuar despues",
     "Que puedes hacer ahora",
     "Analizar otro enlace",
-    "Capas revisadas",
     "Ver todas las billeteras analizadas",
     "No encontramos datos publicos suficientes de billeteras",
     "Perfil de billeteras",
-    "Estimacion PolySignal pendiente",
-    "Todavia no hay suficiente evidencia para generar un porcentaje propio",
-    "Porcentaje PolySignal",
+    "Ya hay un soporte independiente parcial",
+    "Comparacion externa; no es recomendacion ni estimacion automatica.",
     "PolySignal separa el precio del mercado de su estimacion propia",
   ];
 
@@ -1734,17 +1727,16 @@ function validateDeepAnalysisJobRules() {
   assert(analyzePage.includes("handleContinueWithPartial"), "analyze page should allow continuing without Samantha after timeout");
   assert(analyzePage.includes("markJobSendingToSamantha"), "analyze page should expose automatic bridge states");
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
-  assert(reportSource.includes("Progreso del analisis"), "AnalyzerReport should show human progress copy");
-  assert(reportSource.includes("Estado del analisis profundo"), "AnalyzerReport should expose an accessible job-state label");
+  assert(reportSource.includes("Detalles avanzados del analisis"), "AnalyzerReport should keep advanced details behind a collapsed section");
+  assert(reportSource.includes("Estado del motor"), "AnalyzerReport should expose an accessible job-state label");
   assert(reportSource.includes("{analysisAgentName} automatico"), "AnalyzerReport should show dynamic automatic agent state");
   assert(reportSource.includes("Fuente automatica no disponible"), "AnalyzerReport should show unavailable automatic source state");
   assert(reportSource.includes("Evidencia usada"), "AnalyzerReport should expose a compact evidence-used section");
-  assert(reportSource.includes("Datos reales revisados para esta lectura"), "AnalyzerReport should explain evidence provenance");
+  assert(reportSource.includes("Resumen compacto de las capas revisadas"), "AnalyzerReport should explain compact evidence provenance");
   assert(reportSource.includes("Evidencia independiente"), "AnalyzerReport should explain independent evidence requirements");
-  assert(reportSource.includes("Que falta para estimar"), "AnalyzerReport should explain what is still missing for an estimate");
-  assert(reportSource.includes("Fuente no conectada"), "AnalyzerReport should label disconnected evidence sources honestly");
+  assert(reportSource.includes("Que falta para generar estimacion propia"), "AnalyzerReport should explain what is still missing for an estimate");
   assert(reportSource.includes("Cuenta como referencia o apoyo auxiliar"), "AnalyzerReport should keep auxiliary data separate from independent evidence");
-  assert(reportSource.includes("Dato real"), "AnalyzerReport should badge real-data key signals");
+  assert(reportSource.includes("Senales visibles"), "AnalyzerReport should keep detailed signals available inside advanced details");
   assert(reportSource.includes("getDisplayMarketPrices"), "AnalyzerReport should reuse flexible market outcome pricing");
   assert(reportSource.includes("NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS"), "AnalyzerReport should gate manual tools behind debug flag");
   assert(reportSource.includes("markJobSamanthaReportLoaded"), "AnalyzerReport should merge Samantha report into the job");

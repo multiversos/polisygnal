@@ -89,13 +89,14 @@ Estado visible verificado:
   resumen ejecutivo compacto, fuentes visibles, capas avanzadas plegables,
   Wallet Intelligence con drilldown seguro y acciones claras para guardar,
   ver historial, abrir detalle o seguir mercado.
-- `AnalyzerReport.tsx` ahora presenta mejor el reporte automatico de Samantha:
-  lectura rapida, badge `Lectura parcial automatica`/`Sin senales suficientes`/
-  `Analisis completado`, `Evidencia usada`, senales principales, resumen de
-  mercado, resumen de billeteras, riesgos, limitaciones, fuentes usadas y `Que
-  revisar primero`. La evidencia usada resume Mercado, Billeteras, Samantha y
-  Limitaciones con botones `Ver datos`/`Ver billeteras` que reutilizan los
-  drawers existentes y no se abren automaticamente. Si
+- `AnalyzerReport.tsx` ahora prioriza una lectura final mas compacta:
+  `Resultado del analisis`, `Evidencia usada`, `Que falta para generar
+  estimacion propia`, `Que revisar primero` y `Detalles avanzados del
+  analisis`. `Ver datos` y `Ver billeteras` aparecen una sola vez en el
+  resultado final y siguen reutilizando los drawers existentes. La comparacion
+  Polymarket vs OddsBlaze aparece una sola vez dentro de `Odds externas`; el
+  resto de capas tecnicas, diagnosticos, variantes del provider, fuentes
+  completas y limitaciones detalladas quedan plegadas por defecto. Si
   `suggestedDecision.available=false`, no muestra prediccion ni estimate
   propio; explica que el precio de mercado es solo referencia de Polymarket.
 - `/analyze` ahora expone una capa `Evidencia independiente`: separa referencia

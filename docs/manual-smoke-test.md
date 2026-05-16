@@ -690,29 +690,32 @@ Use these quick checks when reviewing public pages:
    fake waits. It should only prevent the first steps from collapsing instantly.
 6. Confirm `Ver datos` and `Ver billeteras` stay closed by default and only
    open after a click/tap.
-7. If Samantha takes longer than normal, confirm the timer explains that
+7. In the final analyzer result, confirm `Ver datos` appears once and `Ver
+   billeteras` appears once. They should stay inside `Evidencia usada`, not be
+   repeated in extra visible cards.
+8. If Samantha takes longer than normal, confirm the timer explains that
    market, data and wallet sources were already consulted. By 90-120 seconds it
    must become a visible timeout/recovery state, not an infinite loader.
-8. Confirm the job also shows:
+9. Confirm the job also shows:
    - Mercado leido desde Polymarket.
    - Datos principales revisados.
    - Actividad de billeteras revisada o bloqueada de forma honesta.
    - Samantha automatica preparada.
    - `Samantha analizando`.
    - Odds/Kalshi/profile steps blocked or pending integration.
-9. Confirm the report does not say the deep analysis is completed while waiting
+10. Confirm the report does not say the deep analysis is completed while waiting
    for Samantha.
-10. Confirm public UI does not show copy/download/schema/report-upload tools.
-11. Save the analysis as pending and open `/history`.
-12. Confirm the saved item shows `Pendiente de investigacion`, the brief date when
+11. Confirm public UI does not show copy/download/schema/report-upload tools.
+12. Save the analysis as pending and open `/history`.
+13. Confirm the saved item shows `Pendiente de investigacion`, the brief date when
    available, and a `Continuar analisis` action.
-13. Paste an invalid Samantha report and confirm it fails without changing the
+14. Paste an invalid Samantha report and confirm it fails without changing the
    job to completed.
-14. In a safe local test, paste a valid structured report and confirm the job
+15. In a safe local test, paste a valid structured report and confirm the job
     updates evidence/scoring state without inventing market data.
-15. Confirm `/performance` does not count awaiting research or ready-to-score
+16. Confirm `/performance` does not count awaiting research or ready-to-score
     records as hit/miss.
-12. Confirm `/performance` separates `Pendientes de investigacion` from
+17. Confirm `/performance` separates `Pendientes de investigacion` from
     `Pendientes de resolucion`.
 
 ## Samantha Automatic Workflow
@@ -722,14 +725,23 @@ Use these quick checks when reviewing public pages:
    `Lectura rapida de Samantha` section.
 3. Confirm `report_received` with a partial report appears as
    `Lectura parcial automatica`, not as a completed prediction.
-4. Confirm the final report shows `Senales principales`, `Riesgos`,
-   `Limitaciones`, `Que revisar primero`, and source badges when Samantha
-   returns them.
-5. Confirm the final report shows `Evidencia usada` with compact cards for
-   `Mercado`, `Billeteras`, `Samantha` and `Limitaciones`. These cards must
-   summarize only real Polymarket/Wallet Intelligence/agent data and must not
-   replace the detail drawers.
-6. Confirm the final report shows `Evidencia independiente` and that it marks:
+4. Confirm the final report is ordered as:
+   - `Resultado del analisis`
+   - `Evidencia usada`
+   - `Que falta para generar estimacion propia`
+   - `Que revisar primero`
+   - `Detalles avanzados del analisis`
+5. Confirm `Detalles avanzados del analisis` is collapsed by default and holds
+   the technical layers, detailed source list, no-match diagnostics and
+   limitations only after expand.
+6. Confirm `Evidencia usada` shows one compact card each for:
+   - `Mercado`
+   - `Odds externas`
+   - `Billeteras`
+   - `Samantha`
+7. Confirm `Ver datos` appears once and `Ver billeteras` appears once in the
+   final visible result.
+8. Confirm the advanced `Evidencia independiente` view marks:
    - `Precio de mercado` as available reference only,
    - `Billeteras` as auxiliary only,
    - `Odds externas` as `Proveedor no configurado`, `Sin match claro`,
@@ -737,34 +749,28 @@ Use these quick checks when reviewing public pages:
      response,
    - `Noticias/lesiones` or `Noticias/encuestas` as missing when no provider is
      connected.
-7. Confirm `Que falta para estimar` explains why there is still no PolySignal
-   estimate when only Polymarket + Wallet Intelligence are present.
-6. Confirm key signal cards show their source and mark `Dato real` only when
-   the structured report says the signal is real. Polymarket signals should
-   offer `Ver datos`; Wallet Intelligence signals should offer `Ver
-   billeteras`.
-7. Confirm the market summary and wallet summary in the report use real
-   Polymarket/Wallet Intelligence values and offer `Ver datos` / `Ver
-   billeteras` without opening drawers automatically.
-8. Confirm `suggestedDecision.available=false` appears as no PolySignal-owned
+9. Confirm `Que falta para generar estimacion propia` explains why there is
+   still no PolySignal estimate when only Polymarket + Wallet Intelligence are
+   present.
+10. Confirm `suggestedDecision.available=false` appears as no PolySignal-owned
    estimate or prediction. A `partial` report is context, not a finalized
    prediction.
-9. Confirm the public flow does not show manual upload/copy/download/schema
+11. Confirm the public flow does not show manual upload/copy/download/schema
    controls by default.
-10. Confirm unavailable sources appear as `Fuente automatica no disponible` or
+12. Confirm unavailable sources appear as `Fuente automatica no disponible` or
    partial reading, not as a request for user evidence.
-11. Confirm no full wallet addresses appear outside the explicit `Ver billeteras`
+13. Confirm no full wallet addresses appear outside the explicit `Ver billeteras`
    drawer, and confirm no secrets, raw payloads, fake ROI/win rate, copy-trading
    language, fake odds, fake news, fake injuries, or betting advice appear.
-12. Confirm no prediction is created unless validated Samantha output and the
+14. Confirm no prediction is created unless validated Samantha output and the
    conservative PolySignal gates pass.
-13. If `ODDS_PROVIDER_ENABLED=true`, test an NBA market such as
+15. If `ODDS_PROVIDER_ENABLED=true`, test an NBA market such as
    `nba-sas-min-2026-05-15` and confirm `/api/external-odds/compare` stays
    same-origin, does not expose the API key, and only marks `Odds externas`
    as independent when the provider returns a medium/high match with real
    outcomes.
-14. When `Odds externas` is `Disponible`, confirm `Evidencia independiente`
-    shows `Comparacion con OddsBlaze` with:
+16. When `Odds externas` is `Disponible`, confirm the visible `Odds externas`
+   card shows `Comparacion con OddsBlaze` with:
    - outcome label,
    - Polymarket probability,
    - DraftKings/OddsBlaze probability,
@@ -773,7 +779,7 @@ Use these quick checks when reviewing public pages:
    - matched query variant.
    This comparison must be labeled as external context only, not a PolySignal
    prediction or recommendation.
-15. Local debug-only manual report tooling may exist behind
+17. Local debug-only manual report tooling may exist behind
    `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`; it is not part of the public
    production flow.
 

@@ -33,7 +33,17 @@ responsable.
 
 ## Capa visible en `/analyze`
 
-`AnalyzerReport` ahora expone `Evidencia independiente` para mostrar:
+`AnalyzerReport` ahora separa una lectura corta visible de un bloque plegado de
+detalle tecnico:
+
+- `Resultado del analisis`;
+- `Evidencia usada`;
+- `Que falta para generar estimacion propia`;
+- `Que revisar primero`;
+- `Detalles avanzados del analisis`.
+
+Dentro de `Detalles avanzados del analisis`, `AnalyzerReport` expone
+`Evidencia independiente` para mostrar:
 
 - que fuentes se revisaron;
 - cuales dieron datos reales;
@@ -106,3 +116,7 @@ una tabla `Polymarket vs OddsBlaze` por outcome con:
 
 Esa comparacion externa sirve para verificacion visual. No debe presentarse
 como recomendacion, pick automatico ni estimate propio de PolySignal.
+
+La comparacion visible debe aparecer una sola vez dentro de la card compacta
+`Odds externas`; las variantes probadas, razones de no-match y diagnosticos del
+provider quedan dentro de `Detalles avanzados del analisis`.

@@ -922,6 +922,24 @@ export function AnalyzerReport({
     externalOddsComparison.matchedMarket &&
     (externalOddsComparison.matchConfidence === "high" ||
       externalOddsComparison.matchConfidence === "medium");
+  const hasExternalOddsNoMatch = externalOddsComparison?.status === "no_match";
+  const estimateGapLead = hasDirectExternalOdds
+    ? "Ya hay odds externas comparables disponibles, pero PolySignal mantiene la estimacion propia en espera hasta que las compuertas conservadoras validen suficiente soporte adicional."
+    : hasExternalOddsNoMatch
+      ? "Odds externas consultadas, pero sin equivalente claro. PolySignal mantiene la estimacion propia en espera y no inventa comparaciones."
+      : "Todavia no hay suficiente evidencia para generar un porcentaje propio. PolySignal necesita Samantha validada y al menos un soporte independiente real.";
+  const advancedOddsDiagnostics = uniqueLimited(
+    [
+      ...(externalOddsComparison?.attemptedQueryVariants?.length
+        ? [`Variantes seguras: ${externalOddsComparison.attemptedQueryVariants.join(", ")}`]
+        : []),
+      ...(externalOddsComparison?.noMatchReasons?.length
+        ? [`Razones: ${externalOddsComparison.noMatchReasons.join(", ")}`]
+        : []),
+      ...(externalOddsComparison?.warnings ?? []),
+    ],
+    6,
+  );
   const displayedPolySignalProbability = polySignalEstimate.available
     ? {
         no: polySignalEstimate.estimateNoProbability,
@@ -1267,10 +1285,15 @@ export function AnalyzerReport({
 
       <section className="analyzer-executive-summary" aria-label="Resumen ejecutivo del analisis">
         <div className="analyzer-executive-copy">
-          <p className="eyebrow">Resumen del analisis</p>
-          <h4>Que encontro PolySignal</h4>
+          <p className="eyebrow">Resultado del analisis</p>
+          <h4>{samanthaAutomaticStatus}</h4>
           <strong>{analyzerSummary.headline}</strong>
-          <p>{analyzerSummary.detail}</p>
+          <p>
+            {polySignalEstimate.available
+              ? polySignalEstimate.explanation
+              : `No hay estimacion propia de PolySignal para este mercado. ${estimateGapLead}`}
+          </p>
+          <small>{samanthaAutomaticCopy}</small>
         </div>
         <div className="analyzer-executive-grid">
           <div className="analyzer-executive-card primary">
@@ -1322,187 +1345,6 @@ export function AnalyzerReport({
         </p>
       </section>
 
-      <section className="samantha-evidence-summary" aria-label="Estimacion PolySignal">
-        <div className="probability-display-heading">
-          <div>
-            <p className="eyebrow">Estimacion PolySignal</p>
-            <h4>
-              {polySignalEstimate.available
-                ? "Porcentaje propio generado con compuertas"
-                : "Estimacion PolySignal pendiente"}
-            </h4>
-          </div>
-          <span>{polySignalEstimate.available ? estimateConfidenceLabel(polySignalEstimate.confidence) : "Pendiente"}</span>
-        </div>
-        {polySignalEstimate.available ? (
-          <>
-            <div className="wallet-report-summary">
-              <div>
-                <span>YES</span>
-                <strong>{formatProbability(polySignalEstimate.estimateYesProbability)}</strong>
-              </div>
-              <div>
-                <span>NO</span>
-                <strong>{formatProbability(polySignalEstimate.estimateNoProbability)}</strong>
-              </div>
-              <div>
-                <span>Decision</span>
-                <strong>{estimateDecisionLabel(polySignalEstimate)}</strong>
-              </div>
-              <div>
-                <span>Soportes</span>
-                <strong>{polySignalEstimate.readiness.independentSupportCount}</strong>
-              </div>
-            </div>
-            <p className="section-note">{polySignalEstimate.explanation}</p>
-            <div className="samantha-evidence-list">
-              {polySignalEstimate.contributions.slice(0, 6).map((contribution) => (
-                <article
-                  className="samantha-evidence-card"
-                  key={`${contribution.source}-${contribution.label}`}
-                >
-                  <span>
-                    {shortDirectionLabel(contribution.direction)} -{" "}
-                    {contribution.usedForEstimate ? "usada" : "referencia"}
-                  </span>
-                  <strong>{contribution.label}</strong>
-                  <p>{contribution.summary}</p>
-                  <small>{contribution.source.replace(/_/g, " ")}</small>
-                </article>
-              ))}
-            </div>
-            <p className="section-note">
-              Esto no es consejo financiero ni garantia. El precio del mercado se mantiene como referencia separada.
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="section-note">
-              {hasDirectExternalOdds
-                ? "Ya hay odds externas comparables disponibles. PolySignal mantiene la estimacion propia en espera hasta que las compuertas conservadoras validen suficiente soporte adicional."
-                : externalOddsComparison?.status === "no_match"
-                  ? "Odds externas consultadas, pero sin equivalente claro. PolySignal mantiene la estimacion propia en espera y no inventa comparaciones."
-                  : "Todavia no hay suficiente evidencia para generar un porcentaje propio. PolySignal necesita Samantha validada y al menos un soporte independiente real."}
-            </p>
-            <div className="wallet-warning-list">
-              {polySignalEstimate.blockers.slice(0, 5).map((entry) => (
-                <span className="warning-chip" key={entry.code}>{entry.label}</span>
-              ))}
-            </div>
-            <p className="section-note">{polySignalEstimate.explanation}</p>
-          </>
-        )}
-      </section>
-
-      <section className="analyzer-source-strip" aria-label="Fuentes del analisis">
-        <strong>Fuentes del analisis</strong>
-        <span>Precio: Polymarket</span>
-        <span>Mercado/evento: datos publicos de Polymarket</span>
-        <span>Billeteras: {sourceLabel(walletSummary)}</span>
-        <span>
-          Odds externas:{" "}
-          {hasDirectExternalOdds
-            ? `${externalOddsComparison?.providerName} / ${externalOddsComparison?.sportsbook}`
-            : externalOddsComparison?.status === "no_match"
-              ? "sin equivalente claro"
-              : externalOddsComparison?.status === "disabled"
-                ? "proveedor no configurado"
-                : "pendiente"}
-        </span>
-        <span>Resolucion: Polymarket si aplica</span>
-        <span>
-          {item.market?.sport_type ? "Noticias/lesiones" : "Investigacion externa"}:{" "}
-          {research.verifiedVisibleCount > 0 ? "fuentes verificadas" : "pendiente"}
-        </span>
-        <span>Historial: este navegador</span>
-      </section>
-
-      {deepAnalysisJob && jobSummary ? (
-        <section className="analyzer-deep-job-state" aria-label="Estado del analisis profundo">
-          <div className="probability-display-heading">
-            <div>
-              <p className="eyebrow">Progreso del analisis</p>
-              <h4>{jobSummary.headline}</h4>
-            </div>
-            <span>
-              {jobSummary.completedSteps}/{jobSummary.totalSteps} pasos
-            </span>
-          </div>
-          <p className="analyzer-report-note">{jobSummary.detail}</p>
-          <ol className="deep-job-step-list">
-            {deepAnalysisJob.steps.map((step) => (
-              <li className={step.status} key={step.id}>
-                <span>{jobStepStatusLabel(step.status)}</span>
-                <div>
-                  <strong>{step.label}</strong>
-                  <small>{step.summary}</small>
-                  {step.requiresManualInput && SHOW_ANALYZER_DEBUG_TOOLS ? <em>Requiere accion manual</em> : null}
-                  {step.requiresExternalIntegration ? <em>Pendiente de integracion segura</em> : null}
-                </div>
-              </li>
-            ))}
-          </ol>
-          <p className="section-note">
-            El analisis profundo solo se completa con fuentes reales suficientes.
-            Si una fuente automatica no esta disponible, queda como lectura parcial.
-          </p>
-          <p className="section-note">
-            Estado actual: Samantha automatica o fuentes externas en progreso.
-          </p>
-          <p className="section-note">
-            Ya leimos el mercado, revisamos billeteras disponibles y preparamos la lectura.
-            No necesitas cargar reportes ni pegar evidencia para guardar este analisis.
-          </p>
-          <div className="watchlist-actions">
-            {samanthaBridgeTaskId ? (
-              <button
-                className="watchlist-button"
-                disabled={samanthaLookupBusy}
-                onClick={handleCheckSamanthaStatus}
-                type="button"
-              >
-                {samanthaLookupBusy ? "Actualizando lectura" : "Actualizar lectura automatica"}
-              </button>
-            ) : null}
-            <button
-              className="watchlist-button"
-              disabled={busy}
-              onClick={() => onSaveHistory(item, polySignalEstimate)}
-              type="button"
-            >
-              Guardar y continuar despues
-            </button>
-            <a className="analysis-link secondary" href="/history">
-              Ver en historial
-            </a>
-            <a className="analysis-link secondary" href="/methodology">
-              Ver metodologia
-            </a>
-          </div>
-          <p className="section-note">{jobSummary.nextAction}</p>
-        </section>
-      ) : null}
-
-      <section className="analyzer-deep-readiness" aria-label="Analisis profundo">
-        <div className="probability-display-heading">
-          <div>
-            <p className="eyebrow">Analisis profundo</p>
-            <h4>Capas del motor</h4>
-          </div>
-          <span>{deepAnalysis.decision.available ? "Decision disponible" : "Decision pendiente"}</span>
-        </div>
-        <p className="analyzer-report-note">{deepAnalysisSummary}</p>
-        <div className="analyzer-deep-layer-grid">
-          {deepLayers.map((layer) => (
-            <article className={`analyzer-deep-layer ${layer.status}`} key={layer.id}>
-              <span>{deepLayerStatusLabel(layer.status)}</span>
-              <strong>{layer.label}</strong>
-              <p>{layer.summary}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
       {!SHOW_ANALYZER_DEBUG_TOOLS ? (
         <section className="samantha-research-panel" aria-label={`Analisis automatico de ${analysisAgentName}`}>
           <div className="probability-display-heading">
@@ -1528,12 +1370,12 @@ export function AnalyzerReport({
             <div className="probability-display-heading">
               <div>
                 <p className="eyebrow">Evidencia usada</p>
-                <h4>Datos reales revisados para esta lectura</h4>
+                <h4>Resumen compacto de las capas revisadas</h4>
               </div>
-              <span>{polySignalEstimate.available ? "Estimacion propia disponible" : "Sin estimacion propia"}</span>
+              <span>{polySignalEstimate.available ? "Estimacion propia disponible" : "Lectura parcial"}</span>
             </div>
             <p className="section-note">
-              Estas tarjetas resumen lo verificable. Los drawers siguen siendo la vista completa y se abren solo por clic.
+              Esta vista deja a mano solo lo mas util para revisar primero. Los detalles tecnicos completos siguen abajo, cerrados por defecto.
             </p>
             <div className="samantha-report-grid evidence-used-grid">
               <article className="samantha-report-section">
@@ -1554,123 +1396,24 @@ export function AnalyzerReport({
                 </small>
               </article>
 
-              <article className="samantha-report-section">
-                <div className="samantha-report-section-heading">
-                  <span>Billeteras</span>
-                  {onOpenWalletDetails ? (
-                    <button className="analysis-link secondary" onClick={onOpenWalletDetails} type="button">
-                      Ver billeteras
-                    </button>
-                  ) : null}
-                </div>
-                <strong>{walletEvidenceHeadline(walletSummary)}</strong>
-                <p>{walletEvidenceDetail(walletSummary)}</p>
-                <small>Actividad publica read-only; no es instruccion operativa ni consejo financiero.</small>
-              </article>
-
-              <article className="samantha-report-section">
-                <div className="samantha-report-section-heading">
-                  <span>{analysisAgentName}</span>
-                  <em>{samanthaReport ? "reporte validado" : "en progreso"}</em>
-                </div>
-                <strong>{samanthaAutomaticStatus}</strong>
-                <p>{samanthaReport ? "Lectura generada con datos disponibles." : "Esperando respuesta segura del agente."}</p>
-                <small>
-                  Fuentes: {samanthaSourcesUsed.length > 0 ? samanthaSourcesUsed.slice(0, 4).join(", ") : "sin fuentes adicionales"}
-                </small>
-              </article>
-
-              <article className="samantha-report-section">
-                <span>Limitaciones</span>
-                <strong>
-                  {polySignalEstimate.available
-                    ? "Compuertas conservadoras superadas"
-                    : "No hay estimacion propia de PolySignal"}
-                </strong>
-                <p>
-                  {samanthaLimitations[0] ||
-                    "No se agregaron limitaciones adicionales en el reporte validado."}
-                </p>
-                <small>Una lectura parcial no cuenta como prediccion si no hay decision propia disponible.</small>
-              </article>
-            </div>
-          </section>
-
-          <section className="analyzer-independent-evidence" aria-label="Evidencia independiente">
-            <div className="probability-display-heading">
-              <div>
-                <p className="eyebrow">Evidencia independiente</p>
-                <h4>Fuentes que separan una estimacion propia del precio de mercado</h4>
-              </div>
-              <span>
-                {independentEvidence.enoughForEstimate
-                  ? "Lista para estimacion"
-                  : "Fuentes independientes pendientes"}
-              </span>
-            </div>
-            <p className="section-note">
-              Datos que PolySignal necesita para separar una estimacion propia del precio de
-              mercado. Si una fuente no esta conectada o no respondio, se muestra como
-              Fuente no conectada, No disponible o Timeout en vez de inventar datos.
-            </p>
-            <div className="wallet-report-summary">
-              <div>
-                <span>Independientes disponibles</span>
-                <strong>{independentEvidence.availableIndependentCount}</strong>
-              </div>
-              <div>
-                <span>Auxiliares disponibles</span>
-                <strong>{independentEvidence.availableAuxiliaryCount}</strong>
-              </div>
-              <div>
-                <span>Estimate propio</span>
-                <strong>{independentEvidence.enoughForEstimate ? "Listo" : "No disponible"}</strong>
-              </div>
-            </div>
-            <div className="samantha-report-grid evidence-used-grid">
-              {independentEvidence.items.map((entry) => (
-                <article className="samantha-report-section" key={entry.id}>
-                  <div className="samantha-report-section-heading">
-                    <span>{entry.label}</span>
-                    <em className={`independent-evidence-status ${independentEvidenceStatusClass(entry.status)}`}>
-                      {getIndependentEvidenceStatusLabel(entry.status)}
-                    </em>
-                  </div>
-                  <strong>{entry.summary}</strong>
-                  <p>
-                    {entry.isIndependent
-                      ? "Cuenta como evidencia independiente solo cuando esta disponible y validada."
-                      : "Cuenta como referencia o apoyo auxiliar; no basta sola para estimar."}
-                  </p>
-                  <small>
-                    Fuente: {entry.sourceName || "sin fuente conectada"}
-                    {entry.checkedAt ? ` · revisado ${formatDate(entry.checkedAt)}` : ""}
-                  </small>
-                  {entry.limitations.length > 0 ? (
-                    <div className="wallet-warning-list">
-                      {entry.limitations.slice(0, 2).map((limitation) => (
-                        <span className="warning-chip" key={`${entry.id}-${limitation}`}>
-                          {limitation}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-            {oddsComparisonDisplay ? (
               <article className="samantha-report-section odds-comparison-section">
                 <div className="samantha-report-section-heading">
-                  <span>Comparacion con OddsBlaze</span>
-                  <em className={`independent-evidence-status ${independentEvidenceStatusClass(oddsComparisonDisplay.status)}`}>
-                    {getIndependentEvidenceStatusLabel(oddsComparisonDisplay.status)}
+                  <span>Odds externas</span>
+                  <em className={`independent-evidence-status ${independentEvidenceStatusClass(oddsComparisonDisplay?.status ?? "not_connected")}`}>
+                    {getIndependentEvidenceStatusLabel(oddsComparisonDisplay?.status ?? "not_connected")}
                   </em>
                 </div>
                 <strong>
-                  {oddsComparisonDisplay.providerName} via {oddsComparisonDisplay.sportsbook}. Comparacion externa, no recomendacion.
+                  {oddsComparisonDisplay
+                    ? `${oddsComparisonDisplay.providerName} via ${oddsComparisonDisplay.sportsbook}`
+                    : "Proveedor externo no configurado"}
                 </strong>
-                <p>{oddsComparisonDisplay.summary}</p>
-                {oddsComparisonDisplay.status === "available" || oddsComparisonDisplay.status === "partial" ? (
+                <p>
+                  {oddsComparisonDisplay?.summary ||
+                    "No hay comparacion externa disponible para este mercado."}
+                </p>
+                {(oddsComparisonDisplay?.status === "available" ||
+                  oddsComparisonDisplay?.status === "partial") ? (
                   <>
                     <div className="wallet-report-table odds-comparison-table" role="list">
                       <div className="wallet-report-row odds-comparison-row odds-comparison-header" role="listitem">
@@ -1679,7 +1422,7 @@ export function AnalyzerReport({
                         <strong>{oddsComparisonDisplay.sportsbook}</strong>
                         <strong>Diferencia</strong>
                       </div>
-                      {oddsComparisonDisplay.rows.map((row) => (
+                      {oddsComparisonDisplay.rows.slice(0, 4).map((row) => (
                         <div className="wallet-report-row odds-comparison-row" key={row.outcomeLabel} role="listitem">
                           <strong>{row.outcomeLabel}</strong>
                           <span>{formatProbabilityPercent(row.polymarketProbability)}</span>
@@ -1691,225 +1434,275 @@ export function AnalyzerReport({
                     <div className="data-health-notes">
                       <span className="badge external-hint">Confianza match: {oddsComparisonDisplay.matchConfidence}</span>
                       {oddsVariantLabel(oddsComparisonDisplay.matchedQueryVariant) ? (
-                        <span className="badge">Match usando variante: {oddsVariantLabel(oddsComparisonDisplay.matchedQueryVariant)}</span>
+                        <span className="badge">Variante: {oddsVariantLabel(oddsComparisonDisplay.matchedQueryVariant)}</span>
                       ) : null}
                       {externalOddsComparison?.checkedAt ? (
                         <span className="badge muted">Revisado {formatDate(externalOddsComparison.checkedAt)}</span>
                       ) : null}
                     </div>
+                    <small>Comparacion externa; no es recomendacion ni estimacion automatica.</small>
                   </>
-                ) : null}
-                {oddsComparisonDisplay.status === "no_match" ? (
-                  <>
-                    <small>
-                      No se encontro equivalente claro en OddsBlaze.
-                      {externalOddsComparison?.attemptedQueries
-                        ? ` Consultas seguras: ${externalOddsComparison.attemptedQueries}.`
-                        : ""}
-                    </small>
-                    {externalOddsComparison?.attemptedQueryVariants?.length ? (
-                      <div className="wallet-warning-list">
-                        <span className="warning-chip">
-                          Variantes: {externalOddsComparison.attemptedQueryVariants.join(", ")}
-                        </span>
-                      </div>
-                    ) : null}
-                  </>
-                ) : null}
-                {oddsComparisonDisplay.limitations.length > 0 ? (
-                  <div className="wallet-warning-list">
-                    {oddsComparisonDisplay.limitations.slice(0, 3).map((limitation) => (
-                      <span className="warning-chip" key={limitation}>
-                        {limitation}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
+                ) : oddsComparisonDisplay?.status === "no_match" ? (
+                  <small>
+                    No se encontro equivalente claro en OddsBlaze. Los intentos y razones quedan en detalles avanzados.
+                  </small>
+                ) : (
+                  <small>Sin equivalente externo util en este momento.</small>
+                )}
               </article>
-            ) : null}
-            <article className="samantha-report-section">
-              <span>Que falta para estimar</span>
-              <strong>
-                {independentEvidence.enoughForEstimate
-                  ? "Hay suficiente evidencia para una estimacion propia"
-                  : "Sin estimacion propia suficiente"}
-              </strong>
-              <p>{independentEvidence.reason}</p>
-              {independentEvidence.missingRequiredCategories.length > 0 ? (
-                <ul className="samantha-report-list">
-                  {independentEvidence.missingRequiredCategories.map((missing) => (
-                    <li key={missing}>{missing}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="section-note">
-                  Las compuertas actuales ya tienen el minimo de evidencia independiente disponible.
-                </p>
-              )}
-            </article>
+
+              <article className="samantha-report-section">
+                <div className="samantha-report-section-heading">
+                  <span>Billeteras</span>
+                  {onOpenWalletDetails ? (
+                    <button className="analysis-link secondary" onClick={onOpenWalletDetails} type="button">
+                      Ver billeteras
+                    </button>
+                  ) : null}
+                </div>
+                <strong>{walletEvidenceHeadline(walletSummary)}</strong>
+                <p>{walletEvidenceDetail(walletSummary)}</p>
+                <small>
+                  {walletPublicActivityCount} actividades - {walletLargeTradeCount} trades - {walletLargePositionCount} posiciones - {walletNotableCount} notables
+                </small>
+              </article>
+
+              <article className="samantha-report-section">
+                <div className="samantha-report-section-heading">
+                  <span>{analysisAgentName}</span>
+                  <em>{samanthaReport ? "reporte validado" : "lectura parcial"}</em>
+                </div>
+                <strong>{samanthaAutomaticStatus}</strong>
+                <p>{samanthaReport ? "Lectura automatica generada con datos disponibles." : "Sin reporte completo adicional del agente."}</p>
+                <small>
+                  {samanthaSourcesUsed.length > 0
+                    ? `Fuentes visibles: ${samanthaSourcesUsed.slice(0, 3).join(", ")}`
+                    : "Sin fuentes adicionales visibles fuera del mercado y las wallets."}
+                </small>
+              </article>
+            </div>
           </section>
 
-          <div className="wallet-report-summary">
-            <div>
-              <span>Mercado</span>
-              <strong>{probabilityState.market || outcomePrices ? "Datos visibles" : "Datos limitados"}</strong>
-            </div>
-            <div>
-              <span>Wallet Intelligence</span>
-              <strong>
-                {walletSummary.available
-                  ? `${formatMetric(walletSummary.relevantWalletsCount)} wallets`
-                  : "No disponible"}
-              </strong>
-            </div>
-            <div>
-              <span>Capital observado</span>
-              <strong>{walletSummary.available ? formatUsd(walletSummary.analyzedCapitalUsd) : "sin dato"}</strong>
-            </div>
-            <div>
-              <span>{analysisAgentName}</span>
-              <strong>{samanthaAutomaticStatus}</strong>
-            </div>
-            <div>
-              <span>Senales principales</span>
-              <strong>{samanthaEvidence.length}</strong>
-            </div>
-            <div>
-              <span>Estimate propio</span>
-              <strong>{polySignalEstimate.available ? "Disponible" : "No disponible"}</strong>
-            </div>
-          </div>
-
-          <div className="samantha-report-grid">
-            <article className="samantha-report-section">
-              <div className="samantha-report-section-heading">
-                <span>Datos de mercado</span>
-                {onOpenMarketDetails ? (
-                  <button className="analysis-link secondary" onClick={onOpenMarketDetails} type="button">
-                    Ver datos
-                  </button>
-                ) : null}
-              </div>
-              <strong>
-                {probabilityState.market
-                  ? `YES ${formatProbability(probabilityState.market.yes)} / NO ${formatProbability(probabilityState.market.no)}`
-                  : outcomePrices || "Precio no disponible"}
-              </strong>
-              <p>
-                Volumen {formatUsd(item.latest_snapshot?.volume)} - Liquidez {formatUsd(item.latest_snapshot?.liquidity)}
-              </p>
-              <small>Precio/probabilidad implicita de mercado; no es estimacion propia.</small>
-            </article>
-
-            <article className="samantha-report-section">
-              <div className="samantha-report-section-heading">
-                <span>Billeteras</span>
-                {onOpenWalletDetails ? (
-                  <button className="analysis-link secondary" onClick={onOpenWalletDetails} type="button">
-                    Ver billeteras
-                  </button>
-                ) : null}
-              </div>
-              <strong>
-                {walletSummary.available
-                  ? `${formatMetric(walletSummary.relevantWalletsCount)} relevantes`
-                  : "Fuente no disponible"}
-              </strong>
-              <p>
-                Capital {formatUsd(walletSummary.analyzedCapitalUsd)} - YES {formatUsd(walletSummary.yesCapitalUsd)} - NO{" "}
-                {formatUsd(walletSummary.noCapitalUsd)}
-                {(walletSummary.neutralCapitalUsd ?? 0) > 0
-                  ? ` - Neutral ${formatUsd(walletSummary.neutralCapitalUsd)}`
-                  : ""}
-              </p>
-              <small>
-                {walletPublicActivityCount} actividades - {walletLargeTradeCount} trades -{" "}
-                {walletLargePositionCount} posiciones - {walletNotableCount} notables
-              </small>
-            </article>
-          </div>
-
-          <div className="samantha-report-section">
+          <section className="samantha-report-section" aria-label="Que falta para generar estimacion propia">
             <div className="samantha-report-section-heading">
-              <span>Senales principales</span>
-              <em>{verifiableSignalCards.length > 0 ? "fuentes visibles" : "en espera"}</em>
+              <span>Que falta para generar estimacion propia</span>
+              <em>{polySignalEstimate.available ? "Compuertas superadas" : "Compuertas conservadoras activas"}</em>
             </div>
-            {verifiableSignalCards.length > 0 ? (
-              <div className="samantha-evidence-list">
-                {verifiableSignalCards.map((signal) => (
-                  <article className="samantha-evidence-card" key={`${signal.source}-${signal.label}`}>
-                    <span>{shortDirectionLabel(signal.direction)} - {signal.confidence}</span>
-                    <strong>{signal.label}</strong>
-                    <p>{signal.summary}</p>
-                    <small>{signal.source}</small>
-                    <div className="data-health-notes">
-                      {signal.isReal ? <span className="badge external-hint">Dato real</span> : null}
-                      {signal.action === "market" && onOpenMarketDetails ? (
-                        <button className="analysis-link secondary" onClick={onOpenMarketDetails} type="button">
-                          Ver datos
-                        </button>
-                      ) : null}
-                      {signal.action === "wallet" && onOpenWalletDetails ? (
-                        <button className="analysis-link secondary" onClick={onOpenWalletDetails} type="button">
-                          Ver billeteras
-                        </button>
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <p className="section-note">
-                Fuente automatica no disponible o aun en progreso. No se inventan noticias,
-                odds, lesiones ni senales externas.
-              </p>
-            )}
-          </div>
-
-          <div className="samantha-report-grid three">
-            <article className="samantha-report-section">
-              <span>Riesgos</span>
-              {samanthaRiskItems.length > 0 ? (
-                <ul className="samantha-report-list">
-                  {samanthaRiskItems.map((risk) => (
-                    <li key={risk}>{risk}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>No se agregaron riesgos nuevos en el reporte validado.</p>
-              )}
-            </article>
-            <article className="samantha-report-section">
-              <span>Limitaciones</span>
-              {samanthaLimitations.length > 0 ? (
-                <ul className="samantha-report-list">
-                  {samanthaLimitations.map((limitation) => (
-                    <li key={limitation}>{limitation}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>Sin limitaciones adicionales reportadas por el agente.</p>
-              )}
-            </article>
-            <article className="samantha-report-section">
-              <span>Que revisar primero</span>
+            <strong>
+              {polySignalEstimate.available
+                ? "La evidencia actual ya habilita una estimacion propia."
+                : hasDirectExternalOdds
+                  ? "Ya hay un soporte independiente parcial, pero todavia no alcanza para habilitar una estimacion propia."
+                  : hasExternalOddsNoMatch
+                    ? "Odds externas consultadas, pero sin equivalente claro. Siguen faltando soportes independientes suficientes."
+                    : "Faltan fuentes independientes externas para separar una estimacion propia del precio de mercado."}
+            </strong>
+            <p>{independentEvidence.reason}</p>
+            {independentEvidence.missingRequiredCategories.length > 0 ? (
               <ul className="samantha-report-list">
-                {samanthaReviewChecklist.map((item) => (
-                  <li key={item}>{item}</li>
+                {independentEvidence.missingRequiredCategories.slice(0, 5).map((missing) => (
+                  <li key={missing}>{missing}</li>
                 ))}
               </ul>
-            </article>
-          </div>
+            ) : (
+              <p className="section-note">
+                Las compuertas actuales ya tienen el minimo de evidencia independiente disponible.
+              </p>
+            )}
+          </section>
 
-          {samanthaSourcesUsed.length > 0 ? (
-            <div className="data-health-notes" aria-label="Fuentes usadas">
-              {samanthaSourcesUsed.map((source) => (
-                <span className="badge external-hint" key={source}>
-                  {source}
-                </span>
-              ))}
+          <section className="samantha-report-section" aria-label="Que revisar primero">
+            <div className="samantha-report-section-heading">
+              <span>Que revisar primero</span>
+              <em>{samanthaReviewChecklist.length} prioridades</em>
             </div>
-          ) : null}
+            <ul className="samantha-report-list">
+              {samanthaReviewChecklist.slice(0, 5).map((entry) => (
+                <li key={entry}>{entry}</li>
+              ))}
+            </ul>
+          </section>
+
+          <details className="analyzer-report-layer completed analyzer-advanced-details">
+            <summary>
+              <span>
+                <strong>Detalles avanzados del analisis</strong>
+                <small>Capas del motor, fuentes completas, diagnosticos y limitaciones visibles solo al expandir.</small>
+              </span>
+              <em>Cerrado por defecto</em>
+            </summary>
+            <div className="analyzer-report-layer-body analyzer-advanced-body">
+              {jobSummary ? (
+                <section className="samantha-report-section">
+                  <div className="samantha-report-section-heading">
+                    <span>Estado del motor</span>
+                    <em>{jobSummary.headline}</em>
+                  </div>
+                  <p>{jobSummary.detail}</p>
+                  {jobSummary.completedSteps < jobSummary.totalSteps ? (
+                    <small>
+                      {jobSummary.completedSteps}/{jobSummary.totalSteps} capas completadas. {jobSummary.nextAction}
+                    </small>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {deepLayers.length > 0 ? (
+                <section className="analyzer-deep-readiness" aria-label="Capas del motor">
+                  <div className="probability-display-heading">
+                    <div>
+                      <p className="eyebrow">Capas del motor</p>
+                      <h4>Revision tecnica detallada</h4>
+                    </div>
+                    <span>{deepAnalysisSummary}</span>
+                  </div>
+                  <div className="analyzer-report-layers">
+                    {deepLayers.map((layer) => (
+                      <details className={`analyzer-report-layer ${layer.status}`} key={layer.id}>
+                        <summary>
+                          <span>
+                            <strong>{layer.label}</strong>
+                            <small>{layer.summary}</small>
+                          </span>
+                          <em>{deepLayerStatusLabel(layer.status)}</em>
+                        </summary>
+                        <div className="analyzer-report-layer-body">
+                          {layer.warnings.length > 0 || layer.missing.length > 0 || layer.signals.length > 0 ? (
+                            <ul className="samantha-report-list">
+                              {layer.signals.map((signal) => (
+                                <li key={`${layer.id}-${signal.label}`}>{signal.label}: {signal.reason}</li>
+                              ))}
+                              {layer.warnings.map((warning) => (
+                                <li key={`${layer.id}-warning-${warning}`}>{warning}</li>
+                              ))}
+                              {layer.missing.map((missing) => (
+                                <li key={`${layer.id}-missing-${missing}`}>Pendiente: {missing}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="section-note">Sin notas tecnicas adicionales para esta capa.</p>
+                          )}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              <section className="analyzer-independent-evidence" aria-label="Evidencia independiente detallada">
+                <div className="probability-display-heading">
+                  <div>
+                    <p className="eyebrow">Evidencia independiente</p>
+                    <h4>Estado completo de las fuentes revisadas</h4>
+                  </div>
+                  <span>
+                    {independentEvidence.enoughForEstimate
+                      ? "Lista para estimacion"
+                      : "Revision todavia parcial"}
+                  </span>
+                </div>
+                <div className="wallet-report-summary">
+                  <div>
+                    <span>Independientes disponibles</span>
+                    <strong>{independentEvidence.availableIndependentCount}</strong>
+                  </div>
+                  <div>
+                    <span>Auxiliares disponibles</span>
+                    <strong>{independentEvidence.availableAuxiliaryCount}</strong>
+                  </div>
+                  <div>
+                    <span>Estimate propio</span>
+                    <strong>{independentEvidence.enoughForEstimate ? "Listo" : "Pendiente"}</strong>
+                  </div>
+                </div>
+                <div className="samantha-report-grid evidence-used-grid">
+                  {independentEvidence.items.map((entry) => (
+                    <article className="samantha-report-section" key={entry.id}>
+                      <div className="samantha-report-section-heading">
+                        <span>{entry.label}</span>
+                        <em className={`independent-evidence-status ${independentEvidenceStatusClass(entry.status)}`}>
+                          {getIndependentEvidenceStatusLabel(entry.status)}
+                        </em>
+                      </div>
+                      <strong>{entry.summary}</strong>
+                      <p>
+                        {entry.isIndependent
+                          ? "Cuenta como evidencia independiente solo cuando esta disponible y validada."
+                          : "Cuenta como referencia o apoyo auxiliar; no basta sola para estimar."}
+                      </p>
+                      <small>
+                        Fuente: {entry.sourceName || "sin fuente conectada"}
+                        {entry.checkedAt ? ` - revisado ${formatDate(entry.checkedAt)}` : ""}
+                      </small>
+                      {entry.limitations.length > 0 ? (
+                        <div className="wallet-warning-list">
+                          {entry.limitations.slice(0, 2).map((limitation) => (
+                            <span className="warning-chip" key={`${entry.id}-${limitation}`}>
+                              {limitation}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              {(advancedOddsDiagnostics.length > 0 || samanthaSourcesUsed.length > 0 || samanthaRiskItems.length > 0 || samanthaLimitations.length > 0) ? (
+                <section className="samantha-report-grid three">
+                  {advancedOddsDiagnostics.length > 0 ? (
+                    <article className="samantha-report-section">
+                      <span>Diagnostico de odds</span>
+                      <div className="wallet-warning-list">
+                        {advancedOddsDiagnostics.map((detail) => (
+                          <span className="warning-chip" key={detail}>{detail}</span>
+                        ))}
+                      </div>
+                    </article>
+                  ) : null}
+                  {samanthaSourcesUsed.length > 0 ? (
+                    <article className="samantha-report-section">
+                      <span>Fuentes visibles completas</span>
+                      <div className="data-health-notes">
+                        {samanthaSourcesUsed.map((source) => (
+                          <span className="badge external-hint" key={source}>
+                            {source}
+                          </span>
+                        ))}
+                      </div>
+                    </article>
+                  ) : null}
+                  <article className="samantha-report-section">
+                    <span>Riesgos y limitaciones</span>
+                    <ul className="samantha-report-list">
+                      {[...samanthaRiskItems, ...samanthaLimitations].slice(0, 8).map((entry) => (
+                        <li key={entry}>{entry}</li>
+                      ))}
+                    </ul>
+                  </article>
+                </section>
+              ) : null}
+
+              {verifiableSignalCards.length > 0 ? (
+                <section className="samantha-report-section">
+                  <div className="samantha-report-section-heading">
+                    <span>Senales visibles</span>
+                    <em>{verifiableSignalCards.length} registradas</em>
+                  </div>
+                  <div className="samantha-evidence-list">
+                    {verifiableSignalCards.map((signal) => (
+                      <article className="samantha-evidence-card" key={`${signal.source}-${signal.label}`}>
+                        <span>{shortDirectionLabel(signal.direction)} - {signal.confidence}</span>
+                        <strong>{signal.label}</strong>
+                        <p>{signal.summary}</p>
+                        <small>{signal.source}</small>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          </details>
         </section>
       ) : (
       <section className="samantha-research-panel" id="samantha-research" aria-label="Investigacion con Samantha">
