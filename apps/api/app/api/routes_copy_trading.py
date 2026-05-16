@@ -7,6 +7,8 @@ from app.clients.polymarket_data import PolymarketDataClient, get_polymarket_dat
 from app.db.session import get_db
 from app.schemas.copy_trading import (
     CopyBotEventRead,
+    CopyTradingDemoPnlSummaryResponse,
+    CopyTradingDemoPositionsResponse,
     CopyTradingEventsResponse,
     CopyTradingListResponse,
     CopyTradingOrdersResponse,
@@ -19,6 +21,13 @@ from app.schemas.copy_trading import (
     CopyWalletUpdate,
 )
 from app.services.copy_trading_demo_engine import run_demo_tick, scan_copy_wallet
+from app.services.copy_trading_demo_positions import (
+    build_closed_demo_positions_read,
+    build_demo_pnl_summary,
+    build_open_demo_positions_read,
+    list_closed_demo_positions,
+    list_open_demo_positions,
+)
 from app.services.copy_trading_service import (
     CopyWalletNotFoundError,
     DuplicateCopyWalletError,
@@ -141,6 +150,41 @@ def get_copy_events(
 ) -> CopyTradingEventsResponse:
     return CopyTradingEventsResponse(
         events=[CopyBotEventRead.model_validate(event) for event in list_copy_events(db, limit=limit)]
+    )
+
+
+@router.get("/demo/positions/open", response_model=CopyTradingDemoPositionsResponse)
+def get_copy_open_demo_positions(
+    db: Session = Depends(get_db),
+    data_client: PolymarketDataClient = Depends(get_polymarket_data_client),
+) -> CopyTradingDemoPositionsResponse:
+    positions = list_open_demo_positions(db)
+    return CopyTradingDemoPositionsResponse(
+        positions=build_open_demo_positions_read(positions, data_client=data_client)
+    )
+
+
+@router.get("/demo/positions/history", response_model=CopyTradingDemoPositionsResponse)
+def get_copy_closed_demo_positions(
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> CopyTradingDemoPositionsResponse:
+    positions = list_closed_demo_positions(db, limit=limit)
+    return CopyTradingDemoPositionsResponse(
+        positions=build_closed_demo_positions_read(positions)
+    )
+
+
+@router.get("/demo/pnl-summary", response_model=CopyTradingDemoPnlSummaryResponse)
+def get_copy_demo_pnl_summary(
+    history_limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    data_client: PolymarketDataClient = Depends(get_polymarket_data_client),
+) -> CopyTradingDemoPnlSummaryResponse:
+    open_positions = build_open_demo_positions_read(list_open_demo_positions(db), data_client=data_client)
+    closed_positions = build_closed_demo_positions_read(list_closed_demo_positions(db, limit=history_limit))
+    return CopyTradingDemoPnlSummaryResponse(
+        summary=build_demo_pnl_summary(open_positions, closed_positions)
     )
 
 

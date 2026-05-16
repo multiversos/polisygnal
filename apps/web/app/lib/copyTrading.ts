@@ -1,6 +1,8 @@
 import { fetchApiJson } from "./api";
 import type {
   CopyTradingDashboardData,
+  CopyTradingDemoPnlSummary,
+  CopyDemoPosition,
   CopyTradingStatus,
   CopyTradingTickSummary,
   CopyTradingWatcherStatus,
@@ -17,15 +19,20 @@ type WalletsResponse = { wallets: CopyWallet[] };
 type TradesResponse = { trades: CopyDetectedTrade[] };
 type OrdersResponse = { orders: CopyOrder[] };
 type EventsResponse = { events: CopyBotEvent[] };
+type DemoPositionsResponse = { positions: CopyDemoPosition[] };
+type DemoPnlSummaryResponse = { summary: CopyTradingDemoPnlSummary };
 
 export async function getCopyTradingDashboardData(): Promise<CopyTradingDashboardData> {
-  const [status, watcher, wallets, trades, orders, events] = await Promise.all([
+  const [status, watcher, wallets, trades, orders, events, openPositions, closedPositions, demoPnlSummary] = await Promise.all([
     fetchApiJson<CopyTradingStatus>("/copy-trading/status"),
     fetchApiJson<CopyTradingWatcherStatus>("/copy-trading/watcher/status"),
     fetchApiJson<WalletsResponse>("/copy-trading/wallets"),
     fetchApiJson<TradesResponse>("/copy-trading/trades?limit=20"),
     fetchApiJson<OrdersResponse>("/copy-trading/orders?limit=20"),
     fetchApiJson<EventsResponse>("/copy-trading/events?limit=20"),
+    fetchApiJson<DemoPositionsResponse>("/copy-trading/demo/positions/open"),
+    fetchApiJson<DemoPositionsResponse>("/copy-trading/demo/positions/history?limit=20"),
+    fetchApiJson<DemoPnlSummaryResponse>("/copy-trading/demo/pnl-summary"),
   ]);
   return {
     status,
@@ -34,6 +41,9 @@ export async function getCopyTradingDashboardData(): Promise<CopyTradingDashboar
     trades: trades.trades,
     orders: orders.orders,
     events: events.events,
+    open_demo_positions: openPositions.positions,
+    closed_demo_positions: closedPositions.positions,
+    demo_pnl_summary: demoPnlSummary.summary,
   };
 }
 
@@ -198,4 +208,28 @@ export function formatDurationMs(value: number | null | undefined): string {
     return `${value}ms`;
   }
   return `${(value / 1000).toFixed(1)}s`;
+}
+
+export function formatPercent(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") {
+    return "Pendiente";
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return "Pendiente";
+  }
+  const sign = parsed > 0 ? "+" : "";
+  return `${sign}${parsed.toFixed(2)}%`;
+}
+
+export function formatPnl(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") {
+    return "Pendiente";
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return "Pendiente";
+  }
+  const sign = parsed > 0 ? "+" : "";
+  return `${sign}${formatUsd(parsed)}`;
 }

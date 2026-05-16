@@ -153,6 +153,10 @@
   grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr) minmax(280px, 0.9fr);
 }
 
+.copy-dashboard-grid.two {
+  grid-template-columns: minmax(260px, 0.95fr) minmax(0, 2.05fr);
+}
+
 .copy-dashboard-grid.three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -572,6 +576,18 @@
   text-align: right;
 }
 
+.copy-pnl-positive {
+  color: #86efac;
+}
+
+.copy-pnl-negative {
+  color: #fda4af;
+}
+
+.copy-pnl-neutral {
+  color: var(--muted-foreground);
+}
+
 .copy-feed-item small,
 .copy-event small {
   color: var(--muted-foreground);
@@ -610,6 +626,7 @@
 @media (max-width: 1100px) {
   .copy-metrics-grid,
   .copy-dashboard-grid,
+  .copy-dashboard-grid.two,
   .copy-dashboard-grid.three {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -633,6 +650,7 @@
 
   .copy-metrics-grid,
   .copy-dashboard-grid,
+  .copy-dashboard-grid.two,
   .copy-dashboard-grid.three,
   .copy-amount-presets {
     grid-template-columns: 1fr;

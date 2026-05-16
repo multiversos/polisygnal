@@ -176,3 +176,26 @@ Fase real:
 - auditoria;
 - emergency stop;
 - modo real sigue bloqueado hasta sprint especifico.
+
+## Demo positions and PnL
+
+- Cada BUY demo `simulated` abre una posicion demo si hay precio, monto y outcome suficientes.
+- Cada SELL demo `simulated` intenta cerrar la posicion abierta mas reciente de la misma wallet y del mismo asset/outcome.
+- Las posiciones abiertas muestran `PnL actual` usando precio publico de mercado si esta disponible.
+- Si no hay precio actual confiable, la UI muestra `Precio actual pendiente` y no inventa profit ni perdida.
+- Las posiciones cerradas guardan `PnL final` y pasan al historial de copias demo.
+- El dashboard expone:
+  - `Copias demo abiertas`
+  - `Historial de copias demo`
+  - `Resumen PnL demo`
+- La fuente de precio actual es de solo lectura publica. No ejecuta operaciones reales, no firma ordenes y no usa credenciales privadas.
+- Limitaciones del MVP:
+  - cierre parcial todavia no tiene ledger avanzado;
+  - slippage, fees y best bid/ask no se modelan todavia;
+  - si llega un SELL sin posicion abierta, se registra un evento limpio y el sistema sigue vivo.
+- Siguiente evolucion natural:
+  - ledger demo mas robusto;
+  - PnL por wallet mas detallado;
+  - precios en tiempo real por canal mas estable;
+  - modelado de slippage y fees;
+  - worker dedicado para watcher y valuacion.

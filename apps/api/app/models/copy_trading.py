@@ -110,6 +110,7 @@ class CopyWallet(Base):
         cascade="all, delete-orphan",
     )
     orders = relationship("CopyOrder", back_populates="wallet", cascade="all, delete-orphan")
+    demo_positions = relationship("CopyDemoPosition", back_populates="wallet", cascade="all, delete-orphan")
     events = relationship("CopyBotEvent", back_populates="wallet")
 
 
@@ -197,6 +198,84 @@ class CopyOrder(Base):
 
     wallet = relationship("CopyWallet", back_populates="orders")
     detected_trade = relationship("CopyDetectedTrade", back_populates="orders")
+    opening_positions = relationship(
+        "CopyDemoPosition",
+        back_populates="opening_order",
+        foreign_keys="CopyDemoPosition.opening_order_id",
+    )
+    closing_positions = relationship(
+        "CopyDemoPosition",
+        back_populates="closing_order",
+        foreign_keys="CopyDemoPosition.closing_order_id",
+    )
+
+
+class CopyDemoPosition(Base):
+    __tablename__ = "copy_demo_positions"
+    __table_args__ = (
+        CheckConstraint("entry_action in ('buy', 'sell')", name="ck_copy_demo_positions_entry_action"),
+        CheckConstraint("status in ('open', 'closed')", name="ck_copy_demo_positions_status"),
+        CheckConstraint("entry_amount_usd > 0", name="ck_copy_demo_positions_entry_amount_positive"),
+        CheckConstraint("entry_size > 0", name="ck_copy_demo_positions_entry_size_positive"),
+        CheckConstraint("entry_price > 0", name="ck_copy_demo_positions_entry_price_positive"),
+        CheckConstraint("exit_price is null or exit_price >= 0", name="ck_copy_demo_positions_exit_price_non_negative"),
+        CheckConstraint(
+            "exit_value_usd is null or exit_value_usd >= 0",
+            name="ck_copy_demo_positions_exit_value_non_negative",
+        ),
+        Index("ix_copy_demo_positions_wallet_id", "wallet_id"),
+        Index("ix_copy_demo_positions_status", "status"),
+        Index("ix_copy_demo_positions_opened_at", "opened_at"),
+        Index("ix_copy_demo_positions_closed_at", "closed_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    wallet_id: Mapped[str] = mapped_column(
+        ForeignKey("copy_wallets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    opening_order_id: Mapped[str] = mapped_column(
+        ForeignKey("copy_orders.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    closing_order_id: Mapped[str | None] = mapped_column(
+        ForeignKey("copy_orders.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    condition_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    asset: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    market_title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    market_slug: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    entry_action: Mapped[str] = mapped_column(String(16), nullable=False)
+    entry_price: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    entry_amount_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    entry_size: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    exit_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 8), nullable=True)
+    exit_value_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    realized_pnl_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    close_reason: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="open", server_default="open", nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    wallet = relationship("CopyWallet", back_populates="demo_positions")
+    opening_order = relationship(
+        "CopyOrder",
+        back_populates="opening_positions",
+        foreign_keys=[opening_order_id],
+    )
+    closing_order = relationship(
+        "CopyOrder",
+        back_populates="closing_positions",
+        foreign_keys=[closing_order_id],
+    )
 
 
 class CopyBotEvent(Base):

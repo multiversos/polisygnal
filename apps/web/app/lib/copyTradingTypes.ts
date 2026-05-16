@@ -104,6 +104,49 @@ export type CopyBotEvent = {
   created_at: string;
 };
 
+export type CopyDemoPositionStatus = "open" | "closed" | "price_pending";
+
+export type CopyDemoPosition = {
+  id: string;
+  wallet_id: string;
+  wallet_label: string | null;
+  proxy_wallet: string | null;
+  opening_order_id: string;
+  closing_order_id: string | null;
+  condition_id: string | null;
+  asset: string | null;
+  outcome: string | null;
+  market_title: string | null;
+  market_slug: string | null;
+  entry_action: CopyTradeSide;
+  entry_price: string;
+  entry_amount_usd: string;
+  entry_size: string;
+  current_price: string | null;
+  current_value_usd: string | null;
+  unrealized_pnl_usd: string | null;
+  unrealized_pnl_percent: string | null;
+  realized_pnl_usd: string | null;
+  exit_price: string | null;
+  exit_value_usd: string | null;
+  close_reason: string | null;
+  status: CopyDemoPositionStatus;
+  opened_at: string;
+  closed_at: string | null;
+  updated_at: string;
+};
+
+export type CopyTradingDemoPnlSummary = {
+  open_positions_count: number;
+  closed_positions_count: number;
+  open_pnl_usd: string | null;
+  realized_pnl_usd: string | null;
+  total_demo_pnl_usd: string | null;
+  winning_closed_count: number;
+  losing_closed_count: number;
+  price_pending_count: number;
+};
+
 export type CopyTradingStatus = {
   mode_default: CopyTradingMode;
   real_trading_available: boolean;
@@ -161,6 +204,9 @@ export type CopyTradingDashboardData = {
   trades: CopyDetectedTrade[];
   orders: CopyOrder[];
   events: CopyBotEvent[];
+  open_demo_positions: CopyDemoPosition[];
+  closed_demo_positions: CopyDemoPosition[];
+  demo_pnl_summary: CopyTradingDemoPnlSummary;
 };
 
 export type CopyWalletCreateInput = {

@@ -12,6 +12,7 @@ from app.clients.polymarket_data import PolymarketDataClient, PolymarketDataClie
 from app.models.copy_trading import CopyWallet
 from app.schemas.copy_trading import CopyTradingTickResponse
 from app.services.copy_trading_risk_rules import CopyTradeForRules, evaluate_demo_trade
+from app.services.copy_trading_demo_positions import close_demo_position_for_sell, open_demo_position
 from app.services.copy_trading_service import (
     add_copy_event,
     classify_trade_freshness,
@@ -234,8 +235,22 @@ def _scan_wallet(
             response.orders_simulated += 1
             if order.action == "buy":
                 response.buy_simulated += 1
+                open_demo_position(
+                    db,
+                    wallet=wallet,
+                    order=order,
+                    trade=trade,
+                    opened_at=current_time,
+                )
             elif order.action == "sell":
                 response.sell_simulated += 1
+                close_demo_position_for_sell(
+                    db,
+                    wallet=wallet,
+                    order=order,
+                    trade=trade,
+                    closed_at=current_time,
+                )
             add_copy_event(
                 db,
                 wallet_id=wallet.id,
