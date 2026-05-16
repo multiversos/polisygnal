@@ -63,6 +63,14 @@ function parseDateFromSlug(value?: string | null): string | null {
   return match?.[1] ?? null;
 }
 
+function inferSportFromSlug(slug?: string | null): "basketball" | "nba" | "unknown" {
+  const normalized = cleanText(slug).toLowerCase();
+  if (normalized.startsWith("nba-")) {
+    return "nba";
+  }
+  return "unknown";
+}
+
 function participantsFromSlug(slug?: string | null): string[] {
   const normalized = cleanText(slug).toLowerCase();
   const match = normalized.match(/^nba-([a-z]{2,4})-([a-z]{2,4})-(20\d{2}-\d{2}-\d{2})$/);
@@ -109,8 +117,13 @@ function participantsFromTitle(title?: string | null): string[] {
 export function buildSportsContextParticipants(
   input: ExternalOddsCompareInput,
 ): SportsContextNbaParticipantSet {
-  const sport = normalizeToken(cleanText(input.sport || input.league));
   const slug = cleanText(input.marketSlug || input.eventSlug);
+  const explicitSport = normalizeToken(cleanText(input.sport || input.league));
+  const inferredSport = inferSportFromSlug(slug);
+  const sport =
+    explicitSport === "nba" || explicitSport === "basketball"
+      ? explicitSport
+      : inferredSport;
   const outcomeParticipants = participantsFromOutcomes(input.outcomePrices);
   if ((sport === "nba" || sport === "basketball") && outcomeParticipants.length >= 2) {
     return {

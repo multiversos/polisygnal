@@ -485,7 +485,7 @@ async function fetchExternalOddsComparison(input: {
         body: JSON.stringify({
           eventDate: sportsContext.eventDate,
           eventSlug: input.eventSlug ?? input.item.market?.event_slug ?? null,
-          league: input.item.market?.sport_type ?? null,
+          league: sportsContext.league ? sportsContext.league.toLowerCase() : input.item.market?.sport_type ?? null,
           marketSlug: input.marketSlug ?? input.item.market?.market_slug ?? null,
           marketTitle: marketTitle(input.item),
           outcomePrices: (input.item.market?.outcomes ?? []).map((outcome) => ({
@@ -494,7 +494,7 @@ async function fetchExternalOddsComparison(input: {
             side: outcome.side,
           })),
           participants: sportsContext.participants,
-          sport: input.item.market?.sport_type ?? null,
+          sport: sportsContext.sport !== "unknown" ? sportsContext.sport : input.item.market?.sport_type ?? null,
         }),
         cache: "no-store",
         credentials: "omit",
@@ -3081,7 +3081,21 @@ export default function AnalyzePage() {
       }));
 
       let externalOddsComparison: ExternalOddsComparison | null = null;
-      const marketSport = String(match.item.market?.sport_type || "").toLowerCase();
+      const inferredSportsContext = buildSportsContextParticipants({
+        eventDate: match.item.market?.close_time ?? match.item.market?.end_date ?? null,
+        eventSlug: match.eventSlug ?? match.item.market?.event_slug ?? null,
+        league: match.item.market?.sport_type ?? null,
+        marketSlug: match.marketSlug ?? match.item.market?.market_slug ?? null,
+        marketTitle: marketTitle(match.item),
+        outcomePrices: (match.item.market?.outcomes ?? []).map((outcome) => ({
+          label: outcome.label,
+          price: outcome.price,
+          side: outcome.side,
+        })),
+        participants: [],
+        sport: match.item.market?.sport_type ?? null,
+      });
+      const marketSport = inferredSportsContext.sport;
       if (marketSport === "nba" || marketSport === "basketball") {
         if (!(await advancePhase("external_odds"))) {
           return;

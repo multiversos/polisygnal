@@ -21,7 +21,8 @@
     "test:external-odds": "node scripts/test-external-odds.mjs",
     "test:sports-context": "node scripts/test-sports-context.mjs",
     "test:odds-comparison-display": "node scripts/test-odds-comparison-display.mjs",
-    "test:analyzer-report-layout": "node scripts/test-analyzer-report-layout.mjs"
+    "test:analyzer-report-layout": "node scripts/test-analyzer-report-layout.mjs",
+    "test:analyze-external-odds": "node scripts/test-analyze-external-odds.mjs"
   },
   "dependencies": {
     "next": "15.5.15",

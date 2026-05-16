@@ -42,6 +42,21 @@ assert(
   `expected Thunder/Lakers participants, got ${JSON.stringify(thunderContext.participants)}`,
 );
 
+const inferredFromSlugContext = buildSportsContextParticipants({
+  marketSlug: "nba-sas-min-2026-05-15",
+  marketTitle: "Spurs vs. Timberwolves",
+  outcomePrices: [
+    { label: "Spurs", price: 0.675, side: "UNKNOWN" },
+    { label: "Timberwolves", price: 0.325, side: "UNKNOWN" },
+  ],
+});
+assert(inferredFromSlugContext.sport === "nba", `expected inferred sport 'nba', got ${inferredFromSlugContext.sport}`);
+assert(inferredFromSlugContext.league === "NBA", `expected inferred league 'NBA', got ${inferredFromSlugContext.league}`);
+assert(
+  JSON.stringify(inferredFromSlugContext.participants) === JSON.stringify(["Spurs", "Timberwolves"]),
+  `expected inferred Spurs/Timberwolves participants, got ${JSON.stringify(inferredFromSlugContext.participants)}`,
+);
+
 console.log(
   JSON.stringify(
     {
