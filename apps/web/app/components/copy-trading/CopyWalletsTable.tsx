@@ -447,7 +447,7 @@ export function CopyWalletsTable({
                           </span>
                           {scanHealth ? (
                             <span className={`copy-badge ${scanHealthBadgeTone(scanHealth.status)}`}>
-                              {scanHealthLabel(scanHealth.status)}
+                              {scanHealthLabel(scanHealth.status, row.wallet.enabled)}
                             </span>
                           ) : null}
                         </div>
@@ -468,7 +468,7 @@ export function CopyWalletsTable({
                           </div>
                           <div className="copy-wallet-row-meta-item">
                             <strong>Escaneo</strong>
-                            {scanHealth ? scanHealthLabel(scanHealth.status) : "Sin datos"}
+                            {scanHealth ? scanHealthLabel(scanHealth.status, row.wallet.enabled) : row.wallet.enabled ? "Sin datos" : "Pausada"}
                           </div>
                         </div>
                       </article>
@@ -661,7 +661,7 @@ function WalletDetailPanel({
               </span>
               {scanHealth ? (
                 <span className={`copy-badge ${scanHealthBadgeTone(scanHealth.status)}`}>
-                  {scanHealthLabel(scanHealth.status)}
+                  {scanHealthLabel(scanHealth.status, row.wallet.enabled)}
                 </span>
               ) : null}
             </div>
@@ -750,10 +750,14 @@ function WalletDetailPanel({
             />
             <StatPair label="Ventana" value={formatCopyWindow(row.wallet.copy_window_seconds ?? row.wallet.max_delay_seconds)} />
             <StatPair label="Estado" value={row.wallet.enabled ? "Activa" : "Pausada"} />
-            <StatPair label="Salud de escaneo" value={scanHealth ? scanHealthLabel(scanHealth.status) : "Sin datos"} />
+            <StatPair
+              label="Salud de escaneo"
+              value={scanHealth ? scanHealthLabel(scanHealth.status, row.wallet.enabled) : row.wallet.enabled ? "Sin datos" : "Pausada"}
+            />
             <StatPair label="Ultima duracion" value={formatDurationShort(scanHealth?.duration_ms ?? null)} />
             <StatPair label="Prioridad" value={formatPriorityLabel(scanHealth?.priority ?? null)} />
           </div>
+          {scanHealth?.reason ? <p className="copy-field-helper">Ultimo estado: {scanHealth.reason}</p> : null}
           {scanHealth?.next_scan_hint ? <p className="copy-field-helper">{scanHealth.next_scan_hint}</p> : null}
           {scanHealth?.error_message ? (
             <p className="copy-field-helper">Ultimo aviso seguro: {scanHealth.error_message}</p>
@@ -1183,14 +1187,26 @@ function getWalletScanMessage(summary: CopyTradingTickSummary): string {
   return `Escaneo completado. Se detectaron ${summary.new_trades} trades nuevos para esta wallet.`;
 }
 
-function scanHealthLabel(status: CopyTradingWatcherWalletScanResult["status"]): string {
+function scanHealthLabel(
+  status: CopyTradingWatcherWalletScanResult["status"],
+  walletEnabled = true,
+): string {
+  if (!walletEnabled) {
+    return "Pausada";
+  }
   switch (status) {
+    case "scanned_ok":
+      return "Saludable";
     case "slow":
       return "Lenta";
     case "timeout":
       return "Timeout reciente";
-    case "skipped":
-      return "Pendiente";
+    case "skipped_budget":
+      return "Pendiente por carga";
+    case "skipped_priority":
+      return "Pendiente proximo ciclo";
+    case "skipped_paused":
+      return "Pausada";
     case "error":
       return "Con aviso";
     default:
@@ -1200,12 +1216,16 @@ function scanHealthLabel(status: CopyTradingWatcherWalletScanResult["status"]): 
 
 function scanHealthBadgeTone(status: CopyTradingWatcherWalletScanResult["status"]): "success" | "warning" | "locked" | "subtle" {
   switch (status) {
+    case "scanned_ok":
+      return "success";
     case "slow":
       return "warning";
     case "timeout":
     case "error":
       return "locked";
-    case "skipped":
+    case "skipped_budget":
+    case "skipped_priority":
+    case "skipped_paused":
       return "subtle";
     default:
       return "success";

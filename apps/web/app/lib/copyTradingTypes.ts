@@ -16,7 +16,14 @@ export type CopyOrderStatus =
   | "partial_failed"
   | "failed";
 export type CopyEventLevel = "info" | "warning" | "error";
-export type CopyWatcherWalletScanStatus = "ok" | "slow" | "timeout" | "error" | "skipped";
+export type CopyWatcherWalletScanStatus =
+  | "scanned_ok"
+  | "slow"
+  | "timeout"
+  | "skipped_budget"
+  | "skipped_priority"
+  | "skipped_paused"
+  | "error";
 export type CopyWatcherWalletPriority = "high" | "normal" | "low";
 
 export type CopyWallet = {
@@ -173,6 +180,7 @@ export type CopyTradingStatus = {
 
 export type CopyTradingTickSummary = {
   wallets_scanned: number;
+  scanned_wallet_count: number;
   trades_detected: number;
   new_trades: number;
   orders_simulated: number;
@@ -189,6 +197,12 @@ export type CopyTradingTickSummary = {
   cycle_budget_exceeded: boolean;
   skipped_wallets_due_to_budget: number;
   pending_wallets: number;
+  slow_wallet_count: number;
+  timeout_count: number;
+  errored_wallet_count: number;
+  skipped_due_to_budget_count: number;
+  skipped_due_to_priority_count: number;
+  pending_wallet_count: number;
 };
 
 export type CopyTradingWatcherWalletScanResult = {
@@ -196,6 +210,7 @@ export type CopyTradingWatcherWalletScanResult = {
   alias: string | null;
   wallet_address_short: string;
   status: CopyWatcherWalletScanStatus;
+  reason: string | null;
   duration_ms: number | null;
   trades_detected: number;
   new_trades: number;
@@ -207,6 +222,10 @@ export type CopyTradingWatcherWalletScanResult = {
   error_message: string | null;
   priority: CopyWatcherWalletPriority;
   next_scan_hint: string | null;
+  skipped_reason: string | null;
+  last_scanned_at: string | null;
+  consecutive_timeouts: number;
+  consecutive_slow_scans: number;
 };
 
 export type CopyTradingWatcherStatus = {
@@ -223,8 +242,13 @@ export type CopyTradingWatcherStatus = {
   next_run_at: string | null;
   last_result: CopyTradingTickSummary | null;
   error_count: number;
+  scanned_wallet_count: number;
   slow_wallet_count: number;
   timeout_count: number;
+  errored_wallet_count: number;
+  skipped_due_to_budget_count: number;
+  skipped_due_to_priority_count: number;
+  pending_wallet_count: number;
   is_over_interval: boolean;
   behind_by_seconds: number;
   last_error: string | null;

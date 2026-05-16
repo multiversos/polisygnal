@@ -67,11 +67,15 @@ class CopyTradingWatcherRunResult:
 @dataclass(slots=True)
 class WalletWatchHealth:
     consecutive_timeouts: int = 0
+    consecutive_slow_scans: int = 0
     last_duration_ms: int | None = None
     last_error: str | None = None
     last_priority: str = "normal"
     last_scanned_at: datetime | None = None
-    last_status: str = "ok"
+    last_status: str = "scanned_ok"
+    last_reason: str | None = None
+    pending_budget_streak: int = 0
+    pending_priority_streak: int = 0
 
 
 class CopyTradingDemoWatcher:
@@ -108,8 +112,13 @@ class CopyTradingDemoWatcher:
         self._next_run_at: datetime | None = None
         self._last_result: CopyTradingWatcherLastResult | None = None
         self._error_count = 0
+        self._scanned_wallet_count = 0
         self._slow_wallet_count = 0
         self._timeout_count = 0
+        self._errored_wallet_count = 0
+        self._skipped_due_to_budget_count = 0
+        self._skipped_due_to_priority_count = 0
+        self._pending_wallet_count = 0
         self._last_error: str | None = None
         self._wallet_health: dict[str, WalletWatchHealth] = {}
 
@@ -136,8 +145,13 @@ class CopyTradingDemoWatcher:
                 next_run_at=self._next_run_at if self._enabled else None,
                 last_result=self._last_result,
                 error_count=self._error_count,
+                scanned_wallet_count=self._scanned_wallet_count,
                 slow_wallet_count=self._slow_wallet_count,
                 timeout_count=self._timeout_count,
+                errored_wallet_count=self._errored_wallet_count,
+                skipped_due_to_budget_count=self._skipped_due_to_budget_count,
+                skipped_due_to_priority_count=self._skipped_due_to_priority_count,
+                pending_wallet_count=self._pending_wallet_count,
                 is_over_interval=bool(last_duration_ms is not None and last_duration_ms > self._interval_seconds * 1000),
                 behind_by_seconds=behind_by_seconds,
                 last_error=self._last_error,
@@ -199,7 +213,7 @@ class CopyTradingDemoWatcher:
         session = db or self._session_factory()
         client = data_client or self._data_client_factory()
         try:
-            tick_result, slow_wallet_count, timed_out = self._run_cycle(
+            tick_result = self._run_cycle(
                 session,
                 data_client=client,
                 started_at=current_time,
@@ -216,9 +230,13 @@ class CopyTradingDemoWatcher:
                 self._total_run_duration_ms += duration_ms
                 self._run_count += 1
                 self._last_result = result
-                self._slow_wallet_count = slow_wallet_count
-                if timed_out:
-                    self._timeout_count += 1
+                self._scanned_wallet_count = result.scanned_wallet_count
+                self._slow_wallet_count = result.slow_wallet_count
+                self._timeout_count = result.timeout_count
+                self._errored_wallet_count = result.errored_wallet_count
+                self._skipped_due_to_budget_count = result.skipped_due_to_budget_count
+                self._skipped_due_to_priority_count = result.skipped_due_to_priority_count
+                self._pending_wallet_count = result.pending_wallet_count
                 self._next_run_at = (
                     max(finished_at, current_time + timedelta(seconds=self._interval_seconds))
                     if self._enabled
@@ -263,8 +281,13 @@ class CopyTradingDemoWatcher:
             self._next_run_at = None
             self._last_result = None
             self._error_count = 0
+            self._scanned_wallet_count = 0
             self._slow_wallet_count = 0
             self._timeout_count = 0
+            self._errored_wallet_count = 0
+            self._skipped_due_to_budget_count = 0
+            self._skipped_due_to_priority_count = 0
+            self._pending_wallet_count = 0
             self._last_error = None
             self._wallet_health = {}
 
@@ -294,7 +317,7 @@ class CopyTradingDemoWatcher:
         *,
         data_client: PolymarketDataClient,
         started_at: datetime,
-    ) -> tuple[CopyTradingTickResponse, int, bool]:
+    ) -> CopyTradingTickResponse:
         wallets = list(
             db.scalars(
                 select(CopyWallet)
@@ -306,51 +329,75 @@ class CopyTradingDemoWatcher:
         wallets = self._prioritize_wallets(wallets, reference_time=started_at)
         response = CopyTradingTickResponse()
         cycle_started_perf = perf_counter()
-        slow_wallet_count = 0
-        timed_out = False
+        focus_target = max(4, min(6, len(wallets)))
 
         for index, wallet in enumerate(wallets):
+            priority = self._priority_for_wallet(wallet, reference_time=started_at)
+            if self._should_defer_for_priority(
+                wallet,
+                priority=priority,
+                scanned_wallet_count=response.scanned_wallet_count,
+                focus_target=focus_target,
+            ):
+                self._append_skipped_wallet_result(
+                    response,
+                    wallet,
+                    status="skipped_priority",
+                    reason="Pendiente: baja prioridad en este ciclo.",
+                    skipped_reason="priority",
+                    priority=priority,
+                    reference_time=started_at,
+                )
+                continue
+
             elapsed_ms = max(0, int((perf_counter() - cycle_started_perf) * 1000))
             if elapsed_ms >= self._cycle_timeout_seconds * 1000:
-                timed_out = True
                 remaining_wallets = wallets[index:]
                 response.cycle_budget_exceeded = True
-                response.skipped_wallets_due_to_budget += len(remaining_wallets)
-                response.pending_wallets = len(remaining_wallets)
                 response.errors.append("Watcher demo recorto el ciclo para no acumular retraso.")
                 for pending_wallet in remaining_wallets:
-                    pending_priority = self._priority_for_wallet(pending_wallet, reference_time=started_at)
-                    response.wallet_scan_results.append(
-                        CopyTradingWatcherWalletScanResult(
-                            wallet_id=pending_wallet.id,
-                            alias=pending_wallet.label,
-                            wallet_address_short=_short_wallet_address(pending_wallet.proxy_wallet),
-                            status="skipped",
-                            priority=pending_priority,
-                            next_scan_hint="Pendiente para proximo ciclo.",
-                        )
-                    )
-                    self._update_wallet_health(
+                    pending_priority = self._priority_for_wallet(
                         pending_wallet,
-                        status="skipped",
-                        duration_ms=None,
-                        error_message=None,
+                        reference_time=started_at,
+                    )
+                    skipped_status = (
+                        "skipped_priority"
+                        if self._should_defer_for_priority(
+                            pending_wallet,
+                            priority=pending_priority,
+                            scanned_wallet_count=response.scanned_wallet_count,
+                            focus_target=focus_target,
+                        )
+                        else "skipped_budget"
+                    )
+                    skipped_reason = "priority" if skipped_status == "skipped_priority" else "budget"
+                    reason = (
+                        "Pendiente: baja prioridad en este ciclo."
+                        if skipped_status == "skipped_priority"
+                        else "Pendiente: ciclo recortado por carga."
+                    )
+                    self._append_skipped_wallet_result(
+                        response,
+                        pending_wallet,
+                        status=skipped_status,
+                        reason=reason,
+                        skipped_reason=skipped_reason,
                         priority=pending_priority,
-                        scanned_at=started_at,
+                        reference_time=started_at,
                     )
                 self._record_cycle_truncated(
                     db,
                     duration_ms=elapsed_ms,
                     remaining_wallets=len(remaining_wallets),
-                    slow_wallet_count=slow_wallet_count,
+                    slow_wallet_count=response.slow_wallet_count,
                 )
                 break
 
             wallet_started_perf = perf_counter()
-            priority = self._priority_for_wallet(wallet, reference_time=started_at)
             partial: CopyTradingTickResponse | None = None
-            wallet_status = "ok"
+            wallet_status = "scanned_ok"
             error_message: str | None = None
+            reason = "Escaneada correctamente."
             try:
                 partial = self._tick_runner(
                     db,
@@ -364,12 +411,19 @@ class CopyTradingDemoWatcher:
                 if any("timeout" in error.lower() for error in partial.errors):
                     wallet_status = "timeout"
                     error_message = "Timeout al leer actividad publica."
+                    reason = "Timeout: supero el tiempo maximo permitido."
                 elif partial.errors:
                     wallet_status = "error"
                     error_message = partial.errors[0]
+                    reason = "Error: no se pudo leer actividad publica."
             except Exception as exc:
                 wallet_status = "timeout" if _is_timeout_error(exc) else "error"
                 error_message = _safe_error_message(str(exc))
+                reason = (
+                    "Timeout: supero el tiempo maximo permitido."
+                    if wallet_status == "timeout"
+                    else "Error: no se pudo leer actividad publica."
+                )
                 partial = CopyTradingTickResponse(wallets_scanned=1)
                 if wallet_status == "timeout":
                     response.errors.append("Una wallet supero el tiempo maximo y se salto para seguir con el ciclo.")
@@ -379,18 +433,23 @@ class CopyTradingDemoWatcher:
                 0,
                 int((perf_counter() - wallet_started_perf) * 1000),
             )
-            if wallet_status == "ok" and wallet_duration_ms > self._interval_seconds * 1000:
+            if wallet_status == "scanned_ok" and wallet_duration_ms > self._interval_seconds * 1000:
                 wallet_status = "slow"
-            if wallet_status in {"slow", "timeout"}:
-                slow_wallet_count += 1
+                reason = f"Lenta: tardo {wallet_duration_ms / 1000:.1f}s."
             _merge_tick_results(response, partial)
-            if wallet_status == "timeout":
-                self._timeout_count += 1
+            response.scanned_wallet_count += 1
+            if wallet_status == "slow":
+                response.slow_wallet_count += 1
+            elif wallet_status == "timeout":
+                response.timeout_count += 1
+            elif wallet_status == "error":
+                response.errored_wallet_count += 1
             wallet_result = CopyTradingWatcherWalletScanResult(
                 wallet_id=wallet.id,
                 alias=wallet.label,
                 wallet_address_short=_short_wallet_address(wallet.proxy_wallet),
                 status=wallet_status,
+                reason=reason,
                 duration_ms=wallet_duration_ms,
                 trades_detected=partial.trades_detected,
                 new_trades=partial.new_trades,
@@ -407,6 +466,10 @@ class CopyTradingDemoWatcher:
                     trades_detected=partial.trades_detected,
                     live_limit=self._live_limit,
                 ),
+                skipped_reason=None,
+                last_scanned_at=started_at,
+                consecutive_timeouts=self._peek_consecutive_timeouts(wallet.id, wallet_status),
+                consecutive_slow_scans=self._peek_consecutive_slow_scans(wallet.id, wallet_status),
             )
             response.wallet_scan_results.append(wallet_result)
             self._update_wallet_health(
@@ -416,20 +479,17 @@ class CopyTradingDemoWatcher:
                 error_message=error_message,
                 priority=priority,
                 scanned_at=started_at,
+                reason=reason,
             )
 
-        return response, slow_wallet_count, timed_out
+        response.pending_wallets = response.pending_wallet_count
+        response.skipped_wallets_due_to_budget = response.skipped_due_to_budget_count
+        return response
 
     def _prioritize_wallets(self, wallets: list[CopyWallet], *, reference_time: datetime) -> list[CopyWallet]:
-        priority_order = {"high": 0, "normal": 1, "low": 2}
         return sorted(
             wallets,
-            key=lambda wallet: (
-                priority_order[self._priority_for_wallet(wallet, reference_time=reference_time)],
-                -(_utc_or_assume(wallet.last_trade_at).timestamp() if wallet.last_trade_at is not None else 0.0),
-                -(_utc_or_assume(wallet.last_scan_at).timestamp() if wallet.last_scan_at is not None else 0.0),
-                -(_utc_or_assume(wallet.updated_at).timestamp() if wallet.updated_at is not None else 0.0),
-            ),
+            key=lambda wallet: self._wallet_sort_key(wallet, reference_time=reference_time),
         )
 
     def _priority_for_wallet(self, wallet: CopyWallet, *, reference_time: datetime) -> str:
@@ -437,14 +497,104 @@ class CopyTradingDemoWatcher:
         if health is not None and health.consecutive_timeouts >= 2:
             return "low"
         last_trade_at = _utc_or_assume(wallet.last_trade_at) if wallet.last_trade_at is not None else None
-        last_scan_at = _utc_or_assume(wallet.last_scan_at) if wallet.last_scan_at is not None else None
         if last_trade_at is not None and last_trade_at >= reference_time - timedelta(minutes=30):
-            return "high"
-        if last_scan_at is not None and last_scan_at >= reference_time - timedelta(minutes=10):
             return "high"
         if health is not None and health.last_status in {"timeout", "error"}:
             return "low"
         return "normal"
+
+    def _wallet_sort_key(self, wallet: CopyWallet, *, reference_time: datetime) -> tuple[float, ...]:
+        priority = self._priority_for_wallet(wallet, reference_time=reference_time)
+        health = self._wallet_health.get(wallet.id)
+        bucket = self._scheduling_bucket(priority=priority, health=health)
+        pending_boost = (health.pending_budget_streak + health.pending_priority_streak) if health else 0
+        last_scan_reference = health.last_scanned_at if health and health.last_scanned_at is not None else wallet.last_scan_at
+        last_scan_rank = _utc_or_assume(last_scan_reference).timestamp() if last_scan_reference is not None else -1.0
+        last_trade_rank = (
+            -_utc_or_assume(wallet.last_trade_at).timestamp() if wallet.last_trade_at is not None else 0.0
+        )
+        updated_rank = -_utc_or_assume(wallet.updated_at).timestamp() if wallet.updated_at is not None else 0.0
+        return (
+            float(bucket),
+            float(-pending_boost),
+            last_scan_rank,
+            last_trade_rank,
+            updated_rank,
+        )
+
+    def _scheduling_bucket(self, *, priority: str, health: WalletWatchHealth | None) -> int:
+        if priority == "high":
+            return 0
+        if (
+            health is not None
+            and health.last_status in {"skipped_budget", "skipped_priority"}
+            and health.consecutive_timeouts < 2
+        ):
+            return 1
+        if priority == "normal":
+            return 2
+        return 3
+
+    def _should_defer_for_priority(
+        self,
+        wallet: CopyWallet,
+        *,
+        priority: str,
+        scanned_wallet_count: int,
+        focus_target: int,
+    ) -> bool:
+        if priority != "low":
+            return False
+        health = self._wallet_health.get(wallet.id)
+        if health is not None and health.last_status in {"skipped_budget", "skipped_priority"}:
+            return False
+        return scanned_wallet_count >= focus_target
+
+    def _append_skipped_wallet_result(
+        self,
+        response: CopyTradingTickResponse,
+        wallet: CopyWallet,
+        *,
+        status: str,
+        reason: str,
+        skipped_reason: str,
+        priority: str,
+        reference_time: datetime,
+    ) -> None:
+        response.wallet_scan_results.append(
+            CopyTradingWatcherWalletScanResult(
+                wallet_id=wallet.id,
+                alias=wallet.label,
+                wallet_address_short=_short_wallet_address(wallet.proxy_wallet),
+                status=status,
+                reason=reason,
+                priority=priority,
+                timeout=False,
+                next_scan_hint=(
+                    "Pendiente por carga. Volvera en el proximo ciclo."
+                    if status == "skipped_budget"
+                    else "Pendiente por prioridad. Volvera en el proximo ciclo."
+                ),
+                skipped_reason=skipped_reason,
+                last_scanned_at=self._wallet_last_scanned_at(wallet),
+                consecutive_timeouts=self._peek_consecutive_timeouts(wallet.id, status),
+                consecutive_slow_scans=self._peek_consecutive_slow_scans(wallet.id, status),
+            )
+        )
+        response.pending_wallet_count += 1
+        if status == "skipped_budget":
+            response.skipped_due_to_budget_count += 1
+        elif status == "skipped_priority":
+            response.skipped_due_to_priority_count += 1
+        self._update_wallet_health(
+            wallet,
+            status=status,
+            duration_ms=None,
+            error_message=None,
+            priority=priority,
+            scanned_at=reference_time,
+            reason=reason,
+        )
 
     def _record_cycle_truncated(
         self,
@@ -476,18 +626,63 @@ class CopyTradingDemoWatcher:
         error_message: str | None,
         priority: str,
         scanned_at: datetime,
+        reason: str | None,
     ) -> None:
         health = self._wallet_health.get(wallet.id) or WalletWatchHealth()
         health.last_status = status
         health.last_duration_ms = duration_ms
         health.last_error = error_message
         health.last_priority = priority
-        health.last_scanned_at = scanned_at
+        health.last_reason = reason
+        if status not in {"skipped_budget", "skipped_priority"}:
+            health.last_scanned_at = scanned_at
         if status == "timeout":
             health.consecutive_timeouts += 1
-        elif status in {"ok", "slow"}:
+            health.pending_budget_streak = 0
+            health.pending_priority_streak = 0
+        elif status in {"scanned_ok", "slow"}:
             health.consecutive_timeouts = 0
+            health.pending_budget_streak = 0
+            health.pending_priority_streak = 0
+        if status == "slow":
+            health.consecutive_slow_scans += 1
+        elif status == "scanned_ok":
+            health.consecutive_slow_scans = 0
+        if status == "skipped_budget":
+            health.pending_budget_streak += 1
+        elif status != "timeout":
+            health.pending_budget_streak = 0
+        if status == "skipped_priority":
+            health.pending_priority_streak += 1
+        elif status not in {"timeout", "skipped_budget"}:
+            health.pending_priority_streak = 0
         self._wallet_health[wallet.id] = health
+
+    def _wallet_last_scanned_at(self, wallet: CopyWallet) -> datetime | None:
+        health = self._wallet_health.get(wallet.id)
+        if health is not None and health.last_scanned_at is not None:
+            return health.last_scanned_at
+        if wallet.last_scan_at is None:
+            return None
+        return _utc_or_assume(wallet.last_scan_at)
+
+    def _peek_consecutive_timeouts(self, wallet_id: str, next_status: str) -> int:
+        health = self._wallet_health.get(wallet_id)
+        current = health.consecutive_timeouts if health is not None else 0
+        if next_status == "timeout":
+            return current + 1
+        if next_status in {"scanned_ok", "slow"}:
+            return 0
+        return current
+
+    def _peek_consecutive_slow_scans(self, wallet_id: str, next_status: str) -> int:
+        health = self._wallet_health.get(wallet_id)
+        current = health.consecutive_slow_scans if health is not None else 0
+        if next_status == "slow":
+            return current + 1
+        if next_status == "scanned_ok":
+            return 0
+        return current
 
     def _record_failure(
         self,
@@ -523,6 +718,7 @@ demo_watcher = CopyTradingDemoWatcher()
 
 def _merge_tick_results(target: CopyTradingTickResponse, partial: CopyTradingTickResponse) -> None:
     target.wallets_scanned += partial.wallets_scanned
+    target.scanned_wallet_count += partial.scanned_wallet_count
     target.trades_detected += partial.trades_detected
     target.new_trades += partial.new_trades
     target.orders_simulated += partial.orders_simulated
@@ -537,6 +733,12 @@ def _merge_tick_results(target: CopyTradingTickResponse, partial: CopyTradingTic
     target.cycle_budget_exceeded = target.cycle_budget_exceeded or partial.cycle_budget_exceeded
     target.skipped_wallets_due_to_budget += partial.skipped_wallets_due_to_budget
     target.pending_wallets += partial.pending_wallets
+    target.slow_wallet_count += partial.slow_wallet_count
+    target.timeout_count += partial.timeout_count
+    target.errored_wallet_count += partial.errored_wallet_count
+    target.skipped_due_to_budget_count += partial.skipped_due_to_budget_count
+    target.skipped_due_to_priority_count += partial.skipped_due_to_priority_count
+    target.pending_wallet_count += partial.pending_wallet_count
     for reason, count in partial.skipped_reasons.items():
         target.skipped_reasons[reason] = target.skipped_reasons.get(reason, 0) + count
     target.errors.extend(partial.errors)
@@ -571,8 +773,10 @@ def _next_scan_hint(
         return "Timeout reciente. Se reintentara en el proximo ciclo."
     if status == "slow":
         return "Wallet lenta. Se priorizaron wallets mas activas."
-    if status == "skipped":
-        return "Pendiente para proximo ciclo."
+    if status == "skipped_budget":
+        return "Pendiente por carga. Volvera en el proximo ciclo."
+    if status == "skipped_priority":
+        return "Pendiente por prioridad. Volvera en el proximo ciclo."
     if trades_detected >= live_limit:
         return "Se priorizaron trades recientes para mantener el escaneo live."
     return None
