@@ -1156,6 +1156,17 @@ async function main() {
     "Ultima actualizacion",
     "Auto-refresh",
     "Refrescar ahora",
+    "Ventana de copia",
+    "10 segundos",
+    "30 segundos",
+    "60 segundos",
+    "5 minutos",
+    "Watcher demo",
+    "5 segundos",
+    "Iniciar watcher demo",
+    "Pausar watcher",
+    "Ejecutar una vez",
+    "No ejecuta operaciones reales",
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
   }

@@ -13,6 +13,7 @@ from app.schemas.copy_trading import (
     CopyTradingStatusResponse,
     CopyTradingTickResponse,
     CopyTradingTradesResponse,
+    CopyTradingWatcherStatusResponse,
     CopyWalletCreate,
     CopyWalletRead,
     CopyWalletUpdate,
@@ -35,6 +36,7 @@ from app.services.copy_trading_service import (
     list_copy_wallets,
     update_copy_wallet,
 )
+from app.services.copy_trading_watcher import demo_watcher
 
 router = APIRouter(prefix="/copy-trading", tags=["copy-trading"])
 
@@ -167,6 +169,31 @@ def post_copy_trading_demo_tick(
     response = run_demo_tick(db, data_client=data_client, limit=limit)
     db.commit()
     return response
+
+
+@router.get("/watcher/status", response_model=CopyTradingWatcherStatusResponse)
+def get_copy_trading_watcher_status() -> CopyTradingWatcherStatusResponse:
+    return demo_watcher.get_status()
+
+
+@router.post("/watcher/start", response_model=CopyTradingWatcherStatusResponse)
+def post_copy_trading_watcher_start() -> CopyTradingWatcherStatusResponse:
+    return demo_watcher.start()
+
+
+@router.post("/watcher/stop", response_model=CopyTradingWatcherStatusResponse)
+def post_copy_trading_watcher_stop() -> CopyTradingWatcherStatusResponse:
+    return demo_watcher.stop()
+
+
+@router.post("/watcher/run-once", response_model=CopyTradingWatcherStatusResponse)
+def post_copy_trading_watcher_run_once(
+    db: Session = Depends(get_db),
+    data_client: PolymarketDataClient = Depends(get_polymarket_data_client),
+) -> CopyTradingWatcherStatusResponse:
+    result = demo_watcher.run_once(db=db, data_client=data_client)
+    db.commit()
+    return result.status
 
 
 def _bad_request(detail: str) -> HTTPException:

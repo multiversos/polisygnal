@@ -193,6 +193,8 @@ class CopyTradingTickResponse(BaseModel):
     trades_detected: int = 0
     new_trades: int = 0
     orders_simulated: int = 0
+    buy_simulated: int = 0
+    sell_simulated: int = 0
     orders_skipped: int = 0
     orders_blocked: int = 0
     live_candidates: int = 0
@@ -200,6 +202,34 @@ class CopyTradingTickResponse(BaseModel):
     historical_trades: int = 0
     skipped_reasons: dict[str, int] = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)
+
+
+class CopyTradingWatcherLastResult(BaseModel):
+    wallets_scanned: int = 0
+    trades_detected: int = 0
+    new_trades: int = 0
+    orders_simulated: int = 0
+    buy_simulated: int = 0
+    sell_simulated: int = 0
+    orders_skipped: int = 0
+    orders_blocked: int = 0
+    live_candidates: int = 0
+    recent_outside_window: int = 0
+    historical_trades: int = 0
+    skipped_reasons: dict[str, int] = Field(default_factory=dict)
+    errors: list[str] = Field(default_factory=list)
+
+
+class CopyTradingWatcherStatusResponse(BaseModel):
+    enabled: bool
+    running: bool
+    interval_seconds: int
+    last_run_at: datetime | None = None
+    next_run_at: datetime | None = None
+    last_result: CopyTradingWatcherLastResult | None = None
+    error_count: int = 0
+    last_error: str | None = None
+    message: str | None = None
 
 
 class CopyTradingListResponse(BaseModel):

@@ -3,6 +3,7 @@ import type {
   CopyTradingDashboardData,
   CopyTradingStatus,
   CopyTradingTickSummary,
+  CopyTradingWatcherStatus,
   CopyWallet,
   CopyWalletCreateInput,
   CopyBotEvent,
@@ -17,8 +18,9 @@ type OrdersResponse = { orders: CopyOrder[] };
 type EventsResponse = { events: CopyBotEvent[] };
 
 export async function getCopyTradingDashboardData(): Promise<CopyTradingDashboardData> {
-  const [status, wallets, trades, orders, events] = await Promise.all([
+  const [status, watcher, wallets, trades, orders, events] = await Promise.all([
     fetchApiJson<CopyTradingStatus>("/copy-trading/status"),
+    fetchApiJson<CopyTradingWatcherStatus>("/copy-trading/watcher/status"),
     fetchApiJson<WalletsResponse>("/copy-trading/wallets"),
     fetchApiJson<TradesResponse>("/copy-trading/trades?limit=20"),
     fetchApiJson<OrdersResponse>("/copy-trading/orders?limit=20"),
@@ -26,6 +28,7 @@ export async function getCopyTradingDashboardData(): Promise<CopyTradingDashboar
   ]);
   return {
     status,
+    watcher,
     wallets: wallets.wallets,
     trades: trades.trades,
     orders: orders.orders,
@@ -65,6 +68,24 @@ export async function scanCopyWallet(walletId: string): Promise<CopyTradingTickS
 
 export async function runCopyTradingDemoTick(): Promise<CopyTradingTickSummary> {
   return fetchApiJson<CopyTradingTickSummary>("/copy-trading/demo/tick", {
+    method: "POST",
+  });
+}
+
+export async function startCopyTradingWatcher(): Promise<CopyTradingWatcherStatus> {
+  return fetchApiJson<CopyTradingWatcherStatus>("/copy-trading/watcher/start", {
+    method: "POST",
+  });
+}
+
+export async function stopCopyTradingWatcher(): Promise<CopyTradingWatcherStatus> {
+  return fetchApiJson<CopyTradingWatcherStatus>("/copy-trading/watcher/stop", {
+    method: "POST",
+  });
+}
+
+export async function runCopyTradingWatcherOnce(): Promise<CopyTradingWatcherStatus> {
+  return fetchApiJson<CopyTradingWatcherStatus>("/copy-trading/watcher/run-once", {
     method: "POST",
   });
 }
