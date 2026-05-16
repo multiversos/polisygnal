@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  getCopyTradingDashboardData,
+  getCopyTradingPrimaryData,
+  getCopyTradingSupplementalData,
   runCopyTradingDemoTick,
   runCopyTradingWatcherOnce,
   startCopyTradingWatcher,
@@ -64,6 +65,7 @@ export function CopyTradingDashboard() {
   const [tickSummary, setTickSummary] = useState<CopyTradingTickSummary | null>(null);
   const [runningTick, setRunningTick] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [supplementalLoading, setSupplementalLoading] = useState(true);
   const [watcherBusyAction, setWatcherBusyAction] = useState<"run-once" | "start" | "stop" | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [pageVisible, setPageVisible] = useState(true);
@@ -78,24 +80,56 @@ export function CopyTradingDashboard() {
     }
     isRefreshingRef.current = true;
     setRefreshing(true);
+    setSupplementalLoading(true);
     if (!options?.isBackground) {
       setError(null);
     }
+    let primaryData: CopyTradingDashboardData | null = null;
     try {
-      const nextData = await getCopyTradingDashboardData();
-      setData(nextData);
+      const loadedPrimaryData = await getCopyTradingPrimaryData();
+      primaryData = loadedPrimaryData;
+      setData((current) => ({
+        ...loadedPrimaryData,
+        open_demo_positions: current?.open_demo_positions ?? loadedPrimaryData.open_demo_positions,
+        closed_demo_positions: current?.closed_demo_positions ?? loadedPrimaryData.closed_demo_positions,
+        demo_pnl_summary: current?.demo_pnl_summary ?? loadedPrimaryData.demo_pnl_summary,
+      }));
       setLastUpdatedAt(new Date());
       if (options?.isBackground) {
         setError(null);
       }
-      return true;
     } catch {
       setError("No pudimos actualizar Copy Trading ahora. Seguiremos intentando.");
       return false;
     } finally {
+      setLoading(false);
+    }
+
+    try {
+      const supplemental = await getCopyTradingSupplementalData();
+      if (Object.keys(supplemental).length > 0) {
+        setData((current) =>
+          current
+            ? { ...current, ...supplemental }
+            : primaryData
+              ? {
+                  ...primaryData,
+                  ...supplemental,
+                  open_demo_positions:
+                    supplemental.open_demo_positions ?? primaryData.open_demo_positions,
+                  closed_demo_positions:
+                    supplemental.closed_demo_positions ?? primaryData.closed_demo_positions,
+                  demo_pnl_summary:
+                    supplemental.demo_pnl_summary ?? primaryData.demo_pnl_summary,
+                }
+              : current,
+        );
+      }
+      return true;
+    } finally {
       isRefreshingRef.current = false;
       setRefreshing(false);
-      setLoading(false);
+      setSupplementalLoading(false);
     }
   }, []);
 
@@ -288,6 +322,7 @@ export function CopyTradingDashboard() {
               <span className={`copy-badge ${autoRefreshEnabled && pageVisible ? "success" : "locked"}`}>
                 Auto-refresh {autoRefreshStatus}
               </span>
+              {supplementalLoading && !loading ? <span className="copy-badge subtle">Metricas demo cargando...</span> : null}
             </div>
           </div>
           <div className="copy-action-row">
@@ -328,7 +363,7 @@ export function CopyTradingDashboard() {
         ) : null}
 
         <div className="copy-dashboard-grid two copy-summary-layout">
-          <CopyDemoPnlSummaryPanel summary={data?.demo_pnl_summary ?? null} />
+          <CopyDemoPnlSummaryPanel loading={supplementalLoading} summary={data?.demo_pnl_summary ?? null} />
           <CopyWatcherPanel
             busyAction={watcherBusyAction}
             onRunOnce={handleWatcherRunOnce}

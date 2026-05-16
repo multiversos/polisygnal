@@ -215,7 +215,7 @@ export type CopyTradingDashboardData = {
   events: CopyBotEvent[];
   open_demo_positions: CopyDemoPosition[];
   closed_demo_positions: CopyDemoPosition[];
-  demo_pnl_summary: CopyTradingDemoPnlSummary;
+  demo_pnl_summary: CopyTradingDemoPnlSummary | null;
 };
 
 export type CopyWalletCreateInput = {
