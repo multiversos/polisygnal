@@ -1,7 +1,7 @@
 "use client";
 
 import type { CopyTradingWatcherStatus } from "../../lib/copyTradingTypes";
-import { formatDateTime } from "../../lib/copyTrading";
+import { formatDateTime, formatDurationMs } from "../../lib/copyTrading";
 
 type CopyWatcherPanelProps = {
   busy: boolean;
@@ -12,10 +12,14 @@ type CopyWatcherPanelProps = {
 };
 
 export function CopyWatcherPanel({ busy, onRunOnce, onStart, onStop, watcher }: CopyWatcherPanelProps) {
-  const stateLabel = watcher.enabled ? (watcher.running ? "Escaneando" : "Activo") : "Pausado";
+  const stateLabel = watcher.enabled ? (watcher.running ? "Escaneando" : "Activo") : watcher.running ? "Pausando" : "Pausado";
   const autoCopyLabel = watcher.enabled ? "Auto-copy demo activo" : "Auto-copy demo pausado";
-  const nextRunLabel = watcher.enabled ? formatDateTime(watcher.next_run_at) : "Watcher pausado";
-  const stateSummary = watcher.last_result?.errors.length ? "Error parcial" : stateLabel;
+  const nextRunLabel = watcher.enabled ? formatDateTime(watcher.next_run_at) : watcher.running ? "Terminando ciclo actual" : "Watcher pausado";
+  const stateSummary = watcher.last_result?.errors.length
+    ? "Error parcial"
+    : watcher.running && watcher.is_over_interval
+      ? "Atrasado"
+      : stateLabel;
   const resultSummary = watcher.last_result
     ? `Ultimo resultado: wallets ${watcher.last_result.wallets_scanned} | nuevos ${watcher.last_result.new_trades} | compras demo ${watcher.last_result.buy_simulated ?? 0} | ventas demo ${watcher.last_result.sell_simulated ?? 0} | historicos ${watcher.last_result.historical_trades} | saltadas ${watcher.last_result.orders_skipped}`
     : "Ultimo resultado: sin ejecuciones todavia";
@@ -29,10 +33,18 @@ export function CopyWatcherPanel({ busy, onRunOnce, onStart, onStop, watcher }: 
       <p>Escanea wallets activas cada 5s y crea compras/ventas demo automaticamente. No ejecuta operaciones reales.</p>
       <div className="copy-wallet-details">
         <small>Intervalo: {watcher.interval_seconds} segundos</small>
+        <small>Inicio actual {formatDateTime(watcher.current_run_started_at)}</small>
+        <small>Ultimo inicio {formatDateTime(watcher.last_run_started_at)}</small>
         <small>Ultimo escaneo {formatDateTime(watcher.last_run_at)}</small>
+        <small>Ultimo fin {formatDateTime(watcher.last_run_finished_at)}</small>
+        <small>Ultima duracion {formatDurationMs(watcher.last_run_duration_ms)}</small>
+        <small>Promedio {formatDurationMs(watcher.average_run_duration_ms)}</small>
         <small>Proximo escaneo {nextRunLabel}</small>
         <small>Error count {watcher.error_count}</small>
+        <small>Wallets lentas {watcher.slow_wallet_count}</small>
+        <small>Timeouts {watcher.timeout_count}</small>
         <small>Estado: {stateSummary}</small>
+        {watcher.is_over_interval ? <small>Atraso sobre el intervalo: {watcher.behind_by_seconds}s</small> : null}
         <small>Con el watcher activo, el escaneo ocurre automaticamente cada 5 segundos.</small>
         <small>{resultSummary}</small>
         {watcher.last_error ? <small>Ultimo error: {watcher.last_error}</small> : null}

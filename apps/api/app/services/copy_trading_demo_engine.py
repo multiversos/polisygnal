@@ -52,10 +52,19 @@ def scan_copy_wallet(
     data_client: PublicWalletTradeReader,
     limit: int = 50,
     now: datetime | None = None,
+    emit_individual_skip_events: bool = True,
 ) -> CopyTradingTickResponse:
     wallet = get_copy_wallet(db, wallet_id)
     response = CopyTradingTickResponse(wallets_scanned=1)
-    _scan_wallet(db, wallet=wallet, data_client=data_client, limit=limit, now=now, response=response)
+    _scan_wallet(
+        db,
+        wallet=wallet,
+        data_client=data_client,
+        limit=limit,
+        now=now,
+        response=response,
+        emit_individual_skip_events=emit_individual_skip_events,
+    )
     return response
 
 
@@ -65,6 +74,7 @@ def run_demo_tick(
     data_client: PolymarketDataClient,
     limit: int = 50,
     now: datetime | None = None,
+    emit_individual_skip_events: bool = True,
 ) -> CopyTradingTickResponse:
     wallets = list(
         db.scalars(
@@ -77,7 +87,15 @@ def run_demo_tick(
     response = CopyTradingTickResponse()
     for wallet in wallets:
         response.wallets_scanned += 1
-        _scan_wallet(db, wallet=wallet, data_client=data_client, limit=limit, now=now, response=response)
+        _scan_wallet(
+            db,
+            wallet=wallet,
+            data_client=data_client,
+            limit=limit,
+            now=now,
+            response=response,
+            emit_individual_skip_events=emit_individual_skip_events,
+        )
     return response
 
 
@@ -131,8 +149,10 @@ def _scan_wallet(
     limit: int,
     now: datetime | None,
     response: CopyTradingTickResponse,
+    emit_individual_skip_events: bool,
 ) -> None:
     current_time = now or datetime.now(tz=UTC)
+    grouped_skips: dict[tuple[str, str], int] = {}
     try:
         raw_trades = data_client.get_trades_for_user(wallet.proxy_wallet, limit=limit, offset=0)
     except PolymarketDataClientError as exc:
@@ -236,17 +256,24 @@ def _scan_wallet(
         else:
             response.orders_skipped += 1
             _record_skipped_reason(response, order.reason)
-            add_copy_event(
-                db,
-                wallet_id=wallet.id,
-                level="warning",
-                event_type="demo_order_skipped",
-                message="Trade detectado pero no copiado por reglas de seguridad.",
-                metadata={
-                    "reason": order.reason or "unknown",
-                    "freshness_status": freshness.status,
-                },
-            )
+            if emit_individual_skip_events:
+                add_copy_event(
+                    db,
+                    wallet_id=wallet.id,
+                    level="warning",
+                    event_type="demo_order_skipped",
+                    message="Trade detectado pero no copiado por reglas de seguridad.",
+                    metadata={
+                        "reason": order.reason or "unknown",
+                        "freshness_status": freshness.status,
+                    },
+                )
+            else:
+                grouped_skips[(order.reason or "unknown", freshness.status)] = (
+                    grouped_skips.get((order.reason or "unknown", freshness.status), 0) + 1
+                )
+    if not emit_individual_skip_events:
+        _emit_grouped_skip_events(db, wallet=wallet, grouped_skips=grouped_skips)
     touch_wallet_scan(db, wallet, now=current_time)
 
 
@@ -280,6 +307,34 @@ def _record_scan_error(
         message="No se pudo leer actividad publica de la wallet.",
         metadata={"diagnostic": message[:180]},
     )
+
+
+def _emit_grouped_skip_events(
+    db: Session,
+    *,
+    wallet: CopyWallet,
+    grouped_skips: dict[tuple[str, str], int],
+) -> None:
+    for (reason, freshness_status), count in grouped_skips.items():
+        if count <= 0:
+            continue
+        message = "Trades detectados pero no copiados por reglas de seguridad."
+        if reason == "trade_too_old" and freshness_status == "historical":
+            message = "Trades historicos detectados fuera de la ventana de copia."
+        elif reason == "trade_too_old" and freshness_status == "recent_outside_window":
+            message = "Trades recientes detectados fuera de la ventana de copia."
+        add_copy_event(
+            db,
+            wallet_id=wallet.id,
+            level="warning",
+            event_type="demo_order_skipped_grouped",
+            message=message,
+            metadata={
+                "count": count,
+                "freshness_status": freshness_status,
+                "reason": reason,
+            },
+        )
 
 
 def _trade_payload(raw_trade: object) -> dict[str, object]:

@@ -188,3 +188,13 @@ export function freshnessBadgeClass(status: CopyTradeFreshnessStatus | null | un
       return "skipped";
   }
 }
+
+export function formatDurationMs(value: number | null | undefined): string {
+  if (value === null || value === undefined || value < 0) {
+    return "-";
+  }
+  if (value < 1000) {
+    return `${value}ms`;
+  }
+  return `${(value / 1000).toFixed(1)}s`;
+}
