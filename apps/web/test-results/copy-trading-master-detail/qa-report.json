@@ -1,0 +1,287 @@
+{
+  "checks": {
+    "addDialogVisible": true,
+    "editDialogVisible": true,
+    "filterRows": 2,
+    "paginationText": "Mostrando 16-30 de 36 wallets",
+    "selectedWallet": "Hedge Scout"
+  },
+  "consoleMessages": [
+    {
+      "level": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    }
+  ],
+  "endpointsHit": [
+    "/copy-trading/demo/pnl-summary",
+    "/copy-trading/demo/positions/history",
+    "/copy-trading/demo/positions/open",
+    "/copy-trading/events",
+    "/copy-trading/orders",
+    "/copy-trading/status",
+    "/copy-trading/trades",
+    "/copy-trading/wallets",
+    "/copy-trading/watcher/status"
+  ],
+  "mockData": {
+    "closedPositions": 18,
+    "events": 12,
+    "openPositions": 18,
+    "orders": 16,
+    "trades": 72,
+    "wallets": 36
+  },
+  "screenshots": {
+    "desktopFull": "N:\\projects\\polimarket-copytrading-master-detail-visual-polish\\apps\\web\\test-results\\copy-trading-master-detail\\desktop-wallets-master-detail.png",
+    "filteredWallet": "N:\\projects\\polimarket-copytrading-master-detail-visual-polish\\apps\\web\\test-results\\copy-trading-master-detail\\desktop-wallet-filtered.png",
+    "mobile": "N:\\projects\\polimarket-copytrading-master-detail-visual-polish\\apps\\web\\test-results\\copy-trading-master-detail\\mobile-wallets-master-detail.png",
+    "selectedWallet": "N:\\projects\\polimarket-copytrading-master-detail-visual-polish\\apps\\web\\test-results\\copy-trading-master-detail\\desktop-wallet-selected.png",
+    "tablet": "N:\\projects\\polimarket-copytrading-master-detail-visual-polish\\apps\\web\\test-results\\copy-trading-master-detail\\tablet-wallets-master-detail.png"
+  },
+  "visualMetrics": {
+    "desktop": {
+      "activity": {
+        "bottom": 1498,
+        "height": 346,
+        "left": 799,
+        "right": 1397,
+        "top": 1152,
+        "width": 598
+      },
+      "activityItems": 3,
+      "bodyTextIncludesNegative": true,
+      "bodyTextIncludesPositive": true,
+      "detail": {
+        "bottom": 1517,
+        "height": 1517,
+        "left": 780,
+        "right": 1416,
+        "top": 0,
+        "width": 636
+      },
+      "detailBelowList": false,
+      "firstRows": [
+        "AEAlpha Edge+$110x1111...1111...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 51mCopiadas3EstadoLista para copiar",
+        "NSNorth Star+$14.40x2222...2222...DemoReal bloqueadoActivaEstado actualFuera de ventanaUltimo tradeHace 53mCopiadas4EstadoLista para copiar",
+        "QWQuiet Whale-$6.80x3333...3333...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 54mCopiadas0EstadoLista para copiar",
+        "PVPaused Value-$14.40x4444...4444...DemoReal bloqueadoPausadaEstado actualSin hora confiableUltimo tradeHace 55mCopiadas6EstadoPausada"
+      ],
+      "horizontalOverflow": false,
+      "innerWidth": 1440,
+      "list": {
+        "bottom": 4391,
+        "height": 4391,
+        "left": 284,
+        "right": 764,
+        "top": 0,
+        "width": 480
+      },
+      "rowCount": 15,
+      "scrollWidth": 1440,
+      "selected": {
+        "bottom": 660,
+        "height": 246,
+        "left": 303,
+        "right": 745,
+        "top": 414,
+        "width": 442
+      },
+      "selectedLabel": "Alpha Edge",
+      "walletToolbarVisible": true
+    },
+    "filter": {
+      "activity": {
+        "bottom": 1498,
+        "height": 346,
+        "left": 799,
+        "right": 1397,
+        "top": 1152,
+        "width": 598
+      },
+      "activityItems": 3,
+      "bodyTextIncludesNegative": true,
+      "bodyTextIncludesPositive": true,
+      "detail": {
+        "bottom": 1517,
+        "height": 1517,
+        "left": 780,
+        "right": 1416,
+        "top": 0,
+        "width": 636
+      },
+      "detailBelowList": false,
+      "firstRows": [
+        "BDBlue Delta-$19.80x7777...7777...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 59mCopiadas9EstadoLista para copiar",
+        "BLBlue LedgerPendiente0x2222...2229...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31EstadoLista para copiar"
+      ],
+      "horizontalOverflow": false,
+      "innerWidth": 1440,
+      "list": {
+        "bottom": 1063,
+        "height": 1063,
+        "left": 284,
+        "right": 764,
+        "top": 0,
+        "width": 480
+      },
+      "rowCount": 2,
+      "scrollWidth": 1440,
+      "selected": {
+        "bottom": 660,
+        "height": 246,
+        "left": 303,
+        "right": 745,
+        "top": 414,
+        "width": 442
+      },
+      "selectedLabel": "Blue Delta",
+      "walletToolbarVisible": true
+    },
+    "mobile": {
+      "activity": {
+        "bottom": 4590,
+        "height": 739,
+        "left": 33,
+        "right": 357,
+        "top": 3851,
+        "width": 324
+      },
+      "activityItems": 3,
+      "bodyTextIncludesNegative": true,
+      "bodyTextIncludesPositive": true,
+      "detail": {
+        "bottom": 4609,
+        "height": 2905,
+        "left": 14,
+        "right": 376,
+        "top": 1704,
+        "width": 362
+      },
+      "detailBelowList": true,
+      "firstRows": [
+        "BDBlue Delta-$19.80x7777...7777...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas9EstadoLista para copiar",
+        "BLBlue LedgerPendiente0x2222...2229...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31EstadoLista para copiar"
+      ],
+      "horizontalOverflow": false,
+      "innerWidth": 390,
+      "list": {
+        "bottom": 1688,
+        "height": 1689,
+        "left": 14,
+        "right": 376,
+        "top": 0,
+        "width": 362
+      },
+      "rowCount": 2,
+      "scrollWidth": 390,
+      "selected": {
+        "bottom": 993,
+        "height": 430,
+        "left": 33,
+        "right": 357,
+        "top": 563,
+        "width": 324
+      },
+      "selectedLabel": "Blue Delta",
+      "walletToolbarVisible": true
+    },
+    "selected": {
+      "activity": {
+        "bottom": 1479,
+        "height": 346,
+        "left": 799,
+        "right": 1397,
+        "top": 1133,
+        "width": 598
+      },
+      "activityItems": 3,
+      "bodyTextIncludesNegative": true,
+      "bodyTextIncludesPositive": true,
+      "detail": {
+        "bottom": 1498,
+        "height": 1498,
+        "left": 780,
+        "right": 1416,
+        "top": 0,
+        "width": 636
+      },
+      "detailBelowList": false,
+      "firstRows": [
+        "AEAlpha Edge+$110x1111...1111...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 51mCopiadas3EstadoLista para copiar",
+        "NSNorth Star+$14.40x2222...2222...DemoReal bloqueadoActivaEstado actualFuera de ventanaUltimo tradeHace 53mCopiadas4EstadoLista para copiar",
+        "QWQuiet Whale-$6.80x3333...3333...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 54mCopiadas0EstadoLista para copiar",
+        "PVPaused Value-$14.40x4444...4444...DemoReal bloqueadoPausadaEstado actualSin hora confiableUltimo tradeHace 55mCopiadas6EstadoPausada"
+      ],
+      "horizontalOverflow": false,
+      "innerWidth": 1440,
+      "list": {
+        "bottom": 4391,
+        "height": 4391,
+        "left": 284,
+        "right": 764,
+        "top": 0,
+        "width": 480
+      },
+      "rowCount": 15,
+      "scrollWidth": 1440,
+      "selected": {
+        "bottom": 1940,
+        "height": 246,
+        "left": 303,
+        "right": 745,
+        "top": 1694,
+        "width": 442
+      },
+      "selectedLabel": "Hedge Scout",
+      "walletToolbarVisible": true
+    },
+    "tablet": {
+      "activity": {
+        "bottom": 2830,
+        "height": 590,
+        "left": 43,
+        "right": 444,
+        "top": 2240,
+        "width": 401
+      },
+      "activityItems": 3,
+      "bodyTextIncludesNegative": true,
+      "bodyTextIncludesPositive": true,
+      "detail": {
+        "bottom": 2849,
+        "height": 1838,
+        "left": 24,
+        "right": 876,
+        "top": 1011,
+        "width": 852
+      },
+      "detailBelowList": true,
+      "firstRows": [
+        "BDBlue Delta-$19.80x7777...7777...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 59mCopiadas9EstadoLista para copiar",
+        "BLBlue LedgerPendiente0x2222...2229...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31EstadoLista para copiar"
+      ],
+      "horizontalOverflow": false,
+      "innerWidth": 900,
+      "list": {
+        "bottom": 995,
+        "height": 995,
+        "left": 24,
+        "right": 876,
+        "top": 0,
+        "width": 852
+      },
+      "rowCount": 2,
+      "scrollWidth": 900,
+      "selected": {
+        "bottom": 636,
+        "height": 246,
+        "left": 43,
+        "right": 857,
+        "top": 390,
+        "width": 814
+      },
+      "selectedLabel": "Blue Delta",
+      "walletToolbarVisible": true
+    }
+  }
+}

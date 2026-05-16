@@ -901,10 +901,18 @@
   min-width: 0;
 }
 
+.copy-wallets-list-panel {
+  overflow: hidden;
+}
+
 .copy-wallet-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1.45fr) repeat(4, minmax(124px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.copy-wallet-toolbar-search {
+  grid-column: 1 / -1;
 }
 
 .copy-wallet-toolbar .copy-field {
@@ -920,6 +928,7 @@
   display: grid;
   gap: 10px;
   min-width: 0;
+  overflow: hidden;
   padding: 14px 15px;
   border: 1px solid rgba(30, 42, 61, 0.98);
   border-radius: 12px;
@@ -1024,10 +1033,15 @@
   gap: 6px;
 }
 
-.copy-wallet-row-meta,
 .copy-wallet-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.copy-wallet-row-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1171,7 +1185,11 @@
 }
 
 .copy-wallet-stat-grid-metrics {
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.copy-wallet-trade-card .copy-wallet-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .copy-wallet-stat.positive {
@@ -1389,6 +1407,12 @@
 }
 
 @media (max-width: 1100px) {
+  .copy-trading-page {
+    width: 100vw;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
   .copy-metrics-grid,
   .copy-dashboard-grid,
   .copy-dashboard-grid.two,
@@ -1400,11 +1424,14 @@
   .copy-performance-row,
   .copy-performance-mini-grid,
   .copy-wallets-kpi-grid,
-  .copy-wallets-master-detail,
   .copy-wallet-detail-grid,
   .copy-wallet-row-meta,
   .copy-wallet-stat-grid-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .copy-wallets-master-detail {
+    grid-template-columns: 1fr;
   }
 
   .copy-wallet-toolbar {
