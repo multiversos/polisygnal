@@ -199,3 +199,29 @@ Fase real:
   - precios en tiempo real por canal mas estable;
   - modelado de slippage y fees;
   - worker dedicado para watcher y valuacion.
+
+## Migracion 0019 - demo positions
+
+- El PR de `demo positions + PnL` requiere la migracion
+  `0019_copy_trading_demo_positions`.
+- Despues del merge a `main`, no ejecutar pasos manuales con secretos desde una
+  consola local.
+- Usar el workflow manual:
+  `.github/workflows/copy-trading-demo-positions-migration.yml`.
+- La confirmacion requerida es exacta:
+  `apply-copy-trading-0019`.
+- El workflow hace:
+  - checkout del repo;
+  - instalacion del backend;
+  - `check_database_config --connect`;
+  - `alembic current`;
+  - `alembic heads`;
+  - `alembic upgrade 0019_copy_trading_demo_positions`.
+- El workflow usa secretos existentes de GitHub Actions y no imprime
+  `DATABASE_URL` ni credenciales.
+- Despues de correr la migracion:
+  - confirmar que Alembic head sea `0019_copy_trading_demo_positions`;
+  - validar `/copy-trading`;
+  - correr `npm.cmd --workspace apps/web run smoke:production`.
+- Mantener la regla operativa ya documentada: evitar deploys manuales que
+  puedan dejar `/api/build-info` con `commit: null`.

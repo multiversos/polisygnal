@@ -891,6 +891,28 @@ secretos.
     makes clear `Auto-refresh` only updates the UI while the watcher scans
     wallets in backend.
 
+### Migracion 0019 - demo positions
+
+Si el cambio mergeado incluye posiciones demo abiertas y PnL:
+
+1. Confirm the merged PR references migration
+   `0019_copy_trading_demo_positions`.
+2. Run the manual GitHub Actions workflow
+   `Copy Trading Demo Positions Migration`.
+3. Type the exact confirmation string:
+   `apply-copy-trading-0019`.
+4. Wait for the workflow to complete without exposing secrets.
+5. Confirm Alembic reports head `0019_copy_trading_demo_positions`.
+6. Open `/copy-trading` and confirm the page shows:
+   - `Resumen PnL demo`
+   - `Copias demo abiertas`
+   - `Historial de copias demo`
+7. Confirm `Precio actual pendiente` appears when the market price is missing
+   instead of inventing profit.
+8. Run `npm.cmd --workspace apps/web run smoke:production`.
+9. Do not run the production migration manually from a local console and do not
+   print `DATABASE_URL` or any secret while validating.
+
 ## Cache Troubleshooting
 
 If a normal browser shows old data but backend/proxy checks pass:
