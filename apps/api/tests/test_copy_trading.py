@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api import routes_copy_trading
+from app.clients.polymarket_data import PolymarketDataClientError
 from app.models.copy_trading import CopyWallet
 from app.schemas.copy_trading import CopyWalletCreate, CopyWalletUpdate
 from app.services.copy_trading_demo_engine import normalize_public_trade, run_demo_tick, scan_copy_wallet
@@ -78,6 +79,19 @@ class SlowTradeReader:
 
         time.sleep(self.delay_seconds)
         return self.trades[:limit]
+
+
+class TimeoutForOneWalletReader:
+    def __init__(self, failing_wallet: str, successful_trades: list[dict[str, object]] | None = None) -> None:
+        self.failing_wallet = failing_wallet
+        self.successful_trades = successful_trades or []
+        self.wallets_seen: list[str] = []
+
+    def get_trades_for_user(self, wallet: str, *, limit: int = 50, offset: int = 0) -> list[dict[str, object]]:
+        self.wallets_seen.append(wallet)
+        if wallet == self.failing_wallet:
+            raise PolymarketDataClientError("No se pudo conectar con Polymarket Data API: timed out")
+        return self.successful_trades[:limit]
 
 
 class FakeMarketPosition:
@@ -842,6 +856,7 @@ def test_watcher_status_initial() -> None:
     assert status.enabled is False
     assert status.running is False
     assert status.interval_seconds == 5
+    assert status.cycle_budget_seconds == 8
     assert status.current_run_started_at is None
     assert status.last_run_started_at is None
     assert status.last_result is None
@@ -897,6 +912,84 @@ def test_watcher_run_once_executes_demo_tick_once(db_session: Session) -> None:
     assert result.status.last_result.orders_simulated == 1
     assert result.status.last_result.buy_simulated == 1
     assert result.status.last_result.sell_simulated == 0
+    assert len(result.status.last_result.wallet_scan_results) == 1
+    assert result.status.last_result.wallet_scan_results[0].status == "ok"
+
+
+def test_watcher_marks_wallet_as_slow(db_session: Session) -> None:
+    _create_wallet(db_session)
+    watcher = CopyTradingDemoWatcher(interval_seconds=1, cycle_timeout_seconds=3, live_limit=5)
+
+    result = watcher.run_once(db=db_session, data_client=SlowTradeReader(1.05, [_trade("0xslow")]), now=_now())
+
+    assert result.executed is True
+    assert result.status.last_result is not None
+    assert result.status.slow_wallet_count == 1
+    assert result.status.last_result.wallet_scan_results[0].status == "slow"
+
+
+def test_watcher_marks_wallet_timeout_and_continues(db_session: Session) -> None:
+    first = _create_wallet(db_session, suffix="11")
+    second = _create_wallet(db_session, suffix="22")
+    watcher = _build_test_watcher()
+
+    result = watcher.run_once(
+        db=db_session,
+        data_client=TimeoutForOneWalletReader(first.proxy_wallet, successful_trades=[_trade("0xok", wallet=second.proxy_wallet)]),
+        now=_now(),
+    )
+
+    assert result.executed is True
+    assert result.status.timeout_count >= 1
+    assert result.status.last_result is not None
+    assert result.status.last_result.wallets_scanned == 2
+    assert any(entry.wallet_id == first.id and entry.status == "timeout" for entry in result.status.last_result.wallet_scan_results)
+    assert any(entry.wallet_id == second.id and entry.status in {"ok", "slow"} for entry in result.status.last_result.wallet_scan_results)
+
+
+def test_watcher_live_scan_limit_caps_trades_per_wallet(db_session: Session) -> None:
+    wallet = _create_wallet(db_session)
+    watcher = CopyTradingDemoWatcher(interval_seconds=5, live_limit=5)
+    trades = [_trade(f"0xlive-{index}", wallet=wallet.proxy_wallet) for index in range(12)]
+
+    result = watcher.run_once(db=db_session, data_client=FakeTradeReader(trades), now=_now())
+
+    assert result.executed is True
+    assert result.status.last_result is not None
+    assert result.status.last_result.trades_detected == 5
+    assert result.status.last_result.wallet_scan_results[0].trades_detected == 5
+    assert result.status.last_result.wallet_scan_results[0].next_scan_hint == "Se priorizaron trades recientes para mantener el escaneo live."
+
+
+def test_watcher_prioritizes_recent_wallets_first(db_session: Session) -> None:
+    older = _create_wallet(db_session, suffix="11")
+    recent = _create_wallet(db_session, suffix="22")
+    older.last_trade_at = _now() - timedelta(hours=3)
+    recent.last_trade_at = _now() - timedelta(minutes=2)
+    db_session.add_all([older, recent])
+    db_session.commit()
+    reader = TrackingTradeReader({recent.proxy_wallet: [], older.proxy_wallet: []})
+    watcher = _build_test_watcher()
+
+    result = watcher.run_once(db=db_session, data_client=reader, now=_now())
+
+    assert result.executed is True
+    assert reader.wallets_seen[0] == recent.proxy_wallet
+
+
+def test_watcher_skips_paused_wallets(db_session: Session) -> None:
+    active = _create_wallet(db_session, suffix="11")
+    paused = _create_wallet(db_session, suffix="22")
+    paused.enabled = False
+    db_session.add(paused)
+    db_session.commit()
+    reader = TrackingTradeReader({active.proxy_wallet: [], paused.proxy_wallet: []})
+    watcher = _build_test_watcher()
+
+    result = watcher.run_once(db=db_session, data_client=reader, now=_now())
+
+    assert result.executed is True
+    assert reader.wallets_seen == [active.proxy_wallet]
 
 
 def test_watcher_run_once_auto_copies_sell_trade(db_session: Session) -> None:
@@ -1009,6 +1102,9 @@ def test_watcher_marks_over_interval_and_counts_timeout(db_session: Session) -> 
     assert result.status.slow_wallet_count >= 1
     assert result.status.last_result is not None
     assert result.status.last_result.errors == ["Watcher demo recorto el ciclo para no acumular retraso."]
+    assert result.status.last_result.cycle_budget_exceeded is True
+    assert result.status.last_result.pending_wallets == 1
+    assert any(entry.status == "skipped" for entry in result.status.last_result.wallet_scan_results)
 
 
 def test_watcher_run_once_route(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:

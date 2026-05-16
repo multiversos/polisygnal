@@ -2683,9 +2683,13 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["Resumen", "Wallets", "Copias abiertas", "Historial de trades", "Auditoria"]) {
     assert(copyTradingDashboard.includes(text), `copy trading tab navigation missing text: ${text}`);
   }
-  for (const text of ["Watcher demo", "Intervalo:", "interval_seconds", "Iniciar watcher demo", "Pausar watcher", "Ejecutar una vez"]) {
+  for (const text of ["Watcher demo", "interval_seconds", "Iniciar watcher demo", "Pausar watcher", "Ejecutar una vez"]) {
     assert(copyWatcherPanel.includes(text), `copy watcher panel missing text: ${text}`);
   }
+  assert(
+    copyWatcherPanel.includes("Intervalo:") || copyWatcherPanel.includes("Intervalo objetivo:"),
+    "copy watcher panel missing interval text",
+  );
   assert(
     copyWatcherPanel.includes("No ejecuta operaciones reales"),
     "copy watcher panel must state that it does not execute real operations",
@@ -2693,7 +2697,8 @@ function validateAnalyzerFirstProductSource() {
   assert(copyWatcherPanel.includes("Prueba manual de un solo escaneo."), "copy watcher panel should frame run once as manual debug");
   assert(copyWatcherPanel.includes("Auto-copy demo"), "copy watcher panel should make automatic demo copying explicit");
   assert(
-    copyWatcherPanel.includes("escanea todas las wallets activas cada 5s"),
+    copyWatcherPanel.includes("escanea todas las wallets activas cada 5s") ||
+      copyWatcherPanel.includes("mantener el escaneo live"),
     "copy watcher panel should explain the automatic scan loop",
   );
   assert(

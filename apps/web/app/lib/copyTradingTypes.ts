@@ -16,6 +16,8 @@ export type CopyOrderStatus =
   | "partial_failed"
   | "failed";
 export type CopyEventLevel = "info" | "warning" | "error";
+export type CopyWatcherWalletScanStatus = "ok" | "slow" | "timeout" | "error" | "skipped";
+export type CopyWatcherWalletPriority = "high" | "normal" | "low";
 
 export type CopyWallet = {
   id: string;
@@ -183,12 +185,35 @@ export type CopyTradingTickSummary = {
   historical_trades: number;
   skipped_reasons: Record<string, number>;
   errors: string[];
+  wallet_scan_results: CopyTradingWatcherWalletScanResult[];
+  cycle_budget_exceeded: boolean;
+  skipped_wallets_due_to_budget: number;
+  pending_wallets: number;
+};
+
+export type CopyTradingWatcherWalletScanResult = {
+  wallet_id: string;
+  alias: string | null;
+  wallet_address_short: string;
+  status: CopyWatcherWalletScanStatus;
+  duration_ms: number | null;
+  trades_detected: number;
+  new_trades: number;
+  orders_simulated: number;
+  orders_skipped: number;
+  historical_trades: number;
+  live_candidates: number;
+  timeout: boolean;
+  error_message: string | null;
+  priority: CopyWatcherWalletPriority;
+  next_scan_hint: string | null;
 };
 
 export type CopyTradingWatcherStatus = {
   enabled: boolean;
   running: boolean;
   interval_seconds: number;
+  cycle_budget_seconds: number;
   current_run_started_at: string | null;
   last_run_started_at: string | null;
   last_run_at: string | null;
