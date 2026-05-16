@@ -261,7 +261,7 @@ Fase real:
 ## Migracion 0020 - demo position resolution
 
 - El PR de settlement demo por resolucion requiere la migracion
-  `0020_copy_trading_demo_position_resolution`.
+  `0020_copy_trading_demo_settle`.
 - Despues del merge a `main`, no ejecutar pasos manuales con secretos desde una
   consola local.
 - Usar el workflow manual:
@@ -273,11 +273,11 @@ Fase real:
   - `check_database_config --connect`;
   - `alembic current`;
   - `alembic heads`;
-- `alembic upgrade 0020_copy_trading_demo_position_resolution`.
+- `alembic upgrade 0020_copy_trading_demo_settle`.
 - El workflow usa secretos existentes de GitHub Actions y no imprime
   `DATABASE_URL` ni credenciales.
 - Despues de correr la migracion:
-- confirmar que Alembic head sea `0020_copy_trading_demo_position_resolution`;
+- confirmar que Alembic head sea `0020_copy_trading_demo_settle`;
   - validar `/copy-trading`;
   - correr `npm.cmd --workspace apps/web run smoke:production`.
 - Mantener la regla operativa ya documentada: evitar deploys manuales que

@@ -1,6 +1,6 @@
 """copy trading demo position resolution
 
-Revision ID: 0020_copy_trading_demo_position_resolution
+Revision ID: 0020_copy_trading_demo_settle
 Revises: 0019_copy_trading_demo_positions
 Create Date: 2026-05-16 16:30:00.000000
 """
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0020_copy_trading_demo_position_resolution"
+revision = "0020_copy_trading_demo_settle"
 down_revision = "0019_copy_trading_demo_positions"
 branch_labels = None
 depends_on = None
