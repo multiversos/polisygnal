@@ -67,6 +67,8 @@ const walletSummary = {
 const sportsSummary = buildIndependentEvidenceSummary({
   agentName: "Samantha",
   externalOddsComparison: {
+    attemptedQueries: 2,
+    attemptedQueryVariants: ["primary", "without_main"],
     bestSourceUrl: "https://sportsbook.draftkings.com/event/fixture",
     checkedAt: "2026-05-15T14:01:00.000Z",
     eventName: "Spurs vs. Timberwolves",
@@ -74,7 +76,9 @@ const sportsSummary = buildIndependentEvidenceSummary({
     league: "NBA",
     limitations: ["Comparison only."],
     matchConfidence: "medium",
+    matchedQueryVariant: "without_main",
     matchedMarket: true,
+    noMatchReasons: [],
     outcomes: [
       { impliedProbability: 0.61, label: "Spurs", priceAmerican: null, priceDecimal: null, sourceOutcomeName: "Spurs" },
       { impliedProbability: 0.39, label: "Timberwolves", priceAmerican: null, priceDecimal: null, sourceOutcomeName: "Timberwolves" },
@@ -102,6 +106,10 @@ assert(
 assert(
   sportsSummary.items.some((item) => item.label === "Odds externas" && item.status === "available" && item.isIndependent),
   "external odds should count as independent only when the provider returns a matched market",
+);
+assert(
+  sportsSummary.items.some((item) => item.label === "Odds externas" && item.summary.includes("variante sin main")),
+  "independent evidence should mention the safe fallback variant when it found the comparable market",
 );
 assert(
   sportsSummary.items.some((item) => item.label === "Noticias/lesiones" && item.status === "not_connected"),
@@ -147,6 +155,8 @@ assert(
 const readySummary = buildIndependentEvidenceSummary({
   agentName: "Samantha",
   externalOddsComparison: {
+    attemptedQueries: 1,
+    attemptedQueryVariants: ["primary"],
     bestSourceUrl: "https://sportsbook.draftkings.com/event/fixture",
     checkedAt: "2026-05-15T14:01:00.000Z",
     eventName: "Spurs vs. Timberwolves",
@@ -154,7 +164,9 @@ const readySummary = buildIndependentEvidenceSummary({
     league: "NBA",
     limitations: ["Comparison only."],
     matchConfidence: "high",
+    matchedQueryVariant: "primary",
     matchedMarket: true,
+    noMatchReasons: [],
     outcomes: [
       { impliedProbability: 0.61, label: "Spurs", priceAmerican: null, priceDecimal: null, sourceOutcomeName: "Spurs" },
       { impliedProbability: 0.39, label: "Timberwolves", priceAmerican: null, priceDecimal: null, sourceOutcomeName: "Timberwolves" },

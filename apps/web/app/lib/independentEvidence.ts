@@ -378,6 +378,16 @@ function buildExternalOddsEvidence(input: BuildIndependentEvidenceSummaryInput):
             )
             .join(" / ")
         : null;
+    const variantLabel =
+      directComparison.matchedQueryVariant === "without_main"
+        ? "sin main"
+        : directComparison.matchedQueryVariant === "without_live"
+          ? "sin live"
+          : directComparison.matchedQueryVariant === "base_league_only"
+            ? "solo liga"
+            : directComparison.matchedQueryVariant === "primary"
+              ? "principal"
+              : null;
     return {
       category: "external_odds",
       checkedAt: directComparison.checkedAt || null,
@@ -400,11 +410,13 @@ function buildExternalOddsEvidence(input: BuildIndependentEvidenceSummaryInput):
       status: directStatus,
       summary:
         directStatus === "available"
-          ? `${directComparison.providerName} (${directComparison.sportsbook}) comparo este mercado con match ${directComparison.matchConfidence}. ${directSummary || "Odds externas disponibles."}`
+          ? `${directComparison.providerName} (${directComparison.sportsbook}) comparo este mercado con match ${directComparison.matchConfidence}${variantLabel ? ` usando variante ${variantLabel}` : ""}. ${directSummary || "Odds externas disponibles."}`
           : directStatus === "partial"
-            ? `${directComparison.providerName} devolvio una comparacion parcial. ${directSummary || "Faltan lineas o match mas fuerte."}`
+            ? `${directComparison.providerName} devolvio una comparacion parcial${variantLabel ? ` con variante ${variantLabel}` : ""}. ${directSummary || "Faltan lineas o match mas fuerte."}`
             : directStatus === "no_match"
-              ? "No se encontro un equivalente claro en el proveedor externo."
+              ? directComparison.attemptedQueries && directComparison.attemptedQueries > 1
+                ? `No se encontro un equivalente claro en el proveedor externo tras ${directComparison.attemptedQueries} consultas seguras.`
+                : "No se encontro un equivalente claro en el proveedor externo."
               : directStatus === "disabled"
                 ? "Proveedor de odds no configurado."
                 : directStatus === "timeout"
