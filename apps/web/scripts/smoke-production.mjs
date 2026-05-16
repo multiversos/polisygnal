@@ -1,5 +1,6 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -176,6 +177,15 @@ const ACTIVITY_TEXT = [
 ];
 const GENERIC_SPORT_ICON_TEXT_PATTERN =
   /<span class="sport-selector-icon"[^>]*>\s*(?:\*|B|N|F|T|BB|H|U|C|HK)\s*<\/span>/;
+const CHROME_DEBUG_START_PORT = Number(process.env.POLYSIGNAL_SMOKE_CHROME_PORT || 9347);
+const CHROME_STDERR_NOISE_PATTERNS = [
+  /SetupDiGetDeviceProperty/i,
+  /DEPRECATED_ENDPOINT/i,
+  /PHONE_REGISTRATION_ERROR/i,
+  /Authentication Failed: wrong_secret/i,
+  /Created TensorFlow Lite XNNPACK delegate/i,
+  /Failed to log in to GCM, resetting connection/i,
+];
 
 function urlFor(path) {
   return `${FRONTEND_BASE_URL}${path}`;
@@ -253,6 +263,267 @@ function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function canListen(port) {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, "127.0.0.1");
+  });
+}
+
+async function findAvailablePort(startPort) {
+  for (let port = startPort; port < startPort + 50; port += 1) {
+    if (await canListen(port)) {
+      return port;
+    }
+  }
+  throw new Error(`No available Chrome debugger port found starting at ${startPort}`);
+}
+
+function hasUsableDom(dom) {
+  return /<html[\s>]/i.test(dom) || /<!doctype html/i.test(dom);
+}
+
+function filterChromeStderr(stderr) {
+  return String(stderr || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !CHROME_STDERR_NOISE_PATTERNS.some((pattern) => pattern.test(line)))
+    .join("\n");
+}
+
+class ChromeConnection {
+  constructor(webSocketUrl) {
+    this.id = 0;
+    this.listeners = new Map();
+    this.pending = new Map();
+    this.socket = new WebSocket(webSocketUrl);
+  }
+
+  async open() {
+    await new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => reject(new Error("CDP connection timed out")), 15000);
+      this.socket.addEventListener("open", () => {
+        clearTimeout(timeoutId);
+        resolve();
+      });
+      this.socket.addEventListener("error", (event) => {
+        clearTimeout(timeoutId);
+        reject(new Error(`CDP connection failed: ${event.message || "unknown error"}`));
+      });
+    });
+
+    this.socket.addEventListener("message", (event) => {
+      const payload = JSON.parse(String(event.data));
+      if (payload.id && this.pending.has(payload.id)) {
+        const { resolvePromise, rejectPromise } = this.pending.get(payload.id);
+        this.pending.delete(payload.id);
+        if (payload.error) {
+          rejectPromise(new Error(payload.error.message || "CDP command failed"));
+          return;
+        }
+        resolvePromise(payload.result || {});
+        return;
+      }
+      const listeners = this.listeners.get(payload.method) || [];
+      for (const listener of listeners) {
+        listener(payload.params || {});
+      }
+    });
+  }
+
+  send(method, params = {}) {
+    const id = (this.id += 1);
+    this.socket.send(JSON.stringify({ id, method, params }));
+    return new Promise((resolvePromise, rejectPromise) => {
+      const timeoutId = setTimeout(() => {
+        this.pending.delete(id);
+        rejectPromise(new Error(`CDP command timed out: ${method}`));
+      }, 20000);
+      this.pending.set(id, {
+        rejectPromise: (error) => {
+          clearTimeout(timeoutId);
+          rejectPromise(error);
+        },
+        resolvePromise: (value) => {
+          clearTimeout(timeoutId);
+          resolvePromise(value);
+        },
+      });
+    });
+  }
+
+  close() {
+    this.socket.close();
+  }
+}
+
+async function fetchLocalJson(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    throw new Error(`${url} responded ${response.status}`);
+  }
+  return response.json();
+}
+
+function killProcessTree(childProcess) {
+  if (!childProcess || childProcess.killed) {
+    return;
+  }
+  if (process.platform === "win32") {
+    try {
+      execFileSync("taskkill.exe", ["/pid", String(childProcess.pid), "/t", "/f"], { stdio: "ignore" });
+      return;
+    } catch {
+      // Fall back to child.kill below.
+    }
+  }
+  childProcess.kill();
+}
+
+function cleanupTempDir(path) {
+  try {
+    rmSync(path, { force: true, recursive: true, maxRetries: 5, retryDelay: 250 });
+  } catch {
+    // Ignore best-effort cleanup failures from Chrome temp profiles on Windows.
+  }
+}
+
+function spawnChromeForCdp(port) {
+  const chrome = findChrome();
+  assert(chrome, "Chrome/Chromium was not found. Set CHROME_PATH to run the render smoke test.");
+  const userDataDir = mkdtempSync(join(tmpdir(), `polisygnal-smoke-cdp-${Date.now()}`));
+  const processHandle = spawn(
+    chrome,
+    [
+      "--headless=new",
+      `--remote-debugging-port=${port}`,
+      `--user-data-dir=${userDataDir}`,
+      "--disable-gpu",
+      "--disable-extensions",
+      "--disable-background-networking",
+      "--disable-component-update",
+      "--disable-default-apps",
+      "--disable-sync",
+      "--metrics-recording-only",
+      "--mute-audio",
+      "--no-first-run",
+      "--no-default-browser-check",
+      "about:blank",
+    ],
+    {
+      stdio: "ignore",
+      windowsHide: true,
+    },
+  );
+  return { processHandle, userDataDir };
+}
+
+async function waitForChromeDebugger(port) {
+  const versionUrl = `http://127.0.0.1:${port}/json/version`;
+  const startedAt = Date.now();
+  let lastError;
+  while (Date.now() - startedAt < 30000) {
+    try {
+      return await fetchLocalJson(versionUrl);
+    } catch (error) {
+      lastError = error;
+      await sleep(250);
+    }
+  }
+  throw new Error(`Chrome debugger did not become available: ${lastError?.message || "timeout"}`);
+}
+
+async function createChromeTarget(port, url) {
+  return fetchLocalJson(`http://127.0.0.1:${port}/json/new?${encodeURIComponent(url)}`, {
+    method: "PUT",
+  });
+}
+
+async function evaluateInChrome(connection, expression) {
+  const response = await connection.send("Runtime.evaluate", {
+    awaitPromise: true,
+    expression,
+    returnByValue: true,
+  });
+  if (response.exceptionDetails) {
+    throw new Error(response.exceptionDetails.text || "Runtime.evaluate failed");
+  }
+  return response.result?.value;
+}
+
+async function waitForChromeExpression(connection, expression, label, timeoutMs = 45000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await evaluateInChrome(connection, expression)) {
+      return;
+    }
+    await sleep(250);
+  }
+  throw new Error(`Timed out waiting for ${label}`);
+}
+
+async function inspectDomWithChrome(url, options = {}) {
+  const attempts = options.attempts || 2;
+  const waitExpression = options.waitExpression || "document.body && document.body.innerText.length > 0";
+  const waitLabel = options.waitLabel || "page content";
+  const timeoutMs = options.timeoutMs || 45000;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const port = await findAvailablePort(CHROME_DEBUG_START_PORT + (attempt - 1) * 10);
+    const { processHandle, userDataDir } = spawnChromeForCdp(port);
+    let connection = null;
+    try {
+      await waitForChromeDebugger(port);
+      const target = await createChromeTarget(port, "about:blank");
+      connection = new ChromeConnection(target.webSocketDebuggerUrl);
+      await connection.open();
+      await connection.send("Page.enable");
+      await connection.send("Runtime.enable");
+      await connection.send("Page.navigate", { url });
+      await waitForChromeExpression(connection, waitExpression, waitLabel, timeoutMs);
+      const dom = await evaluateInChrome(connection, "document.documentElement.outerHTML");
+      if (hasUsableDom(dom)) {
+        return dom;
+      }
+      lastError = new Error(`${url} did not return a usable hydrated DOM on attempt ${attempt}/${attempts}`);
+    } catch (error) {
+      if (connection) {
+        try {
+          const currentText = await evaluateInChrome(
+            connection,
+            "(document.body?.innerText || document.body?.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 500)",
+          );
+          if (currentText) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            lastError = new Error(`${errorMessage}. Body snapshot: ${currentText}`);
+          } else {
+            lastError = error;
+          }
+        } catch {
+          lastError = error;
+        }
+      } else {
+        lastError = error;
+      }
+    } finally {
+      connection?.close();
+      killProcessTree(processHandle);
+      cleanupTempDir(userDataDir);
+    }
+    if (attempt < attempts) {
+      await sleep(1200 * attempt);
+    }
+  }
+
+  throw lastError || new Error(`Could not inspect hydrated DOM for ${url}`);
 }
 
 function isTransientSmokeError(error) {
@@ -398,30 +669,68 @@ function findChrome() {
   return candidates.find((candidate) => existsSync(candidate)) || null;
 }
 
-async function dumpDom(url) {
+async function dumpDom(url, options = {}) {
   const chrome = findChrome();
   assert(chrome, "Chrome/Chromium was not found. Set CHROME_PATH to run the render smoke test.");
+  const attempts = options.attempts || 2;
+  const virtualTimeBudgetMs = options.virtualTimeBudgetMs || 20000;
+  const acceptDom = options.acceptDom || (() => true);
+  let lastError = null;
 
-  const userDataDir = mkdtempSync(join(tmpdir(), "polisygnal-smoke-chrome-"));
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      chrome,
-      [
-        "--headless",
-        "--disable-gpu",
-        "--disable-extensions",
-        "--no-first-run",
-        `--user-data-dir=${userDataDir}`,
-        "--virtual-time-budget=20000",
-        "--dump-dom",
-        url,
-      ],
-      { maxBuffer: 8 * 1024 * 1024, timeout: 30000 },
-    );
-    return `${stdout || ""}${stderr || ""}`;
-  } finally {
-    rmSync(userDataDir, { force: true, recursive: true });
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const userDataDir = mkdtempSync(join(tmpdir(), "polisygnal-smoke-chrome-"));
+    try {
+      const { stdout, stderr } = await execFileAsync(
+        chrome,
+        [
+          "--headless",
+          "--disable-gpu",
+          "--disable-extensions",
+          "--disable-background-networking",
+          "--disable-component-update",
+          "--disable-default-apps",
+          "--disable-sync",
+          "--metrics-recording-only",
+          "--mute-audio",
+          "--no-default-browser-check",
+          "--no-first-run",
+          `--user-data-dir=${userDataDir}`,
+          `--virtual-time-budget=${virtualTimeBudgetMs}`,
+          "--dump-dom",
+          url,
+        ],
+        { maxBuffer: 8 * 1024 * 1024, timeout: 45000 },
+      );
+      const dom = stdout || "";
+      const meaningfulStderr = filterChromeStderr(stderr);
+      if (hasUsableDom(dom) && acceptDom(dom)) {
+        return dom;
+      }
+      lastError = new Error(
+        meaningfulStderr
+          ? `${url} produced incomplete DOM: ${meaningfulStderr}`
+          : `${url} produced incomplete DOM on attempt ${attempt}/${attempts}`,
+      );
+    } catch (error) {
+      const dom = typeof error?.stdout === "string" ? error.stdout : "";
+      const meaningfulStderr = filterChromeStderr(error?.stderr);
+      if (hasUsableDom(dom) && acceptDom(dom)) {
+        return dom;
+      }
+      lastError =
+        meaningfulStderr
+          ? new Error(`${url} dump failed on attempt ${attempt}/${attempts}: ${meaningfulStderr}`)
+          : error instanceof Error
+            ? error
+            : new Error(String(error));
+    } finally {
+      cleanupTempDir(userDataDir);
+    }
+    if (attempt < attempts) {
+      await sleep(1200 * attempt);
+    }
   }
+  throw lastError || new Error(`Could not dump DOM for ${url}`);
 }
 
 function countMarketCards(dom) {
@@ -1140,7 +1449,29 @@ async function main() {
     "profiles anti-copy-trading copy",
   );
   assertTextExcludes(profilesText, ["tokenId", "conditionId", "transactionHash", "raw JSON"], "profiles technical noise");
-  const copyTradingDom = await dumpDom(urlFor(COPY_TRADING_PATH));
+  const copyTradingStatus = await fetchJson("/api/backend/copy-trading/status");
+  const copyTradingWallets = await fetchJson("/api/backend/copy-trading/wallets");
+  const liveCopyWallets = Array.isArray(copyTradingWallets.body?.wallets) ? copyTradingWallets.body.wallets : [];
+  const liveCopyWalletLabels = liveCopyWallets
+    .map((wallet) => wallet?.label)
+    .filter(Boolean)
+    .slice(0, 5);
+  const liveCopyWalletCount = liveCopyWallets.length;
+  const copyTradingWaitExpression =
+    liveCopyWalletCount === 0
+      ? `document.body && document.body.innerText.includes("Sin wallets. Agrega una direccion publica para iniciar el modo demo.")`
+      : `(() => {
+          const text = document.body?.innerText || "";
+          const rowCount = document.querySelectorAll(".copy-wallet-row").length;
+          const detailVisible = Boolean(document.querySelector(".copy-wallet-detail"));
+          return text.includes("Wallets seguidas") && rowCount > 0 && detailVisible;
+        })()`;
+  const copyTradingDom = await inspectDomWithChrome(urlFor(COPY_TRADING_PATH), {
+    attempts: 2,
+    timeoutMs: liveCopyWalletCount > 0 ? 60000 : 45000,
+    waitExpression: copyTradingWaitExpression,
+    waitLabel: "copy trading hydrated data",
+  });
   const copyTradingRender = validatePublicProductPage(copyTradingDom, "copy trading", ["Copiar Wallets"]);
   const copyTradingText = visibleText(copyTradingDom);
   for (const expected of [
@@ -1176,13 +1507,30 @@ async function main() {
   );
   assertTextIncludesOneOf(
     copyTradingText,
-    [
-      "Cargando modulo Copiar Wallets...",
-      "Lista compacta",
-      "Sin wallets. Agrega una direccion publica para iniciar el modo demo.",
-      "Selecciona una wallet para ver su detalle.",
-    ],
+    liveCopyWalletCount > 0
+      ? ["Lista compacta", "Wallet seleccionada", "Estado actual"]
+      : [
+          "Cargando modulo Copiar Wallets...",
+          "Lista compacta",
+          "Sin wallets. Agrega una direccion publica para iniciar el modo demo.",
+          "Selecciona una wallet para ver su detalle.",
+        ],
     "copy trading loading/master-detail state",
+  );
+  if (liveCopyWalletCount > 0) {
+    assert(
+      liveCopyWalletLabels.some((label) => copyTradingText.includes(label)),
+      "copy trading did not render any live wallet label even though the backend returned wallets",
+    );
+    assertTextExcludes(
+      copyTradingText,
+      ["Sin wallets. Agrega una direccion publica para iniciar el modo demo."],
+      "copy trading live wallets",
+    );
+  }
+  assert(
+    copyTradingStatus.body?.wallets_enabled === liveCopyWalletCount,
+    `copy trading status wallets_enabled=${copyTradingStatus.body?.wallets_enabled}, wallets endpoint count=${liveCopyWalletCount}`,
   );
   assert(copyTradingDom.includes("Escanea esta wallet una vez ahora."), "copy trading scan button helper missing");
   assertTextExcludes(copyTradingText, ["Editar modo"], "copy trading legacy edit label");

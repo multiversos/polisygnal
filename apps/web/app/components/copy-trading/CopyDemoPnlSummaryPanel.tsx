@@ -3,7 +3,13 @@
 import { formatPercent, formatPnl, formatUsd } from "../../lib/copyTrading";
 import type { CopyTradingDemoPnlSummary } from "../../lib/copyTradingTypes";
 
-export function CopyDemoPnlSummaryPanel({ summary }: { summary: CopyTradingDemoPnlSummary | null }) {
+export function CopyDemoPnlSummaryPanel({
+  loading = false,
+  summary,
+}: {
+  loading?: boolean;
+  summary: CopyTradingDemoPnlSummary | null;
+}) {
   const hasAnyDemoData = Boolean(summary?.open_positions_count || summary?.closed_positions_count);
 
   return (
@@ -15,7 +21,9 @@ export function CopyDemoPnlSummaryPanel({ summary }: { summary: CopyTradingDemoP
       <p className="copy-field-helper">
         Vista financiera simulada del copy trading demo. No representa dinero real ni ganancias garantizadas.
       </p>
-      {!hasAnyDemoData || !summary ? (
+      {loading ? (
+        <div className="copy-empty-state">Cargando metricas demo...</div>
+      ) : !hasAnyDemoData || !summary ? (
         <div className="copy-empty-state">Todavia no hay copias demo suficientes para calcular rendimiento.</div>
       ) : (
         <div className="copy-performance-grid">

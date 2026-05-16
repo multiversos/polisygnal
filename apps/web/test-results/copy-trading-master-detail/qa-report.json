@@ -32,11 +32,11 @@
     "wallets": 36
   },
   "screenshots": {
-    "desktopFull": "N:\\projects\\polimarket-copytrading-master-detail-visual-polish\\apps\\web\\test-results\\copy-trading-master-detail\\desktop-wallets-master-detail.png",
-    "filteredWallet": "N:\\projects\\polimarket-copytrading-master-detail-visual-polish\\apps\\web\\test-results\\copy-trading-master-detail\\desktop-wallet-filtered.png",
-    "mobile": "N:\\projects\\polimarket-copytrading-master-detail-visual-polish\\apps\\web\\test-results\\copy-trading-master-detail\\mobile-wallets-master-detail.png",
-    "selectedWallet": "N:\\projects\\polimarket-copytrading-master-detail-visual-polish\\apps\\web\\test-results\\copy-trading-master-detail\\desktop-wallet-selected.png",
-    "tablet": "N:\\projects\\polimarket-copytrading-master-detail-visual-polish\\apps\\web\\test-results\\copy-trading-master-detail\\tablet-wallets-master-detail.png"
+    "desktopFull": "N:\\projects\\polimarket-copytrading-loading-smoke\\apps\\web\\test-results\\copy-trading-master-detail\\desktop-wallets-master-detail.png",
+    "filteredWallet": "N:\\projects\\polimarket-copytrading-loading-smoke\\apps\\web\\test-results\\copy-trading-master-detail\\desktop-wallet-filtered.png",
+    "mobile": "N:\\projects\\polimarket-copytrading-loading-smoke\\apps\\web\\test-results\\copy-trading-master-detail\\mobile-wallets-master-detail.png",
+    "selectedWallet": "N:\\projects\\polimarket-copytrading-loading-smoke\\apps\\web\\test-results\\copy-trading-master-detail\\desktop-wallet-selected.png",
+    "tablet": "N:\\projects\\polimarket-copytrading-loading-smoke\\apps\\web\\test-results\\copy-trading-master-detail\\tablet-wallets-master-detail.png"
   },
   "visualMetrics": {
     "desktop": {
@@ -61,10 +61,10 @@
       },
       "detailBelowList": false,
       "firstRows": [
-        "AEAlpha Edge0x1111...1111+$11Copiable ahora...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 1hCopiadas3",
-        "NSNorth Star0x2222...2222+$14.4Fuera de ventana...DemoReal bloqueadoActivaEstado actualFuera de ventanaUltimo tradeHace 1hCopiadas4",
-        "QWQuiet Whale0x3333...3333-$6.8Historico...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas0",
-        "PVPaused Value0x4444...4444-$14.4Sin hora confiable...DemoReal bloqueadoPausadaEstado actualSin hora confiableUltimo tradeHace 1hCopiadas6"
+        "AEAlpha Edge0x1111...1111+$11Copiable ahora...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas3",
+        "NSNorth Star0x2222...2222+$14.4Fuera de ventana...DemoReal bloqueadoActivaEstado actualFuera de ventanaUltimo tradeHace 2hCopiadas4",
+        "QWQuiet Whale0x3333...3333-$6.8Historico...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 2hCopiadas0",
+        "PVPaused Value0x4444...4444-$14.4Sin hora confiable...DemoReal bloqueadoPausadaEstado actualSin hora confiableUltimo tradeHace 2hCopiadas6"
       ],
       "horizontalOverflow": false,
       "innerWidth": 1440,
@@ -111,8 +111,8 @@
       },
       "detailBelowList": false,
       "firstRows": [
-        "BDBlue Delta0x7777...7777-$19.8Historico...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas9",
-        "BLBlue Ledger0x2222...2229PendienteCopiable ahora...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31"
+        "BDBlue Delta0x7777...7777-$19.8Historico...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 2hCopiadas9",
+        "BLBlue Ledger0x2222...2229PendienteCopiable ahora...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 3hCopiadas31"
       ],
       "horizontalOverflow": false,
       "innerWidth": 1440,
@@ -159,8 +159,8 @@
       },
       "detailBelowList": true,
       "firstRows": [
-        "BDBlue Delta0x7777...7777-$19.8Historico...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas9",
-        "BLBlue Ledger0x2222...2229PendienteCopiable ahora...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31"
+        "BDBlue Delta0x7777...7777-$19.8Historico...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 2hCopiadas9",
+        "BLBlue Ledger0x2222...2229PendienteCopiable ahora...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 3hCopiadas31"
       ],
       "horizontalOverflow": false,
       "innerWidth": 390,
@@ -207,10 +207,10 @@
       },
       "detailBelowList": false,
       "firstRows": [
-        "AEAlpha Edge0x1111...1111+$11Copiable ahora...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 1hCopiadas3",
-        "NSNorth Star0x2222...2222+$14.4Fuera de ventana...DemoReal bloqueadoActivaEstado actualFuera de ventanaUltimo tradeHace 1hCopiadas4",
-        "QWQuiet Whale0x3333...3333-$6.8Historico...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas0",
-        "PVPaused Value0x4444...4444-$14.4Sin hora confiable...DemoReal bloqueadoPausadaEstado actualSin hora confiableUltimo tradeHace 1hCopiadas6"
+        "AEAlpha Edge0x1111...1111+$11Copiable ahora...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas3",
+        "NSNorth Star0x2222...2222+$14.4Fuera de ventana...DemoReal bloqueadoActivaEstado actualFuera de ventanaUltimo tradeHace 2hCopiadas4",
+        "QWQuiet Whale0x3333...3333-$6.8Historico...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 2hCopiadas0",
+        "PVPaused Value0x4444...4444-$14.4Sin hora confiable...DemoReal bloqueadoPausadaEstado actualSin hora confiableUltimo tradeHace 2hCopiadas6"
       ],
       "horizontalOverflow": false,
       "innerWidth": 1440,
@@ -257,8 +257,8 @@
       },
       "detailBelowList": true,
       "firstRows": [
-        "BDBlue Delta0x7777...7777-$19.8Historico...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 1hCopiadas9",
-        "BLBlue Ledger0x2222...2229PendienteCopiable ahora...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 2hCopiadas31"
+        "BDBlue Delta0x7777...7777-$19.8Historico...DemoReal bloqueadoActivaEstado actualHistoricoUltimo tradeHace 2hCopiadas9",
+        "BLBlue Ledger0x2222...2229PendienteCopiable ahora...DemoReal bloqueadoActivaEstado actualCopiable ahoraUltimo tradeHace 3hCopiadas31"
       ],
       "horizontalOverflow": false,
       "innerWidth": 900,

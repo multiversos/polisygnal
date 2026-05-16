@@ -21,18 +21,21 @@ type OrdersResponse = { orders: CopyOrder[] };
 type EventsResponse = { events: CopyBotEvent[] };
 type DemoPositionsResponse = { positions: CopyDemoPosition[] };
 type DemoPnlSummaryResponse = { summary: CopyTradingDemoPnlSummary };
+const COPY_TRADING_PRIMARY_TIMEOUT_MS = 15_000;
+const COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS = 20_000;
 
-export async function getCopyTradingDashboardData(): Promise<CopyTradingDashboardData> {
-  const [status, watcher, wallets, trades, orders, events, openPositions, closedPositions, demoPnlSummary] = await Promise.all([
-    fetchApiJson<CopyTradingStatus>("/copy-trading/status"),
-    fetchApiJson<CopyTradingWatcherStatus>("/copy-trading/watcher/status"),
-    fetchApiJson<WalletsResponse>("/copy-trading/wallets"),
-    fetchApiJson<TradesResponse>("/copy-trading/trades?limit=20"),
-    fetchApiJson<OrdersResponse>("/copy-trading/orders?limit=20"),
-    fetchApiJson<EventsResponse>("/copy-trading/events?limit=20"),
-    fetchApiJson<DemoPositionsResponse>("/copy-trading/demo/positions/open"),
-    fetchApiJson<DemoPositionsResponse>("/copy-trading/demo/positions/history?limit=20"),
-    fetchApiJson<DemoPnlSummaryResponse>("/copy-trading/demo/pnl-summary"),
+export async function getCopyTradingPrimaryData(): Promise<CopyTradingDashboardData> {
+  const [status, watcher, wallets, trades, orders, events] = await Promise.all([
+    fetchApiJson<CopyTradingStatus>("/copy-trading/status", undefined, COPY_TRADING_PRIMARY_TIMEOUT_MS),
+    fetchApiJson<CopyTradingWatcherStatus>(
+      "/copy-trading/watcher/status",
+      undefined,
+      COPY_TRADING_PRIMARY_TIMEOUT_MS,
+    ),
+    fetchApiJson<WalletsResponse>("/copy-trading/wallets", undefined, COPY_TRADING_PRIMARY_TIMEOUT_MS),
+    fetchApiJson<TradesResponse>("/copy-trading/trades?limit=20", undefined, COPY_TRADING_PRIMARY_TIMEOUT_MS),
+    fetchApiJson<OrdersResponse>("/copy-trading/orders?limit=20", undefined, COPY_TRADING_PRIMARY_TIMEOUT_MS),
+    fetchApiJson<EventsResponse>("/copy-trading/events?limit=20", undefined, COPY_TRADING_PRIMARY_TIMEOUT_MS),
   ]);
   return {
     status,
@@ -41,9 +44,66 @@ export async function getCopyTradingDashboardData(): Promise<CopyTradingDashboar
     trades: trades.trades,
     orders: orders.orders,
     events: events.events,
-    open_demo_positions: openPositions.positions,
-    closed_demo_positions: closedPositions.positions,
-    demo_pnl_summary: demoPnlSummary.summary,
+    open_demo_positions: [],
+    closed_demo_positions: [],
+    demo_pnl_summary: null,
+  };
+}
+
+export async function getCopyTradingSupplementalData(): Promise<
+  Partial<
+    Pick<
+      CopyTradingDashboardData,
+      "open_demo_positions" | "closed_demo_positions" | "demo_pnl_summary"
+    >
+  >
+> {
+  const [openPositions, closedPositions, demoPnlSummary] = await Promise.allSettled([
+    fetchApiJson<DemoPositionsResponse>(
+      "/copy-trading/demo/positions/open",
+      undefined,
+      COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
+    ),
+    fetchApiJson<DemoPositionsResponse>(
+      "/copy-trading/demo/positions/history?limit=20",
+      undefined,
+      COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
+    ),
+    fetchApiJson<DemoPnlSummaryResponse>(
+      "/copy-trading/demo/pnl-summary",
+      undefined,
+      COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
+    ),
+  ]);
+  const supplemental: Partial<
+    Pick<
+      CopyTradingDashboardData,
+      "open_demo_positions" | "closed_demo_positions" | "demo_pnl_summary"
+    >
+  > = {};
+
+  if (openPositions.status === "fulfilled") {
+    supplemental.open_demo_positions = openPositions.value.positions;
+  }
+  if (closedPositions.status === "fulfilled") {
+    supplemental.closed_demo_positions = closedPositions.value.positions;
+  }
+  if (demoPnlSummary.status === "fulfilled") {
+    supplemental.demo_pnl_summary = demoPnlSummary.value.summary;
+  }
+
+  return supplemental;
+}
+
+export async function getCopyTradingDashboardData(): Promise<CopyTradingDashboardData> {
+  const primary = await getCopyTradingPrimaryData();
+  const supplemental = await getCopyTradingSupplementalData();
+  return {
+    ...primary,
+    ...supplemental,
+    open_demo_positions: supplemental.open_demo_positions ?? primary.open_demo_positions,
+    closed_demo_positions: supplemental.closed_demo_positions ?? primary.closed_demo_positions,
+    demo_pnl_summary: supplemental.demo_pnl_summary ?? primary.demo_pnl_summary,
   };
 }
 
