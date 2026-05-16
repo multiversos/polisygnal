@@ -3778,15 +3778,19 @@ export default function AnalyzePage() {
   return (
     <main className="dashboard-shell analyze-page">
       <MainNavigation />
-      <AnalyzeHero
-        input={input}
-        loading={loading}
-        onClear={handleClear}
-        onInputChange={setInput}
-        onSubmit={() => void runAnalysis()}
-      />
-      <AnalyzeSteps />
-      <AnalysisPreview {...previewProps} />
+      {state.status !== "result" ? (
+        <>
+          <AnalyzeHero
+            input={input}
+            loading={loading}
+            onClear={handleClear}
+            onInputChange={setInput}
+            onSubmit={() => void runAnalysis()}
+          />
+          <AnalyzeSteps />
+          <AnalysisPreview {...previewProps} />
+        </>
+      ) : null}
 
       {state.status === "invalid" ? (
         <section className="alert-panel compact" role="status">
@@ -3884,10 +3888,6 @@ export default function AnalyzePage() {
                       <span className="badge" key={reason}>{reason}</span>
                     ))}
                   </div>
-                  <ProfileAlertsBlock
-                    alerts={profileAlerts}
-                    onOpenWalletDetails={() => setWalletDetailsOpen(true)}
-                  />
                   <AnalyzerReport
                     busy={actionBusy}
                     deepAnalysisJob={deepAnalysisJob}
@@ -3905,6 +3905,10 @@ export default function AnalyzePage() {
                     relatedHistory={relatedHistory}
                     saved={saved}
                     watchlisted={Boolean(match.item.market?.id && watchlistByMarketId.has(match.item.market.id))}
+                  />
+                  <ProfileAlertsBlock
+                    alerts={profileAlerts}
+                    onOpenWalletDetails={() => setWalletDetailsOpen(true)}
                   />
                 </div>
               );

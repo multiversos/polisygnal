@@ -1884,6 +1884,7 @@ export function AnalyzerReport({
       </section>
       )}
 
+      {SHOW_ANALYZER_DEBUG_TOOLS ? (
       <section className="analyzer-report-layers" aria-label="Capas revisadas">
         <div className="probability-display-heading">
           <h4>Capas revisadas</h4>
@@ -2124,6 +2125,7 @@ export function AnalyzerReport({
           ) : null}
         </AnalyzerLayerDetails>
       </section>
+      ) : null}
 
       <section className="analyzer-next-actions" aria-label="Que puedes hacer ahora">
         <div>
