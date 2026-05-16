@@ -1,42 +1,92 @@
 "use client";
 
+import { useState } from "react";
 import {
   deleteCopyWallet,
-  freshnessBadgeClass,
   formatCopyWindow,
   formatDateTime,
   formatFreshnessLabel,
   formatUsd,
   formatWalletAddress,
+  freshnessBadgeClass,
   scanCopyWallet,
   updateCopyWallet,
 } from "../../lib/copyTrading";
-import type { CopyWallet } from "../../lib/copyTradingTypes";
+import type { CopyTradingTickSummary, CopyWallet } from "../../lib/copyTradingTypes";
 
 type CopyWalletsTableProps = {
-  onChanged: () => void;
+  onChanged: () => Promise<void> | void;
+  onNotice?: (message: string) => void;
   wallets: CopyWallet[];
 };
 
-export function CopyWalletsTable({ onChanged, wallets }: CopyWalletsTableProps) {
+type RowAction = "delete" | "mode" | "pause" | "scan" | null;
+
+export function CopyWalletsTable({ onChanged, onNotice, wallets }: CopyWalletsTableProps) {
+  const [pendingActionByWallet, setPendingActionByWallet] = useState<Record<string, RowAction>>({});
+
+  function setPendingAction(walletId: string, action: RowAction) {
+    setPendingActionByWallet((current) => ({ ...current, [walletId]: action }));
+  }
+
+  function clearPendingAction(walletId: string) {
+    setPendingActionByWallet((current) => {
+      const next = { ...current };
+      delete next[walletId];
+      return next;
+    });
+  }
+
   async function handlePause(wallet: CopyWallet) {
-    await updateCopyWallet(wallet.id, { enabled: !wallet.enabled });
-    onChanged();
+    setPendingAction(wallet.id, "pause");
+    try {
+      await updateCopyWallet(wallet.id, { enabled: !wallet.enabled });
+      onNotice?.(wallet.enabled ? "Wallet pausada." : "Wallet reactivada.");
+      await onChanged();
+    } catch {
+      onNotice?.("No pudimos actualizar esta wallet ahora.");
+    } finally {
+      clearPendingAction(wallet.id);
+    }
   }
 
   async function handleMode(wallet: CopyWallet) {
-    await updateCopyWallet(wallet.id, { mode: wallet.mode === "demo" ? "real" : "demo" });
-    onChanged();
+    setPendingAction(wallet.id, "mode");
+    try {
+      await updateCopyWallet(wallet.id, { mode: wallet.mode === "demo" ? "real" : "demo" });
+      onNotice?.("Modo de esta wallet actualizado.");
+      await onChanged();
+    } catch {
+      onNotice?.("No pudimos actualizar esta wallet ahora.");
+    } finally {
+      clearPendingAction(wallet.id);
+    }
   }
 
   async function handleDelete(wallet: CopyWallet) {
-    await deleteCopyWallet(wallet.id);
-    onChanged();
+    setPendingAction(wallet.id, "delete");
+    try {
+      await deleteCopyWallet(wallet.id);
+      onNotice?.("Wallet eliminada.");
+      await onChanged();
+    } catch {
+      onNotice?.("No pudimos eliminar esta wallet ahora.");
+    } finally {
+      clearPendingAction(wallet.id);
+    }
   }
 
   async function handleScan(wallet: CopyWallet) {
-    await scanCopyWallet(wallet.id);
-    onChanged();
+    setPendingAction(wallet.id, "scan");
+    try {
+      const summary = await scanCopyWallet(wallet.id);
+      onNotice?.(getWalletScanMessage(summary));
+      await onChanged();
+    } catch {
+      onNotice?.("No pudimos escanear esta wallet ahora.");
+    } finally {
+      clearPendingAction(wallet.id);
+    }
   }
 
   return (
@@ -45,6 +95,10 @@ export function CopyWalletsTable({ onChanged, wallets }: CopyWalletsTableProps) 
         <span>Seguimiento</span>
         <strong>Wallets seguidas</strong>
       </div>
+      <p className="copy-field-helper">
+        El watcher demo escanea todas las wallets automaticamente cada 5s. Usa Escanear para revisar una wallet
+        puntual.
+      </p>
       {wallets.length === 0 ? (
         <div className="copy-empty-state">Sin wallets. Agrega una direccion publica para iniciar el modo demo.</div>
       ) : (
@@ -63,55 +117,99 @@ export function CopyWalletsTable({ onChanged, wallets }: CopyWalletsTableProps) 
               </tr>
             </thead>
             <tbody>
-              {wallets.map((wallet) => (
-                <tr key={wallet.id}>
-                  <td>{wallet.label || "Sin alias"}</td>
-                  <td className="copy-mono">{formatWalletAddress(wallet.proxy_wallet)}</td>
-                  <td>
-                    <span className={`copy-badge ${wallet.mode === "demo" ? "success" : "locked"}`}>
-                      {wallet.mode === "demo" ? "Demo" : "Real bloqueado"}
-                    </span>
-                  </td>
-                  <td>{wallet.enabled ? "Activa" : "Pausada"}</td>
-                  <td>{formatUsd(wallet.copy_amount_usd)}</td>
-                  <td>{`${wallet.copy_buys ? "BUY" : "-"} / ${wallet.copy_sells ? "SELL" : "-"}`}</td>
-                  <td>
-                    <div className="copy-wallet-details">
-                      <span className={`copy-badge ${freshnessBadgeClass(wallet.last_trade_freshness_status)}`}>
-                        {wallet.last_trade_freshness_label
-                          ? formatFreshnessLabel(wallet.last_trade_freshness_status, wallet.last_trade_freshness_label)
-                          : "Sin actividad reciente"}
+              {wallets.map((wallet) => {
+                const pendingAction = pendingActionByWallet[wallet.id] ?? null;
+                return (
+                  <tr key={wallet.id}>
+                    <td>{wallet.label || "Sin alias"}</td>
+                    <td className="copy-mono">{formatWalletAddress(wallet.proxy_wallet)}</td>
+                    <td>
+                      <span className={`copy-badge ${wallet.mode === "demo" ? "success" : "locked"}`}>
+                        {wallet.mode === "demo" ? "Demo" : "Real bloqueado"}
                       </span>
-                      <small>Ultimo trade {formatDateTime(wallet.last_trade_at)}</small>
-                      <small>{formatCopyWindow(wallet.copy_window_seconds)}</small>
-                      <small>
-                        Recientes {wallet.recent_trades} · Historicos {wallet.historical_trades} · Copiables {wallet.live_candidates}
-                      </small>
-                      <small>Ultimo escaneo {formatDateTime(wallet.last_scan_at)}</small>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="copy-action-row">
-                      <button onClick={() => handlePause(wallet)} type="button">
-                        {wallet.enabled ? "Pausar" : "Activar"}
-                      </button>
-                      <button onClick={() => handleScan(wallet)} type="button">
-                        Escanear
-                      </button>
-                      <button onClick={() => handleMode(wallet)} type="button">
-                        Editar modo
-                      </button>
-                      <button className="danger" onClick={() => handleDelete(wallet)} type="button">
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>{wallet.enabled ? "Activa" : "Pausada"}</td>
+                    <td>{formatUsd(wallet.copy_amount_usd)}</td>
+                    <td>{`${wallet.copy_buys ? "BUY" : "-"} / ${wallet.copy_sells ? "SELL" : "-"}`}</td>
+                    <td>
+                      <div className="copy-wallet-details">
+                        <span className={`copy-badge ${freshnessBadgeClass(wallet.last_trade_freshness_status)}`}>
+                          {wallet.last_trade_freshness_label
+                            ? formatFreshnessLabel(wallet.last_trade_freshness_status, wallet.last_trade_freshness_label)
+                            : "Sin actividad reciente"}
+                        </span>
+                        <small>Ultimo trade {formatDateTime(wallet.last_trade_at)}</small>
+                        <small>{formatCopyWindow(wallet.copy_window_seconds)}</small>
+                        <small>
+                          Recientes {wallet.recent_trades} · Historicos {wallet.historical_trades} · Copiables {wallet.live_candidates}
+                        </small>
+                        <small>Ultimo escaneo {formatDateTime(wallet.last_scan_at)}</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="copy-action-row">
+                        <button
+                          className="copy-secondary-button"
+                          disabled={pendingAction !== null}
+                          onClick={() => handlePause(wallet)}
+                          type="button"
+                        >
+                          {pendingAction === "pause" ? (wallet.enabled ? "Pausando..." : "Activando...") : wallet.enabled ? "Pausar" : "Activar"}
+                        </button>
+                        <button
+                          aria-label="Escanea esta wallet una vez ahora."
+                          className="copy-action-button"
+                          disabled={pendingAction !== null}
+                          onClick={() => handleScan(wallet)}
+                          title="Escanea esta wallet una vez ahora."
+                          type="button"
+                        >
+                          {pendingAction === "scan" ? "Escaneando..." : "Escanear"}
+                        </button>
+                        <button
+                          className="copy-secondary-button"
+                          disabled={pendingAction !== null}
+                          onClick={() => handleMode(wallet)}
+                          type="button"
+                        >
+                          {pendingAction === "mode" ? "Actualizando..." : "Editar modo"}
+                        </button>
+                        <button
+                          className="copy-danger-button"
+                          disabled={pendingAction !== null}
+                          onClick={() => handleDelete(wallet)}
+                          type="button"
+                        >
+                          {pendingAction === "delete" ? "Eliminando..." : "Eliminar"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
     </section>
   );
+}
+
+function getWalletScanMessage(summary: CopyTradingTickSummary): string {
+  if (summary.errors.length > 0) {
+    return "No pudimos escanear esta wallet ahora.";
+  }
+  if (summary.orders_simulated > 0) {
+    return `Escaneo completado. Se generaron ${summary.orders_simulated} orden${summary.orders_simulated === 1 ? "" : "es"} demo.`;
+  }
+  if (summary.historical_trades > 0) {
+    return `Escaneo completado. Se detectaron ${summary.historical_trades} trades historicos para esta wallet.`;
+  }
+  if (summary.recent_outside_window > 0) {
+    return `Escaneo completado. Se detectaron ${summary.recent_outside_window} trades fuera de ventana para esta wallet.`;
+  }
+  if (summary.new_trades === 0) {
+    return "Escaneo completado. No se detectaron trades nuevos para esta wallet.";
+  }
+  return `Escaneo completado. Se detectaron ${summary.new_trades} trades nuevos para esta wallet.`;
 }

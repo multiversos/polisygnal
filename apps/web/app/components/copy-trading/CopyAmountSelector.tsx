@@ -29,7 +29,7 @@ export function CopyAmountSelector({
       <div className="copy-amount-presets" aria-label="Monto por trade">
         {PRESETS.map((preset) => (
           <button
-            className={mode === "preset" && amount === preset.value ? "active" : ""}
+            className={`copy-pill-button ${mode === "preset" && amount === preset.value ? "active" : ""}`}
             disabled={disabled}
             key={preset.value}
             onClick={() => onChange({ amount: preset.value, mode: "preset" })}
@@ -39,7 +39,7 @@ export function CopyAmountSelector({
           </button>
         ))}
         <button
-          className={mode === "custom" ? "active" : ""}
+          className={`copy-pill-button ${mode === "custom" ? "active" : ""}`}
           disabled={disabled}
           onClick={() => onChange({ amount: amount > 0 ? amount : 25, mode: "custom" })}
           type="button"

@@ -2608,6 +2608,10 @@ function validateAnalyzerFirstProductSource() {
     resolve(appRoot, "app/components/copy-trading/CopyWatcherPanel.tsx"),
     "utf8",
   );
+  const copyWalletsTable = readFileSync(
+    resolve(appRoot, "app/components/copy-trading/CopyWalletsTable.tsx"),
+    "utf8",
+  );
   const copyOrdersTable = readFileSync(
     resolve(appRoot, "app/components/copy-trading/CopyOrdersTable.tsx"),
     "utf8",
@@ -2669,6 +2673,43 @@ function validateAnalyzerFirstProductSource() {
   );
   assert(copyWatcherPanel.includes("Prueba manual de un solo escaneo."), "copy watcher panel should frame run once as manual debug");
   assert(copyWatcherPanel.includes("Auto-copy demo"), "copy watcher panel should make automatic demo copying explicit");
+  assert(
+    copyWatcherPanel.includes("escanea todas las wallets activas cada 5s"),
+    "copy watcher panel should explain the automatic scan loop",
+  );
+  assert(
+    copyWalletForm.includes("Ventana de copia en vivo"),
+    "copy wallet form should keep copy window visible",
+  );
+  assert(
+    copyTradingDashboard.includes("auto-copy demo ocurre automaticamente cada 5 segundos"),
+    "copy trading dashboard should explain that auto-copy is the primary flow",
+  );
+  assert(
+    copyTradingDashboard.includes("Demo tick manual"),
+    "copy trading dashboard should keep manual demo tick clearly secondary",
+  );
+  assert(
+    copyTradingDashboard.includes("Refrescar ahora"),
+    "copy trading dashboard should keep manual refresh visible",
+  );
+  assert(
+    copyTradingDashboard.includes("Pausar auto"),
+    "copy trading dashboard should keep auto-refresh controls visible",
+  );
+  assert(
+    copyTradingDashboard.includes("onNotice={setNotice}"),
+    "copy trading dashboard should forward wallet scan results to the global notice area",
+  );
+  assert(
+    copyWalletForm.includes("Agregar wallet"),
+    "copy wallet form should keep add wallet CTA visible",
+  );
+  assert(copyWalletsTable.includes("Escanea esta wallet una vez ahora."), "scan button should explain manual single-wallet scans");
+  assert(copyWalletsTable.includes("Escaneando..."), "wallet scan button should show loading state");
+  assert(copyWalletsTable.includes("Pausando..."), "wallet pause button should show loading state");
+  assert(copyWalletsTable.includes("Eliminando..."), "wallet delete button should show loading state");
+  assert(copyWalletsTable.includes("Actualizando..."), "wallet mode button should show loading state");
   assert(copyTradingDashboard.includes("visibilityState"), "copy trading auto-refresh should respect hidden tabs");
   assert(copyTradingDashboard.includes("isRefreshingRef"), "copy trading auto-refresh should avoid overlapping refresh requests");
   assert(copyOrdersTable.includes("formatCopyOrderReason"), "copy orders should translate technical reasons");

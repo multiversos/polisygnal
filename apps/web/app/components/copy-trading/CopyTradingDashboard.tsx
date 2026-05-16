@@ -29,7 +29,7 @@ export function CopyTradingDashboard() {
   const [tickSummary, setTickSummary] = useState<CopyTradingTickSummary | null>(null);
   const [runningTick, setRunningTick] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [watcherBusy, setWatcherBusy] = useState(false);
+  const [watcherBusyAction, setWatcherBusyAction] = useState<"run-once" | "start" | "stop" | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [pageVisible, setPageVisible] = useState(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -153,7 +153,7 @@ export function CopyTradingDashboard() {
   }
 
   async function handleWatcherStart() {
-    setWatcherBusy(true);
+    setWatcherBusyAction("start");
     setError(null);
     try {
       const watcher = await startCopyTradingWatcher();
@@ -163,12 +163,12 @@ export function CopyTradingDashboard() {
     } catch {
       setError("No pudimos iniciar el watcher demo ahora.");
     } finally {
-      setWatcherBusy(false);
+      setWatcherBusyAction(null);
     }
   }
 
   async function handleWatcherStop() {
-    setWatcherBusy(true);
+    setWatcherBusyAction("stop");
     setError(null);
     try {
       const watcher = await stopCopyTradingWatcher();
@@ -178,12 +178,12 @@ export function CopyTradingDashboard() {
     } catch {
       setError("No pudimos pausar el watcher demo ahora.");
     } finally {
-      setWatcherBusy(false);
+      setWatcherBusyAction(null);
     }
   }
 
   async function handleWatcherRunOnce() {
-    setWatcherBusy(true);
+    setWatcherBusyAction("run-once");
     setError(null);
     try {
       const watcher = await runCopyTradingWatcherOnce();
@@ -198,7 +198,7 @@ export function CopyTradingDashboard() {
     } catch {
       setError("No pudimos ejecutar el watcher demo ahora.");
     } finally {
-      setWatcherBusy(false);
+      setWatcherBusyAction(null);
     }
   }
 
@@ -228,13 +228,14 @@ export function CopyTradingDashboard() {
             {refreshing ? "Actualizando..." : "Refrescar ahora"}
           </button>
           <button
+            className="copy-secondary-button"
             disabled={runningTick || loading}
             onClick={() => setAutoRefreshEnabled((current) => !current)}
             type="button"
           >
             {autoRefreshEnabled ? "Pausar auto" : "Reanudar auto"}
           </button>
-          <button disabled={runningTick || loading} onClick={handleDemoTick} type="button">
+          <button className="copy-action-button" disabled={runningTick || loading} onClick={handleDemoTick} type="button">
             {runningTick ? "Ejecutando..." : "Demo tick manual"}
           </button>
         </div>
@@ -266,7 +267,7 @@ export function CopyTradingDashboard() {
           wallets={data?.wallets ?? []}
         />
         <CopyWatcherPanel
-          busy={watcherBusy}
+          busyAction={watcherBusyAction}
           onRunOnce={handleWatcherRunOnce}
           onStart={handleWatcherStart}
           onStop={handleWatcherStop}
@@ -315,6 +316,7 @@ export function CopyTradingDashboard() {
         onChanged={async () => {
           await refresh();
         }}
+        onNotice={setNotice}
         wallets={data?.wallets ?? []}
       />
 

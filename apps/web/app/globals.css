@@ -259,7 +259,11 @@
 
 .copy-amount-presets button,
 .copy-action-row button,
-.copy-primary-button {
+.copy-primary-button,
+.copy-secondary-button,
+.copy-danger-button,
+.copy-pill-button,
+.copy-action-button {
   min-height: 38px;
   padding: 8px 11px;
   border: 1px solid rgba(34, 211, 238, 0.2);
@@ -269,6 +273,13 @@
   cursor: pointer;
   font-weight: 700;
   white-space: nowrap;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    opacity 140ms ease;
 }
 
 .copy-amount-presets button.active,
@@ -277,10 +288,74 @@
   background: linear-gradient(135deg, rgba(34, 211, 238, 0.22), rgba(34, 197, 94, 0.16));
 }
 
+.copy-secondary-button,
+.copy-action-button,
+.copy-pill-button {
+  border-color: rgba(96, 165, 250, 0.22);
+  background: rgba(15, 23, 42, 0.78);
+}
+
+.copy-danger-button {
+  border-color: rgba(251, 113, 133, 0.3);
+  color: #fda4af;
+  background: rgba(61, 10, 20, 0.52);
+}
+
+.copy-amount-presets button:hover:not(:disabled),
+.copy-action-row button:hover:not(:disabled),
+.copy-primary-button:hover:not(:disabled),
+.copy-secondary-button:hover:not(:disabled),
+.copy-danger-button:hover:not(:disabled),
+.copy-pill-button:hover:not(:disabled),
+.copy-action-button:hover:not(:disabled) {
+  border-color: rgba(34, 211, 238, 0.5);
+  background: rgba(22, 34, 54, 0.96);
+  box-shadow: 0 10px 22px rgba(8, 145, 178, 0.18);
+  transform: translateY(-1px);
+}
+
+.copy-primary-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.28), rgba(34, 197, 94, 0.2));
+}
+
+.copy-danger-button:hover:not(:disabled) {
+  border-color: rgba(251, 113, 133, 0.5);
+  background: rgba(90, 18, 32, 0.76);
+  box-shadow: 0 10px 22px rgba(251, 113, 133, 0.16);
+}
+
+.copy-amount-presets button:focus-visible,
+.copy-action-row button:focus-visible,
+.copy-primary-button:focus-visible,
+.copy-secondary-button:focus-visible,
+.copy-danger-button:focus-visible,
+.copy-pill-button:focus-visible,
+.copy-action-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
+}
+
+.copy-amount-presets button:active:not(:disabled),
+.copy-action-row button:active:not(:disabled),
+.copy-primary-button:active:not(:disabled),
+.copy-secondary-button:active:not(:disabled),
+.copy-danger-button:active:not(:disabled),
+.copy-pill-button:active:not(:disabled),
+.copy-action-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
 .copy-primary-button:disabled,
+.copy-secondary-button:disabled,
+.copy-danger-button:disabled,
+.copy-pill-button:disabled,
+.copy-action-button:disabled,
 .copy-amount-presets button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
+  box-shadow: none;
+  transform: none;
 }
 
 .copy-toggle-pill {
@@ -423,11 +498,6 @@
 .copy-wallet-status-strip span:first-child {
   border-color: rgba(34, 211, 238, 0.32);
   color: #67e8f9;
-}
-
-.copy-action-row button.danger {
-  border-color: rgba(251, 113, 133, 0.32);
-  color: #fda4af;
 }
 
 .copy-feed,
