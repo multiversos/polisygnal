@@ -113,7 +113,42 @@ export type CopyBotEvent = {
   created_at: string;
 };
 
-export type CopyDemoPositionStatus = "open" | "closed" | "price_pending";
+export type CopyDemoPositionStatus =
+  | "open"
+  | "waiting_resolution"
+  | "unknown_resolution"
+  | "closed"
+  | "cancelled"
+  | "price_pending";
+
+export type CopyTradingDemoSettlementPositionResult = {
+  position_id: string;
+  wallet_alias: string | null;
+  market_title: string | null;
+  outcome: string | null;
+  previous_status: CopyDemoPositionStatus;
+  new_status: CopyDemoPositionStatus;
+  close_reason: string | null;
+  realized_pnl_usd: string | null;
+  resolution_source: string | null;
+  reason: string;
+};
+
+export type CopyTradingDemoSettlementSummary = {
+  checked_positions: number;
+  closed_by_market_resolution: number;
+  waiting_resolution: number;
+  still_open: number;
+  cancelled: number;
+  unknown_resolution: number;
+  errors: number;
+};
+
+export type CopyTradingDemoSettlementResponse = {
+  summary: CopyTradingDemoSettlementSummary;
+  positions: CopyTradingDemoSettlementPositionResult[];
+  ran_at: string;
+};
 
 export type CopyDemoPosition = {
   id: string;
@@ -139,6 +174,7 @@ export type CopyDemoPosition = {
   exit_price: string | null;
   exit_value_usd: string | null;
   close_reason: string | null;
+  resolution_source: string | null;
   status: CopyDemoPositionStatus;
   opened_at: string;
   closed_at: string | null;

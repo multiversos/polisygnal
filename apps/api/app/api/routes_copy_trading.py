@@ -3,11 +3,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.clients.polymarket import PolymarketGammaClient, get_polymarket_client
 from app.clients.polymarket_data import PolymarketDataClient, get_polymarket_data_client
 from app.db.session import get_db
 from app.schemas.copy_trading import (
     CopyBotEventRead,
     CopyTradingDemoPnlSummaryResponse,
+    CopyTradingDemoSettlementResponse,
     CopyTradingDemoPositionsResponse,
     CopyTradingEventsResponse,
     CopyTradingListResponse,
@@ -28,6 +30,7 @@ from app.services.copy_trading_demo_positions import (
     list_closed_demo_positions,
     list_open_demo_positions,
 )
+from app.services.copy_trading_demo_settlement import settle_open_demo_positions
 from app.services.copy_trading_service import (
     CopyWalletNotFoundError,
     DuplicateCopyWalletError,
@@ -186,6 +189,17 @@ def get_copy_demo_pnl_summary(
     return CopyTradingDemoPnlSummaryResponse(
         summary=build_demo_pnl_summary(open_positions, closed_positions)
     )
+
+
+@router.post("/demo/settlement/run-once", response_model=CopyTradingDemoSettlementResponse)
+def post_copy_demo_settlement_run_once(
+    limit: int = Query(default=25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    gamma_client: PolymarketGammaClient = Depends(get_polymarket_client),
+) -> CopyTradingDemoSettlementResponse:
+    response = settle_open_demo_positions(db, gamma_client=gamma_client, limit=limit)
+    db.commit()
+    return response
 
 
 @router.post("/wallets/{wallet_id}/scan", response_model=CopyTradingTickResponse)

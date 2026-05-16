@@ -8,6 +8,11 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.clients.polymarket import get_polymarket_client
+from app.main import app
+from app.models.event import Event
+from app.models.market import Market
+from app.models.market_outcome import MarketOutcome
 from app.api import routes_copy_trading
 from app.clients.polymarket_data import PolymarketDataClientError
 from app.models.copy_trading import CopyWallet
@@ -20,6 +25,7 @@ from app.services.copy_trading_demo_positions import (
     list_closed_demo_positions,
     list_open_demo_positions,
 )
+from app.services.copy_trading_demo_settlement import settle_open_demo_positions
 from app.services.copy_trading_risk_rules import CopyTradeForRules, evaluate_demo_trade
 from app.services.copy_trading_service import (
     DuplicateCopyWalletError,
@@ -131,6 +137,17 @@ class DummySession:
 
 class DummyDataClient:
     def close(self) -> None:
+        return None
+
+
+class DummyGammaClient:
+    def close(self) -> None:
+        return None
+
+    def fetch_market_by_condition_id(self, condition_id: str):
+        return None
+
+    def fetch_market_by_slug(self, slug: str):
         return None
 
 
@@ -651,6 +668,187 @@ def test_demo_tick_sell_without_open_position_does_not_break(db_session: Session
     )
 
 
+def test_demo_settlement_keeps_active_market_open(db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("10"))
+    trade = _trade("0xsettle-open", price="0.40", wallet=wallet.proxy_wallet) | {
+        "slug": "settle-open-market",
+        "conditionId": "cond-open-market",
+        "asset": "asset-yes-open",
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    _create_market(
+        db_session,
+        slug="settle-open-market",
+        condition_id="cond-open-market",
+        yes_token_id="asset-yes-open",
+        no_token_id="asset-no-open",
+        end_date=_now() + timedelta(minutes=5),
+        active=True,
+        closed=False,
+    )
+
+    response = settle_open_demo_positions(db_session, gamma_client=DummyGammaClient(), now=_now())
+    positions = list_open_demo_positions(db_session)
+
+    assert response.summary.checked_positions == 1
+    assert response.summary.still_open == 1
+    assert len(positions) == 1
+    assert positions[0].status == "open"
+    assert positions[0].close_reason is None
+
+
+def test_demo_settlement_marks_expired_market_waiting_resolution(db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("10"))
+    trade = _trade("0xsettle-waiting", price="0.40", wallet=wallet.proxy_wallet) | {
+        "slug": "settle-waiting-market",
+        "conditionId": "cond-waiting-market",
+        "asset": "asset-yes-waiting",
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    _create_market(
+        db_session,
+        slug="settle-waiting-market",
+        condition_id="cond-waiting-market",
+        yes_token_id="asset-yes-waiting",
+        no_token_id="asset-no-waiting",
+        end_date=_now() - timedelta(minutes=1),
+        active=False,
+        closed=True,
+    )
+
+    response = settle_open_demo_positions(db_session, gamma_client=DummyGammaClient(), now=_now())
+    positions = list_open_demo_positions(db_session)
+
+    assert response.summary.waiting_resolution == 1
+    assert len(positions) == 1
+    assert positions[0].status == "waiting_resolution"
+    assert positions[0].close_reason == "market_expired_waiting_resolution"
+
+
+def test_demo_settlement_closes_winning_position_by_market_resolution(db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("10"))
+    trade = _trade("0xsettle-win", price="0.40", wallet=wallet.proxy_wallet) | {
+        "slug": "settle-win-market",
+        "conditionId": "cond-win-market",
+        "asset": "asset-yes-win",
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    market = _create_market(
+        db_session,
+        slug="settle-win-market",
+        condition_id="cond-win-market",
+        yes_token_id="asset-yes-win",
+        no_token_id="asset-no-win",
+        end_date=_now() - timedelta(minutes=1),
+        active=False,
+        closed=True,
+    )
+    _create_market_outcome(db_session, market=market, resolved_outcome="yes")
+
+    response = settle_open_demo_positions(db_session, gamma_client=DummyGammaClient(), now=_now())
+    positions = list_closed_demo_positions(db_session)
+
+    assert response.summary.closed_by_market_resolution == 1
+    assert len(positions) == 1
+    assert positions[0].status == "closed"
+    assert positions[0].close_reason == "market_resolved"
+    assert positions[0].exit_price == Decimal("1.00")
+    assert positions[0].exit_value_usd == Decimal("25.00")
+    assert positions[0].realized_pnl_usd == Decimal("15.00")
+
+
+def test_demo_settlement_closes_losing_position_by_market_resolution(db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("10"))
+    trade = _trade("0xsettle-loss", price="0.40", wallet=wallet.proxy_wallet) | {
+        "slug": "settle-loss-market",
+        "conditionId": "cond-loss-market",
+        "asset": "asset-yes-loss",
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    market = _create_market(
+        db_session,
+        slug="settle-loss-market",
+        condition_id="cond-loss-market",
+        yes_token_id="asset-yes-loss",
+        no_token_id="asset-no-loss",
+        end_date=_now() - timedelta(minutes=1),
+        active=False,
+        closed=True,
+    )
+    _create_market_outcome(db_session, market=market, resolved_outcome="no")
+
+    response = settle_open_demo_positions(db_session, gamma_client=DummyGammaClient(), now=_now())
+    positions = list_closed_demo_positions(db_session)
+
+    assert response.summary.closed_by_market_resolution == 1
+    assert len(positions) == 1
+    assert positions[0].status == "closed"
+    assert positions[0].exit_price == Decimal("0.00")
+    assert positions[0].exit_value_usd == Decimal("0.00")
+    assert positions[0].realized_pnl_usd == Decimal("-10.00")
+
+
+def test_demo_settlement_cancels_market_without_invented_profit(db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("10"))
+    trade = _trade("0xsettle-cancelled", price="0.40", wallet=wallet.proxy_wallet) | {
+        "slug": "settle-cancelled-market",
+        "conditionId": "cond-cancelled-market",
+        "asset": "asset-yes-cancelled",
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    market = _create_market(
+        db_session,
+        slug="settle-cancelled-market",
+        condition_id="cond-cancelled-market",
+        yes_token_id="asset-yes-cancelled",
+        no_token_id="asset-no-cancelled",
+        end_date=_now() - timedelta(minutes=1),
+        active=False,
+        closed=True,
+    )
+    _create_market_outcome(db_session, market=market, resolved_outcome="cancelled")
+
+    response = settle_open_demo_positions(db_session, gamma_client=DummyGammaClient(), now=_now())
+    positions = list_closed_demo_positions(db_session)
+
+    assert response.summary.cancelled == 1
+    assert len(positions) == 1
+    assert positions[0].status == "cancelled"
+    assert positions[0].close_reason == "market_cancelled"
+    assert positions[0].realized_pnl_usd == Decimal("0.00")
+    assert positions[0].exit_value_usd == Decimal("10.00")
+
+
+def test_demo_settlement_does_not_close_when_resolution_is_not_reliable(db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("10"))
+    trade = _trade("0xsettle-unknown", price="0.40", wallet=wallet.proxy_wallet) | {
+        "slug": "settle-unknown-market",
+        "conditionId": "cond-unknown-market",
+        "asset": "asset-weird-unknown",
+        "outcome": "MAYBE",
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    market = _create_market(
+        db_session,
+        slug="settle-unknown-market",
+        condition_id="cond-unknown-market",
+        yes_token_id="asset-yes-unknown",
+        no_token_id="asset-no-unknown",
+        end_date=_now() - timedelta(minutes=1),
+        active=False,
+        closed=True,
+    )
+    _create_market_outcome(db_session, market=market, resolved_outcome="yes")
+
+    response = settle_open_demo_positions(db_session, gamma_client=DummyGammaClient(), now=_now())
+    positions = list_open_demo_positions(db_session)
+
+    assert response.summary.unknown_resolution == 1
+    assert len(positions) == 1
+    assert positions[0].status == "unknown_resolution"
+    assert positions[0].close_reason == "no_reliable_resolution"
+
+
 def test_open_demo_positions_read_calculates_unrealized_pnl(db_session: Session) -> None:
     _create_wallet(db_session, amount=Decimal("10"))
     trade = _trade("0xposition-pnl", price="0.40") | {"conditionId": "cond-pnl", "asset": "asset-yes"}
@@ -924,7 +1122,12 @@ def test_watcher_run_once_executes_demo_tick_once(db_session: Session) -> None:
 
 def test_watcher_marks_wallet_as_slow(db_session: Session) -> None:
     _create_wallet(db_session)
-    watcher = CopyTradingDemoWatcher(interval_seconds=1, cycle_timeout_seconds=3, live_limit=5)
+    watcher = CopyTradingDemoWatcher(
+        interval_seconds=1,
+        cycle_timeout_seconds=3,
+        live_limit=5,
+        gamma_client_factory=DummyGammaClient,
+    )
 
     result = watcher.run_once(db=db_session, data_client=SlowTradeReader(1.05, [_trade("0xslow")]), now=_now())
 
@@ -958,7 +1161,7 @@ def test_watcher_marks_wallet_timeout_and_continues(db_session: Session) -> None
 
 def test_watcher_live_scan_limit_caps_trades_per_wallet(db_session: Session) -> None:
     wallet = _create_wallet(db_session)
-    watcher = CopyTradingDemoWatcher(interval_seconds=5, live_limit=5)
+    watcher = CopyTradingDemoWatcher(interval_seconds=5, live_limit=5, gamma_client_factory=DummyGammaClient)
     trades = [_trade(f"0xlive-{index}", wallet=wallet.proxy_wallet) for index in range(12)]
 
     result = watcher.run_once(db=db_session, data_client=FakeTradeReader(trades), now=_now())
@@ -1099,7 +1302,11 @@ def test_watcher_groups_repeated_historical_skip_events(db_session: Session) -> 
 def test_watcher_marks_over_interval_and_counts_timeout(db_session: Session) -> None:
     _create_wallet(db_session, suffix="11")
     _create_wallet(db_session, suffix="22")
-    watcher = CopyTradingDemoWatcher(interval_seconds=1, cycle_timeout_seconds=1)
+    watcher = CopyTradingDemoWatcher(
+        interval_seconds=1,
+        cycle_timeout_seconds=1,
+        gamma_client_factory=DummyGammaClient,
+    )
 
     result = watcher.run_once(db=db_session, data_client=SlowTradeReader(1.05), now=None)
 
@@ -1140,7 +1347,12 @@ def test_watcher_timeout_count_only_tracks_real_timeout(db_session: Session) -> 
 def test_watcher_pending_wallets_are_promoted_next_cycle(db_session: Session) -> None:
     first = _create_wallet(db_session, suffix="11")
     second = _create_wallet(db_session, suffix="22")
-    watcher = CopyTradingDemoWatcher(interval_seconds=1, cycle_timeout_seconds=1, live_limit=5)
+    watcher = CopyTradingDemoWatcher(
+        interval_seconds=1,
+        cycle_timeout_seconds=1,
+        live_limit=5,
+        gamma_client_factory=DummyGammaClient,
+    )
 
     first_run = watcher.run_once(db=db_session, data_client=SlowTradeReader(1.05), now=_now())
 
@@ -1161,7 +1373,12 @@ def test_watcher_pending_wallets_are_promoted_next_cycle(db_session: Session) ->
 def test_watcher_pending_results_include_reason_and_hint(db_session: Session) -> None:
     _create_wallet(db_session, suffix="11")
     _create_wallet(db_session, suffix="22")
-    watcher = CopyTradingDemoWatcher(interval_seconds=1, cycle_timeout_seconds=1, live_limit=5)
+    watcher = CopyTradingDemoWatcher(
+        interval_seconds=1,
+        cycle_timeout_seconds=1,
+        live_limit=5,
+        gamma_client_factory=DummyGammaClient,
+    )
 
     result = watcher.run_once(db=db_session, data_client=SlowTradeReader(1.05), now=_now())
 
@@ -1194,6 +1411,33 @@ def test_watcher_start_stop_routes(client: TestClient, monkeypatch: pytest.Monke
     assert start_response.json()["enabled"] is True
     assert stop_response.status_code == 200
     assert stop_response.json()["enabled"] is False
+
+
+def test_demo_settlement_run_once_route(client: TestClient, db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("10"))
+    trade = _trade("0xroute-settlement", price="0.40", wallet=wallet.proxy_wallet) | {
+        "slug": "route-settlement-market",
+        "conditionId": "cond-route-settlement",
+        "asset": "asset-yes-route",
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    market = _create_market(
+        db_session,
+        slug="route-settlement-market",
+        condition_id="cond-route-settlement",
+        yes_token_id="asset-yes-route",
+        no_token_id="asset-no-route",
+        end_date=_now() - timedelta(minutes=1),
+        active=False,
+        closed=True,
+    )
+    _create_market_outcome(db_session, market=market, resolved_outcome="yes")
+    app.dependency_overrides[get_polymarket_client] = lambda: DummyGammaClient()
+
+    response = client.post("/copy-trading/demo/settlement/run-once")
+
+    assert response.status_code == 200
+    assert response.json()["summary"]["closed_by_market_resolution"] == 1
 
 
 def _create_wallet(
@@ -1242,7 +1486,56 @@ def _build_test_watcher() -> CopyTradingDemoWatcher:
         interval_seconds=5,
         session_factory=DummySession,
         data_client_factory=DummyDataClient,
+        gamma_client_factory=DummyGammaClient,
     )
+
+
+def _create_market(
+    db_session: Session,
+    *,
+    slug: str,
+    condition_id: str,
+    yes_token_id: str,
+    no_token_id: str,
+    end_date: datetime,
+    active: bool,
+    closed: bool,
+) -> Market:
+    event = Event(
+        polymarket_event_id=f"event-{slug}",
+        title=f"Event {slug}",
+        slug=f"event-{slug}",
+        active=active,
+        closed=closed,
+        end_at=end_date,
+    )
+    market = Market(
+        polymarket_market_id=f"market-{slug}",
+        event=event,
+        question=f"Will {slug} resolve?",
+        slug=slug,
+        condition_id=condition_id,
+        yes_token_id=yes_token_id,
+        no_token_id=no_token_id,
+        active=active,
+        closed=closed,
+        end_date=end_date,
+    )
+    db_session.add_all([event, market])
+    db_session.commit()
+    return market
+
+
+def _create_market_outcome(db_session: Session, *, market: Market, resolved_outcome: str) -> MarketOutcome:
+    outcome = MarketOutcome(
+        market_id=market.id,
+        resolved_outcome=resolved_outcome,
+        resolution_source="local_market_outcome",
+        resolved_at=_now(),
+    )
+    db_session.add(outcome)
+    db_session.commit()
+    return outcome
 
 
 def _now() -> datetime:
