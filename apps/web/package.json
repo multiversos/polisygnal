@@ -19,7 +19,8 @@
     "test:analysis-agent-timeout": "node scripts/test-analysis-agent-timeout.mjs",
     "test:independent-evidence": "node scripts/test-independent-evidence.mjs",
     "test:external-odds": "node scripts/test-external-odds.mjs",
-    "test:sports-context": "node scripts/test-sports-context.mjs"
+    "test:sports-context": "node scripts/test-sports-context.mjs",
+    "test:odds-comparison-display": "node scripts/test-odds-comparison-display.mjs"
   },
   "dependencies": {
     "next": "15.5.15",

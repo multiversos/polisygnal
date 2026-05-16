@@ -11435,6 +11435,42 @@ html:not([data-theme="dark"]) .app-sidebar {
   font-size: 0.86rem;
 }
 
+.odds-comparison-section {
+  display: grid;
+  gap: 12px;
+}
+
+.odds-comparison-table {
+  padding: 0;
+}
+
+.odds-comparison-row {
+  grid-template-columns: minmax(110px, 1.3fr) repeat(3, minmax(84px, 1fr));
+}
+
+.odds-comparison-header {
+  background: rgba(24, 143, 255, 0.08);
+}
+
+.odds-comparison-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted-foreground);
+  font-size: 0.84rem;
+}
+
+.odds-delta.external_higher {
+  color: #8be0a7;
+}
+
+.odds-delta.polymarket_higher {
+  color: #f7b267;
+}
+
+.odds-delta.same {
+  color: var(--foreground);
+}
+
 @media (max-width: 980px) {
   .home-analyzer-hero {
     grid-template-columns: 1fr;
@@ -11485,6 +11521,10 @@ html:not([data-theme="dark"]) .app-sidebar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .odds-comparison-row {
+    grid-template-columns: minmax(90px, 1fr) repeat(3, minmax(72px, 1fr));
+  }
+
   .analyzer-summary-columns {
     grid-template-columns: 1fr;
   }
@@ -11517,6 +11557,11 @@ html:not([data-theme="dark"]) .app-sidebar {
   .app-nav {
     flex-wrap: wrap;
     overflow-x: visible;
+  }
+
+  .odds-comparison-row {
+    grid-template-columns: minmax(82px, 1fr) repeat(3, minmax(60px, 1fr));
+    gap: 6px;
   }
 
   .app-nav-item {

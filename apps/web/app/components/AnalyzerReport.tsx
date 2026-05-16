@@ -48,6 +48,7 @@ import {
   buildIndependentEvidenceSummary,
   getIndependentEvidenceStatusLabel,
 } from "../lib/independentEvidence";
+import { buildOddsComparisonDisplay } from "../lib/oddsComparisonDisplay";
 import type { ExternalOddsComparison } from "../lib/externalOddsTypes";
 import type { MarketOverviewItem } from "../lib/marketOverview";
 import {
@@ -217,6 +218,37 @@ function formatMarketPriceValue(value: unknown): string {
 
 function formatOutcomePriceCard(card: DisplayMarketPriceCard): string {
   return `${card.name} ${formatMarketPriceValue(card.price)}`;
+}
+
+function formatProbabilityPercent(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) {
+    return "No comparable";
+  }
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatDifferencePoints(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) {
+    return "No comparable";
+  }
+  const sign = value > 0 ? "+" : value < 0 ? "" : "";
+  return `${sign}${value.toFixed(1)} pts`;
+}
+
+function oddsVariantLabel(value?: string | null): string | null {
+  if (value === "without_main") {
+    return "without_main";
+  }
+  if (value === "without_live") {
+    return "without_live";
+  }
+  if (value === "base_league_only") {
+    return "base_league_only";
+  }
+  if (value === "primary") {
+    return "primary";
+  }
+  return value?.trim() || null;
 }
 
 function outcomePriceSummary(item: MarketOverviewItem): string | null {
@@ -860,6 +892,10 @@ export function AnalyzerReport({
     suggestedDecisionAvailable: polySignalEstimate.available,
     walletSummary,
   });
+  const oddsComparisonDisplay = useMemo(
+    () => buildOddsComparisonDisplay(item, externalOddsComparison),
+    [externalOddsComparison, item],
+  );
   const walletPublicActivityCount =
     walletSummary.publicActivities?.length ?? walletSummary.allActivitiesCount ?? 0;
   const walletLargeTradeCount = walletSummary.largeTrades?.length ?? 0;
@@ -1341,7 +1377,9 @@ export function AnalyzerReport({
             <p className="section-note">
               {hasDirectExternalOdds
                 ? "Ya hay odds externas comparables disponibles. PolySignal mantiene la estimacion propia en espera hasta que las compuertas conservadoras validen suficiente soporte adicional."
-                : "Todavia no hay suficiente evidencia para generar un porcentaje propio. PolySignal necesita Samantha validada y al menos un soporte independiente real."}
+                : externalOddsComparison?.status === "no_match"
+                  ? "Odds externas consultadas, pero sin equivalente claro. PolySignal mantiene la estimacion propia en espera y no inventa comparaciones."
+                  : "Todavia no hay suficiente evidencia para generar un porcentaje propio. PolySignal necesita Samantha validada y al menos un soporte independiente real."}
             </p>
             <div className="wallet-warning-list">
               {polySignalEstimate.blockers.slice(0, 5).map((entry) => (
@@ -1617,6 +1655,75 @@ export function AnalyzerReport({
                 </article>
               ))}
             </div>
+            {oddsComparisonDisplay ? (
+              <article className="samantha-report-section odds-comparison-section">
+                <div className="samantha-report-section-heading">
+                  <span>Comparacion con OddsBlaze</span>
+                  <em className={`independent-evidence-status ${independentEvidenceStatusClass(oddsComparisonDisplay.status)}`}>
+                    {getIndependentEvidenceStatusLabel(oddsComparisonDisplay.status)}
+                  </em>
+                </div>
+                <strong>
+                  {oddsComparisonDisplay.providerName} via {oddsComparisonDisplay.sportsbook}. Comparacion externa, no recomendacion.
+                </strong>
+                <p>{oddsComparisonDisplay.summary}</p>
+                {oddsComparisonDisplay.status === "available" || oddsComparisonDisplay.status === "partial" ? (
+                  <>
+                    <div className="wallet-report-table odds-comparison-table" role="list">
+                      <div className="wallet-report-row odds-comparison-row odds-comparison-header" role="listitem">
+                        <strong>Outcome</strong>
+                        <strong>Polymarket</strong>
+                        <strong>{oddsComparisonDisplay.sportsbook}</strong>
+                        <strong>Diferencia</strong>
+                      </div>
+                      {oddsComparisonDisplay.rows.map((row) => (
+                        <div className="wallet-report-row odds-comparison-row" key={row.outcomeLabel} role="listitem">
+                          <strong>{row.outcomeLabel}</strong>
+                          <span>{formatProbabilityPercent(row.polymarketProbability)}</span>
+                          <span>{formatProbabilityPercent(row.externalProbability)}</span>
+                          <span className={`odds-delta ${row.direction}`}>{formatDifferencePoints(row.differencePoints)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="data-health-notes">
+                      <span className="badge external-hint">Confianza match: {oddsComparisonDisplay.matchConfidence}</span>
+                      {oddsVariantLabel(oddsComparisonDisplay.matchedQueryVariant) ? (
+                        <span className="badge">Match usando variante: {oddsVariantLabel(oddsComparisonDisplay.matchedQueryVariant)}</span>
+                      ) : null}
+                      {externalOddsComparison?.checkedAt ? (
+                        <span className="badge muted">Revisado {formatDate(externalOddsComparison.checkedAt)}</span>
+                      ) : null}
+                    </div>
+                  </>
+                ) : null}
+                {oddsComparisonDisplay.status === "no_match" ? (
+                  <>
+                    <small>
+                      No se encontro equivalente claro en OddsBlaze.
+                      {externalOddsComparison?.attemptedQueries
+                        ? ` Consultas seguras: ${externalOddsComparison.attemptedQueries}.`
+                        : ""}
+                    </small>
+                    {externalOddsComparison?.attemptedQueryVariants?.length ? (
+                      <div className="wallet-warning-list">
+                        <span className="warning-chip">
+                          Variantes: {externalOddsComparison.attemptedQueryVariants.join(", ")}
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+                {oddsComparisonDisplay.limitations.length > 0 ? (
+                  <div className="wallet-warning-list">
+                    {oddsComparisonDisplay.limitations.slice(0, 3).map((limitation) => (
+                      <span className="warning-chip" key={limitation}>
+                        {limitation}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
+            ) : null}
             <article className="samantha-report-section">
               <span>Que falta para estimar</span>
               <strong>

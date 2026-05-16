@@ -109,7 +109,11 @@ Estado visible verificado:
   privada, `sportsbook` configurable y matching auditado por participantes +
   fecha. Si no hay match claro, timeout o provider off, la UI muestra
   `Sin match claro`, `Odds no disponibles` o `Proveedor no configurado`; no se
-  inventan odds ni se convierten en recomendacion automatica.
+  inventan odds ni se convierten en recomendacion automatica. Cuando hay match
+  comparable, `AnalyzerReport` muestra una comparacion Polymarket vs OddsBlaze
+  por outcome, con diferencia en puntos porcentuales, confianza de match y la
+  variante segura usada por el provider. Esa diferencia sigue siendo contexto
+  externo, no un pick automatico ni una estimacion propia de PolySignal.
 - `Ver billeteras` usa una vista compacta por wallet: direccion publica,
   tipo de actividad, outcome/posicion, monto, precio, shares/contratos,
   posicion, PnL/win rate solo si vienen reales, mercados cerrados y wins/losses

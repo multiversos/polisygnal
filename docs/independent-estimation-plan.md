@@ -94,3 +94,15 @@ La comparacion solo cuenta como evidencia independiente si:
 Si no, debe quedar como `Parcial`, `Sin match claro`, `Timeout` o `Proveedor no
 configurado`. El precio de Polymarket sigue siendo solo referencia y no se
 convierte en estimate propio.
+
+Cuando el provider devuelve match comparable, `AnalyzerReport` puede mostrar
+una tabla `Polymarket vs OddsBlaze` por outcome con:
+
+- probabilidad visible de Polymarket;
+- probabilidad externa de DraftKings via OddsBlaze;
+- diferencia en puntos porcentuales;
+- confianza del match;
+- variante segura usada por el provider.
+
+Esa comparacion externa sirve para verificacion visual. No debe presentarse
+como recomendacion, pick automatico ni estimate propio de PolySignal.

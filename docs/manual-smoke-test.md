@@ -763,7 +763,17 @@ Use these quick checks when reviewing public pages:
    same-origin, does not expose the API key, and only marks `Odds externas`
    as independent when the provider returns a medium/high match with real
    outcomes.
-14. Local debug-only manual report tooling may exist behind
+14. When `Odds externas` is `Disponible`, confirm `Evidencia independiente`
+    shows `Comparacion con OddsBlaze` with:
+   - outcome label,
+   - Polymarket probability,
+   - DraftKings/OddsBlaze probability,
+   - difference in percentage points,
+   - match confidence,
+   - matched query variant.
+   This comparison must be labeled as external context only, not a PolySignal
+   prediction or recommendation.
+15. Local debug-only manual report tooling may exist behind
    `NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS=1`; it is not part of the public
    production flow.
 
