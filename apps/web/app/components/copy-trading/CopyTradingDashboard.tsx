@@ -40,6 +40,7 @@ const DEFAULT_WATCHER: CopyTradingWatcherStatus = {
   enabled: false,
   running: false,
   interval_seconds: 5,
+  cycle_budget_seconds: 8,
   current_run_started_at: null,
   last_run_started_at: null,
   last_run_at: null,
@@ -436,6 +437,7 @@ export function CopyTradingDashboard() {
           summary={data?.demo_pnl_summary ?? null}
           trades={data?.trades ?? []}
           wallets={data?.wallets ?? []}
+          watcher={data?.watcher ?? DEFAULT_WATCHER}
           watcherIntervalSeconds={data?.watcher.interval_seconds ?? DEFAULT_WATCHER.interval_seconds}
         />
       </section>

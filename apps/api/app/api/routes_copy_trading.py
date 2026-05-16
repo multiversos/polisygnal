@@ -233,9 +233,8 @@ def post_copy_trading_watcher_stop() -> CopyTradingWatcherStatusResponse:
 @router.post("/watcher/run-once", response_model=CopyTradingWatcherStatusResponse)
 def post_copy_trading_watcher_run_once(
     db: Session = Depends(get_db),
-    data_client: PolymarketDataClient = Depends(get_polymarket_data_client),
 ) -> CopyTradingWatcherStatusResponse:
-    result = demo_watcher.run_once(db=db, data_client=data_client)
+    result = demo_watcher.run_once(db=db)
     db.commit()
     return result.status
 

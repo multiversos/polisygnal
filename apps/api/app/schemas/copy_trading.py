@@ -27,6 +27,8 @@ CopyOrderStatus = Literal[
 ]
 CopyEventLevel = Literal["info", "warning", "error"]
 CopyDemoPositionStatus = Literal["open", "closed", "price_pending"]
+CopyWatcherWalletScanStatus = Literal["ok", "slow", "timeout", "error", "skipped"]
+CopyWatcherWalletPriority = Literal["high", "normal", "low"]
 
 COPY_AMOUNT_PRESETS = {
     Decimal("1"),
@@ -273,6 +275,10 @@ class CopyTradingTickResponse(BaseModel):
     historical_trades: int = 0
     skipped_reasons: dict[str, int] = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)
+    wallet_scan_results: list["CopyTradingWatcherWalletScanResult"] = Field(default_factory=list)
+    cycle_budget_exceeded: bool = False
+    skipped_wallets_due_to_budget: int = 0
+    pending_wallets: int = 0
 
 
 class CopyTradingWatcherLastResult(BaseModel):
@@ -289,12 +295,35 @@ class CopyTradingWatcherLastResult(BaseModel):
     historical_trades: int = 0
     skipped_reasons: dict[str, int] = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)
+    wallet_scan_results: list["CopyTradingWatcherWalletScanResult"] = Field(default_factory=list)
+    cycle_budget_exceeded: bool = False
+    skipped_wallets_due_to_budget: int = 0
+    pending_wallets: int = 0
+
+
+class CopyTradingWatcherWalletScanResult(BaseModel):
+    wallet_id: str
+    alias: str | None = None
+    wallet_address_short: str
+    status: CopyWatcherWalletScanStatus = "ok"
+    duration_ms: int | None = None
+    trades_detected: int = 0
+    new_trades: int = 0
+    orders_simulated: int = 0
+    orders_skipped: int = 0
+    historical_trades: int = 0
+    live_candidates: int = 0
+    timeout: bool = False
+    error_message: str | None = None
+    priority: CopyWatcherWalletPriority = "normal"
+    next_scan_hint: str | None = None
 
 
 class CopyTradingWatcherStatusResponse(BaseModel):
     enabled: bool
     running: bool
     interval_seconds: int
+    cycle_budget_seconds: int
     current_run_started_at: datetime | None = None
     last_run_started_at: datetime | None = None
     last_run_at: datetime | None = None

@@ -1488,7 +1488,7 @@ async function main() {
     "Pausar watcher",
     "Ejecutar una vez",
     "Prueba manual de un solo escaneo.",
-    "escanea todas las wallets activas cada 5s",
+    "No ejecuta operaciones reales",
     "No ejecuta operaciones reales",
     "Wallets seguidas",
     "Escanear wallets",
@@ -1547,6 +1547,11 @@ async function main() {
   assertTextIncludesOneOf(copyTradingText, ["Estado actual", "Sin wallets."], "copy trading current status summary");
   assertTextIncludesOneOf(copyTradingText, ["Ultimo trade", "Sin wallets."], "copy trading last trade summary");
   assertTextIncludesOneOf(copyTradingText, ["Actividad", "Sin wallets."], "copy trading activity summary");
+  assertTextIncludesOneOf(
+    copyTradingText,
+    ["Wallets lentas", "escanea todas las wallets activas cada 5s", "mantener el escaneo live"],
+    "copy trading watcher health summary",
+  );
   assertTextIncludesOneOf(copyTradingText, ["Demo", "Sin wallets."], "copy trading demo summary");
   assertTextIncludesOneOf(copyTradingText, ["Copiadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo copied summary");
   assertTextIncludesOneOf(copyTradingText, ["Saltadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo skipped summary");

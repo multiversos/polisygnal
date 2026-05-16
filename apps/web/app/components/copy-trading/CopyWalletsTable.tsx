@@ -21,6 +21,8 @@ import type {
   CopyDetectedTrade,
   CopyTradingDemoPnlSummary,
   CopyTradingTickSummary,
+  CopyTradingWatcherStatus,
+  CopyTradingWatcherWalletScanResult,
   CopyTradeSide,
   CopyWallet,
 } from "../../lib/copyTradingTypes";
@@ -37,6 +39,7 @@ type CopyWalletsTableProps = {
   summary: CopyTradingDemoPnlSummary | null;
   trades: CopyDetectedTrade[];
   wallets: CopyWallet[];
+  watcher: CopyTradingWatcherStatus;
   watcherIntervalSeconds: number;
 };
 
@@ -59,6 +62,7 @@ export function CopyWalletsTable({
   summary,
   trades,
   wallets,
+  watcher,
   watcherIntervalSeconds,
 }: CopyWalletsTableProps) {
   const [pendingActionByWallet, setPendingActionByWallet] = useState<Record<string, RowAction>>({});
@@ -121,6 +125,10 @@ export function CopyWalletsTable({
       };
     });
   }, [positionsByWallet, tradesByWallet, wallets]);
+
+  const watcherHealthByWallet = useMemo(() => {
+    return new Map((watcher.last_result?.wallet_scan_results ?? []).map((entry) => [entry.wallet_id, entry]));
+  }, [watcher.last_result?.wallet_scan_results]);
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -375,6 +383,7 @@ export function CopyWalletsTable({
                     const pendingAction = pendingActionByWallet[row.wallet.id] ?? null;
                     const isSelected = row.wallet.id === selectedWalletId;
                     const walletPnlTone = pnlTone(row.analytics.totalPnlUsd);
+                    const scanHealth = watcherHealthByWallet.get(row.wallet.id) ?? null;
                     return (
                       <article
                         aria-pressed={isSelected}
@@ -436,6 +445,11 @@ export function CopyWalletsTable({
                           <span className={`copy-badge ${row.wallet.enabled ? "success" : "skipped"}`}>
                             {row.wallet.enabled ? "Activa" : "Pausada"}
                           </span>
+                          {scanHealth ? (
+                            <span className={`copy-badge ${scanHealthBadgeTone(scanHealth.status)}`}>
+                              {scanHealthLabel(scanHealth.status)}
+                            </span>
+                          ) : null}
                         </div>
 
                         <div className="copy-wallet-row-meta">
@@ -453,8 +467,8 @@ export function CopyWalletsTable({
                             {formatTradeAge(ageSecondsFromNow(row.latestTradeAt))}
                           </div>
                           <div className="copy-wallet-row-meta-item">
-                            <strong>Copiadas</strong>
-                            {row.wallet.demo_copied_count}
+                            <strong>Escaneo</strong>
+                            {scanHealth ? scanHealthLabel(scanHealth.status) : "Sin datos"}
                           </div>
                         </div>
                       </article>
@@ -530,6 +544,7 @@ export function CopyWalletsTable({
                 onScan={handleScan}
                 pendingAction={pendingActionByWallet[selectedRow.wallet.id] ?? null}
                 row={selectedRow}
+                scanHealth={watcherHealthByWallet.get(selectedRow.wallet.id) ?? null}
               />
             ) : (
               <div className="copy-empty-state">
@@ -585,6 +600,7 @@ function WalletDetailPanel({
   onScan,
   pendingAction,
   row,
+  scanHealth,
 }: {
   onCopyAddress: (wallet: CopyWallet) => Promise<void>;
   onDelete: (wallet: CopyWallet) => Promise<void>;
@@ -593,6 +609,7 @@ function WalletDetailPanel({
   onScan: (wallet: CopyWallet) => Promise<void>;
   pendingAction: RowAction;
   row: WalletRow;
+  scanHealth: CopyTradingWatcherWalletScanResult | null;
 }) {
   const latestTrade = row.latestTrade;
   const latestAction = latestTrade?.side ? latestTrade.side.toUpperCase() : row.wallet.last_demo_copy_action?.toUpperCase() ?? "-";
@@ -642,6 +659,11 @@ function WalletDetailPanel({
               <span className={`copy-badge ${row.wallet.enabled ? "success" : "skipped"}`}>
                 {row.wallet.enabled ? "Activa" : "Pausada"}
               </span>
+              {scanHealth ? (
+                <span className={`copy-badge ${scanHealthBadgeTone(scanHealth.status)}`}>
+                  {scanHealthLabel(scanHealth.status)}
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -728,7 +750,14 @@ function WalletDetailPanel({
             />
             <StatPair label="Ventana" value={formatCopyWindow(row.wallet.copy_window_seconds ?? row.wallet.max_delay_seconds)} />
             <StatPair label="Estado" value={row.wallet.enabled ? "Activa" : "Pausada"} />
+            <StatPair label="Salud de escaneo" value={scanHealth ? scanHealthLabel(scanHealth.status) : "Sin datos"} />
+            <StatPair label="Ultima duracion" value={formatDurationShort(scanHealth?.duration_ms ?? null)} />
+            <StatPair label="Prioridad" value={formatPriorityLabel(scanHealth?.priority ?? null)} />
           </div>
+          {scanHealth?.next_scan_hint ? <p className="copy-field-helper">{scanHealth.next_scan_hint}</p> : null}
+          {scanHealth?.error_message ? (
+            <p className="copy-field-helper">Ultimo aviso seguro: {scanHealth.error_message}</p>
+          ) : null}
           <div className="copy-wallet-subsection">
             <span className="copy-wallet-subsection-title">Ventana de copia</span>
             <div className="copy-action-row">
@@ -1152,4 +1181,53 @@ function getWalletScanMessage(summary: CopyTradingTickSummary): string {
     return "Escaneo completado. No se detectaron trades nuevos para esta wallet.";
   }
   return `Escaneo completado. Se detectaron ${summary.new_trades} trades nuevos para esta wallet.`;
+}
+
+function scanHealthLabel(status: CopyTradingWatcherWalletScanResult["status"]): string {
+  switch (status) {
+    case "slow":
+      return "Lenta";
+    case "timeout":
+      return "Timeout reciente";
+    case "skipped":
+      return "Pendiente";
+    case "error":
+      return "Con aviso";
+    default:
+      return "Saludable";
+  }
+}
+
+function scanHealthBadgeTone(status: CopyTradingWatcherWalletScanResult["status"]): "success" | "warning" | "locked" | "subtle" {
+  switch (status) {
+    case "slow":
+      return "warning";
+    case "timeout":
+    case "error":
+      return "locked";
+    case "skipped":
+      return "subtle";
+    default:
+      return "success";
+  }
+}
+
+function formatDurationShort(durationMs: number | null): string {
+  if (durationMs === null) {
+    return "Sin datos";
+  }
+  if (durationMs < 1000) {
+    return `${durationMs} ms`;
+  }
+  return `${(durationMs / 1000).toFixed(1)} s`;
+}
+
+function formatPriorityLabel(priority: CopyTradingWatcherWalletScanResult["priority"] | null): string {
+  if (priority === "high") {
+    return "Alta";
+  }
+  if (priority === "low") {
+    return "Baja";
+  }
+  return "Normal";
 }

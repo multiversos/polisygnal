@@ -147,6 +147,27 @@ npm.cmd --workspace apps/web run smoke:production
 - Si el trade entra dentro de la ventana configurada por wallet, se marca como `Copiable ahora` y crea simulacion demo automatica.
 - Si el trade llega tarde o ya es historico, queda registrado con texto humano y sin tratarse como error grave.
 
+## Watcher live performance
+
+- El watcher demo sigue apuntando a un intervalo objetivo de `5 segundos`, pero ahora usa un budget maximo por ciclo para no quedarse atrasado cuando una wallet o la API publica responden lento.
+- El ciclo live prioriza wallets mas utiles:
+  - actividad reciente;
+  - wallets que no vienen acumulando timeouts;
+  - wallets activas en modo `demo`.
+- Si una wallet tarda demasiado, el watcher la marca como lenta o timeout y sigue con las demas. No deja que una sola wallet bloquee todo el ciclo.
+- El watcher automatico usa un live scan mas liviano:
+  - limite menor por wallet;
+  - prioridad a trades recientes;
+  - menos historico por ciclo.
+- El backfill historico pesado queda mejor para escaneos manuales, run-once o una arquitectura futura mas robusta.
+- La UI expone salud del watcher y resultados compactos por wallet para identificar:
+  - wallets lentas;
+  - timeouts;
+  - wallets pendientes para el proximo ciclo;
+  - ciclos recortados por carga.
+- Esto sigue siendo `demo`. No activa modo real, no firma ordenes y no usa CLOB real.
+- Para un modo real futuro se necesitara una arquitectura mas robusta: worker dedicado, cola persistente, mejor estado por wallet y posiblemente WebSocket o canal server-side mas cercano a tiempo real.
+
 ## Copy Trading tiempo real - ruta tecnica
 
 Fase actual:

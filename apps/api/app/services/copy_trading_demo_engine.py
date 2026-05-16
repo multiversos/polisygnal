@@ -54,6 +54,7 @@ def scan_copy_wallet(
     limit: int = 50,
     now: datetime | None = None,
     emit_individual_skip_events: bool = True,
+    live_scan: bool = False,
 ) -> CopyTradingTickResponse:
     wallet = get_copy_wallet(db, wallet_id)
     response = CopyTradingTickResponse(wallets_scanned=1)
@@ -65,6 +66,7 @@ def scan_copy_wallet(
         now=now,
         response=response,
         emit_individual_skip_events=emit_individual_skip_events,
+        live_scan=live_scan,
     )
     return response
 
@@ -76,6 +78,7 @@ def run_demo_tick(
     limit: int = 50,
     now: datetime | None = None,
     emit_individual_skip_events: bool = True,
+    live_scan: bool = False,
 ) -> CopyTradingTickResponse:
     wallets = list(
         db.scalars(
@@ -96,6 +99,7 @@ def run_demo_tick(
             now=now,
             response=response,
             emit_individual_skip_events=emit_individual_skip_events,
+            live_scan=live_scan,
         )
     return response
 
@@ -151,6 +155,7 @@ def _scan_wallet(
     now: datetime | None,
     response: CopyTradingTickResponse,
     emit_individual_skip_events: bool,
+    live_scan: bool,
 ) -> None:
     current_time = now or datetime.now(tz=UTC)
     grouped_skips: dict[tuple[str, str], int] = {}
@@ -313,7 +318,11 @@ def _record_scan_error(
     response: CopyTradingTickResponse,
     message: str,
 ) -> None:
-    response.errors.append("No se pudo leer actividad publica.")
+    safe_message = message.lower()
+    if "timeout" in safe_message or "timed out" in safe_message or "readtimeout" in safe_message:
+        response.errors.append("Timeout al leer actividad publica.")
+    else:
+        response.errors.append("No se pudo leer actividad publica.")
     add_copy_event(
         db,
         wallet_id=wallet.id,
