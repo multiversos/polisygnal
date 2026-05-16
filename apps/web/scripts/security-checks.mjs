@@ -2680,6 +2680,9 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["Ultima actualizacion", "Auto-refresh", "Refrescar ahora", "Pausar auto"]) {
     assert(copyTradingDashboard.includes(text), `copy trading auto-refresh controls missing text: ${text}`);
   }
+  for (const text of ["Resumen", "Wallets", "Copias abiertas", "Historial de trades", "Auditoria"]) {
+    assert(copyTradingDashboard.includes(text), `copy trading tab navigation missing text: ${text}`);
+  }
   for (const text of ["Watcher demo", "Intervalo:", "interval_seconds", "Iniciar watcher demo", "Pausar watcher", "Ejecutar una vez"]) {
     assert(copyWatcherPanel.includes(text), `copy watcher panel missing text: ${text}`);
   }
@@ -2700,7 +2703,8 @@ function validateAnalyzerFirstProductSource() {
   assert(copyWalletForm.includes("1 minuto"), "copy wallet form should expose 1-minute window");
   assert(copyWalletForm.includes("2 minutos"), "copy wallet form should expose 2-minute window");
   assert(
-    copyTradingDashboard.includes("auto-copy demo ocurre automaticamente cada 5 segundos"),
+    copyTradingDashboard.includes("auto-copy demo ocurre automaticamente") &&
+      copyTradingDashboard.includes("5 segundos"),
     "copy trading dashboard should explain that auto-copy is the primary flow",
   );
   assert(
@@ -2733,15 +2737,23 @@ function validateAnalyzerFirstProductSource() {
   assert(copyWalletsTable.includes("Copiadas"), "wallet table should expose copied demo count");
   assert(copyWalletsTable.includes("Saltadas"), "wallet table should expose skipped demo count");
   assert(copyWalletsTable.includes("Ultima copia demo"), "wallet table should expose last demo copy details");
-  assert(copyDemoPnlSummaryPanel.includes("Resumen PnL demo"), "demo pnl panel should be visible");
+  assert(copyDemoPnlSummaryPanel.includes("Rendimiento demo"), "demo pnl panel should be visible");
+  assert(copyDemoPnlSummaryPanel.includes("Capital demo usado"), "demo pnl panel should expose capital used");
+  assert(copyDemoPnlSummaryPanel.includes("PnL total demo"), "demo pnl panel should expose total demo pnl");
+  assert(copyDemoPnlSummaryPanel.includes("ROI demo"), "demo pnl panel should expose demo roi");
+  assert(copyDemoPnlSummaryPanel.includes("Win rate"), "demo pnl panel should expose win rate");
   assert(copyDemoPnlSummaryPanel.includes("PnL abierto"), "demo pnl panel should expose open pnl");
   assert(copyDemoPnlSummaryPanel.includes("PnL realizado"), "demo pnl panel should expose realized pnl");
-  assert(copyDemoPnlSummaryPanel.includes("PnL total"), "demo pnl panel should expose total pnl");
+  assert(copyDemoPnlSummaryPanel.includes("Mejor copia"), "demo pnl panel should expose best closed pnl");
+  assert(copyDemoPnlSummaryPanel.includes("Peor copia"), "demo pnl panel should expose worst closed pnl");
   assert(copyOpenDemoPositionsTable.includes("Copias demo abiertas"), "open demo positions table should be visible");
   assert(copyOpenDemoPositionsTable.includes("Precio actual pendiente"), "open demo positions table should handle pending price");
+  assert(copyOpenDemoPositionsTable.includes("Valor actual"), "open demo positions table should expose current value");
   assert(copyOpenDemoPositionsTable.includes("PnL actual"), "open demo positions table should label current pnl");
   assert(copyOpenDemoPositionsTable.includes("PnL %"), "open demo positions table should label pnl percent");
-  assert(copyClosedDemoPositionsTable.includes("Historial de copias demo"), "closed demo history should be visible");
+  assert(copyClosedDemoPositionsTable.includes("Historial de trades"), "closed demo history should be visible");
+  assert(copyClosedDemoPositionsTable.includes("Ganadoras"), "closed demo history should expose winning filter");
+  assert(copyClosedDemoPositionsTable.includes("Perdedoras"), "closed demo history should expose losing filter");
   assert(copyClosedDemoPositionsTable.includes("PnL final"), "closed demo history should label final pnl");
   assert(copyClosedDemoPositionsTable.includes("Wallet vendio"), "closed demo history should explain wallet-driven closes");
   assert(copyWalletsTable.includes("Escaneando..."), "wallet scan button should show loading state");

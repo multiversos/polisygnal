@@ -11,7 +11,7 @@ export function CopyBotEvents({ events }: { events: CopyBotEvent[] }) {
         <strong>Eventos</strong>
       </div>
       {groupedEvents.length === 0 ? (
-        <div className="copy-empty-state">Sin eventos del bot todavia.</div>
+        <div className="copy-empty-state">Sin eventos recientes.</div>
       ) : (
         <div className="copy-events">
           {groupedEvents.map((event) => (

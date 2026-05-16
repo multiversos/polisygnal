@@ -266,33 +266,78 @@ def build_demo_pnl_summary(
 ) -> CopyTradingDemoPnlSummary:
     open_items = list(open_positions)
     closed_items = list(closed_positions)
+    capital_demo_used = ZERO
+    open_capital = ZERO
+    closed_capital = ZERO
+    open_current_value = ZERO
     open_pnl = ZERO
     realized_pnl = ZERO
     price_pending_count = 0
+    open_priced_count = 0
     winning_closed_count = 0
     losing_closed_count = 0
+    best_closed_pnl: Decimal | None = None
+    worst_closed_pnl: Decimal | None = None
 
     for position in open_items:
+        open_capital += position.entry_amount_usd
+        capital_demo_used += position.entry_amount_usd
         if position.unrealized_pnl_usd is None:
             price_pending_count += 1
         else:
             open_pnl += position.unrealized_pnl_usd
+            open_priced_count += 1
+        if position.current_value_usd is not None:
+            open_current_value += position.current_value_usd
 
     for position in closed_items:
+        closed_capital += position.entry_amount_usd
+        capital_demo_used += position.entry_amount_usd
         pnl = position.realized_pnl_usd or ZERO
         realized_pnl += pnl
         if pnl > 0:
             winning_closed_count += 1
         elif pnl < 0:
             losing_closed_count += 1
+        if best_closed_pnl is None or pnl > best_closed_pnl:
+            best_closed_pnl = pnl
+        if worst_closed_pnl is None or pnl < worst_closed_pnl:
+            worst_closed_pnl = pnl
 
-    total_demo_pnl = open_pnl + realized_pnl
+    open_pnl_value = _quantize_usd(open_pnl) if open_priced_count > 0 else None
+    open_current_value_value = _quantize_usd(open_current_value) if open_priced_count > 0 else None
+    realized_pnl_value = _quantize_usd(realized_pnl)
+    total_demo_pnl_value: Decimal | None = realized_pnl_value
+    if open_pnl_value is not None:
+        total_demo_pnl_value = _quantize_usd(open_pnl_value + realized_pnl_value)
+    elif len(closed_items) == 0 and len(open_items) > 0:
+        total_demo_pnl_value = None
+
+    demo_roi_percent = None
+    if capital_demo_used > 0 and total_demo_pnl_value is not None:
+        demo_roi_percent = _quantize_percent((total_demo_pnl_value / capital_demo_used) * Decimal("100"))
+
+    win_rate_percent = None
+    average_closed_pnl = None
+    if closed_items:
+        win_rate_percent = _quantize_percent((Decimal(winning_closed_count) / Decimal(len(closed_items))) * Decimal("100"))
+        average_closed_pnl = _quantize_usd(realized_pnl / Decimal(len(closed_items)))
+
     return CopyTradingDemoPnlSummary(
         open_positions_count=len(open_items),
         closed_positions_count=len(closed_items),
-        open_pnl_usd=_quantize_usd(open_pnl),
-        realized_pnl_usd=_quantize_usd(realized_pnl),
-        total_demo_pnl_usd=_quantize_usd(total_demo_pnl),
+        capital_demo_used_usd=_quantize_usd(capital_demo_used),
+        open_capital_usd=_quantize_usd(open_capital),
+        closed_capital_usd=_quantize_usd(closed_capital),
+        open_current_value_usd=open_current_value_value,
+        open_pnl_usd=open_pnl_value,
+        realized_pnl_usd=realized_pnl_value,
+        total_demo_pnl_usd=total_demo_pnl_value,
+        demo_roi_percent=demo_roi_percent,
+        win_rate_percent=win_rate_percent,
+        average_closed_pnl_usd=average_closed_pnl,
+        best_closed_pnl_usd=_quantize_usd(best_closed_pnl) if best_closed_pnl is not None else None,
+        worst_closed_pnl_usd=_quantize_usd(worst_closed_pnl) if worst_closed_pnl is not None else None,
         winning_closed_count=winning_closed_count,
         losing_closed_count=losing_closed_count,
         price_pending_count=price_pending_count,

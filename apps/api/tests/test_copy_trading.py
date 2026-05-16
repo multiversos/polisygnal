@@ -713,12 +713,43 @@ def test_demo_pnl_summary_counts_open_and_closed_positions(db_session: Session) 
 
     assert summary.open_positions_count == 1
     assert summary.closed_positions_count == 1
+    assert summary.capital_demo_used_usd == Decimal("15.00")
+    assert summary.open_capital_usd == Decimal("10.00")
+    assert summary.closed_capital_usd == Decimal("5.00")
+    assert summary.open_current_value_usd == Decimal("13.75")
     assert summary.open_pnl_usd == Decimal("3.75")
     assert summary.realized_pnl_usd == Decimal("1.50")
     assert summary.total_demo_pnl_usd == Decimal("5.25")
+    assert summary.demo_roi_percent == Decimal("35.00")
+    assert summary.win_rate_percent == Decimal("100.00")
+    assert summary.average_closed_pnl_usd == Decimal("1.50")
+    assert summary.best_closed_pnl_usd == Decimal("1.50")
+    assert summary.worst_closed_pnl_usd == Decimal("1.50")
     assert summary.winning_closed_count == 1
     assert summary.losing_closed_count == 0
     assert summary.price_pending_count == 0
+
+
+def test_demo_pnl_summary_keeps_pending_prices_out_of_current_value(db_session: Session) -> None:
+    _create_wallet(db_session, amount=Decimal("10"), suffix="11")
+    trade = _trade("0xpending-summary", price="0.40") | {"conditionId": "cond-pending-summary", "asset": "asset-pending"}
+
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+
+    open_reads = build_open_demo_positions_read(
+        list_open_demo_positions(db_session),
+        data_client=PriceAwareDataClient(),
+        now=_now(),
+    )
+    summary = build_demo_pnl_summary(open_reads, [])
+
+    assert summary.capital_demo_used_usd == Decimal("10.00")
+    assert summary.open_capital_usd == Decimal("10.00")
+    assert summary.open_current_value_usd is None
+    assert summary.open_pnl_usd is None
+    assert summary.total_demo_pnl_usd is None
+    assert summary.demo_roi_percent is None
+    assert summary.price_pending_count == 1
 
 
 def test_demo_positions_do_not_mix_wallets(db_session: Session) -> None:

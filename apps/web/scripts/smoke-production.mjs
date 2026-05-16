@@ -1146,6 +1146,11 @@ async function main() {
     "$20",
     "Personalizado",
     "Mi wallet de ejecución",
+    "Resumen",
+    "Wallets",
+    "Copias abiertas",
+    "Historial de trades",
+    "Auditoria",
     "Conectar wallet",
     "Wallet que quieres copiar",
     "Perfil o wallet pública",
@@ -1180,14 +1185,18 @@ async function main() {
   assertTextIncludesOneOf(copyTradingText, ["Demo", "Sin wallets."], "copy trading demo summary");
   assertTextIncludesOneOf(copyTradingText, ["Copiadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo copied summary");
   assertTextIncludesOneOf(copyTradingText, ["Saltadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo skipped summary");
-  assertTextIncludesOneOf(copyTradingText, ["Copias demo abiertas", "Sin copias demo abiertas todavia"], "copy trading open demo positions");
-  assertTextIncludesOneOf(copyTradingText, ["Historial de copias demo", "Sin historial de copias demo todavia"], "copy trading closed demo history");
-  assertTextIncludesOneOf(copyTradingText, ["Resumen PnL demo", "Sin resumen demo todavia"], "copy trading pnl summary");
-  assertTextIncludesOneOf(copyTradingText, ["PnL abierto", "Sin resumen demo todavia"], "copy trading open pnl");
-  assertTextIncludesOneOf(copyTradingText, ["PnL total", "Sin resumen demo todavia"], "copy trading total pnl");
+  assertTextIncludesOneOf(copyTradingText, ["Copias demo abiertas", "Todavia no hay copias demo abiertas."], "copy trading open demo positions");
+  assertTextIncludesOneOf(copyTradingText, ["Historial de trades", "Todavia no hay copias demo cerradas."], "copy trading closed demo history");
+  assertTextIncludesOneOf(copyTradingText, ["Rendimiento demo", "Todavia no hay copias demo suficientes para calcular rendimiento."], "copy trading pnl summary");
+  assertTextIncludesOneOf(copyTradingText, ["Capital demo usado", "Todavia no hay copias demo suficientes para calcular rendimiento."], "copy trading capital used");
+  assertTextIncludesOneOf(copyTradingText, ["PnL total demo", "Todavia no hay copias demo suficientes para calcular rendimiento."], "copy trading total pnl");
+  assertTextIncludesOneOf(copyTradingText, ["ROI demo", "Todavia no hay copias demo suficientes para calcular rendimiento."], "copy trading roi");
+  assertTextIncludesOneOf(copyTradingText, ["Win rate", "Todavia no hay copias demo suficientes para calcular rendimiento."], "copy trading win rate");
+  assertTextIncludesOneOf(copyTradingText, ["PnL abierto", "Todavia no hay copias demo suficientes para calcular rendimiento."], "copy trading open pnl");
+  assertTextIncludesOneOf(copyTradingText, ["PnL realizado", "Todavia no hay copias demo suficientes para calcular rendimiento."], "copy trading realized pnl");
   assertTextIncludesOneOf(
     copyTradingText,
-    ["Precio actual pendiente", "PnL actual", "Sin copias demo abiertas todavia"],
+    ["Precio actual pendiente", "PnL actual", "Todavia no hay copias demo abiertas."],
     "copy trading open position pricing",
   );
   assertTextExcludes(
