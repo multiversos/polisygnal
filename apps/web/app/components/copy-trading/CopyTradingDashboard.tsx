@@ -13,6 +13,7 @@ import {
 import type {
   CopyTradingDashboardData,
   CopyTradingTickSummary,
+  CopyTradingStatus,
   CopyTradingWatcherStatus,
 } from "../../lib/copyTradingTypes";
 import { CopyBotEvents } from "./CopyBotEvents";
@@ -40,6 +41,7 @@ type CopyTradingDashboardTab = (typeof DASHBOARD_TABS)[number]["id"];
 const DEFAULT_WATCHER: CopyTradingWatcherStatus = {
   enabled: false,
   running: false,
+  demo_only: true,
   interval_seconds: 5,
   cycle_budget_seconds: 8,
   current_run_started_at: null,
@@ -62,6 +64,40 @@ const DEFAULT_WATCHER: CopyTradingWatcherStatus = {
   behind_by_seconds: 0,
   last_error: null,
   message: null,
+  worker_status: "not_started",
+  worker_owner_id: null,
+  last_heartbeat_at: null,
+  last_loop_started_at: null,
+  last_loop_finished_at: null,
+  last_success_at: null,
+  last_result_json: null,
+  consecutive_errors: 0,
+  stale_after_seconds: 30,
+};
+
+const DEFAULT_STATUS: CopyTradingStatus = {
+  mode_default: "demo",
+  demo_only: true,
+  real_trading_available: false,
+  real_trading_block_reason: "real_trading_not_configured",
+  wallets_total: 0,
+  wallets_enabled: 0,
+  trades_detected: 0,
+  orders_simulated: 0,
+  orders_skipped: 0,
+  orders_blocked: 0,
+  open_demo_positions_count: 0,
+  last_scan_at: null,
+  worker_status: "not_started",
+  worker_owner_id: null,
+  last_heartbeat_at: null,
+  last_loop_started_at: null,
+  last_loop_finished_at: null,
+  last_success_at: null,
+  last_error: null,
+  last_result_json: null,
+  consecutive_errors: 0,
+  stale_after_seconds: 30,
 };
 
 export function CopyTradingDashboard() {
@@ -454,6 +490,7 @@ export function CopyTradingDashboard() {
             onRunOnce={handleWatcherRunOnce}
             onStart={handleWatcherStart}
             onStop={handleWatcherStop}
+            status={data?.status ?? DEFAULT_STATUS}
             watcher={data?.watcher ?? DEFAULT_WATCHER}
           />
         </div>

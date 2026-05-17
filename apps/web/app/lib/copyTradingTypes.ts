@@ -203,6 +203,7 @@ export type CopyTradingDemoPnlSummary = {
 
 export type CopyTradingStatus = {
   mode_default: CopyTradingMode;
+  demo_only: boolean;
   real_trading_available: boolean;
   real_trading_block_reason: string;
   wallets_total: number;
@@ -211,7 +212,18 @@ export type CopyTradingStatus = {
   orders_simulated: number;
   orders_skipped: number;
   orders_blocked: number;
+  open_demo_positions_count: number;
   last_scan_at: string | null;
+  worker_status: "not_started" | "running" | "stale" | "stopped" | "error" | "unknown";
+  worker_owner_id: string | null;
+  last_heartbeat_at: string | null;
+  last_loop_started_at: string | null;
+  last_loop_finished_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  last_result_json: Record<string, unknown> | null;
+  consecutive_errors: number;
+  stale_after_seconds: number;
 };
 
 export type CopyTradingTickSummary = {
@@ -267,6 +279,7 @@ export type CopyTradingWatcherWalletScanResult = {
 export type CopyTradingWatcherStatus = {
   enabled: boolean;
   running: boolean;
+  demo_only: boolean;
   interval_seconds: number;
   cycle_budget_seconds: number;
   current_run_started_at: string | null;
@@ -289,6 +302,15 @@ export type CopyTradingWatcherStatus = {
   behind_by_seconds: number;
   last_error: string | null;
   message: string | null;
+  worker_status: "not_started" | "running" | "stale" | "stopped" | "error" | "unknown";
+  worker_owner_id: string | null;
+  last_heartbeat_at: string | null;
+  last_loop_started_at: string | null;
+  last_loop_finished_at: string | null;
+  last_success_at: string | null;
+  last_result_json: Record<string, unknown> | null;
+  consecutive_errors: number;
+  stale_after_seconds: number;
 };
 
 export type CopyTradingDashboardData = {

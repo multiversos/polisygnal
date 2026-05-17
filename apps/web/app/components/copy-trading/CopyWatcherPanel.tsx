@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  CopyTradingStatus,
   CopyTradingWatcherStatus,
   CopyTradingWatcherWalletScanResult,
 } from "../../lib/copyTradingTypes";
@@ -11,6 +12,7 @@ type CopyWatcherPanelProps = {
   onRunOnce: () => Promise<void> | void;
   onStart: () => Promise<void> | void;
   onStop: () => Promise<void> | void;
+  status: CopyTradingStatus;
   watcher: CopyTradingWatcherStatus;
 };
 
@@ -19,8 +21,10 @@ export function CopyWatcherPanel({
   onRunOnce,
   onStart,
   onStop,
+  status,
   watcher,
 }: CopyWatcherPanelProps) {
+  const persistedStateLabel = describeWorkerState(watcher.worker_status);
   const busy = busyAction !== null;
   const stateLabel = watcher.enabled
     ? watcher.running
@@ -54,6 +58,10 @@ export function CopyWatcherPanel({
   const resultSummary = watcher.last_result
     ? `Ultimo resultado: wallets ${scannedWallets} | pendientes ${pendingWallets} | nuevos ${watcher.last_result.new_trades} | compras demo ${watcher.last_result.buy_simulated ?? 0} | ventas demo ${watcher.last_result.sell_simulated ?? 0}`
     : "Ultimo resultado: sin ejecuciones todavia";
+  const persistentSummary =
+    watcher.worker_status === "not_started"
+      ? "Worker demo no iniciado todavia."
+      : `${persistedStateLabel}. Heartbeat ${formatDateTime(watcher.last_heartbeat_at)}.`;
 
   return (
     <section className="copy-panel copy-watcher-panel">
@@ -66,6 +74,16 @@ export function CopyWatcherPanel({
         historico pesado para escaneos manuales o ciclos posteriores.
       </p>
       <div className="copy-wallet-details">
+        <small>Estado persistido del worker: {persistedStateLabel}</small>
+        <small>{persistentSummary}</small>
+        <small>Modo demo: no ejecuta dinero real.</small>
+        <small>Wallets activas: {status.wallets_enabled}</small>
+        <small>Posiciones abiertas: {status.open_demo_positions_count}</small>
+        <small>Ultimo heartbeat: {formatDateTime(watcher.last_heartbeat_at)}</small>
+        <small>Ultimo loop iniciado: {formatDateTime(watcher.last_loop_started_at)}</small>
+        <small>Ultimo loop terminado: {formatDateTime(watcher.last_loop_finished_at)}</small>
+        <small>Ultimo exito: {formatDateTime(watcher.last_success_at)}</small>
+        <small>Errores consecutivos: {watcher.consecutive_errors}</small>
         <small>Intervalo objetivo: {watcher.interval_seconds} segundos</small>
         <small>Budget maximo por ciclo: {watcher.cycle_budget_seconds} segundos</small>
         <small>Ciclo en curso desde {formatDateTime(watcher.current_run_started_at)}</small>
@@ -187,4 +205,21 @@ function formatWalletScanLine(entry: CopyTradingWatcherWalletScanResult): string
             : "Saludable";
   const reason = entry.reason ? ` | ${entry.reason}` : "";
   return `${alias} | ${status} | ${duration}${reason}${entry.next_scan_hint ? ` | ${entry.next_scan_hint}` : ""}`;
+}
+
+function describeWorkerState(state: CopyTradingWatcherStatus["worker_status"]): string {
+  switch (state) {
+    case "running":
+      return "Activo";
+    case "stale":
+      return "Desactualizado";
+    case "stopped":
+      return "Detenido";
+    case "error":
+      return "Error";
+    case "not_started":
+      return "No iniciado";
+    default:
+      return "Estado desconocido";
+  }
 }
