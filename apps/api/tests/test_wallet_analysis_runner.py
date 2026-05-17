@@ -15,7 +15,11 @@ from app.clients.polymarket_data import (
 )
 from app.models import PolySignalMarketSignal, WalletAnalysisCandidate, WalletAnalysisJob
 from app.services.polysignal_market_signals import list_market_signals, mark_market_signal_resolved
-from app.services.wallet_analysis_runner import WalletAnalysisRunnerConfig, run_wallet_analysis_job_once
+from app.services.wallet_analysis_runner import (
+    WalletAnalysisRunnerConfig,
+    run_wallet_analysis_job_batch,
+    run_wallet_analysis_job_once,
+)
 
 MARKET_URL = "https://polymarket.com/market/will-btc-finish-may-above-110k"
 CONDITION_ID = "cond-btc-may-110k"
@@ -243,6 +247,78 @@ def test_runner_completes_job_and_persists_candidates_and_signal(db_session: Ses
     assert yes_candidate.markets_traded_30d == 1
     assert yes_candidate.score is not None and yes_candidate.score > Decimal("0")
     assert "realized_pnl_30d_observed" in (yes_candidate.reasons_json or [])
+
+
+def test_runner_batch_progresses_job_incrementally_without_duplicate_candidates(db_session: Session) -> None:
+    now = datetime(2026, 5, 17, 18, 10, tzinfo=UTC)
+    job = _create_job(db_session, created_at=now - timedelta(minutes=5))
+    client = DummyDataClient(
+        market_positions=[
+            _build_market_position(WALLET_YES, "Yes", TOKEN_YES, "1200"),
+            _build_market_position(WALLET_NO, "No", TOKEN_NO, "350"),
+        ],
+        closed_positions_by_wallet={
+            WALLET_YES: [
+                _build_user_position(wallet=WALLET_YES, outcome="Yes", timestamp=now - timedelta(days=day), realized_pnl=value)
+                for day, value in [(1, "18"), (2, "12"), (3, "10"), (5, "-4"), (7, "8"), (10, "6")]
+            ],
+            WALLET_NO: [
+                _build_user_position(wallet=WALLET_NO, outcome="No", timestamp=now - timedelta(days=2), realized_pnl="-3"),
+                _build_user_position(wallet=WALLET_NO, outcome="No", timestamp=now - timedelta(days=9), realized_pnl="2"),
+            ],
+        },
+        trades_by_wallet={
+            WALLET_YES: [
+                _build_trade(wallet=WALLET_YES, outcome="Yes", timestamp=now - timedelta(days=day), size="12", price="0.63")
+                for day in [1, 2, 3, 4, 6, 8]
+            ],
+            WALLET_NO: [_build_trade(wallet=WALLET_NO, outcome="No", timestamp=now - timedelta(days=3), size="5", price="0.42")],
+        },
+    )
+
+    first = run_wallet_analysis_job_batch(
+        db_session,
+        job_id=job.id,
+        data_client=client,
+        config=WalletAnalysisRunnerConfig(batch_size=1, max_wallets_analyze=10, max_wallets_discovery=10, user_history_limit=100),
+        now=now,
+    )
+    db_session.commit()
+    db_session.refresh(job)
+
+    assert first.run_state == "progressed"
+    assert first.has_more is True
+    assert first.next_action == "run_next_batch"
+    assert job.status == "analyzing_wallets"
+    assert job.wallets_found == 2
+    assert job.wallets_analyzed == 1
+
+    second = run_wallet_analysis_job_batch(
+        db_session,
+        job_id=job.id,
+        data_client=client,
+        config=WalletAnalysisRunnerConfig(batch_size=1, max_wallets_analyze=10, max_wallets_discovery=10, user_history_limit=100),
+        now=now,
+    )
+    db_session.commit()
+    db_session.refresh(job)
+
+    assert second.has_more is False
+    assert job.status == "completed"
+    assert job.wallets_analyzed == 2
+    candidates = list(db_session.scalars(select(WalletAnalysisCandidate).where(WalletAnalysisCandidate.job_id == job.id)).all())
+    assert len(candidates) == 2
+
+    third = run_wallet_analysis_job_batch(
+        db_session,
+        job_id=job.id,
+        data_client=client,
+        config=WalletAnalysisRunnerConfig(batch_size=1, max_wallets_analyze=10, max_wallets_discovery=10, user_history_limit=100),
+        now=now,
+    )
+    db_session.commit()
+    assert third.run_state == "no_work_remaining"
+    assert len(list(db_session.scalars(select(WalletAnalysisCandidate).where(WalletAnalysisCandidate.job_id == job.id)).all())) == 2
 
 
 def test_runner_marks_metrics_unavailable_when_wallet_history_is_missing(db_session: Session) -> None:

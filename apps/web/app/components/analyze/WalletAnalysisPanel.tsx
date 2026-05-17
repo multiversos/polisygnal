@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createWalletAnalysisJob,
@@ -9,7 +9,7 @@ import {
   fetchWalletAnalysisJob,
   fetchWalletProfiles,
   followWalletProfileInDemo,
-  runWalletAnalysisJobOnce,
+  runWalletAnalysisJobStep,
   saveWalletAnalysisCandidateAsProfile,
   settlePendingPolySignalMarketSignals,
   settlePolySignalMarketSignal,
@@ -201,11 +201,14 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
   const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [profilesLoading, setProfilesLoading] = useState(false);
   const [signalsLoading, setSignalsLoading] = useState(false);
+  const [stepAutoAdvance, setStepAutoAdvance] = useState(false);
+  const [stepInFlight, setStepInFlight] = useState(false);
   const [sortBy, setSortBy] = useState<WalletAnalysisCandidateSortBy>("score");
   const [sortOrder, setSortOrder] = useState<WalletAnalysisSortOrder>("desc");
   const [sideFilter, setSideFilter] = useState<string>("ALL");
   const [confidenceFilter, setConfidenceFilter] = useState<WalletAnalysisConfidence | "ALL">("ALL");
   const [signalStatusFilter, setSignalStatusFilter] = useState<string>("ALL");
+  const stepTimerRef = useRef<number | null>(null);
 
   const profileByWallet = useMemo(() => {
     const map = new Map<string, WalletProfileRead>();
@@ -226,6 +229,10 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
   }, [job?.signal_summary]);
 
   useEffect(() => {
+    if (stepTimerRef.current !== null) {
+      window.clearTimeout(stepTimerRef.current);
+      stepTimerRef.current = null;
+    }
     setJob(null);
     setCandidates([]);
     setProfiles([]);
@@ -238,12 +245,22 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     setCandidatesLoading(false);
     setProfilesLoading(false);
     setSignalsLoading(false);
+    setStepAutoAdvance(false);
+    setStepInFlight(false);
     setSortBy("score");
     setSortOrder("desc");
     setSideFilter("ALL");
     setConfidenceFilter("ALL");
     setSignalStatusFilter("ALL");
   }, [normalizedUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (stepTimerRef.current !== null) {
+        window.clearTimeout(stepTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -395,6 +412,7 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     try {
       const created = await createWalletAnalysisJob(normalizedUrl);
       setJob(created.market);
+      setStepAutoAdvance(false);
       await refreshSignals(created.market);
       setActionMessage("Job de analisis profundo creado. Ya puedes ejecutar una pasada limitada.");
     } catch {
@@ -404,29 +422,81 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     }
   }
 
-  async function handleRunOnce() {
-    if (!job?.id) {
+  async function runJobStep(jobId: string, autoAdvance: boolean) {
+    if (stepTimerRef.current !== null) {
+      window.clearTimeout(stepTimerRef.current);
+      stepTimerRef.current = null;
+    }
+    if (stepInFlight) {
       return;
     }
+    setStepInFlight(true);
     setBusy(true);
     setJobError(null);
     setActionMessage(null);
     try {
-      const result = await runWalletAnalysisJobOnce({
-        batchSize: 20,
+      const result = await runWalletAnalysisJobStep({
+        batchSize: 10,
         historyLimit: 100,
-        jobId: job.id,
+        jobId,
+        maxRuntimeSeconds: 12,
         maxWallets: 50,
         maxWalletsDiscovery: 100,
       });
       setJob(result.market);
       await Promise.all([refreshProfiles(), refreshSignals(result.market)]);
-      setActionMessage(result.message);
+      const baseMessage =
+        result.run_state === "already_running"
+          ? "Ya hay otro lote corto procesandose para este job."
+          : result.message;
+      setActionMessage(
+        result.has_more
+          ? `${baseMessage} Quedan mas wallets por procesar en lotes cortos.`
+          : baseMessage,
+      );
+      if (autoAdvance && result.has_more && result.run_state !== "already_running" && !document.hidden) {
+        setStepAutoAdvance(true);
+        stepTimerRef.current = window.setTimeout(() => {
+          void runJobStep(jobId, true);
+        }, 1200);
+      } else if (autoAdvance && result.has_more && document.hidden) {
+        setStepAutoAdvance(false);
+        setActionMessage(
+          `${baseMessage} Quedan mas wallets por procesar. Reanuda el analisis cuando vuelvas a esta pestana.`,
+        );
+      } else {
+        setStepAutoAdvance(false);
+      }
     } catch {
+      setStepAutoAdvance(false);
       setJobError("No pudimos ejecutar esta pasada limitada del analisis profundo.");
     } finally {
       setBusy(false);
+      setStepInFlight(false);
     }
+  }
+
+  async function handleRunStep(autoAdvance: boolean) {
+    if (!job?.id) {
+      return;
+    }
+    if (!autoAdvance && stepTimerRef.current !== null) {
+      window.clearTimeout(stepTimerRef.current);
+      stepTimerRef.current = null;
+    }
+    if (!autoAdvance) {
+      setStepAutoAdvance(false);
+    }
+    await runJobStep(job.id, autoAdvance);
+  }
+
+  function handlePauseStep() {
+    if (stepTimerRef.current !== null) {
+      window.clearTimeout(stepTimerRef.current);
+      stepTimerRef.current = null;
+    }
+    setStepAutoAdvance(false);
+    setActionMessage("Avance automatico pausado. Puedes continuar el analisis por lotes cuando quieras.");
   }
 
   async function handleRefreshJob() {
@@ -568,8 +638,14 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
           </button>
         ) : (
           <>
-            <button className="watchlist-button active" disabled={busy} onClick={() => void handleRunOnce()} type="button">
-              {busy ? "Ejecutando..." : "Analizar wallets del mercado"}
+            <button className="watchlist-button active" disabled={busy} onClick={() => void handleRunStep(true)} type="button">
+              {busy ? "Procesando lote..." : stepAutoAdvance ? "Continuar analisis por lotes" : "Iniciar analisis"}
+            </button>
+            <button className="watchlist-button" disabled={busy || !stepAutoAdvance} onClick={handlePauseStep} type="button">
+              Pausar avance
+            </button>
+            <button className="watchlist-button" disabled={busy} onClick={() => void handleRunStep(false)} type="button">
+              Procesar un lote
             </button>
             <button className="watchlist-button" disabled={busy} onClick={() => void handleRefreshJob()} type="button">
               Refrescar progreso
@@ -651,6 +727,16 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
             <div className="focus-notice active" role="status">
               <strong>Estado del job</strong>
               <span>{job.status_detail}</span>
+            </div>
+          ) : null}
+
+          {ACTIVE_JOB_STATUSES.has(job.status) || stepAutoAdvance ? (
+            <div className="focus-notice active" role="status">
+              <strong>Analizando por lotes</strong>
+              <span>
+                Ultimo lote procesado: {job.progress.current_batch || 0}. Puedes dejar que el analisis continue por
+                steps cortos sin depender de una request larga del navegador.
+              </span>
             </div>
           ) : null}
 

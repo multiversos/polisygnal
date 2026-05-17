@@ -441,12 +441,63 @@ def test_wallet_analysis_run_once_route_returns_progress_and_signal(client: Test
     payload = response.json()
     assert payload["job_id"] == job_id
     assert payload["status"] == "completed"
+    assert payload["run_state"] == "progressed"
+    assert payload["has_more"] is False
     assert payload["wallets_found"] == 2
     assert payload["wallets_analyzed"] == 2
     assert payload["candidates_count"] == 2
     assert payload["signal_id"]
     assert payload["market"]["signal_summary"]["signal_status"] in {"pending_resolution", "no_clear_signal"}
     assert payload["market"]["progress"]["wallets_with_sufficient_history"] >= 1
+
+
+def test_wallet_analysis_run_step_route_returns_incremental_progress(client: TestClient) -> None:
+    app.dependency_overrides[get_polymarket_client] = lambda: DummyGammaAnalysisClient()
+    app.dependency_overrides[get_polymarket_data_client] = lambda: DummyDataRouteClient()
+    try:
+        created = client.post("/wallet-analysis/jobs", json={"polymarket_url": MARKET_URL})
+        assert created.status_code == 201
+        job_id = created.json()["job_id"]
+        first = client.post(
+            f"/wallet-analysis/jobs/{job_id}/run-step",
+            json={
+                "max_wallets": 20,
+                "max_wallets_discovery": 20,
+                "batch_size": 1,
+                "history_limit": 100,
+                "max_runtime_seconds": 8,
+            },
+        )
+        second = client.post(
+            f"/wallet-analysis/jobs/{job_id}/run-step",
+            json={
+                "max_wallets": 20,
+                "max_wallets_discovery": 20,
+                "batch_size": 1,
+                "history_limit": 100,
+                "max_runtime_seconds": 8,
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_polymarket_client, None)
+        app.dependency_overrides.pop(get_polymarket_data_client, None)
+
+    assert first.status_code == 200
+    first_payload = first.json()
+    assert first_payload["run_state"] == "progressed"
+    assert first_payload["status"] == "analyzing_wallets"
+    assert first_payload["has_more"] is True
+    assert first_payload["next_action"] == "run_next_batch"
+    assert first_payload["wallets_found"] == 2
+    assert first_payload["wallets_analyzed"] == 1
+
+    assert second.status_code == 200
+    second_payload = second.json()
+    assert second_payload["run_state"] == "progressed"
+    assert second_payload["status"] == "completed"
+    assert second_payload["has_more"] is False
+    assert second_payload["wallets_found"] == 2
+    assert second_payload["wallets_analyzed"] == 2
 
 
 def test_wallet_analysis_job_detail_includes_signal_summary(client: TestClient, db_session: Session) -> None:

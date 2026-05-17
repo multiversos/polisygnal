@@ -439,7 +439,7 @@ def serialize_wallet_analysis_job(
             no_wallets=job.no_wallets or 0,
             current_batch=job.current_batch or 0,
         ),
-        result_json=job.result_json,
+        result_json=_public_job_result_json(job.result_json),
         warnings=[str(item) for item in warnings if isinstance(item, str)],
         status_detail=_job_status_detail(job),
         error_message=_clean_optional(job.error_message, 2000),
@@ -600,6 +600,11 @@ def _clean_text_list(values: Iterable[str]) -> list[str]:
 
 
 def _job_status_detail(job: WalletAnalysisJob) -> str | None:
+    public_result = _public_job_result_json(job.result_json)
+    if isinstance(public_result, dict):
+        status_detail = _clean_optional(public_result.get("status_detail"), 400)
+        if status_detail:
+            return status_detail
     warnings = [str(item) for item in (job.warnings_json or []) if isinstance(item, str)]
     if job.status == "partial":
         if "wallet_discovery_truncated" in warnings:
@@ -614,6 +619,17 @@ def _job_status_detail(job: WalletAnalysisJob) -> str | None:
     if job.status == "completed" and (job.wallets_found or 0) == 0:
         return "No se detectaron wallets publicas suficientes para este mercado en esta pasada."
     return None
+
+
+def _public_job_result_json(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict):
+        return None
+    public_value = {
+        key: item
+        for key, item in value.items()
+        if key not in {"runner_state", "lock"}
+    }
+    return public_value or None
 
 
 def _default_copy_wallet_label(profile: WalletProfile) -> str:

@@ -55,9 +55,10 @@ from app.services.wallet_analysis import (
     update_wallet_profile,
 )
 from app.services.wallet_analysis_runner import (
+    WalletAnalysisJobBatchResult,
     WalletAnalysisRunnerConfig,
     WalletAnalysisRunnerError,
-    run_wallet_analysis_job_once,
+    run_wallet_analysis_job_batch,
 )
 
 router = APIRouter(tags=["wallet-analysis"])
@@ -131,36 +132,62 @@ def post_wallet_analysis_job_run_once(
     db: Session = Depends(get_db),
     data_client: PolymarketDataClient = Depends(get_polymarket_data_client),
 ) -> WalletAnalysisJobRunResponse:
+    return _run_wallet_analysis_job_step(
+        job_id=job_id,
+        payload=payload,
+        db=db,
+        data_client=data_client,
+        compatibility_mode=True,
+    )
+
+
+@router.post("/wallet-analysis/jobs/{job_id}/run-step", response_model=WalletAnalysisJobRunResponse)
+def post_wallet_analysis_job_run_step(
+    job_id: str,
+    payload: WalletAnalysisJobRunRequest,
+    db: Session = Depends(get_db),
+    data_client: PolymarketDataClient = Depends(get_polymarket_data_client),
+) -> WalletAnalysisJobRunResponse:
+    return _run_wallet_analysis_job_step(
+        job_id=job_id,
+        payload=payload,
+        db=db,
+        data_client=data_client,
+        compatibility_mode=False,
+    )
+
+
+def _run_wallet_analysis_job_step(
+    *,
+    job_id: str,
+    payload: WalletAnalysisJobRunRequest,
+    db: Session,
+    data_client: PolymarketDataClient,
+    compatibility_mode: bool,
+) -> WalletAnalysisJobRunResponse:
     try:
         existing_job = get_wallet_analysis_job(db, job_id)
     except WalletAnalysisJobNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="wallet_analysis_job_not_found") from exc
 
     if existing_job.status in {"completed", "partial", "cancelled"}:
-        candidates_count = count_wallet_analysis_candidates(db, existing_job.id)
-        signal = get_latest_market_signal_for_job(db, existing_job.id)
-        market = serialize_wallet_analysis_job(
-            existing_job,
-            candidates_count=candidates_count,
-            signal_summary=build_wallet_analysis_signal_summary(db, existing_job.id),
-        )
-        return WalletAnalysisJobRunResponse(
-            job_id=existing_job.id,
-            status=existing_job.status,
-        message="Wallet analysis job already finished for this controlled pass.",
-        wallets_found=existing_job.wallets_found,
-        wallets_analyzed=existing_job.wallets_analyzed,
-        wallets_with_sufficient_history=existing_job.wallets_with_sufficient_history,
-        candidates_count=candidates_count,
-        warnings=market.warnings,
-        status_detail=market.status_detail,
-        signal_id=signal.id if signal is not None else None,
-        signal_status=signal.signal_status if signal is not None else None,
-        market=market,
+        return _serialize_wallet_analysis_step_response(
+            db=db,
+            result=WalletAnalysisJobBatchResult(
+                job=existing_job,
+                has_more=False,
+                next_action=None,
+                run_state="no_work_remaining",
+            ),
+            message=(
+                "Wallet analysis job already finished for this controlled pass."
+                if compatibility_mode
+                else "Este job ya termino. No hace falta correr otro step."
+            ),
         )
 
     try:
-        job = run_wallet_analysis_job_once(
+        result = run_wallet_analysis_job_batch(
             db,
             job_id=job_id,
             data_client=data_client,
@@ -169,14 +196,13 @@ def post_wallet_analysis_job_run_once(
                 max_wallets_analyze=payload.max_wallets,
                 max_wallets_discovery=payload.max_wallets_discovery,
                 user_history_limit=payload.history_limit,
+                max_runtime_seconds=payload.max_runtime_seconds,
             ),
         )
         db.commit()
-        db.refresh(job)
     except WalletAnalysisRunnerError as exc:
         db.commit()
         job = get_wallet_analysis_job(db, job_id)
-        candidates_count = count_wallet_analysis_candidates(db, job.id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -187,6 +213,24 @@ def post_wallet_analysis_job_run_once(
             },
         ) from exc
 
+    return _serialize_wallet_analysis_step_response(
+        db=db,
+        result=result,
+        message=(
+            "Controlled wallet analysis pass executed."
+            if compatibility_mode
+            else "Step corto ejecutado. El analisis puede continuar por lotes."
+        ),
+    )
+
+
+def _serialize_wallet_analysis_step_response(
+    *,
+    db: Session,
+    result: WalletAnalysisJobBatchResult,
+    message: str,
+) -> WalletAnalysisJobRunResponse:
+    job = get_wallet_analysis_job(db, result.job.id)
     candidates_count = count_wallet_analysis_candidates(db, job.id)
     signal = get_latest_market_signal_for_job(db, job.id)
     market = serialize_wallet_analysis_job(
@@ -197,13 +241,16 @@ def post_wallet_analysis_job_run_once(
     return WalletAnalysisJobRunResponse(
         job_id=job.id,
         status=job.status,
-        message="Controlled wallet analysis pass executed.",
+        run_state=result.run_state,
+        message=message,
         wallets_found=job.wallets_found,
         wallets_analyzed=job.wallets_analyzed,
         wallets_with_sufficient_history=job.wallets_with_sufficient_history,
         candidates_count=candidates_count,
         warnings=market.warnings,
         status_detail=market.status_detail,
+        has_more=result.has_more,
+        next_action=result.next_action,
         signal_id=signal.id if signal is not None else None,
         signal_status=signal.signal_status if signal is not None else None,
         market=market,

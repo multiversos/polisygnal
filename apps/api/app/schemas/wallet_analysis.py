@@ -23,6 +23,7 @@ WalletAnalysisJobStatus = Literal[
 WalletAnalysisCandidateSortBy = Literal["score", "volume_30d", "win_rate_30d", "pnl_30d", "created_at"]
 SortOrder = Literal["asc", "desc"]
 WalletAnalysisResolveStatus = Literal["ok", "partial", "not_found", "unsupported", "error"]
+WalletAnalysisRunState = Literal["progressed", "already_running", "no_work_remaining", "failed"]
 MarketSignalStatus = Literal[
     "pending_resolution",
     "resolved_hit",
@@ -117,11 +118,13 @@ class WalletAnalysisJobRunRequest(BaseModel):
     max_wallets_discovery: int = Field(default=100, ge=1, le=500)
     batch_size: int = Field(default=20, ge=1, le=100)
     history_limit: int = Field(default=100, ge=1, le=250)
+    max_runtime_seconds: int = Field(default=12, ge=5, le=25)
 
 
 class WalletAnalysisJobRunResponse(BaseModel):
     job_id: str
     status: WalletAnalysisJobStatus
+    run_state: WalletAnalysisRunState
     message: str
     wallets_found: int
     wallets_analyzed: int
@@ -129,6 +132,8 @@ class WalletAnalysisJobRunResponse(BaseModel):
     candidates_count: int
     warnings: list[str] = Field(default_factory=list)
     status_detail: str | None = None
+    has_more: bool = False
+    next_action: str | None = None
     signal_id: str | None = None
     signal_status: MarketSignalStatus | None = None
     market: WalletAnalysisJobRead

@@ -14,6 +14,7 @@ export type WalletAnalysisJobStatus =
   | "partial"
   | "failed"
   | "cancelled";
+export type WalletAnalysisRunState = "progressed" | "already_running" | "no_work_remaining" | "failed";
 export type WalletAnalysisCandidateSortBy = "created_at" | "pnl_30d" | "score" | "volume_30d" | "win_rate_30d";
 export type WalletAnalysisSortOrder = "asc" | "desc";
 export type WalletProfileStatus = "candidate" | "watching" | "demo_follow" | "paused" | "rejected";
@@ -88,6 +89,7 @@ export type WalletAnalysisJobCreateResponse = {
 export type WalletAnalysisRunResponse = {
   job_id: string;
   status: WalletAnalysisJobStatus;
+  run_state: WalletAnalysisRunState;
   message: string;
   wallets_found: number;
   wallets_analyzed: number;
@@ -95,6 +97,8 @@ export type WalletAnalysisRunResponse = {
   candidates_count: number;
   warnings: string[];
   status_detail?: string | null;
+  has_more: boolean;
+  next_action?: string | null;
   signal_id?: string | null;
   signal_status?: string | null;
   market: WalletAnalysisJobRead;
@@ -267,6 +271,7 @@ export async function runWalletAnalysisJobOnce(input: {
   jobId: string;
   maxWallets?: number;
   maxWalletsDiscovery?: number;
+  maxRuntimeSeconds?: number;
 }): Promise<WalletAnalysisRunResponse> {
   return fetchApiJson<WalletAnalysisRunResponse>(`/wallet-analysis/jobs/${encodeURIComponent(input.jobId)}/run-once`, {
     body: JSON.stringify({
@@ -274,9 +279,30 @@ export async function runWalletAnalysisJobOnce(input: {
       history_limit: input.historyLimit ?? 100,
       max_wallets: input.maxWallets ?? 50,
       max_wallets_discovery: input.maxWalletsDiscovery ?? 100,
+      max_runtime_seconds: input.maxRuntimeSeconds ?? 12,
     }),
     method: "POST",
   }, 30000);
+}
+
+export async function runWalletAnalysisJobStep(input: {
+  batchSize?: number;
+  historyLimit?: number;
+  jobId: string;
+  maxWallets?: number;
+  maxWalletsDiscovery?: number;
+  maxRuntimeSeconds?: number;
+}): Promise<WalletAnalysisRunResponse> {
+  return fetchApiJson<WalletAnalysisRunResponse>(`/wallet-analysis/jobs/${encodeURIComponent(input.jobId)}/run-step`, {
+    body: JSON.stringify({
+      batch_size: input.batchSize ?? 10,
+      history_limit: input.historyLimit ?? 100,
+      max_wallets: input.maxWallets ?? 50,
+      max_wallets_discovery: input.maxWalletsDiscovery ?? 100,
+      max_runtime_seconds: input.maxRuntimeSeconds ?? 12,
+    }),
+    method: "POST",
+  }, 20000);
 }
 
 export async function fetchWalletAnalysisJob(jobId: string): Promise<WalletAnalysisJobRead> {

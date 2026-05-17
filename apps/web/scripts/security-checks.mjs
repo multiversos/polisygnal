@@ -1634,6 +1634,11 @@ function validateDeepAnalysisJobRules() {
   const storageSource = readFileSync(resolve(appRoot, "app/lib/deepAnalysisJobStorage.ts"), "utf8");
   const analyzePage = readFileSync(resolve(appRoot, "app/analyze/page.tsx"), "utf8");
   const reportSource = readFileSync(resolve(appRoot, "app/components/AnalyzerReport.tsx"), "utf8");
+  const walletAnalysisPanelSource = readFileSync(
+    resolve(appRoot, "app/components/analyze/WalletAnalysisPanel.tsx"),
+    "utf8",
+  );
+  const walletAnalysisSource = readFileSync(resolve(appRoot, "app/lib/walletAnalysis.ts"), "utf8");
   const historySource = readFileSync(resolve(appRoot, "app/history/page.tsx"), "utf8");
 
   let job = createDeepAnalysisJob("https://polymarket.com/event/test");
@@ -1734,6 +1739,10 @@ function validateDeepAnalysisJobRules() {
   assert(analyzePage.includes("getLatestDeepAnalysisJobForUrl(normalizedUrl)"), "analyze page should reuse pending jobs by URL");
   assert(analyzePage.includes("WalletAnalysisPanel"), "analyze page should hand off the primary experience to wallet-analysis");
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
+  assert(walletAnalysisPanelSource.includes("runWalletAnalysisJobStep"), "wallet analysis panel should use the short run-step endpoint");
+  assert(walletAnalysisPanelSource.includes("Analizando por lotes"), "wallet analysis panel should explain incremental batch processing");
+  assert(walletAnalysisSource.includes("/run-step"), "wallet analysis client should target the short run-step route");
+  assert(!walletAnalysisPanelSource.includes("runWalletAnalysisJobOnce("), "wallet analysis panel should not depend on the long run-once request");
   assert(reportSource.includes("Detalles avanzados del analisis"), "AnalyzerReport should keep advanced details behind a collapsed section");
   assert(reportSource.includes("Estado del motor"), "AnalyzerReport should expose an accessible job-state label");
   assert(reportSource.includes("{analysisAgentName} automatico"), "AnalyzerReport should show dynamic automatic agent state");

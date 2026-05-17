@@ -39,6 +39,7 @@ const SAFE_WRITE_RULES = [
   { method: "POST", pattern: /^\/copy-trading\/watcher\/run-once$/ },
   { method: "POST", pattern: /^\/wallet-analysis\/jobs$/ },
   { method: "POST", pattern: /^\/wallet-analysis\/jobs\/[^/]+\/run-once$/ },
+  { method: "POST", pattern: /^\/wallet-analysis\/jobs\/[^/]+\/run-step$/ },
   { method: "POST", pattern: /^\/wallet-analysis\/candidates\/[^/]+\/save-profile$/ },
   { method: "POST", pattern: /^\/wallet-profiles$/ },
   { method: "PATCH", pattern: /^\/wallet-profiles\/[^/]+$/ },

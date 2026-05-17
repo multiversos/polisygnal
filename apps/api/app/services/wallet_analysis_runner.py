@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -25,7 +26,9 @@ DEFAULT_ANALYZE_LIMIT = 100
 DEFAULT_BATCH_SIZE = 20
 DEFAULT_TRADES_PAGE_SIZE = 100
 DEFAULT_USER_HISTORY_LIMIT = 100
+DEFAULT_STEP_RUNTIME_SECONDS = 12
 MIN_HISTORY_ITEMS_FOR_CONFIDENCE = 5
+RUNNER_LOCK_TTL_SECONDS = 90
 
 
 class WalletAnalysisRunnerError(Exception):
@@ -39,6 +42,7 @@ class WalletAnalysisRunnerConfig:
     max_wallets_discovery: int = DEFAULT_DISCOVERY_LIMIT
     trades_page_size: int = DEFAULT_TRADES_PAGE_SIZE
     user_history_limit: int = DEFAULT_USER_HISTORY_LIMIT
+    max_runtime_seconds: int = DEFAULT_STEP_RUNTIME_SECONDS
 
 
 @dataclass(slots=True)
@@ -51,6 +55,14 @@ class DiscoveredWalletCandidate:
     raw_summary_json: dict[str, object]
 
 
+@dataclass(slots=True)
+class WalletAnalysisJobBatchResult:
+    job: WalletAnalysisJob
+    has_more: bool
+    next_action: str | None
+    run_state: str
+
+
 def run_wallet_analysis_job_once(
     db: Session,
     *,
@@ -60,122 +72,247 @@ def run_wallet_analysis_job_once(
     now: datetime | None = None,
 ) -> WalletAnalysisJob:
     runner_config = config or WalletAnalysisRunnerConfig()
-    job = get_wallet_analysis_job(db, job_id)
-    job_now = now or datetime.now(tz=UTC)
-    if job.status in {"completed", "cancelled"}:
-        return job
-    try:
-        if not job.condition_id:
-            job.status = "failed"
-            job.started_at = job.started_at or job_now
-            job.finished_at = job_now
-            job.error_message = "condition_id_unavailable"
-            job.result_json = {"status": "failed", "reason": "condition_id_unavailable"}
-            db.add(job)
-            db.flush()
-            return job
-
-        job.status = "resolving_market"
-        job.started_at = job.started_at or job_now
-        job.error_message = None
-        job.warnings_json = []
-        db.add(job)
-        db.flush()
-
-        warnings: list[str] = []
-        job.status = "discovering_wallets"
-        discovered = discover_market_wallets(
-            job,
+    while True:
+        batch = run_wallet_analysis_job_batch(
+            db,
+            job_id=job_id,
             data_client=data_client,
-            max_wallets_discovery=runner_config.max_wallets_discovery,
-            trades_page_size=runner_config.trades_page_size,
-            warnings=warnings,
+            config=WalletAnalysisRunnerConfig(
+                batch_size=runner_config.batch_size,
+                max_wallets_analyze=runner_config.max_wallets_analyze,
+                max_wallets_discovery=runner_config.max_wallets_discovery,
+                trades_page_size=runner_config.trades_page_size,
+                user_history_limit=runner_config.user_history_limit,
+                max_runtime_seconds=max(runner_config.max_runtime_seconds, 120),
+            ),
+            now=now,
         )
-        job.wallets_found = len(discovered)
-        db.add(job)
-        db.flush()
+        if batch.run_state == "already_running":
+            raise WalletAnalysisRunnerError("wallet_analysis_job_already_running")
+        if not batch.has_more:
+            return batch.job
 
-        if not discovered:
-            job.status = "completed"
-            job.finished_at = job_now
-            job.result_json = {
-                "status": "completed",
-                "wallets_found": 0,
-                "wallets_analyzed": 0,
-                "wallets_with_sufficient_history": 0,
-                "warnings": warnings,
-            }
-            job.warnings_json = _dedupe(warnings)
-            create_market_signal_from_analysis_result(db, job=job, candidates=[], result_summary=job.result_json)
-            db.flush()
-            return job
 
-        job.status = "analyzing_wallets"
-        db.add(job)
-        db.flush()
-
-        wallets_to_analyze = discovered[: runner_config.max_wallets_analyze]
-        sufficient_history = 0
-        batch_number = 0
-
-        for batch_start in range(0, len(wallets_to_analyze), runner_config.batch_size):
-            batch_number += 1
-            batch = wallets_to_analyze[batch_start : batch_start + runner_config.batch_size]
-            job.current_batch = batch_number
-            db.add(job)
-            db.flush()
-            sufficient_history += analyze_wallet_batch(
-                db,
-                job=job,
-                discovered_wallets=batch,
-                data_client=data_client,
-                history_limit=runner_config.user_history_limit,
-                now=job_now,
-                warnings=warnings,
-            )
-            job.wallets_analyzed = min(len(wallets_to_analyze), batch_start + len(batch))
-            job.wallets_with_sufficient_history = sufficient_history
-            db.add(job)
-            db.flush()
-
-        job.status = "scoring"
-        db.add(job)
-        db.flush()
-
-        candidates = list(
-            db.scalars(
-                select(WalletAnalysisCandidate)
-                .where(WalletAnalysisCandidate.job_id == job.id)
-                .order_by(WalletAnalysisCandidate.score.desc().nullslast(), WalletAnalysisCandidate.created_at.asc())
-            ).all()
+def run_wallet_analysis_job_batch(
+    db: Session,
+    *,
+    job_id: str,
+    data_client: PolymarketDataClient,
+    config: WalletAnalysisRunnerConfig | None = None,
+    now: datetime | None = None,
+) -> WalletAnalysisJobBatchResult:
+    runner_config = config or WalletAnalysisRunnerConfig()
+    job_now = now or datetime.now(tz=UTC)
+    job = get_wallet_analysis_job(db, job_id)
+    if job.status in {"completed", "partial", "cancelled"}:
+        return WalletAnalysisJobBatchResult(
+            job=job,
+            has_more=False,
+            next_action=None,
+            run_state="no_work_remaining",
         )
-        job.yes_wallets = sum(1 for candidate in candidates if (candidate.side or "").upper() == "YES")
-        job.no_wallets = sum(1 for candidate in candidates if (candidate.side or "").upper() == "NO")
-        status = "partial" if len(discovered) > len(wallets_to_analyze) else "completed"
-        job.status = status
-        job.finished_at = job_now
-        job.warnings_json = _dedupe(warnings)
 
-        result_json = build_wallet_analysis_result(job, candidates, status=status)
-        job.result_json = result_json
-        create_market_signal_from_analysis_result(db, job=job, candidates=candidates, result_summary=result_json)
-        db.add(job)
-        db.flush()
-        return job
-    except Exception as exc:
-        job.status = "failed"
-        job.finished_at = datetime.now(tz=UTC)
-        job.error_message = _sanitize_error_message(exc)
-        job.result_json = {
-            "status": "failed",
-            "reason": "wallet_analysis_runner_failed",
-        }
+    runner_state = _runner_state(job)
+    active_lock = _current_lock(runner_state)
+    if _lock_is_active(active_lock, job_now):
+        return WalletAnalysisJobBatchResult(
+            job=job,
+            has_more=_has_more_work(job, runner_state),
+            next_action="wait_for_current_batch",
+            run_state="already_running",
+        )
+
+    if active_lock is not None:
         warnings = list(job.warnings_json or [])
-        warnings.append("wallet_analysis_runner_failed")
+        warnings.append("stale_runner_lock_recovered")
         job.warnings_json = _dedupe(warnings)
+
+    _acquire_lock(job, runner_state, job_now)
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    try:
+        return _run_wallet_analysis_locked_batch(
+            db,
+            job=job,
+            data_client=data_client,
+            config=runner_config,
+            now=job_now,
+        )
+    except Exception as exc:
+        _handle_runner_failure(job, exc, now=job_now)
         db.add(job)
         db.flush()
         raise WalletAnalysisRunnerError(job.error_message) from exc
+
+
+def _run_wallet_analysis_locked_batch(
+    db: Session,
+    *,
+    job: WalletAnalysisJob,
+    data_client: PolymarketDataClient,
+    config: WalletAnalysisRunnerConfig,
+    now: datetime,
+) -> WalletAnalysisJobBatchResult:
+    if not job.condition_id:
+        job.status = "failed"
+        job.started_at = job.started_at or now
+        job.finished_at = now
+        job.error_message = "condition_id_unavailable"
+        job.result_json = {"status": "failed", "reason": "condition_id_unavailable"}
+        _release_lock(job)
+        db.add(job)
+        db.flush()
+        return WalletAnalysisJobBatchResult(
+            job=job,
+            has_more=False,
+            next_action=None,
+            run_state="failed",
+        )
+
+    runner_state = _runner_state(job)
+    warnings = list(job.warnings_json or [])
+    job.started_at = job.started_at or now
+    job.error_message = None
+
+    discovered_wallets = _deserialize_discovered_wallets(runner_state.get("discovered_wallets"))
+    if not discovered_wallets:
+        job.status = "resolving_market"
+        db.add(job)
+        db.flush()
+
+        job.status = "discovering_wallets"
+        db.add(job)
+        db.flush()
+
+        discovered_wallets = discover_market_wallets(
+            job,
+            data_client=data_client,
+            max_wallets_discovery=config.max_wallets_discovery,
+            trades_page_size=config.trades_page_size,
+            warnings=warnings,
+        )
+        runner_state["discovered_wallets"] = _serialize_discovered_wallets(discovered_wallets)
+        runner_state["analysis_target"] = min(len(discovered_wallets), config.max_wallets_analyze)
+        runner_state["history_limit"] = config.user_history_limit
+        runner_state["batch_size"] = config.batch_size
+        runner_state["max_runtime_seconds"] = config.max_runtime_seconds
+        runner_state["next_wallet_index"] = int(job.wallets_analyzed or 0)
+        job.wallets_found = len(discovered_wallets)
+        _set_runner_state(
+            job,
+            runner_state,
+            status_detail="Analizando por lotes. La discovery ya quedo guardada y el job puede continuar por steps cortos.",
+        )
+        db.add(job)
+        db.flush()
+
+    if not discovered_wallets:
+        return _finalize_wallet_analysis_job(
+            db,
+            job=job,
+            discovered_wallets=[],
+            warnings=warnings,
+            now=now,
+        )
+
+    analysis_target = min(len(discovered_wallets), int(runner_state.get("analysis_target") or config.max_wallets_analyze))
+    next_index = min(int(runner_state.get("next_wallet_index") or 0), analysis_target)
+
+    if next_index < analysis_target:
+        job.status = "analyzing_wallets"
+        batch_wallets = discovered_wallets[next_index : min(next_index + config.batch_size, analysis_target)]
+        job.current_batch = int(job.current_batch or 0) + 1
+        db.add(job)
+        db.flush()
+
+        sufficient_history = analyze_wallet_batch(
+            db,
+            job=job,
+            discovered_wallets=batch_wallets,
+            data_client=data_client,
+            history_limit=config.user_history_limit,
+            now=now,
+            warnings=warnings,
+        )
+        job.wallets_analyzed = min(analysis_target, next_index + len(batch_wallets))
+        job.wallets_with_sufficient_history = int(job.wallets_with_sufficient_history or 0) + sufficient_history
+        runner_state["next_wallet_index"] = job.wallets_analyzed
+        runner_state["last_processed_wallets"] = len(batch_wallets)
+        runner_state["last_batch_completed_at"] = now.isoformat()
+        _set_runner_state(
+            job,
+            runner_state,
+            status_detail=(
+                f"Analizando por lotes. Ultimo lote procesado: {len(batch_wallets)} wallets. "
+                "Puedes dejar que el analisis continue por steps cortos."
+            ),
+        )
+        job.warnings_json = _dedupe(warnings)
+        db.add(job)
+        db.flush()
+
+    has_more = int(runner_state.get("next_wallet_index") or 0) < analysis_target
+    if has_more:
+        _release_lock(job)
+        db.add(job)
+        db.flush()
+        return WalletAnalysisJobBatchResult(
+            job=job,
+            has_more=True,
+            next_action="run_next_batch",
+            run_state="progressed",
+        )
+
+    return _finalize_wallet_analysis_job(
+        db,
+        job=job,
+        discovered_wallets=discovered_wallets,
+        warnings=warnings,
+        now=now,
+    )
+
+
+def _finalize_wallet_analysis_job(
+    db: Session,
+    *,
+    job: WalletAnalysisJob,
+    discovered_wallets: list[DiscoveredWalletCandidate],
+    warnings: list[str],
+    now: datetime,
+) -> WalletAnalysisJobBatchResult:
+    job.status = "scoring"
+    db.add(job)
+    db.flush()
+
+    candidates = list(
+        db.scalars(
+            select(WalletAnalysisCandidate)
+            .where(WalletAnalysisCandidate.job_id == job.id)
+            .order_by(WalletAnalysisCandidate.score.desc().nullslast(), WalletAnalysisCandidate.created_at.asc())
+        ).all()
+    )
+    job.yes_wallets = sum(1 for candidate in candidates if (candidate.side or "").upper() == "YES")
+    job.no_wallets = sum(1 for candidate in candidates if (candidate.side or "").upper() == "NO")
+    analysis_target = min(len(discovered_wallets), int(job.wallets_analyzed or 0))
+    status = "partial" if len(discovered_wallets) > analysis_target else "completed"
+    job.status = status
+    job.finished_at = now
+    job.warnings_json = _dedupe(warnings)
+
+    result_json = build_wallet_analysis_result(job, candidates, status=status)
+    job.result_json = result_json
+    create_market_signal_from_analysis_result(db, job=job, candidates=candidates, result_summary=result_json)
+    _release_lock(job)
+    db.add(job)
+    db.flush()
+    return WalletAnalysisJobBatchResult(
+        job=job,
+        has_more=False,
+        next_action=None,
+        run_state="progressed",
+    )
 
 
 def discover_market_wallets(
@@ -476,6 +613,138 @@ def build_wallet_analysis_result(
             for candidate in top_candidates
         ],
     }
+
+
+def _runner_state(job: WalletAnalysisJob) -> dict[str, Any]:
+    if not isinstance(job.result_json, dict):
+        return {}
+    state = job.result_json.get("runner_state")
+    return dict(state) if isinstance(state, dict) else {}
+
+
+def _set_runner_state(job: WalletAnalysisJob, runner_state: dict[str, Any], *, status_detail: str | None) -> None:
+    payload: dict[str, Any] = {"runner_state": runner_state}
+    if status_detail:
+        payload["status_detail"] = status_detail
+    job.result_json = payload
+
+
+def _acquire_lock(job: WalletAnalysisJob, runner_state: dict[str, Any], now: datetime) -> None:
+    runner_state["lock"] = {
+        "acquired_at": now.isoformat(),
+        "token": str(uuid4()),
+    }
+    _set_runner_state(
+        job,
+        runner_state,
+        status_detail="Analizando por lotes. Esta request solo procesa un paso corto para evitar timeouts del proxy.",
+    )
+
+
+def _release_lock(job: WalletAnalysisJob) -> None:
+    runner_state = _runner_state(job)
+    if not runner_state:
+        return
+    runner_state.pop("lock", None)
+    if job.status in {"completed", "partial", "failed", "cancelled"}:
+        return
+    _set_runner_state(
+        job,
+        runner_state,
+        status_detail=_clean_optional_result_status(job.result_json),
+    )
+
+
+def _current_lock(runner_state: dict[str, Any]) -> dict[str, Any] | None:
+    candidate = runner_state.get("lock")
+    return dict(candidate) if isinstance(candidate, dict) else None
+
+
+def _lock_is_active(lock: dict[str, Any] | None, now: datetime) -> bool:
+    if not lock:
+        return False
+    acquired_at_raw = lock.get("acquired_at")
+    if not isinstance(acquired_at_raw, str):
+        return False
+    try:
+        acquired_at = datetime.fromisoformat(acquired_at_raw)
+    except ValueError:
+        return False
+    if acquired_at.tzinfo is None:
+        acquired_at = acquired_at.replace(tzinfo=UTC)
+    return acquired_at >= now - timedelta(seconds=RUNNER_LOCK_TTL_SECONDS)
+
+
+def _has_more_work(job: WalletAnalysisJob, runner_state: dict[str, Any]) -> bool:
+    discovered = _deserialize_discovered_wallets(runner_state.get("discovered_wallets"))
+    analysis_target = min(len(discovered), int(runner_state.get("analysis_target") or len(discovered)))
+    next_index = int(runner_state.get("next_wallet_index") or job.wallets_analyzed or 0)
+    return next_index < analysis_target or job.status in {"resolving_market", "discovering_wallets", "analyzing_wallets", "scoring"}
+
+
+def _serialize_discovered_wallets(discovered_wallets: list[DiscoveredWalletCandidate]) -> list[dict[str, Any]]:
+    return [
+        {
+            "wallet_address": candidate.wallet_address,
+            "side": candidate.side,
+            "outcome": candidate.outcome,
+            "token_id": candidate.token_id,
+            "observed_market_position_usd": str(candidate.observed_market_position_usd),
+            "raw_summary_json": candidate.raw_summary_json,
+        }
+        for candidate in discovered_wallets
+    ]
+
+
+def _deserialize_discovered_wallets(value: Any) -> list[DiscoveredWalletCandidate]:
+    if not isinstance(value, list):
+        return []
+    discovered: list[DiscoveredWalletCandidate] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        wallet_address = str(item.get("wallet_address") or "").strip().lower()
+        side = str(item.get("side") or "UNKNOWN").strip()[:160] or "UNKNOWN"
+        outcome = _clean_optional_text(item.get("outcome")) if isinstance(item.get("outcome"), str) else None
+        token_id = _clean_optional_text(item.get("token_id")) if isinstance(item.get("token_id"), str) else None
+        observed_raw = item.get("observed_market_position_usd")
+        try:
+            observed_market_position_usd = Decimal(str(observed_raw))
+        except Exception:
+            continue
+        raw_summary_json = item.get("raw_summary_json")
+        discovered.append(
+            DiscoveredWalletCandidate(
+                wallet_address=wallet_address,
+                side=side,
+                outcome=outcome,
+                token_id=token_id,
+                observed_market_position_usd=observed_market_position_usd,
+                raw_summary_json=dict(raw_summary_json) if isinstance(raw_summary_json, dict) else {},
+            )
+        )
+    return discovered
+
+
+def _handle_runner_failure(job: WalletAnalysisJob, exc: Exception, *, now: datetime) -> None:
+    job.status = "failed"
+    job.finished_at = now
+    job.error_message = _sanitize_error_message(exc)
+    warnings = list(job.warnings_json or [])
+    warnings.append("wallet_analysis_runner_failed")
+    job.warnings_json = _dedupe(warnings)
+    job.result_json = {
+        "reason": "wallet_analysis_runner_failed",
+        "status": "failed",
+        "status_detail": "El ultimo step fallo. Puedes revisar el warning y reintentar una pasada corta.",
+    }
+
+
+def _clean_optional_result_status(result_json: Any) -> str | None:
+    if not isinstance(result_json, dict):
+        return None
+    detail = result_json.get("status_detail")
+    return detail if isinstance(detail, str) and detail.strip() else None
 
 
 def _candidate_from_market_position(position: PolymarketDataMarketPosition) -> DiscoveredWalletCandidate | None:
