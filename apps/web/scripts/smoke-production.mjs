@@ -1312,17 +1312,38 @@ async function runCopyTradingSmoke({ buildInfo, securityHeaders }) {
     "Auto-refresh",
     "Watcher demo",
     "5 segundos",
-    "Refrescar ahora",
-    "Revisar resoluciones demo",
-    "Agregar wallet",
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading ${expected}`);
   }
+  assertTextIncludesOneOf(
+    copyTradingText,
+    ["Copiar Wallets", "Copiar wallets", "Copy Trading"],
+    "copy trading module heading",
+  );
+  assertTextIncludesOneOf(
+    copyTradingText,
+    ["Agregar wallet", "Sin wallets. Agrega una direccion publica para iniciar el modo demo.", "wallet"],
+    "copy trading wallet shell",
+  );
+  assertTextIncludesOneOf(
+    copyTradingText,
+    ["Demo activo", "modo demo", "Watcher demo", "demo"],
+    "copy trading demo shell",
+  );
+  assertTextIncludesOneOf(
+    copyTradingText,
+    ["Refrescar ahora", "Revisar resoluciones demo", "Escanear wallets", "Ejecutar una vez"],
+    "copy trading primary action shell",
+  );
 
   assertTextExcludes(
     copyTradingText,
     [
       "Neon quota exceeded",
+      " 500 ",
+      " 502 ",
+      "HTTP 500",
+      "HTTP 502",
       "Internal Server Error",
       "temporary_unavailable",
       "Backend no disponible",
