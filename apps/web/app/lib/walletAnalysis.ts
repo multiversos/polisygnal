@@ -264,6 +264,7 @@ export async function saveWalletAnalysisCandidateAsProfile(candidateId: string):
   return fetchApiJson<WalletProfileRead>(
     `/wallet-analysis/candidates/${encodeURIComponent(candidateId)}/save-profile`,
     {
+      body: "{}",
       method: "POST",
     },
   );
@@ -301,6 +302,7 @@ export async function followWalletProfileInDemo(profileId: string): Promise<Wall
   return fetchApiJson<WalletProfileDemoFollowResponse>(
     `/wallet-profiles/${encodeURIComponent(profileId)}/demo-follow`,
     {
+      body: "{}",
       method: "POST",
     },
   );
