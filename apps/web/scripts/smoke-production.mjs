@@ -10,6 +10,10 @@ const execFileAsync = promisify(execFile);
 const FRONTEND_BASE_URL = (
   process.env.POLYSIGNAL_SMOKE_FRONTEND_URL || "https://polisygnal-web.vercel.app"
 ).replace(/\/$/, "");
+const BACKEND_BASE_URL = (
+  process.env.POLYSIGNAL_SMOKE_BACKEND_URL || "https://polisygnal.onrender.com"
+).replace(/\/$/, "");
+const PRODUCT_MODE = (process.env.POLYSIGNAL_SMOKE_PRODUCT_MODE || "copy-trading").trim().toLowerCase();
 const SAMANTHA_BRIDGE_HEALTH_URL =
   process.env.POLYSIGNAL_SMOKE_SAMANTHA_HEALTH_URL ||
   "https://samantha-polysignal-bridge.onrender.com/health";
@@ -189,6 +193,10 @@ const CHROME_STDERR_NOISE_PATTERNS = [
 
 function urlFor(path) {
   return `${FRONTEND_BASE_URL}${path}`;
+}
+
+function backendUrlFor(path) {
+  return `${BACKEND_BASE_URL}${path}`;
 }
 
 function assert(condition, message) {
@@ -576,6 +584,46 @@ async function fetchJson(path) {
   throw lastError;
 }
 
+async function fetchJsonFromAbsoluteUrl(url) {
+  const attempts = 5;
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      const text = await response.text();
+      let body;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = { raw: text.slice(0, 500) };
+      }
+      if (response.ok) {
+        if (attempt > 1) {
+          console.warn(`${url} passed on retry ${attempt}/${attempts}`);
+        }
+        return { body, contentType: response.headers.get("content-type"), status: response.status };
+      }
+      lastError = new Error(
+        `${url} returned HTTP ${response.status} on attempt ${attempt}/${attempts}: ${JSON.stringify(body)}`,
+      );
+      if (response.status < 500 || attempt === attempts) {
+        throw lastError;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts || !isTransientSmokeError(error)) {
+        break;
+      }
+    }
+    console.warn(`${url} retrying after transient failure on attempt ${attempt}/${attempts}`);
+    await sleep(1600 * attempt);
+  }
+  throw lastError;
+}
+
 async function fetchExternalJsonWithRetry(url, label) {
   const attempts = 5;
   let lastError;
@@ -638,6 +686,23 @@ async function fetchJsonAllowFailure(path) {
 
 async function postJsonAllowFailure(path, body) {
   const response = await fetch(urlFor(path), {
+    body: JSON.stringify(body),
+    cache: "no-store",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    method: "POST",
+  });
+  const text = await response.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = { text: text.slice(0, 200) };
+  }
+  return { body: parsed, headers: response.headers, status: response.status };
+}
+
+async function postJsonAbsoluteUrl(url, body) {
+  const response = await fetch(url, {
     body: JSON.stringify(body),
     cache: "no-store",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
@@ -1170,9 +1235,178 @@ function validateInternalDataStatusPage(dom) {
   return { internal_data_status_found: true, secrets_hidden: true };
 }
 
+async function runCopyTradingSmoke({ buildInfo, securityHeaders }) {
+  const backendHealth = await fetchJsonFromAbsoluteUrl(backendUrlFor("/health"));
+  assert(backendHealth.body?.status === "ok", "backend /health did not return status ok");
+
+  const directStatus = await fetchJsonFromAbsoluteUrl(backendUrlFor("/copy-trading/status"));
+  const directWallets = await fetchJsonFromAbsoluteUrl(backendUrlFor("/copy-trading/wallets"));
+  const directOpenPositions = await fetchJsonFromAbsoluteUrl(backendUrlFor("/copy-trading/demo/positions/open"));
+  const directHistory = await fetchJsonFromAbsoluteUrl(backendUrlFor("/copy-trading/demo/positions/history"));
+  const directPnlSummary = await fetchJsonFromAbsoluteUrl(backendUrlFor("/copy-trading/demo/pnl-summary"));
+  const directSettlement = await postJsonAbsoluteUrl(
+    backendUrlFor("/copy-trading/demo/settlement/run-once"),
+    {},
+  );
+
+  const proxyStatus = await fetchJson("/api/backend/copy-trading/status");
+  const proxyWallets = await fetchJson("/api/backend/copy-trading/wallets");
+  const proxySettlement = await postJsonAllowFailure("/api/backend/copy-trading/demo/settlement/run-once", {});
+
+  assert(directStatus.status === 200, `backend copy-trading/status returned HTTP ${directStatus.status}`);
+  assert(directWallets.status === 200, `backend copy-trading/wallets returned HTTP ${directWallets.status}`);
+  assert(
+    directOpenPositions.status === 200,
+    `backend copy-trading/demo/positions/open returned HTTP ${directOpenPositions.status}`,
+  );
+  assert(
+    directHistory.status === 200,
+    `backend copy-trading/demo/positions/history returned HTTP ${directHistory.status}`,
+  );
+  assert(
+    directPnlSummary.status === 200,
+    `backend copy-trading/demo/pnl-summary returned HTTP ${directPnlSummary.status}`,
+  );
+  assert(
+    directSettlement.status === 200,
+    `backend copy-trading/demo/settlement/run-once returned HTTP ${directSettlement.status}`,
+  );
+  assert(proxyStatus.status === 200, `proxy copy-trading/status returned HTTP ${proxyStatus.status}`);
+  assert(proxyWallets.status === 200, `proxy copy-trading/wallets returned HTTP ${proxyWallets.status}`);
+  assert(
+    proxySettlement.status === 200,
+    `proxy copy-trading/demo/settlement/run-once returned HTTP ${proxySettlement.status}`,
+  );
+
+  const liveCopyWallets = Array.isArray(directWallets.body?.wallets) ? directWallets.body.wallets : [];
+  const liveCopyWalletLabels = liveCopyWallets
+    .map((wallet) => wallet?.label)
+    .filter(Boolean)
+    .slice(0, 5);
+  const liveCopyWalletCount = liveCopyWallets.length;
+  const copyTradingWaitExpression =
+    liveCopyWalletCount === 0
+      ? `document.body && document.body.innerText.includes("Copiar Wallets")`
+      : `(() => {
+          const text = document.body?.innerText || "";
+          const rowCount = document.querySelectorAll(".copy-wallet-row").length;
+          const detailVisible = Boolean(document.querySelector(".copy-wallet-detail"));
+          return text.includes("Wallets seguidas") && rowCount > 0 && detailVisible;
+        })()`;
+  const copyTradingDom = await inspectDomWithChrome(urlFor(COPY_TRADING_PATH), {
+    attempts: 2,
+    timeoutMs: liveCopyWalletCount > 0 ? 60000 : 45000,
+    waitExpression: copyTradingWaitExpression,
+    waitLabel: liveCopyWalletCount > 0 ? "copy trading hydrated data" : "copy trading page shell",
+  });
+  const copyTradingRender = validatePublicProductPage(copyTradingDom, "copy trading", ["Copiar Wallets"], ["API"]);
+  const copyTradingText = visibleText(copyTradingDom);
+
+  for (const expected of [
+    "Resumen",
+    "Wallets",
+    "Copias abiertas",
+    "Historial de trades",
+    "Auditoria",
+    "Ultima actualizacion",
+    "Auto-refresh",
+    "Watcher demo",
+    "5 segundos",
+    "Refrescar ahora",
+    "Revisar resoluciones demo",
+    "Agregar wallet",
+  ]) {
+    assertTextIncludes(copyTradingText, expected, `copy trading ${expected}`);
+  }
+
+  assertTextExcludes(
+    copyTradingText,
+    [
+      "Neon quota exceeded",
+      "Internal Server Error",
+      "temporary_unavailable",
+      "Backend no disponible",
+      "private key",
+      "seed phrase",
+    ],
+    "copy trading production UI",
+  );
+  assert(
+    copyTradingStatusCompatible(directStatus.body, liveCopyWalletCount),
+    `copy trading status wallets_enabled=${directStatus.body?.wallets_enabled}, wallets endpoint count=${liveCopyWalletCount}`,
+  );
+  assertNoFullWalletAddress(copyTradingText, "copy trading wallet privacy");
+  assertTextIncludesOneOf(
+    copyTradingText,
+    [
+      "Sin wallets. Agrega una direccion publica para iniciar el modo demo.",
+      "Selecciona una wallet para ver su detalle.",
+      "Lista compacta",
+      "Estado actual",
+    ],
+    "copy trading empty or hydrated state",
+  );
+
+  if (liveCopyWalletCount > 0) {
+    assert(
+      liveCopyWalletLabels.some((label) => copyTradingText.includes(label)),
+      "copy trading did not render any live wallet label even though the backend returned wallets",
+    );
+  }
+
+  return {
+    backend: {
+      health: backendHealth.status,
+      settlement: directSettlement.status,
+      status: directStatus.status,
+      wallets: directWallets.status,
+      open_positions: directOpenPositions.status,
+      history: directHistory.status,
+      pnl_summary: directPnlSummary.status,
+    },
+    build_info: {
+      app: buildInfo.body.app,
+      commit: buildInfo.body.commit,
+      env: buildInfo.body.env,
+      api_host: buildInfo.body.api_host,
+      proxy: buildInfo.body.proxy,
+    },
+    copy_trading: {
+      empty_state_expected: liveCopyWalletCount === 0,
+      settlement_checked_positions: directSettlement.body?.summary?.checked_positions ?? null,
+      wallets_total: liveCopyWalletCount,
+      wallets_enabled: directStatus.body?.wallets_enabled ?? null,
+    },
+    frontend: FRONTEND_BASE_URL,
+    mode: PRODUCT_MODE,
+    proxy: {
+      settlement: proxySettlement.status,
+      status: proxyStatus.status,
+      wallets: proxyWallets.status,
+    },
+    public_pages: {
+      copy_trading: copyTradingRender,
+    },
+    security: securityHeaders,
+    status: "ok",
+    warnings: [
+      "legacy markets/soccer validation is not part of the default copy-trading smoke on a clean Railway database",
+    ],
+  };
+}
+
+function copyTradingStatusCompatible(statusBody, walletCount) {
+  return statusBody?.wallets_enabled === walletCount;
+}
+
 async function main() {
   const buildInfo = await fetchJson(BUILD_INFO_PATH);
   validateBuildInfo(buildInfo);
+  const securityHeaders = validateSecurityHeaders(await fetchPage(HOME_PATH), "home headers");
+  if (PRODUCT_MODE === "copy-trading") {
+    console.log(JSON.stringify(await runCopyTradingSmoke({ buildInfo, securityHeaders }), null, 2));
+    return;
+  }
   const samanthaBridgeHealth = await fetchExternalJsonWithRetry(
     SAMANTHA_BRIDGE_HEALTH_URL,
     "Samantha Bridge health",
@@ -1251,7 +1485,6 @@ async function main() {
     "external odds smoke response",
   );
   const analyzeLoadingPanel = validateAnalyzeLoadingPanelSource();
-  const securityHeaders = validateSecurityHeaders(await fetchPage(HOME_PATH), "home headers");
   const overview = await fetchJson(PROXY_PATH);
   const items = Array.isArray(overview.body.items) ? overview.body.items : [];
   const expectedTitles = items

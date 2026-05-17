@@ -10,6 +10,9 @@
 - ultimo deploy production validado: confirmar en `/api/build-info`
 - proxy same-origin: activo en `/api/backend/[...path]`
 - diagnostico de build: `/api/build-info`
+- base de datos productiva activa: Railway PostgreSQL
+- Neon: retenida como referencia historica, ya no es la DB activa
+- estado inicial esperado tras cutover limpio: Copy Trading vacio pero sano
 - rama `feat/copy-trading-wallets`: modulo inicial `Copiar Wallets` en `/copy-trading`, modo demo read-only y modo real bloqueado
 
 No usar estos dominios incorrectos:
@@ -19,16 +22,16 @@ No usar estos dominios incorrectos:
 
 ## Estado de datos
 
-Estado validado antes de esta cola nocturna:
+Estado validado despues del cutover limpio a Railway:
 
-- `/sports/soccer` muestra `75` mercados reales mediante paginacion por offset.
-- `match_card_count`: alrededor de `24`.
-- con snapshot: `60`.
-- sin snapshot: `15`.
-- con analisis/prediction: `50`.
-- sin analisis/prediction: `25`.
-- stale 48h: `50`.
-- deporte con datos fuertes: `soccer`.
+- Copy Trading backend responde `200` en `status`, `wallets`, `demo/positions/open`,
+  `demo/positions/history`, `demo/pnl-summary` y `demo/settlement/run-once`.
+- `copy_wallets`, `copy_detected_trades`, `copy_orders`, `copy_bot_events` y
+  `copy_demo_positions` arrancan en `0`.
+- `/copy-trading` carga vacio pero sano y permite volver a agregar wallets de
+  forma manual.
+- `markets/overview` y `/sports/soccer` quedan como superficies legacy y pueden
+  devolver `0` mientras no se repueble esa parte del producto.
 - UFC, cricket y NHL/Hockey siguen visibles pero desactivados.
 
 Endpoints backend sanos:
@@ -475,8 +478,8 @@ ni scheduler real sin autorizacion explicita.
 ## Sprints Completados 1-11
 
 - Render backend vivo con health checks.
-- Neon configurado como Postgres principal con URL directa para migraciones.
-- Alembic aplicado contra Neon.
+- Railway configurado como Postgres principal para produccion.
+- Alembic aplicado contra Railway hasta `0020_copy_trading_demo_settle`.
 - Driver Postgres agregado para Render.
 - Pipeline minimo E2E: markets, snapshots y predictions para soccer.
 - `sport_type` normalizado a deportes generales; NBA no es deporte canonico.
@@ -590,6 +593,8 @@ Estado actual:
   `deepAnalysisJobId`, `awaitingResearch` y `researchStatus`, y ofrece
   `Continuar analisis`.
 - No se creo auth real.
+- No se migraron datos historicos desde Neon al nuevo Railway.
+- Las wallets de Copy Trading deben re-agregarse manualmente en esta nueva base.
 - Se preparo una tabla real global/publica para Perfiles v2:
   `highlighted_wallet_profiles`.
 - La migracion de Perfiles v2 debe aplicarse de forma controlada antes de

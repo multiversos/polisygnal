@@ -9,17 +9,35 @@ Use these checks after a production deploy. Correct domains:
 ## Backend And Proxy
 
 1. Open `https://polisygnal.onrender.com/health` and confirm `status: ok`.
-2. Open `https://polisygnal.onrender.com/markets/overview?sport_type=soccer&limit=50`.
-3. Confirm `total_count` is at least `75` and `items` is not empty.
-4. Open `https://polisygnal-web.vercel.app/api/backend/markets/overview?sport_type=soccer&limit=50`.
-5. Confirm the proxy returns the same overview shape and does not expose CORS issues.
-6. Open `https://polisygnal-web.vercel.app/api/backend/markets/overview?sport_type=soccer&limit=50&offset=50`.
-7. Confirm pagination returns the remaining soccer markets instead of timing out.
-8. If one proxy request returns 502, 503, or 504, wait briefly and retry before
+2. Open `https://polisygnal.onrender.com/copy-trading/status`.
+3. Confirm it returns `200` and `real_trading_available: false`.
+4. Open `https://polisygnal.onrender.com/copy-trading/wallets`.
+5. Confirm it returns `200` even if `wallets` is empty.
+6. Open `https://polisygnal.onrender.com/copy-trading/demo/positions/open`.
+7. Confirm it returns `200` even if `positions` is empty.
+8. Open `https://polisygnal.onrender.com/copy-trading/demo/pnl-summary`.
+9. Confirm it returns `200` with a healthy empty summary on a clean DB.
+10. Open `https://polisygnal-web.vercel.app/api/backend/copy-trading/status`.
+11. Confirm the proxy returns `200` and does not expose CORS issues.
+12. Open `https://polisygnal-web.vercel.app/api/backend/copy-trading/wallets`.
+13. Confirm the proxy returns `200` even if `wallets` is empty.
+14. Send `POST https://polisygnal-web.vercel.app/api/backend/copy-trading/demo/settlement/run-once`
+    with explicit JSON body `{}` and confirm it returns `200`.
+15. If one proxy request returns 502, 503, or 504, wait briefly and retry before
    declaring the page broken. A persistent failure across retries is still a
    production issue.
-9. Do not raise the soccer limit to 75 or 100 to work around a timeout; use the
-   offset pagination checks above.
+
+## Legacy Markets
+
+1. `markets/overview` and `/sports/soccer` are now legacy validations on the
+   clean Railway database.
+2. `npm.cmd --workspace apps/web run smoke:production` is Copy Trading-first and
+   no longer blocks production just because soccer data is empty.
+3. Use `npm.cmd --workspace apps/web run smoke:legacy-markets` only when the
+   product direction explicitly requires legacy sports/markets coverage.
+4. On a clean Railway cutover, `markets/overview` returning `0` items is an
+   expected state and should be treated as a warning for legacy product areas,
+   not as a Copy Trading outage.
 
 ## Build Diagnostics
 
@@ -857,6 +875,9 @@ secretos.
 ## Copiar Wallets
 
 1. Open `https://polisygnal-web.vercel.app/copy-trading`.
+2. Confirm the clean Railway cutover does not show `Neon quota exceeded`.
+3. Confirm the page can load with `0` wallets, `0` positions, and `0` history
+   without showing `500`, `502`, or `Backend no disponible`.
 2. Confirm the sidebar contains `Copiar Wallets`.
 3. Confirm the page shows `Demo activo` and `Real no conectado`.
 4. Confirm the page also shows `Auto-refresh`, `Ultima actualizacion`, and
@@ -890,6 +911,10 @@ secretos.
 15. Confirm watcher status is separate from `Auto-refresh` and that the page
     makes clear `Auto-refresh` only updates the UI while the watcher scans
     wallets in backend.
+16. On a clean DB, confirm `Agregar wallet` is visible so wallets can be
+    recreated manually.
+17. Confirm `Revisar resoluciones demo` returns a healthy empty summary when no
+    demo positions exist yet.
 
 ### Migracion 0019 - demo positions
 
