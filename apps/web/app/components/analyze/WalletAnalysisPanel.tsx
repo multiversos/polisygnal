@@ -86,6 +86,13 @@ function formatPercent(value: unknown): string {
   }).format(normalized);
 }
 
+function formatCount(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "No disponible";
+  }
+  return new Intl.NumberFormat("es").format(value);
+}
+
 function formatDate(value?: string | null): string {
   if (!value) {
     return "sin dato";
@@ -100,16 +107,28 @@ function formatDate(value?: string | null): string {
   }).format(parsed);
 }
 
-function metricStatusLabel(
-  label: string,
+function metricStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    estimated: "Estimado",
+    unavailable: "No disponible",
+    verified: "Verificado",
+  };
+  return labels[status] || status;
+}
+
+function formatMetricWithStatus(
   status: string,
   value: unknown,
   formatter: (value: unknown) => string,
 ): string {
   if (status === "unavailable") {
-    return `${label} no disponible`;
+    return "No disponible";
   }
-  return `${label} ${formatter(value)} (${status})`;
+  const formatted = formatter(value);
+  if (formatted === "sin dato") {
+    return "No disponible";
+  }
+  return formatted;
 }
 
 function jobStatusLabel(status: string): string {
@@ -172,11 +191,80 @@ function scoreEntries(signal: WalletAnalysisJobRead["signal_summary"]) {
     }))
     .filter((entry) => entry.value > 0);
   const total = entries.reduce((sum, entry) => sum + entry.value, 0);
-  return entries.map((entry) => ({
-    label: entry.label,
-    percent: total > 0 ? entry.value / total : 0,
-    raw: entry.value,
-  }));
+  return entries
+    .map((entry) => ({
+      label: entry.label,
+      percent: total > 0 ? entry.value / total : 0,
+      raw: entry.value,
+    }))
+    .sort((left, right) => right.percent - left.percent);
+}
+
+function confidenceLabel(confidence?: WalletAnalysisConfidence | null): string {
+  const labels: Record<WalletAnalysisConfidence, string> = {
+    high: "alta",
+    medium: "media",
+    low: "baja",
+  };
+  if (!confidence) {
+    return "sin dato";
+  }
+  return labels[confidence];
+}
+
+function confidenceBadgeLabel(confidence?: WalletAnalysisConfidence | null): string {
+  const labels: Record<WalletAnalysisConfidence, string> = {
+    high: "Alta",
+    medium: "Media",
+    low: "Baja",
+  };
+  if (!confidence) {
+    return "Sin dato";
+  }
+  return labels[confidence];
+}
+
+function normalizeSideLabel(value?: string | null): string {
+  if (!value) {
+    return "Sin lado claro";
+  }
+  const normalized = value.trim();
+  if (!normalized) {
+    return "Sin lado claro";
+  }
+  return normalized.toUpperCase() === "YES" || normalized.toUpperCase() === "NO"
+    ? normalized.toUpperCase()
+    : normalized;
+}
+
+function humanizeTechnicalWarning(warning: string): string {
+  const normalized = warning.trim().toLowerCase();
+  if (!normalized) {
+    return "Algunos datos requieren revision tecnica.";
+  }
+  if (normalized.startsWith("wallet_fetch_failed:")) {
+    return "Algunas wallets no devolvieron historial completo.";
+  }
+  if (normalized.includes("multiple_event_markets_resolved_to_primary_market")) {
+    return "El mercado fue normalizado al mercado principal del evento.";
+  }
+  if (normalized.includes("partial") || normalized.includes("incomplete")) {
+    return "Algunos datos son parciales.";
+  }
+  if (normalized.includes("insufficient_history") || normalized.includes("history")) {
+    return "Parte de las wallets no tenia historial suficiente.";
+  }
+  if (normalized.includes("timeout") || normalized.includes("rate_limit")) {
+    return "Algunas consultas tardaron demasiado y devolvieron datos parciales.";
+  }
+  if (normalized.includes("market_resolved") || normalized.includes("resolved_to_primary")) {
+    return "El mercado fue consolidado con su referencia principal.";
+  }
+  return "Algunos datos requieren revision tecnica.";
+}
+
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  return [...new Set(values.filter((value): value is string => Boolean(value && value.trim())))];
 }
 
 function SignalDisclaimer({ signalCopy }: { signalCopy: string }) {
@@ -219,14 +307,29 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
   }, [profiles]);
 
   const scoreSummary = useMemo(() => scoreEntries(job?.signal_summary), [job?.signal_summary]);
+  const favoredScore = scoreSummary[0] ?? null;
+  const secondaryScore = scoreSummary[1] ?? null;
+  const favoredSideLabel = normalizeSideLabel(
+    job?.signal_summary?.predicted_side || job?.signal_summary?.predicted_outcome || favoredScore?.label,
+  );
+  const technicalWarnings = useMemo(
+    () => uniqueStrings([...(job?.warnings || []), ...((job?.signal_summary?.warnings_json || []) as string[])]),
+    [job?.signal_summary?.warnings_json, job?.warnings],
+  );
+  const warningSummary = useMemo(
+    () => uniqueStrings(technicalWarnings.map((warning) => humanizeTechnicalWarning(warning))).slice(0, 3),
+    [technicalWarnings],
+  );
   const signalCopy = useMemo(() => {
-    if (!job?.signal_summary) {
+    if (!job?.signal_summary || !favoredScore) {
       return "Todavia no hay una senal PolySignal persistida para este job.";
     }
-    const score = formatPercent(job.signal_summary.polysignal_score);
-    const side = job.signal_summary.predicted_side || job.signal_summary.predicted_outcome || "sin lado dominante";
-    return `${side} ${score}. Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.`;
-  }, [job?.signal_summary]);
+    const favored = normalizeSideLabel(favoredScore.label);
+    const runnerUp = secondaryScore
+      ? `${normalizeSideLabel(secondaryScore.label)} ${formatPercent(secondaryScore.percent)}`
+      : "sin contraparte clara";
+    return `${favored} domina la balanza con ${formatPercent(favoredScore.percent)} frente a ${runnerUp}. Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.`;
+  }, [favoredScore, job?.signal_summary, secondaryScore]);
 
   useEffect(() => {
     if (stepTimerRef.current !== null) {
@@ -634,18 +737,24 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
       <div className="watchlist-actions">
         {!job ? (
           <button className="watchlist-button active" disabled={busy} onClick={() => void handleCreateJob()} type="button">
-            {busy ? "Creando..." : "Crear job de wallets"}
+            {busy ? "Creando..." : "Analizar wallets del mercado"}
           </button>
         ) : (
           <>
             <button className="watchlist-button active" disabled={busy} onClick={() => void handleRunStep(true)} type="button">
-              {busy ? "Procesando lote..." : stepAutoAdvance ? "Continuar analisis por lotes" : "Iniciar analisis"}
+              {busy
+                ? "Procesando lote..."
+                : stepAutoAdvance
+                  ? "Continuar analisis por lotes"
+                  : job.progress.wallets_analyzed > 0
+                    ? "Analizar mas wallets"
+                    : "Analizar wallets del mercado"}
             </button>
             <button className="watchlist-button" disabled={busy || !stepAutoAdvance} onClick={handlePauseStep} type="button">
-              Pausar avance
+              Pausar analisis
             </button>
             <button className="watchlist-button" disabled={busy} onClick={() => void handleRunStep(false)} type="button">
-              Procesar un lote
+              Procesar siguiente lote
             </button>
             <button className="watchlist-button" disabled={busy} onClick={() => void handleRefreshJob()} type="button">
               Refrescar progreso
@@ -667,92 +776,60 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
               <strong>{job.market_title || "Mercado sin titulo disponible"}</strong>
             </div>
             <div>
-              <span>Link</span>
-              <strong>{job.normalized_url}</strong>
-            </div>
-            <div>
-              <span>Condition ID</span>
-              <strong>{job.condition_id || "sin dato"}</strong>
-            </div>
-            <div>
-              <span>Market slug</span>
-              <strong>{job.market_slug || "sin dato"}</strong>
-            </div>
-            <div>
-              <span>Event slug</span>
-              <strong>{job.event_slug || "sin dato"}</strong>
-            </div>
-            <div>
               <span>Outcomes</span>
               <strong>{job.outcomes.map((outcome) => outcome.label).join(" / ") || "sin dato"}</strong>
             </div>
-          </div>
-
-          <div className="wallet-report-summary">
             <div>
               <span>Fase actual</span>
               <strong>{jobStatusLabel(job.status)}</strong>
             </div>
-            <div>
-              <span>Wallets encontradas</span>
-              <strong>{job.progress.wallets_found}</strong>
-            </div>
-            <div>
-              <span>Wallets analizadas</span>
-              <strong>{job.progress.wallets_analyzed}</strong>
-            </div>
-            <div>
-              <span>Historial suficiente</span>
-              <strong>{job.progress.wallets_with_sufficient_history}</strong>
-            </div>
-            <div>
-              <span>YES wallets</span>
-              <strong>{job.progress.yes_wallets}</strong>
-            </div>
-            <div>
-              <span>NO wallets</span>
-              <strong>{job.progress.no_wallets}</strong>
-            </div>
-            <div>
-              <span>Lote actual</span>
-              <strong>{job.progress.current_batch}</strong>
-            </div>
-            <div>
-              <span>Candidatas</span>
-              <strong>{job.candidates_count}</strong>
-            </div>
           </div>
 
-          {job.status_detail ? (
-            <div className="focus-notice active" role="status">
-              <strong>Estado del job</strong>
-              <span>{job.status_detail}</span>
+          <section className="wallet-balance-card" aria-label="Balanza PolySignal">
+            <div className="wallet-balance-hero">
+              <div>
+                <p className="eyebrow">Balanza PolySignal</p>
+                <h4>
+                  {job.signal_summary
+                    ? `Las wallets con historial suficiente favorecen ${favoredSideLabel}.`
+                    : "Todavia no hay una balanza PolySignal persistida."}
+                </h4>
+                <p>
+                  {job.signal_summary && favoredScore ? signalCopy : "Ejecuta un lote para construir una lectura estadistica basada en wallets analizadas."}
+                </p>
+                <p className="wallet-balance-copy">
+                  Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.
+                </p>
+              </div>
+              <div className="data-health-notes">
+                {job.signal_summary ? (
+                  <>
+                    <span className="badge external-hint">{favoredSideLabel}</span>
+                    <span className="badge">Confianza {confidenceBadgeLabel(job.signal_summary.confidence)}</span>
+                    <span className="badge muted">{job.signal_summary.signal_status}</span>
+                  </>
+                ) : (
+                  <span className="badge muted">Sin senal persistida todavia</span>
+                )}
+              </div>
             </div>
-          ) : null}
 
-          {ACTIVE_JOB_STATUSES.has(job.status) || stepAutoAdvance ? (
-            <div className="focus-notice active" role="status">
-              <strong>Analizando por lotes</strong>
-              <span>
-                Ultimo lote procesado: {job.progress.current_batch || 0}. Puedes dejar que el analisis continue por
-                steps cortos sin depender de una request larga del navegador.
-              </span>
-            </div>
-          ) : null}
-
-          <SignalDisclaimer signalCopy={signalCopy} />
-
-          {scoreSummary.length > 0 ? (
             <div className="wallet-report-summary">
-              {scoreSummary.map((entry) => (
-                <div key={entry.label}>
-                  <span>{entry.label}</span>
-                  <strong>{formatPercent(entry.percent)}</strong>
-                </div>
-              ))}
+              <div>
+                <span>Lado favorecido</span>
+                <strong>{job.signal_summary ? favoredSideLabel : "Sin lado claro"}</strong>
+              </div>
+              <div>
+                <span>Porcentaje favorecido</span>
+                <strong>{favoredScore ? formatPercent(favoredScore.percent) : "sin dato"}</strong>
+              </div>
+              <div>
+                <span>Porcentaje contrario</span>
+                <strong>{secondaryScore ? formatPercent(secondaryScore.percent) : "sin dato"}</strong>
+              </div>
               <div>
                 <span>Confianza</span>
-                <strong>{job.signal_summary?.confidence || "sin dato"}</strong>
+                <strong>{job.signal_summary ? `Confianza ${confidenceLabel(job.signal_summary.confidence)}` : "sin dato"}</strong>
               </div>
               <div>
                 <span>YES score</span>
@@ -762,27 +839,117 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
                 <span>NO score</span>
                 <strong>{formatMetric(job.signal_summary?.no_score)}</strong>
               </div>
+              <div>
+                <span>Wallets encontradas</span>
+                <strong>{formatCount(job.progress.wallets_found)}</strong>
+              </div>
+              <div>
+                <span>Wallets analizadas</span>
+                <strong>{formatCount(job.progress.wallets_analyzed)}</strong>
+              </div>
+              <div>
+                <span>Historial suficiente</span>
+                <strong>{formatCount(job.progress.wallets_with_sufficient_history)}</strong>
+              </div>
+              <div>
+                <span>YES wallets</span>
+                <strong>{formatCount(job.progress.yes_wallets)}</strong>
+              </div>
+              <div>
+                <span>NO wallets</span>
+                <strong>{formatCount(job.progress.no_wallets)}</strong>
+              </div>
+              <div>
+                <span>Candidatas</span>
+                <strong>{formatCount(job.candidates_count)}</strong>
+              </div>
             </div>
-          ) : null}
+          </section>
 
-          <div className="data-health-notes">
-            {job.signal_summary ? (
-              <span className="badge external-hint">
-                {job.signal_summary.predicted_side || job.signal_summary.predicted_outcome || "sin lado"}{" "}
-                {formatPercent(job.signal_summary.polysignal_score)}
+          {job.status === "partial" ? (
+            <div className="focus-notice active" role="status">
+              <strong>Analisis parcial utilizable</strong>
+              <span>
+                Se analizaron {formatCount(job.progress.wallets_analyzed)} de {formatCount(job.progress.wallets_found)} wallets encontradas.{" "}
+                {formatCount(job.progress.wallets_with_sufficient_history)} wallets tenian historial suficiente. La senal se calculo con los datos disponibles.
+                Puedes procesar otro lote para ampliar el analisis.
               </span>
-            ) : (
-              <span className="badge muted">Sin senal persistida todavia</span>
-            )}
-          </div>
-
-          {job.warnings.length > 0 ? (
-            <div className="wallet-warning-list">
-              {job.warnings.slice(0, 8).map((warning) => (
-                <span className="warning-chip" key={warning}>{warning}</span>
-              ))}
             </div>
           ) : null}
+
+          {job.status_detail ? (
+            <div className="focus-notice active" role="status">
+              <strong>Estado del analisis</strong>
+              <span>{job.status_detail}</span>
+            </div>
+          ) : null}
+
+          {ACTIVE_JOB_STATUSES.has(job.status) || stepAutoAdvance ? (
+            <div className="focus-notice active" role="status">
+              <strong>Analizando por lotes</strong>
+              <span>
+                Ultimo lote procesado: {job.progress.current_batch || 0}. La pagina no depende de una request larga:
+                puedes continuar el analisis por steps cortos y refrescar el progreso cuando quieras.
+              </span>
+            </div>
+          ) : null}
+
+          <SignalDisclaimer signalCopy="Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas." />
+
+          {warningSummary.length > 0 ? (
+            <div className="focus-notice active" role="status">
+              <strong>Lectura con datos parciales</strong>
+              <span>{warningSummary.join(" ")}</span>
+            </div>
+          ) : null}
+
+          <details className="wallet-report-drilldown wallet-technical-details">
+            <summary>Advertencias tecnicas y detalles del job</summary>
+            <div className="wallet-technical-details-body">
+              <div className="wallet-report-summary">
+                <div>
+                  <span>Link</span>
+                  <strong>{job.normalized_url}</strong>
+                </div>
+                <div>
+                  <span>Condition ID</span>
+                  <strong>{job.condition_id || "sin dato"}</strong>
+                </div>
+                <div>
+                  <span>Market slug</span>
+                  <strong>{job.market_slug || "sin dato"}</strong>
+                </div>
+                <div>
+                  <span>Event slug</span>
+                  <strong>{job.event_slug || "sin dato"}</strong>
+                </div>
+                <div>
+                  <span>Lote actual</span>
+                  <strong>{job.progress.current_batch}</strong>
+                </div>
+                <div>
+                  <span>Estado tecnico</span>
+                  <strong>{job.status}</strong>
+                </div>
+              </div>
+              {warningSummary.length > 0 ? (
+                <div className="wallet-warning-list">
+                  {warningSummary.map((warning) => (
+                    <span className="warning-chip" key={warning}>{warning}</span>
+                  ))}
+                </div>
+              ) : null}
+              {technicalWarnings.length > 0 ? (
+                <div className="wallet-warning-list">
+                  {technicalWarnings.map((warning) => (
+                    <span className="warning-chip" key={warning}>{warning}</span>
+                  ))}
+                </div>
+              ) : (
+                <p className="section-note">No hay advertencias tecnicas adicionales para este job.</p>
+              )}
+            </div>
+          </details>
 
           <div className="panel-heading" style={{ marginTop: "1rem" }}>
             <div>
@@ -838,21 +1005,58 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
               {candidates.map((candidate) => {
                 const profile = profileByWallet.get(candidate.wallet_address.toLowerCase());
                 return (
-                  <div className="wallet-report-row" key={candidate.id} role="listitem">
-                    <div>
-                      <strong>{formatShortWallet(candidate.wallet_address)}</strong>
-                      <span>{candidate.side || candidate.outcome || "lado sin confirmar"}</span>
+                  <div className="wallet-candidate-card" key={candidate.id} role="listitem">
+                    <div className="wallet-candidate-header">
+                      <div>
+                        <strong>{formatShortWallet(candidate.wallet_address)}</strong>
+                        <span>{normalizeSideLabel(candidate.side || candidate.outcome || "lado sin confirmar")}</span>
+                      </div>
+                      <div className="data-health-notes">
+                        <span className="badge">Score {formatMetric(candidate.score)}</span>
+                        <span className="badge">Confianza {confidenceBadgeLabel(candidate.confidence)}</span>
+                      </div>
                     </div>
-                    <span>Score {formatMetric(candidate.score)}</span>
-                    <span>Volumen {formatUsd(candidate.volume_30d)}</span>
-                    <span>{metricStatusLabel("ROI 30d", candidate.roi_30d_status, candidate.roi_30d_value, formatPercent)}</span>
-                    <span>{metricStatusLabel("Win rate 30d", candidate.win_rate_30d_status, candidate.win_rate_30d_value, formatPercent)}</span>
-                    <span>{metricStatusLabel("PnL 30d", candidate.pnl_30d_status, candidate.pnl_30d_value, formatUsd)}</span>
-                    <span>Trades 30d {candidate.trades_30d ?? 0}</span>
-                    <span>Confianza {candidate.confidence}</span>
-                    <span>Reasons {candidate.reasons_json.slice(0, 2).join(" | ") || "sin detalle"}</span>
-                    <span>Risks {candidate.risks_json.slice(0, 2).join(" | ") || "sin riesgos nuevos"}</span>
-                    <div className="watchlist-actions">
+                    <div className="wallet-report-summary wallet-candidate-metrics">
+                      <div>
+                        <span>ROI 30d - {metricStatusLabel(candidate.roi_30d_status)}</span>
+                        <strong>{formatMetricWithStatus(candidate.roi_30d_status, candidate.roi_30d_value, formatPercent)}</strong>
+                      </div>
+                      <div>
+                        <span>Win rate 30d - {metricStatusLabel(candidate.win_rate_30d_status)}</span>
+                        <strong>{formatMetricWithStatus(candidate.win_rate_30d_status, candidate.win_rate_30d_value, formatPercent)}</strong>
+                      </div>
+                      <div>
+                        <span>PnL 30d - {metricStatusLabel(candidate.pnl_30d_status)}</span>
+                        <strong>{formatMetricWithStatus(candidate.pnl_30d_status, candidate.pnl_30d_value, formatUsd)}</strong>
+                      </div>
+                      <div>
+                        <span>Trades 30d</span>
+                        <strong>{formatCount(candidate.trades_30d)}</strong>
+                      </div>
+                      <div>
+                        <span>Volumen 30d</span>
+                        <strong>{candidate.volume_30d == null ? "No disponible" : formatUsd(candidate.volume_30d)}</strong>
+                      </div>
+                      <div>
+                        <span>Mercados 30d</span>
+                        <strong>{formatCount(candidate.markets_traded_30d)}</strong>
+                      </div>
+                    </div>
+                    <div className="wallet-report-summary wallet-candidate-notes">
+                      <div>
+                        <span>Razones</span>
+                        <strong>{candidate.reasons_json.slice(0, 3).join(" | ") || "Sin detalle adicional"}</strong>
+                      </div>
+                      <div>
+                        <span>Riesgos</span>
+                        <strong>{candidate.risks_json.slice(0, 3).join(" | ") || "Sin riesgos nuevos"}</strong>
+                      </div>
+                      <div>
+                        <span>Perfil</span>
+                        <strong>{profile ? profileStatusLabel(profile.status) : "Aun no guardado"}</strong>
+                      </div>
+                    </div>
+                    <div className="watchlist-actions wallet-candidate-actions">
                       {!profile ? (
                         <button className="watchlist-button active" disabled={busy} onClick={() => void handleSaveProfile(candidate)} type="button">
                           Guardar perfil
@@ -902,9 +1106,9 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
                   </div>
                   <span>Score {formatMetric(profile.score)}</span>
                   <span>Confianza {profile.confidence}</span>
-                  <span>{metricStatusLabel("ROI 30d", profile.roi_30d_status, profile.roi_30d_value, formatPercent)}</span>
-                  <span>{metricStatusLabel("Win rate 30d", profile.win_rate_30d_status, profile.win_rate_30d_value, formatPercent)}</span>
-                  <span>{metricStatusLabel("PnL 30d", profile.pnl_30d_status, profile.pnl_30d_value, formatUsd)}</span>
+                  <span>ROI 30d - {formatMetricWithStatus(profile.roi_30d_status, profile.roi_30d_value, formatPercent)} ({metricStatusLabel(profile.roi_30d_status)})</span>
+                  <span>Win rate 30d - {formatMetricWithStatus(profile.win_rate_30d_status, profile.win_rate_30d_value, formatPercent)} ({metricStatusLabel(profile.win_rate_30d_status)})</span>
+                  <span>PnL 30d - {formatMetricWithStatus(profile.pnl_30d_status, profile.pnl_30d_value, formatUsd)} ({metricStatusLabel(profile.pnl_30d_status)})</span>
                   <span>Trades 30d {profile.trades_30d ?? 0}</span>
                   <span>Volumen {formatUsd(profile.volume_30d)}</span>
                   <span>Ultima actividad {formatDate(profile.last_activity_at)}</span>

@@ -2274,6 +2274,11 @@ async function main() {
   );
   assertTextExcludes(
     validAnalyzeText,
+    ["wallet_fetch_failed:", "multiple_event_markets_resolved_to_primary_market"],
+    "analyze raw wallet warning noise",
+  );
+  assertTextExcludes(
+    validAnalyzeText,
     [
       "Samantha automático",
       "Samantha automatico",
