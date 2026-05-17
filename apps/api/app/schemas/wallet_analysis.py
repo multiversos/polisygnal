@@ -31,6 +31,7 @@ MarketSignalStatus = Literal[
     "unknown",
     "no_clear_signal",
 ]
+MarketResolutionStatus = Literal["open", "resolved", "cancelled", "unknown"]
 
 
 class WalletAnalysisCreateRequest(BaseModel):
@@ -301,6 +302,60 @@ class PolySignalMarketSignalRead(BaseModel):
     updated_at: datetime
 
 
+class PolySignalMarketResolutionRead(BaseModel):
+    status: MarketResolutionStatus
+    final_outcome: str | None = None
+    source: str
+    confidence: WalletConfidence
+    reason: str
+    checked_at: datetime
+
+
+class PolySignalMarketSignalSettlementRead(BaseModel):
+    signal: PolySignalMarketSignalRead
+    resolution: PolySignalMarketResolutionRead
+    changed: bool = False
+
+
+class PolySignalMarketSignalMetricsBucketRead(BaseModel):
+    total: int = 0
+    resolved_hit: int = 0
+    resolved_miss: int = 0
+    win_rate: Decimal | None = None
+
+
+class PolySignalMarketSignalMetricsRead(BaseModel):
+    total: int = 0
+    pending_resolution: int = 0
+    resolved_hit: int = 0
+    resolved_miss: int = 0
+    cancelled: int = 0
+    unknown: int = 0
+    no_clear_signal: int = 0
+    win_rate: Decimal | None = None
+    avg_score_resolved_hit: Decimal | None = None
+    avg_score_resolved_miss: Decimal | None = None
+    by_confidence: dict[str, PolySignalMarketSignalMetricsBucketRead] = Field(default_factory=dict)
+
+
 class PolySignalMarketSignalList(BaseModel):
     items: list[PolySignalMarketSignalRead]
     total: int
+    metrics: PolySignalMarketSignalMetricsRead
+
+
+class PolySignalMarketSignalSettlePendingRequest(BaseModel):
+    limit: int = Field(default=10, ge=1, le=50)
+    job_id: str | None = None
+    market_slug: str | None = Field(default=None, max_length=256)
+
+
+class PolySignalMarketSignalSettlePendingResponse(BaseModel):
+    checked: int = 0
+    still_pending: int = 0
+    resolved_hit: int = 0
+    resolved_miss: int = 0
+    cancelled: int = 0
+    unknown: int = 0
+    errors: int = 0
+    items: list[PolySignalMarketSignalSettlementRead] = Field(default_factory=list)

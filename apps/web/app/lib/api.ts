@@ -21,7 +21,7 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 10000;
 const DEFAULT_TRANSIENT_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 450;
 const TRANSIENT_STATUS_CODES = new Set([502, 503, 504]);
-const SAFE_PROXY_WRITE_PREFIXES = ["/copy-trading"];
+const SAFE_PROXY_WRITE_PREFIXES = ["/copy-trading", "/polysignal-market-signals"];
 
 const SAFE_PROXY_GET_PREFIXES = [
   "/alerts",

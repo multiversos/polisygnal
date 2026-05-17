@@ -11,8 +11,11 @@ import {
   followWalletProfileInDemo,
   runWalletAnalysisJobOnce,
   saveWalletAnalysisCandidateAsProfile,
+  settlePendingPolySignalMarketSignals,
+  settlePolySignalMarketSignal,
   updateWalletProfile,
   type PolySignalMarketSignal,
+  type PolySignalMarketSignalMetrics,
   type WalletAnalysisCandidate,
   type WalletAnalysisCandidateSortBy,
   type WalletAnalysisConfidence,
@@ -135,6 +138,29 @@ function profileStatusLabel(status: WalletProfileStatus): string {
   return labels[status];
 }
 
+function signalStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending_resolution: "Pendiente",
+    resolved_hit: "Acertada",
+    resolved_miss: "Fallida",
+    cancelled: "Cancelada",
+    unknown: "No verificable",
+    no_clear_signal: "Sin senal clara",
+  };
+  return labels[status] || status;
+}
+
+function summaryMetricLabel(value?: string | number | null): string {
+  const parsed = toNumber(value);
+  if (parsed === null) {
+    return "sin dato";
+  }
+  return new Intl.NumberFormat("es", {
+    style: "percent",
+    maximumFractionDigits: 1,
+  }).format(parsed > 1 ? parsed / 100 : parsed);
+}
+
 function scoreEntries(signal: WalletAnalysisJobRead["signal_summary"]) {
   if (!signal?.outcome_scores_json) {
     return [];
@@ -167,6 +193,8 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
   const [candidates, setCandidates] = useState<WalletAnalysisCandidate[]>([]);
   const [profiles, setProfiles] = useState<WalletProfileRead[]>([]);
   const [signals, setSignals] = useState<PolySignalMarketSignal[]>([]);
+  const [signalsTotal, setSignalsTotal] = useState(0);
+  const [signalMetrics, setSignalMetrics] = useState<PolySignalMarketSignalMetrics | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -177,6 +205,7 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
   const [sortOrder, setSortOrder] = useState<WalletAnalysisSortOrder>("desc");
   const [sideFilter, setSideFilter] = useState<string>("ALL");
   const [confidenceFilter, setConfidenceFilter] = useState<WalletAnalysisConfidence | "ALL">("ALL");
+  const [signalStatusFilter, setSignalStatusFilter] = useState<string>("ALL");
 
   const profileByWallet = useMemo(() => {
     const map = new Map<string, WalletProfileRead>();
@@ -187,7 +216,6 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
   }, [profiles]);
 
   const scoreSummary = useMemo(() => scoreEntries(job?.signal_summary), [job?.signal_summary]);
-
   const signalCopy = useMemo(() => {
     if (!job?.signal_summary) {
       return "Todavia no hay una senal PolySignal persistida para este job.";
@@ -202,6 +230,8 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     setCandidates([]);
     setProfiles([]);
     setSignals([]);
+    setSignalsTotal(0);
+    setSignalMetrics(null);
     setJobError(null);
     setActionMessage(null);
     setBusy(false);
@@ -212,6 +242,7 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     setSortOrder("desc");
     setSideFilter("ALL");
     setConfidenceFilter("ALL");
+    setSignalStatusFilter("ALL");
   }, [normalizedUrl]);
 
   useEffect(() => {
@@ -306,13 +337,17 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     let cancelled = false;
     setSignalsLoading(true);
     void fetchPolySignalMarketSignals({
+      confidence: undefined,
       jobId: job?.id || undefined,
       limit: 6,
       marketSlug: job?.market_slug || undefined,
+      signalStatus: signalStatusFilter === "ALL" ? undefined : (signalStatusFilter as never),
     })
       .then((result) => {
         if (!cancelled) {
           setSignals(result.items);
+          setSignalsTotal(result.total);
+          setSignalMetrics(result.metrics);
         }
       })
       .catch(() => {
@@ -328,7 +363,7 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     return () => {
       cancelled = true;
     };
-  }, [job?.id, job?.market_slug]);
+  }, [job?.id, job?.market_slug, signalStatusFilter]);
 
   async function refreshProfiles() {
     const result = await fetchWalletProfiles({ limit: 12 });
@@ -338,14 +373,19 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
   async function refreshSignals(nextJob?: WalletAnalysisJobRead | null) {
     if (!nextJob?.id && !nextJob?.market_slug) {
       setSignals([]);
+      setSignalsTotal(0);
+      setSignalMetrics(null);
       return;
     }
     const result = await fetchPolySignalMarketSignals({
       jobId: nextJob?.id || undefined,
       limit: 6,
       marketSlug: nextJob?.market_slug || undefined,
+      signalStatus: signalStatusFilter === "ALL" ? undefined : (signalStatusFilter as never),
     });
     setSignals(result.items);
+    setSignalsTotal(result.total);
+    setSignalMetrics(result.metrics);
   }
 
   async function handleCreateJob() {
@@ -453,6 +493,46 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
       setActionMessage(result.message);
     } catch {
       setJobError("No pudimos activar este perfil para Copy Trading demo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSettleSignal(signalId: string) {
+    setBusy(true);
+    setJobError(null);
+    setActionMessage(null);
+    try {
+      const result = await settlePolySignalMarketSignal(signalId);
+      await refreshSignals(job);
+      setActionMessage(
+        result.changed
+          ? `Senal revisada: ${signalStatusLabel(result.signal.signal_status)}.`
+          : `Senal revisada sin cambios: ${result.resolution.reason}`,
+      );
+    } catch {
+      setJobError("No pudimos revisar la resolucion de esta senal ahora.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSettlePendingSignals() {
+    setBusy(true);
+    setJobError(null);
+    setActionMessage(null);
+    try {
+      const result = await settlePendingPolySignalMarketSignals({
+        jobId: job?.id || undefined,
+        limit: 6,
+        marketSlug: job?.market_slug || undefined,
+      });
+      await refreshSignals(job);
+      setActionMessage(
+        `Revision de pendientes: ${result.checked} revisadas, ${result.resolved_hit} acertadas, ${result.resolved_miss} fallidas, ${result.still_pending} siguen pendientes.`,
+      );
+    } catch {
+      setJobError("No pudimos revisar las senales pendientes ahora.");
     } finally {
       setBusy(false);
     }
@@ -772,8 +852,71 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
               <p className="eyebrow">Historial de senales</p>
               <h4>Senales PolySignal guardadas</h4>
             </div>
-            <span className="badge muted">{signals.length} senales</span>
+            <span className="badge muted">{signalsTotal} senales</span>
           </div>
+
+          <div className="watchlist-actions">
+            <label className="analyze-secondary-button" style={{ alignItems: "center", display: "inline-flex", gap: "0.5rem" }}>
+              <span>Estado</span>
+              <select value={signalStatusFilter} onChange={(event) => setSignalStatusFilter(event.target.value)}>
+                <option value="ALL">Todos</option>
+                <option value="pending_resolution">Pendientes</option>
+                <option value="resolved_hit">Acertadas</option>
+                <option value="resolved_miss">Fallidas</option>
+                <option value="cancelled">Canceladas</option>
+                <option value="unknown">No verificables</option>
+                <option value="no_clear_signal">Sin senal clara</option>
+              </select>
+            </label>
+            <button className="watchlist-button" disabled={busy} onClick={() => void handleSettlePendingSignals()} type="button">
+              Revisar pendientes
+            </button>
+          </div>
+
+          {signalMetrics ? (
+            <div className="wallet-report-summary">
+              <div>
+                <span>Total</span>
+                <strong>{signalMetrics.total}</strong>
+              </div>
+              <div>
+                <span>Pendientes</span>
+                <strong>{signalMetrics.pending_resolution}</strong>
+              </div>
+              <div>
+                <span>Acertadas</span>
+                <strong>{signalMetrics.resolved_hit}</strong>
+              </div>
+              <div>
+                <span>Fallidas</span>
+                <strong>{signalMetrics.resolved_miss}</strong>
+              </div>
+              <div>
+                <span>Canceladas</span>
+                <strong>{signalMetrics.cancelled}</strong>
+              </div>
+              <div>
+                <span>No verificables</span>
+                <strong>{signalMetrics.unknown}</strong>
+              </div>
+              <div>
+                <span>Win rate</span>
+                <strong>{summaryMetricLabel(signalMetrics.win_rate)}</strong>
+              </div>
+              <div>
+                <span>Win rate high</span>
+                <strong>{summaryMetricLabel(signalMetrics.by_confidence.high?.win_rate)}</strong>
+              </div>
+              <div>
+                <span>Win rate medium</span>
+                <strong>{summaryMetricLabel(signalMetrics.by_confidence.medium?.win_rate)}</strong>
+              </div>
+              <div>
+                <span>Win rate low</span>
+                <strong>{summaryMetricLabel(signalMetrics.by_confidence.low?.win_rate)}</strong>
+              </div>
+            </div>
+          ) : null}
 
           {signalsLoading ? (
             <p className="section-note">Cargando senales historicas...</p>
@@ -785,14 +928,21 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
                 <div className="wallet-report-row" key={signal.id} role="listitem">
                   <div>
                     <strong>{signal.market_title || signal.market_slug || "Mercado sin titulo disponible"}</strong>
-                    <span>{signal.signal_status}</span>
+                    <span>{signalStatusLabel(signal.signal_status)}</span>
                   </div>
                   <span>{signal.predicted_side || signal.predicted_outcome || "sin lado claro"}</span>
                   <span>Score {formatPercent(signal.polysignal_score)}</span>
                   <span>Confianza {signal.confidence}</span>
+                  <span>Resultado final {signal.final_outcome || "pendiente"}</span>
+                  <span>Resuelta {formatDate(signal.resolved_at)}</span>
                   <span>Wallets analizadas {signal.wallets_analyzed ?? 0}</span>
                   <span>Historial suficiente {signal.wallets_with_sufficient_history ?? 0}</span>
                   <span>Creada {formatDate(signal.created_at)}</span>
+                  <div className="watchlist-actions">
+                    <button className="watchlist-button" disabled={busy} onClick={() => void handleSettleSignal(signal.id)} type="button">
+                      Revisar resolucion
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

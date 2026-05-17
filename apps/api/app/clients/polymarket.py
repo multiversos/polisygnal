@@ -70,6 +70,10 @@ class PolymarketMarketPayload(BaseModel):
     )
     active: bool | None = None
     closed: bool | None = None
+    resolution_source: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("resolutionSource", "resolution_source"),
+    )
     end_date: datetime | None = Field(default=None, alias="endDate")
     start_date: datetime | None = Field(default=None, alias="startDate")
     liquidity: Decimal | None = None
@@ -87,10 +91,14 @@ class PolymarketMarketPayload(BaseModel):
         default_factory=list,
         validation_alias=AliasChoices("tokens", "outcomeTokens", "outcome_tokens"),
     )
+    uma_resolution_statuses: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("umaResolutionStatuses", "uma_resolution_statuses"),
+    )
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    @field_validator("clob_token_ids", "outcomes", mode="before")
+    @field_validator("clob_token_ids", "outcomes", "uma_resolution_statuses", mode="before")
     @classmethod
     def parse_string_list(cls, value: object) -> list[str]:
         if value is None:

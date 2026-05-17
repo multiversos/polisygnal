@@ -219,21 +219,59 @@ Estados iniciales:
 - `pending_resolution`
 - `no_clear_signal`
 
-Estados de resolucion preparados para un sprint posterior:
+Estados soportados:
 
 - `resolved_hit`
 - `resolved_miss`
 - `cancelled`
 - `unknown`
 
-En este sprint la resolucion real del mercado queda preparada, pero el settlement automatico completo se implementara despues.
+Settlement disponible en este sprint:
+
+- `POST /polysignal-market-signals/{signal_id}/settle`
+- `POST /polysignal-market-signals/settle-pending`
+
+El settlement:
+
+- intenta resolver primero desde `market_outcomes` local si existe
+- si no encuentra outcome local, consulta Gamma de forma read-only
+- deja `pending_resolution` si el mercado sigue abierto
+- marca `resolved_hit` o `resolved_miss` solo cuando el outcome final es confiable
+- marca `cancelled` cuando la resolucion local o remota indica cancelacion/invalidacion
+- marca `unknown` cuando el mercado aparece cerrado, pero el outcome final no es lo bastante confiable
+- nunca reescribe `predicted_side`, `predicted_outcome` ni `polysignal_score`
+
+Para binarias, la comparacion usa la etiqueta final equivalente a `Yes` / `No`.
+Para multi-outcome, la comparacion usa `predicted_outcome` contra la etiqueta final del outcome resuelto.
 
 Endpoints minimos:
 
 ```powershell
 GET /polysignal-market-signals?limit=25
 GET /polysignal-market-signals/{signal_id}
+POST /polysignal-market-signals/{signal_id}/settle
+POST /polysignal-market-signals/settle-pending
 ```
+
+El listado tambien devuelve metricas agregadas:
+
+- `total`
+- `pending_resolution`
+- `resolved_hit`
+- `resolved_miss`
+- `cancelled`
+- `unknown`
+- `no_clear_signal`
+- `win_rate`
+- `avg_score_resolved_hit`
+- `avg_score_resolved_miss`
+- `by_confidence.high|medium|low`
+
+Reglas de win rate:
+
+- solo cuentan `resolved_hit` y `resolved_miss`
+- `cancelled`, `unknown`, `pending_resolution` y `no_clear_signal` quedan fuera
+- las senales historicas se mantienen congeladas; si se recalcula el mercado despues, debe nacer una nueva senal o snapshot
 
 ## Copy Trading Demo
 

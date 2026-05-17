@@ -24,6 +24,7 @@ export type MarketSignalStatus =
   | "cancelled"
   | "unknown"
   | "no_clear_signal";
+export type MarketResolutionStatus = "open" | "resolved" | "cancelled" | "unknown";
 
 export type WalletAnalysisOutcome = {
   label: string;
@@ -193,13 +194,64 @@ export type PolySignalMarketSignal = {
   warnings_json: string[];
   signal_status: MarketSignalStatus;
   final_outcome?: string | null;
+  final_resolution_source?: string | null;
+  resolved_at?: string | null;
+  top_wallets_json?: Array<Record<string, unknown>>;
   created_at: string;
   updated_at: string;
+};
+
+export type PolySignalMarketSignalMetricsBucket = {
+  total: number;
+  resolved_hit: number;
+  resolved_miss: number;
+  win_rate?: string | number | null;
+};
+
+export type PolySignalMarketSignalMetrics = {
+  total: number;
+  pending_resolution: number;
+  resolved_hit: number;
+  resolved_miss: number;
+  cancelled: number;
+  unknown: number;
+  no_clear_signal: number;
+  win_rate?: string | number | null;
+  avg_score_resolved_hit?: string | number | null;
+  avg_score_resolved_miss?: string | number | null;
+  by_confidence: Record<string, PolySignalMarketSignalMetricsBucket>;
 };
 
 export type PolySignalMarketSignalList = {
   items: PolySignalMarketSignal[];
   total: number;
+  metrics: PolySignalMarketSignalMetrics;
+};
+
+export type PolySignalMarketResolution = {
+  status: MarketResolutionStatus;
+  final_outcome?: string | null;
+  source: string;
+  confidence: WalletAnalysisConfidence;
+  reason: string;
+  checked_at: string;
+};
+
+export type PolySignalMarketSignalSettlement = {
+  signal: PolySignalMarketSignal;
+  resolution: PolySignalMarketResolution;
+  changed: boolean;
+};
+
+export type PolySignalMarketSignalSettlePendingResponse = {
+  checked: number;
+  still_pending: number;
+  resolved_hit: number;
+  resolved_miss: number;
+  cancelled: number;
+  unknown: number;
+  errors: number;
+  items: PolySignalMarketSignalSettlement[];
 };
 
 export async function createWalletAnalysisJob(polymarketUrl: string): Promise<WalletAnalysisJobCreateResponse> {
@@ -309,10 +361,12 @@ export async function followWalletProfileInDemo(profileId: string): Promise<Wall
 }
 
 export async function fetchPolySignalMarketSignals(input?: {
+  confidence?: WalletAnalysisConfidence;
   jobId?: string;
   limit?: number;
   marketSlug?: string;
   offset?: number;
+  predictedSide?: string;
   signalStatus?: MarketSignalStatus;
 }): Promise<PolySignalMarketSignalList> {
   const params = new URLSearchParams();
@@ -324,8 +378,42 @@ export async function fetchPolySignalMarketSignals(input?: {
   if (input?.marketSlug) {
     params.set("market_slug", input.marketSlug);
   }
+  if (input?.predictedSide) {
+    params.set("predicted_side", input.predictedSide);
+  }
+  if (input?.confidence) {
+    params.set("confidence", input.confidence);
+  }
   if (input?.signalStatus) {
     params.set("signal_status", input.signalStatus);
   }
   return fetchApiJson<PolySignalMarketSignalList>(`/polysignal-market-signals?${params.toString()}`);
+}
+
+export async function settlePolySignalMarketSignal(signalId: string): Promise<PolySignalMarketSignalSettlement> {
+  return fetchApiJson<PolySignalMarketSignalSettlement>(
+    `/polysignal-market-signals/${encodeURIComponent(signalId)}/settle`,
+    {
+      body: "{}",
+      method: "POST",
+    },
+  );
+}
+
+export async function settlePendingPolySignalMarketSignals(input?: {
+  jobId?: string;
+  limit?: number;
+  marketSlug?: string;
+}): Promise<PolySignalMarketSignalSettlePendingResponse> {
+  return fetchApiJson<PolySignalMarketSignalSettlePendingResponse>(
+    "/polysignal-market-signals/settle-pending",
+    {
+      body: JSON.stringify({
+        job_id: input?.jobId,
+        limit: input?.limit ?? 10,
+        market_slug: input?.marketSlug,
+      }),
+      method: "POST",
+    },
+  );
 }

@@ -7,6 +7,9 @@ from app.clients.polymarket import PolymarketGammaClient, get_polymarket_client
 from app.clients.polymarket_data import PolymarketDataClient, get_polymarket_data_client
 from app.db.session import get_db
 from app.schemas.wallet_analysis import (
+    PolySignalMarketSignalSettlePendingRequest,
+    PolySignalMarketSignalSettlePendingResponse,
+    PolySignalMarketSignalSettlementRead,
     PolySignalMarketSignalList,
     PolySignalMarketSignalRead,
     WalletAnalysisCandidateList,
@@ -27,6 +30,8 @@ from app.services.polysignal_market_signals import (
     get_latest_market_signal_for_job,
     get_market_signal,
     list_market_signals,
+    settle_market_signal,
+    settle_pending_market_signals,
     serialize_market_signal,
 )
 from app.services.wallet_analysis import (
@@ -318,6 +323,8 @@ def get_polysignal_market_signals(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     signal_status: str | None = Query(default=None, pattern="^(pending_resolution|resolved_hit|resolved_miss|cancelled|unknown|no_clear_signal)$"),
+    predicted_side: str | None = Query(default=None, max_length=160),
+    confidence: str | None = Query(default=None, pattern="^(low|medium|high)$"),
     job_id: str | None = Query(default=None),
     market_slug: str | None = Query(default=None, max_length=256),
     db: Session = Depends(get_db),
@@ -327,6 +334,8 @@ def get_polysignal_market_signals(
         limit=limit,
         offset=offset,
         signal_status=signal_status,
+        predicted_side=predicted_side,
+        confidence=confidence,
         job_id=job_id,
         market_slug=market_slug,
     )
@@ -342,3 +351,38 @@ def get_polysignal_market_signal_detail(
     except PolySignalMarketSignalNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="polysignal_market_signal_not_found") from exc
     return serialize_market_signal(signal)
+
+
+@router.post("/polysignal-market-signals/{signal_id}/settle", response_model=PolySignalMarketSignalSettlementRead)
+def post_polysignal_market_signal_settle(
+    signal_id: str,
+    db: Session = Depends(get_db),
+    gamma_client: PolymarketGammaClient = Depends(get_polymarket_client),
+) -> PolySignalMarketSignalSettlementRead:
+    try:
+        response = settle_market_signal(
+            db,
+            signal_id=signal_id,
+            gamma_client=gamma_client,
+        )
+    except PolySignalMarketSignalNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="polysignal_market_signal_not_found") from exc
+    db.commit()
+    return response
+
+
+@router.post("/polysignal-market-signals/settle-pending", response_model=PolySignalMarketSignalSettlePendingResponse)
+def post_polysignal_market_signals_settle_pending(
+    payload: PolySignalMarketSignalSettlePendingRequest,
+    db: Session = Depends(get_db),
+    gamma_client: PolymarketGammaClient = Depends(get_polymarket_client),
+) -> PolySignalMarketSignalSettlePendingResponse:
+    response = settle_pending_market_signals(
+        db,
+        gamma_client=gamma_client,
+        limit=payload.limit,
+        job_id=payload.job_id,
+        market_slug=payload.market_slug,
+    )
+    db.commit()
+    return response

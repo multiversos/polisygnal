@@ -43,6 +43,8 @@ const SAFE_WRITE_RULES = [
   { method: "POST", pattern: /^\/wallet-profiles$/ },
   { method: "PATCH", pattern: /^\/wallet-profiles\/[^/]+$/ },
   { method: "POST", pattern: /^\/wallet-profiles\/[^/]+\/demo-follow$/ },
+  { method: "POST", pattern: /^\/polysignal-market-signals\/settle-pending$/ },
+  { method: "POST", pattern: /^\/polysignal-market-signals\/[^/]+\/settle$/ },
 ];
 
 type RouteContext = {
