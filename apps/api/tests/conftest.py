@@ -33,6 +33,9 @@ from app.models import (
     ResearchFinding,
     ResearchRun,
     Source,
+    WalletAnalysisCandidate,
+    WalletAnalysisJob,
+    WalletProfile,
     WatchlistItem,
 )
 
@@ -61,6 +64,9 @@ def db_session() -> Generator[Session, None, None]:
         ResearchFinding,
         ResearchRun,
         Source,
+        WalletAnalysisCandidate,
+        WalletAnalysisJob,
+        WalletProfile,
         WatchlistItem,
     )
     engine = create_engine(

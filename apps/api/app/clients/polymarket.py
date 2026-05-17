@@ -390,6 +390,22 @@ class PolymarketGammaClient:
                 f"Error parseando mercado en /markets slug={slug}: {exc.errors()[0]['msg']}"
             ) from exc
 
+    def fetch_event_by_slug(self, slug: str) -> PolymarketEventPayload | None:
+        payload = self._get_json(
+            "/events",
+            params={"slug": slug},
+        )
+        if not isinstance(payload, list):
+            raise PolymarketClientError("La API de Polymarket devolvio un payload invalido para /events.")
+        if len(payload) == 0:
+            return None
+        try:
+            return PolymarketEventPayload.model_validate(payload[0])
+        except ValidationError as exc:
+            raise PolymarketClientError(
+                f"Error parseando evento en /events slug={slug}: {exc.errors()[0]['msg']}"
+            ) from exc
+
     def _get_json(self, path: str, *, params: dict[str, object] | list[tuple[str, object]]) -> object:
         try:
             response = self._client.get(path, params=params)

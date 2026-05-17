@@ -18,6 +18,8 @@ from app.api.routes_research_packets import router as research_packets_router
 from app.api.routes_smart_alerts import router as smart_alerts_router
 from app.api.routes_sources import router as sources_router
 from app.api.routes_tags import router as tags_router
+from app.api.routes_wallet_analysis import profiles_router as wallet_profiles_router
+from app.api.routes_wallet_analysis import router as wallet_analysis_router
 from app.api.routes_watchlist import router as watchlist_router
 from app.core.config import get_settings
 
@@ -53,6 +55,8 @@ app.include_router(market_timeline_router)
 app.include_router(smart_alerts_router)
 app.include_router(tags_router)
 app.include_router(sources_router)
+app.include_router(wallet_analysis_router)
+app.include_router(wallet_profiles_router)
 
 
 @app.get("/", tags=["meta"])

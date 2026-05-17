@@ -17,6 +17,7 @@ from app.models.research_finding import ResearchFinding
 from app.models.refresh_run import RefreshRun
 from app.models.research_run import ResearchRun
 from app.models.source import Source
+from app.models.wallet_analysis import WalletAnalysisCandidate, WalletAnalysisJob, WalletProfile
 from app.models.watchlist_item import WatchlistItem
 
 __all__ = [
@@ -30,6 +31,9 @@ __all__ = [
     "CopyWallet",
     "CopyWorkerState",
     "HighlightedWalletProfile",
+    "WalletAnalysisCandidate",
+    "WalletAnalysisJob",
+    "WalletProfile",
     "Market",
     "MarketDecisionLog",
     "MarketInvestigationStatus",
