@@ -1308,10 +1308,10 @@ async function runCopyTradingSmoke({ buildInfo, securityHeaders }) {
     "Copias abiertas",
     "Historial de trades",
     "Auditoria",
-    "Ultima actualizacion",
-    "Auto-refresh",
+    "Ultima vista",
+    "Refresh visual",
     "Watcher demo",
-    "5 segundos",
+    "Worker demo en Render",
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading ${expected}`);
   }
@@ -1333,6 +1333,20 @@ async function runCopyTradingSmoke({ buildInfo, securityHeaders }) {
   assert(
     ["Copy Trading", "Agregar wallet", "wallet", "demo"].every((value) => copyTradingText.includes(value)),
     "copy trading stable shell did not render expected copy/wallet/demo signals",
+  );
+  assertTextExcludes(
+    copyTradingText,
+    [
+      "Iniciar watcher demo",
+      "Pausar watcher",
+      "Ejecutar una vez",
+      "Escanear wallets",
+      "Demo tick manual",
+      "Revisar resoluciones demo",
+      "Pausar auto",
+      "Reanudar auto",
+    ],
+    "copy trading legacy automation controls",
   );
 
   assertTextExcludes(
@@ -1738,18 +1752,15 @@ async function main() {
     "Copias abiertas",
     "Historial de trades",
     "Auditoria",
-    "Ultima actualizacion",
-    "Auto-refresh",
+    "Ultima vista",
+    "Refresh visual",
     "Watcher demo",
-    "5 segundos",
-    "Iniciar watcher demo",
-    "Pausar watcher",
-    "Ejecutar una vez",
-    "Prueba manual de un solo escaneo.",
-    "No ejecuta operaciones reales",
+    "Worker demo en Render",
+    "Estado persistido del worker",
+    "Ultimo heartbeat",
+    "Errores consecutivos",
     "No ejecuta operaciones reales",
     "Wallets seguidas",
-    "Escanear wallets",
     "Agregar wallet",
     "Ordenar por",
     "Copias abiertas",
@@ -1757,6 +1768,20 @@ async function main() {
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
   }
+  assertTextExcludes(
+    copyTradingText,
+    [
+      "Iniciar watcher demo",
+      "Pausar watcher",
+      "Ejecutar una vez",
+      "Escanear wallets",
+      "Demo tick manual",
+      "Revisar resoluciones demo",
+      "Pausar auto",
+      "Reanudar auto",
+    ],
+    "copy trading amount/input legacy automation controls",
+  );
   assertDomIncludes(
     copyTradingDom,
     'placeholder="Buscar por alias o wallet"',

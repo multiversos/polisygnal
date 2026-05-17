@@ -8,37 +8,12 @@ import type {
 import { formatDateTime, formatDurationMs } from "../../lib/copyTrading";
 
 type CopyWatcherPanelProps = {
-  busyAction: "run-once" | "start" | "stop" | null;
-  onRunOnce: () => Promise<void> | void;
-  onStart: () => Promise<void> | void;
-  onStop: () => Promise<void> | void;
   status: CopyTradingStatus;
   watcher: CopyTradingWatcherStatus;
 };
 
-export function CopyWatcherPanel({
-  busyAction,
-  onRunOnce,
-  onStart,
-  onStop,
-  status,
-  watcher,
-}: CopyWatcherPanelProps) {
+export function CopyWatcherPanel({ status, watcher }: CopyWatcherPanelProps) {
   const persistedStateLabel = describeWorkerState(watcher.worker_status);
-  const busy = busyAction !== null;
-  const stateLabel = watcher.enabled
-    ? watcher.running
-      ? "Escaneando"
-      : "Activo"
-    : watcher.running
-      ? "Pausando"
-      : "Pausado";
-  const autoCopyLabel = watcher.enabled ? "Auto-copy demo activo" : "Auto-copy demo pausado";
-  const nextRunLabel = watcher.enabled
-    ? formatDateTime(watcher.next_run_at)
-    : watcher.running
-      ? "Terminando ciclo actual"
-      : "Watcher pausado";
   const walletScanResults = watcher.last_result?.wallet_scan_results ?? [];
   const topSlowWallets = walletScanResults
     .filter((entry) => entry.status === "slow")
@@ -48,15 +23,32 @@ export function CopyWatcherPanel({
   const pendingWalletsList = walletScanResults
     .filter((entry) => entry.status === "skipped_budget" || entry.status === "skipped_priority")
     .slice(0, 4);
-  const scannedWallets = watcher.last_result?.scanned_wallet_count ?? watcher.scanned_wallet_count ?? 0;
+  const scannedWallets = getLastResultNumber(
+    watcher.last_result_json,
+    "wallets_scanned",
+    watcher.last_result?.scanned_wallet_count ?? watcher.scanned_wallet_count ?? 0,
+  );
   const pendingWallets = watcher.last_result?.pending_wallet_count ?? watcher.pending_wallet_count ?? 0;
+  const tradesDetected = getLastResultNumber(
+    watcher.last_result_json,
+    "trades_detected",
+    watcher.last_result?.trades_detected ?? 0,
+  );
+  const demoOrdersCreated = getLastResultNumber(
+    watcher.last_result_json,
+    "demo_orders_created",
+    watcher.last_result?.orders_simulated ?? 0,
+  );
+  const positionsOpened = getLastResultNumber(watcher.last_result_json, "positions_opened", 0);
+  const positionsClosed = getLastResultNumber(watcher.last_result_json, "positions_closed", 0);
+  const nextRunLabel = formatDateTime(watcher.next_run_at);
   const cycleMessage = watcher.last_result?.cycle_budget_exceeded
     ? "Ciclo recortado por carga"
     : watcher.is_over_interval
       ? "Atrasado por carga"
-      : stateLabel;
-  const resultSummary = watcher.last_result
-    ? `Ultimo resultado: wallets ${scannedWallets} | pendientes ${pendingWallets} | nuevos ${watcher.last_result.new_trades} | compras demo ${watcher.last_result.buy_simulated ?? 0} | ventas demo ${watcher.last_result.sell_simulated ?? 0}`
+      : persistedStateLabel;
+  const resultSummary = watcher.last_result_json
+    ? `Ultimo resultado: wallets ${scannedWallets} | trades ${tradesDetected} | ordenes demo ${demoOrdersCreated} | posiciones abiertas ${positionsOpened} | posiciones cerradas ${positionsClosed}`
     : "Ultimo resultado: sin ejecuciones todavia";
   const persistentSummary =
     watcher.worker_status === "not_started"
@@ -67,11 +59,11 @@ export function CopyWatcherPanel({
     <section className="copy-panel copy-watcher-panel">
       <div className="copy-panel-heading">
         <span>Watcher demo</span>
-        <strong>{autoCopyLabel}</strong>
+        <strong>Estado del worker en Render</strong>
       </div>
       <p>
-        El watcher prioriza wallets activas para mantener el escaneo live. No ejecuta operaciones reales y deja el
-        historico pesado para escaneos manuales o ciclos posteriores.
+        El worker demo en Render escanea wallets, detecta trades y actualiza el estado persistido. Esta pagina solo
+        muestra estado y resultados. No ejecuta operaciones reales.
       </p>
       <div className="copy-wallet-details">
         <small>Estado persistido del worker: {persistedStateLabel}</small>
@@ -93,6 +85,10 @@ export function CopyWatcherPanel({
         <small>Proximo escaneo {nextRunLabel}</small>
         <small>Estado: {cycleMessage}</small>
         <small>Escaneadas: {scannedWallets}</small>
+        <small>Trades detectados: {tradesDetected}</small>
+        <small>Ordenes demo nuevas: {demoOrdersCreated}</small>
+        <small>Posiciones abiertas por el worker: {positionsOpened}</small>
+        <small>Posiciones cerradas por el worker: {positionsClosed}</small>
         <small>Pendientes: {pendingWallets}</small>
         <small>Wallets lentas: {watcher.slow_wallet_count}</small>
         <small>Timeouts reales: {watcher.timeout_count}</small>
@@ -146,7 +142,7 @@ export function CopyWatcherPanel({
       ) : null}
 
       <div className="copy-status-strip">
-        <span className="copy-badge subtle">El watcher priorizo wallets activas para mantener el escaneo live.</span>
+        <span className="copy-badge subtle">La automatizacion corre en Render. Esta vista solo refresca estado y resultados.</span>
         {watcher.skipped_due_to_budget_count > 0 ? (
           <span className="copy-badge warning">Pendiente por carga no es error: vuelve en el proximo ciclo.</span>
         ) : null}
@@ -154,36 +150,17 @@ export function CopyWatcherPanel({
           <span className="copy-badge locked">Timeout real: una wallet o la API tardaron demasiado.</span>
         ) : null}
       </div>
-
-      <div className="copy-action-row">
-        <button
-          className="copy-primary-button"
-          disabled={busy || watcher.enabled}
-          onClick={() => void onStart()}
-          type="button"
-        >
-          {busyAction === "start" ? "Iniciando..." : "Iniciar watcher demo"}
-        </button>
-        <button
-          className="copy-secondary-button"
-          disabled={busy || !watcher.enabled}
-          onClick={() => void onStop()}
-          type="button"
-        >
-          {busyAction === "stop" ? "Pausando..." : "Pausar watcher"}
-        </button>
-        <button
-          className="copy-action-button"
-          disabled={busy}
-          onClick={() => void onRunOnce()}
-          type="button"
-        >
-          {busyAction === "run-once" ? "Ejecutando..." : "Ejecutar una vez"}
-        </button>
-      </div>
-      <small>Prueba manual de un solo escaneo.</small>
     </section>
   );
+}
+
+function getLastResultNumber(
+  payload: Record<string, unknown> | null,
+  key: string,
+  fallback: number,
+): number {
+  const value = payload?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function formatWalletScanLine(entry: CopyTradingWatcherWalletScanResult): string {

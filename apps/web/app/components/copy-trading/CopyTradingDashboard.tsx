@@ -1,21 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  getCopyTradingPrimaryData,
-  getCopyTradingSupplementalData,
-  runCopyTradingDemoSettlementOnce,
-  runCopyTradingDemoTick,
-  runCopyTradingWatcherOnce,
-  startCopyTradingWatcher,
-  stopCopyTradingWatcher,
-} from "../../lib/copyTrading";
-import type {
-  CopyTradingDashboardData,
-  CopyTradingTickSummary,
-  CopyTradingStatus,
-  CopyTradingWatcherStatus,
-} from "../../lib/copyTradingTypes";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getCopyTradingPrimaryData, getCopyTradingSupplementalData } from "../../lib/copyTrading";
+import type { CopyTradingDashboardData, CopyTradingStatus, CopyTradingWatcherStatus } from "../../lib/copyTradingTypes";
 import { CopyBotEvents } from "./CopyBotEvents";
 import { CopyClosedDemoPositionsTable } from "./CopyClosedDemoPositionsTable";
 import { CopyDemoPnlSummaryPanel } from "./CopyDemoPnlSummaryPanel";
@@ -27,7 +14,7 @@ import { CopyTradingMetrics } from "./CopyTradingMetrics";
 import { CopyWatcherPanel } from "./CopyWatcherPanel";
 import { CopyWalletsTable } from "./CopyWalletsTable";
 
-const AUTO_REFRESH_INTERVAL_MS = 5_000;
+const AUTO_REFRESH_INTERVAL_MS = 15_000;
 const DASHBOARD_TABS = [
   { id: "summary", label: "Resumen" },
   { id: "wallets", label: "Wallets" },
@@ -105,15 +92,10 @@ export function CopyTradingDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [tickSummary, setTickSummary] = useState<CopyTradingTickSummary | null>(null);
-  const [runningTick, setRunningTick] = useState(false);
-  const [runningSettlement, setRunningSettlement] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [supplementalLoading, setSupplementalLoading] = useState(true);
   const [supplementalRefreshing, setSupplementalRefreshing] = useState(false);
   const [supplementalError, setSupplementalError] = useState<string | null>(null);
-  const [watcherBusyAction, setWatcherBusyAction] = useState<"run-once" | "start" | "stop" | null>(null);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [pageVisible, setPageVisible] = useState(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastUpdatedLabel, setLastUpdatedLabel] = useState("Sin datos todavia");
@@ -232,9 +214,6 @@ export function CopyTradingDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!autoRefreshEnabled) {
-      return;
-    }
     const intervalId = window.setInterval(() => {
       if (!pageVisible || isRefreshingRef.current) {
         return;
@@ -242,7 +221,7 @@ export function CopyTradingDashboard() {
       void refresh({ isBackground: true });
     }, AUTO_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
-  }, [autoRefreshEnabled, pageVisible, refresh]);
+  }, [pageVisible, refresh]);
 
   useEffect(() => {
     function updateLastUpdatedLabel() {
@@ -269,111 +248,9 @@ export function CopyTradingDashboard() {
     return () => window.clearInterval(timerId);
   }, [lastUpdatedAt]);
 
-  const autoRefreshStatus = useMemo(() => {
-    if (!autoRefreshEnabled) {
-      return "Pausado";
-    }
-    if (!pageVisible) {
-      return "Pausado en pestana oculta";
-    }
-    return "Cada 5s";
-  }, [autoRefreshEnabled, pageVisible]);
-
-  async function handleDemoTick() {
-    if (!loading && (data?.wallets.length ?? 0) === 0) {
-      setError(null);
-      setNotice("Agrega una wallet para ejecutar el demo.");
-      setTickSummary(null);
-      return;
-    }
-    setRunningTick(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const summary = await runCopyTradingDemoTick();
-      setTickSummary(summary);
-      setNotice(getDemoTickMessage(summary));
-      await refresh();
-    } catch {
-      setError("No pudimos ejecutar el demo ahora. Revisa la conexion del backend.");
-    } finally {
-      setRunningTick(false);
-    }
-  }
-
   async function handleManualRefresh() {
     setNotice(null);
     await refresh();
-  }
-
-  async function handleDemoSettlement() {
-    setRunningSettlement(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const result = await runCopyTradingDemoSettlementOnce();
-      setNotice(
-        `Settlement demo reviso ${result.summary.checked_positions} posiciones. ` +
-          `Cerro ${result.summary.closed_by_market_resolution}, ` +
-          `esperando ${result.summary.waiting_resolution}, ` +
-          `canceladas ${result.summary.cancelled}.`,
-      );
-      await refresh();
-    } catch {
-      setError("No pudimos revisar resoluciones demo ahora.");
-    } finally {
-      setRunningSettlement(false);
-    }
-  }
-
-  async function handleWatcherStart() {
-    setWatcherBusyAction("start");
-    setError(null);
-    try {
-      const watcher = await startCopyTradingWatcher();
-      setData((current) => (current ? { ...current, watcher } : current));
-      setNotice(watcher.message || "Watcher demo iniciado.");
-      await refresh({ isBackground: true });
-    } catch {
-      setError("No pudimos iniciar el watcher demo ahora.");
-    } finally {
-      setWatcherBusyAction(null);
-    }
-  }
-
-  async function handleWatcherStop() {
-    setWatcherBusyAction("stop");
-    setError(null);
-    try {
-      const watcher = await stopCopyTradingWatcher();
-      setData((current) => (current ? { ...current, watcher } : current));
-      setNotice(watcher.message || "Watcher demo pausado.");
-      await refresh({ isBackground: true });
-    } catch {
-      setError("No pudimos pausar el watcher demo ahora.");
-    } finally {
-      setWatcherBusyAction(null);
-    }
-  }
-
-  async function handleWatcherRunOnce() {
-    setWatcherBusyAction("run-once");
-    setError(null);
-    try {
-      const watcher = await runCopyTradingWatcherOnce();
-      setData((current) => (current ? { ...current, watcher } : current));
-      if (watcher.last_result) {
-        setTickSummary(watcher.last_result);
-        setNotice(getDemoTickMessage(watcher.last_result));
-      } else {
-        setNotice(watcher.message || "Watcher demo ejecuto un escaneo.");
-      }
-      await refresh({ isBackground: true });
-    } catch {
-      setError("No pudimos ejecutar el watcher demo ahora.");
-    } finally {
-      setWatcherBusyAction(null);
-    }
   }
 
   return (
@@ -414,18 +291,19 @@ export function CopyTradingDashboard() {
       <section className="copy-tab-panel" hidden={activeTab !== "summary"}>
         <CopyTradingMetrics status={data?.status ?? null} />
 
-        <section className="copy-control-bar" aria-label="Controles del modo demo">
+        <section className="copy-control-bar" aria-label="Estado del modo demo">
           <div className="copy-control-copy">
-            <span>Modo demo funcional</span>
+            <span>Worker demo en Render</span>
             <strong>
-              Auto-refresh actualiza la pantalla. Con el watcher activo, el auto-copy demo ocurre automaticamente cada
-              5 segundos.
+              El worker demo en Render escanea automaticamente. Esta pagina solo muestra estado, posiciones, PnL e
+              historial.
             </strong>
             <div className="copy-status-strip">
-              <span className="copy-badge">Ultima actualizacion {lastUpdatedLabel}</span>
-              <span className={`copy-badge ${autoRefreshEnabled && pageVisible ? "success" : "locked"}`}>
-                Auto-refresh {autoRefreshStatus}
+              <span className="copy-badge">Ultima vista {lastUpdatedLabel}</span>
+              <span className={`copy-badge ${pageVisible ? "success" : "locked"}`}>
+                Refresh visual {pageVisible ? "cada 15s" : "en pausa por pestana oculta"}
               </span>
+              <span className="copy-badge subtle">Modo demo: no ejecuta dinero real</span>
               {supplementalLoading && !loading ? <span className="copy-badge subtle">Metricas demo cargando...</span> : null}
               {supplementalRefreshing ? <span className="copy-badge subtle">Actualizando metricas...</span> : null}
               {supplementalError ? <span className="copy-badge locked">{supplementalError}</span> : null}
@@ -440,43 +318,10 @@ export function CopyTradingDashboard() {
               onClick={handleManualRefresh}
               type="button"
             >
-              {refreshing ? "Actualizando..." : "Refrescar ahora"}
-            </button>
-            <button
-              className="copy-secondary-button"
-              disabled={runningTick || loading}
-              onClick={() => setAutoRefreshEnabled((current) => !current)}
-              type="button"
-            >
-              {autoRefreshEnabled ? "Pausar auto" : "Reanudar auto"}
-            </button>
-            <button className="copy-action-button" disabled={runningTick || loading} onClick={handleDemoTick} type="button">
-              {runningTick ? "Ejecutando..." : "Demo tick manual"}
-            </button>
-            <button
-              className="copy-secondary-button"
-              disabled={runningSettlement || loading}
-              onClick={handleDemoSettlement}
-              type="button"
-            >
-              {runningSettlement ? "Revisando..." : "Revisar resoluciones demo"}
+              {refreshing ? "Actualizando..." : "Actualizar vista"}
             </button>
           </div>
         </section>
-
-        {tickSummary ? (
-          <section className="copy-tick-summary" aria-label="Resultado del ultimo demo tick">
-            <span>Wallets escaneadas {tickSummary.wallets_scanned}</span>
-            <span>Trades nuevos {tickSummary.new_trades}</span>
-            <span>Copiables {tickSummary.live_candidates}</span>
-            <span>Compras demo {tickSummary.buy_simulated ?? 0}</span>
-            <span>Ventas demo {tickSummary.sell_simulated ?? 0}</span>
-            <span>Fuera de ventana {tickSummary.recent_outside_window}</span>
-            <span>Historicos {tickSummary.historical_trades}</span>
-            <span>Simuladas {tickSummary.orders_simulated}</span>
-            <span>Saltadas {tickSummary.orders_skipped}</span>
-          </section>
-        ) : null}
 
         <div className="copy-dashboard-grid two copy-summary-layout">
           <CopyDemoPnlSummaryPanel
@@ -485,14 +330,7 @@ export function CopyTradingDashboard() {
             statusMessage={supplementalError}
             summary={data?.demo_pnl_summary ?? null}
           />
-          <CopyWatcherPanel
-            busyAction={watcherBusyAction}
-            onRunOnce={handleWatcherRunOnce}
-            onStart={handleWatcherStart}
-            onStop={handleWatcherStop}
-            status={data?.status ?? DEFAULT_STATUS}
-            watcher={data?.watcher ?? DEFAULT_WATCHER}
-          />
+          <CopyWatcherPanel status={data?.status ?? DEFAULT_STATUS} watcher={data?.watcher ?? DEFAULT_WATCHER} />
         </div>
       </section>
 
@@ -503,14 +341,11 @@ export function CopyTradingDashboard() {
             await refresh();
           }}
           onNotice={setNotice}
-          onScanAll={handleWatcherRunOnce}
           openPositions={data?.open_demo_positions ?? []}
-          scanAllBusy={watcherBusyAction === "run-once"}
           summary={data?.demo_pnl_summary ?? null}
           trades={data?.trades ?? []}
           wallets={data?.wallets ?? []}
           watcher={data?.watcher ?? DEFAULT_WATCHER}
-          watcherIntervalSeconds={data?.watcher.interval_seconds ?? DEFAULT_WATCHER.interval_seconds}
         />
       </section>
 
@@ -531,26 +366,4 @@ export function CopyTradingDashboard() {
       </section>
     </main>
   );
-}
-
-function getDemoTickMessage(summary: CopyTradingTickSummary): string {
-  if (summary.wallets_scanned === 0) {
-    return "Agrega una wallet para ejecutar el demo.";
-  }
-  if (summary.errors.length > 0) {
-    return `Escaneo completado con avisos. ${summary.errors.length} wallet${summary.errors.length === 1 ? "" : "s"} no respondieron.`;
-  }
-  if (summary.new_trades === 0) {
-    return "Escaneo completado. No se detectaron trades nuevos.";
-  }
-  if (summary.live_candidates > 0) {
-    return `Escaneo completado. ${summary.live_candidates} trades copiables, ${summary.buy_simulated ?? 0} compras demo, ${summary.sell_simulated ?? 0} ventas demo, ${summary.historical_trades} historicos.`;
-  }
-  if (summary.recent_outside_window > 0 && summary.historical_trades === 0) {
-    return `Escaneo completado. Se detectaron ${summary.recent_outside_window} trades recientes, pero llegaron fuera de la ventana de copia en vivo.`;
-  }
-  if (summary.historical_trades > 0 && summary.orders_simulated === 0) {
-    return `Escaneo completado. Se detectaron ${summary.historical_trades} trades historicos. No hubo trades dentro de la ventana de copia en vivo.`;
-  }
-  return `Escaneo completado. Trades nuevos ${summary.new_trades}, simuladas ${summary.orders_simulated}, fuera de ventana ${summary.recent_outside_window}, saltadas ${summary.orders_skipped}.`;
 }

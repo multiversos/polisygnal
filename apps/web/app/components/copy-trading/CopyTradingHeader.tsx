@@ -10,17 +10,20 @@ export function CopyTradingHeader({ status }: { status: CopyTradingStatus | null
           <span className="copy-trading-brand-section">Copy Trading</span>
         </div>
         <div>
-          <span className="copy-section-kicker">Read-only wallet automation</span>
+          <span className="copy-section-kicker">Worker demo gestionado en Render</span>
           <h1>Copy Trading</h1>
-          <p>Sigue wallets publicas en Copiar Wallets y simula copias demo con monto fijo. Bloqueado hasta configurar credenciales.</p>
+          <p>
+            Sigue wallets publicas y revisa el estado del worker demo persistente. Esta pagina solo muestra estado,
+            PnL e historial; no inicia copias desde el navegador.
+          </p>
         </div>
       </div>
       <div className="copy-status-strip" aria-label="Estado del modulo">
-        <span className="copy-status-pill subtle">Actualizacion automatica 5s</span>
-        <span className="copy-status-pill success">Demo activo</span>
+        <span className="copy-status-pill subtle">Vista read-only</span>
+        <span className="copy-status-pill success">Worker demo en Render</span>
         <span className="copy-status-pill locked">Real no conectado</span>
         <span className="copy-status-pill subtle">
-          {status?.real_trading_available ? "Real disponible" : "Preparado para proximo sprint"}
+          {status?.worker_status === "running" ? "Heartbeat activo" : "Estado persistido visible"}
         </span>
       </div>
     </header>

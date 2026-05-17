@@ -2665,9 +2665,13 @@ function validateAnalyzerFirstProductSource() {
   assert(!existsSync(legacySamanthaRoute), "legacy samantha-polysignal-analysis route must not be reintroduced");
   assert(copyTradingPage.includes("CopyTradingDashboard"), "copy trading page should render the dashboard");
   const copyTradingSource = `${copyTradingHeader}\n${copyTradingDashboard}\n${copyExecutionWallet}\n${copyWatcherPanel}`;
-  for (const text of ["Copiar Wallets", "Demo activo", "Real no conectado", "Bloqueado hasta configurar credenciales"]) {
+  for (const text of ["Copy Trading", "Worker demo en Render", "Real no conectado"]) {
     assert(copyTradingSource.includes(text), `copy trading dashboard missing safe text: ${text}`);
   }
+  assert(
+    copyTradingHeader.includes("no inicia copias desde el navegador"),
+    "copy trading header should explain that the browser no longer starts copy processes",
+  );
   for (const text of ["Mi wallet de ejecución", "Conectar wallet", "Wallet conectada", "Ejecución real pendiente"]) {
     assert(copyExecutionWallet.includes(text), `execution wallet card missing safe text: ${text}`);
   }
@@ -2677,13 +2681,13 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["$1", "$5", "$10", "$20", "Personalizado", "Monto personalizado USD"]) {
     assert(copyAmountSelector.includes(text), `copy amount selector missing preset/custom text: ${text}`);
   }
-  for (const text of ["Ultima actualizacion", "Auto-refresh", "Refrescar ahora", "Pausar auto"]) {
-    assert(copyTradingDashboard.includes(text), `copy trading auto-refresh controls missing text: ${text}`);
+  for (const text of ["Ultima vista", "Refresh visual", "Actualizar vista", "Worker demo en Render"]) {
+    assert(copyTradingDashboard.includes(text), `copy trading view refresh copy missing text: ${text}`);
   }
   for (const text of ["Resumen", "Wallets", "Copias abiertas", "Historial de trades", "Auditoria"]) {
     assert(copyTradingDashboard.includes(text), `copy trading tab navigation missing text: ${text}`);
   }
-  for (const text of ["Watcher demo", "interval_seconds", "Iniciar watcher demo", "Pausar watcher", "Ejecutar una vez"]) {
+  for (const text of ["Watcher demo", "Estado del worker en Render", "Estado persistido del worker", "Ultimo heartbeat", "Errores consecutivos"]) {
     assert(copyWatcherPanel.includes(text), `copy watcher panel missing text: ${text}`);
   }
   assert(
@@ -2694,12 +2698,11 @@ function validateAnalyzerFirstProductSource() {
     copyWatcherPanel.includes("No ejecuta operaciones reales"),
     "copy watcher panel must state that it does not execute real operations",
   );
-  assert(copyWatcherPanel.includes("Prueba manual de un solo escaneo."), "copy watcher panel should frame run once as manual debug");
-  assert(copyWatcherPanel.includes("Auto-copy demo"), "copy watcher panel should make automatic demo copying explicit");
   assert(
-    copyWatcherPanel.includes("escanea todas las wallets activas cada 5s") ||
-      copyWatcherPanel.includes("mantener el escaneo live"),
-    "copy watcher panel should explain the automatic scan loop",
+    copyWatcherPanel.includes("La automatizacion corre en Render") &&
+      copyWatcherPanel.includes("Esta pagina solo") &&
+      copyWatcherPanel.includes("muestra estado y resultados"),
+    "copy watcher panel should explain that automation lives in Render and the page is read-only",
   );
   assert(
     copyWalletForm.includes("Ventana de copia en vivo"),
@@ -2708,21 +2711,22 @@ function validateAnalyzerFirstProductSource() {
   assert(copyWalletForm.includes("1 minuto"), "copy wallet form should expose 1-minute window");
   assert(copyWalletForm.includes("2 minutos"), "copy wallet form should expose 2-minute window");
   assert(
-    copyTradingDashboard.includes("auto-copy demo ocurre automaticamente") &&
-      copyTradingDashboard.includes("5 segundos"),
-    "copy trading dashboard should explain that auto-copy is the primary flow",
+    copyTradingDashboard.includes("Esta pagina solo muestra estado") &&
+      copyTradingDashboard.includes("posiciones, PnL e") &&
+      copyTradingDashboard.includes("historial."),
+    "copy trading dashboard should explain the page-only role",
   );
   assert(
-    copyTradingDashboard.includes("Demo tick manual"),
-    "copy trading dashboard should keep manual demo tick clearly secondary",
-  );
-  assert(
-    copyTradingDashboard.includes("Refrescar ahora"),
+    copyTradingDashboard.includes("Actualizar vista"),
     "copy trading dashboard should keep manual refresh visible",
   );
   assert(
-    copyTradingDashboard.includes("Pausar auto"),
-    "copy trading dashboard should keep auto-refresh controls visible",
+    !copyTradingDashboard.includes("Demo tick manual") &&
+      !copyTradingDashboard.includes("Revisar resoluciones demo") &&
+      !copyTradingDashboard.includes("Pausar auto") &&
+      !copyTradingDashboard.includes("Reanudar auto") &&
+      !copyTradingDashboard.includes("auto-copy demo ocurre automaticamente"),
+    "copy trading dashboard should not expose legacy browser-driven copy actions",
   );
   assert(
     copyTradingDashboard.includes("onNotice={setNotice}"),
@@ -2732,7 +2736,14 @@ function validateAnalyzerFirstProductSource() {
     copyWalletForm.includes("Agregar wallet"),
     "copy wallet form should keep add wallet CTA visible",
   );
-  assert(copyWalletsTable.includes("Escanea esta wallet una vez ahora."), "scan button should explain manual single-wallet scans");
+  assert(
+    copyWalletsTable.includes("El worker demo en Render escanea automaticamente estas wallets."),
+    "wallet table should explain that Render owns scanning",
+  );
+  assert(
+    copyWalletsTable.includes("Selecciona una wallet para ver su detalle."),
+    "wallet table should explain that the page is now read-only for scanning",
+  );
   assert(copyWalletsTable.includes("Editar configuracion de esta wallet"), "edit button should explain wallet settings editing");
   assert(!copyWalletsTable.includes("Editar modo"), "legacy edit mode label should be removed");
   assert(copyWalletsTable.includes("Estado actual"), "wallet table should label current trade status");
@@ -2742,6 +2753,11 @@ function validateAnalyzerFirstProductSource() {
   assert(copyWalletsTable.includes("Copiadas"), "wallet table should expose copied demo count");
   assert(copyWalletsTable.includes("Saltadas"), "wallet table should expose skipped demo count");
   assert(copyWalletsTable.includes("Ultima copia demo"), "wallet table should expose last demo copy details");
+  assert(
+    !copyWalletsTable.includes("Escanear wallets") &&
+      !copyWalletsTable.includes("Escanea esta wallet una vez ahora."),
+    "wallet table should not expose scan buttons now that the Render worker owns scanning",
+  );
   assert(copyDemoPnlSummaryPanel.includes("Rendimiento demo"), "demo pnl panel should be visible");
   assert(copyDemoPnlSummaryPanel.includes("Capital demo usado"), "demo pnl panel should expose capital used");
   assert(copyDemoPnlSummaryPanel.includes("PnL total demo"), "demo pnl panel should expose total demo pnl");
@@ -2761,7 +2777,6 @@ function validateAnalyzerFirstProductSource() {
   assert(copyClosedDemoPositionsTable.includes("Perdedoras"), "closed demo history should expose losing filter");
   assert(copyClosedDemoPositionsTable.includes("PnL final"), "closed demo history should label final pnl");
   assert(copyClosedDemoPositionsTable.includes("Wallet vendio"), "closed demo history should explain wallet-driven closes");
-  assert(copyWalletsTable.includes("Escaneando..."), "wallet scan button should show loading state");
   assert(copyWalletsTable.includes("Pausando..."), "wallet pause button should show loading state");
   assert(copyWalletsTable.includes("Eliminando..."), "wallet delete button should show loading state");
   assert(copyWalletsTable.includes("Editando..."), "wallet edit button should show loading state");
@@ -2783,8 +2798,8 @@ function validateAnalyzerFirstProductSource() {
   assert(copyOrdersTable.includes("Historico"), "historical copy orders need a visible status label");
   assert(copyBotEvents.includes("groupCopyBotEvents"), "copy bot events should group repeated audit messages");
   assert(copyBotEvents.includes("Trades historicos detectados fuera de la ventana de copia."), "historical audit events need humane copy");
-  assert(copyTradingDashboard.includes("live_candidates"), "demo tick summary should expose live readiness counts");
-  assert(copyTradingDashboard.includes("historical_trades"), "demo tick summary should expose historical trade counts");
+  assert(copyWatcherPanel.includes("wallets_scanned"), "watcher panel should map persisted wallets_scanned results");
+  assert(copyWatcherPanel.includes("trades_detected"), "watcher panel should map persisted trades_detected results");
   assertTextExcludes(
     `${copyTradingSource}\n${copyAmountSelector}\n${copyOrdersTable}\n${copyBotEvents}\n${copyDemoPnlSummaryPanel}\n${copyOpenDemoPositionsTable}\n${copyClosedDemoPositionsTable}`,
     [

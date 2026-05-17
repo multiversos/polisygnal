@@ -13,14 +13,12 @@ import {
   formatUsd,
   formatWalletAddress,
   freshnessBadgeClass,
-  scanCopyWallet,
   updateCopyWallet,
 } from "../../lib/copyTrading";
 import type {
   CopyDemoPosition,
   CopyDetectedTrade,
   CopyTradingDemoPnlSummary,
-  CopyTradingTickSummary,
   CopyTradingWatcherStatus,
   CopyTradingWatcherWalletScanResult,
   CopyTradeSide,
@@ -33,17 +31,14 @@ type CopyWalletsTableProps = {
   closedPositions: CopyDemoPosition[];
   onChanged: () => Promise<void> | void;
   onNotice?: (message: string) => void;
-  onScanAll: () => Promise<void> | void;
   openPositions: CopyDemoPosition[];
-  scanAllBusy: boolean;
   summary: CopyTradingDemoPnlSummary | null;
   trades: CopyDetectedTrade[];
   wallets: CopyWallet[];
   watcher: CopyTradingWatcherStatus;
-  watcherIntervalSeconds: number;
 };
 
-type RowAction = "delete" | "pause" | "scan" | null;
+type RowAction = "delete" | "pause" | null;
 type WalletStatusFilter = "all" | "active" | "paused";
 type WalletModeFilter = "all" | "demo" | "real-blocked";
 type WalletFreshnessFilter = "all" | "live_candidate" | "recent_outside_window" | "historical";
@@ -56,14 +51,11 @@ export function CopyWalletsTable({
   closedPositions,
   onChanged,
   onNotice,
-  onScanAll,
   openPositions,
-  scanAllBusy,
   summary,
   trades,
   wallets,
   watcher,
-  watcherIntervalSeconds,
 }: CopyWalletsTableProps) {
   const [pendingActionByWallet, setPendingActionByWallet] = useState<Record<string, RowAction>>({});
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
@@ -225,19 +217,6 @@ export function CopyWalletsTable({
     }
   }
 
-  async function handleScan(wallet: CopyWallet) {
-    setPendingAction(wallet.id, "scan", setPendingActionByWallet);
-    try {
-      const summaryResult = await scanCopyWallet(wallet.id);
-      onNotice?.(getWalletScanMessage(summaryResult));
-      await onChanged();
-    } catch {
-      onNotice?.("No pudimos escanear esta wallet ahora.");
-    } finally {
-      clearPendingAction(wallet.id, setPendingActionByWallet);
-    }
-  }
-
   async function handleCopyAddress(wallet: CopyWallet) {
     try {
       await navigator.clipboard.writeText(wallet.proxy_wallet);
@@ -255,14 +234,11 @@ export function CopyWalletsTable({
             <span className="copy-section-kicker">Copy Trading demo</span>
             <h2>Wallets seguidas</h2>
             <p>
-              Monitorea en tiempo real las wallets que sigues. El watcher demo escanea automaticamente cada{" "}
-              {watcherIntervalSeconds}s.
+              El worker demo en Render escanea automaticamente estas wallets. Usa esta vista para revisar estado,
+              resultados y configuracion manual.
             </p>
           </div>
           <div className="copy-action-row" aria-label="Acciones de wallets seguidas">
-            <button className="copy-secondary-button" disabled={scanAllBusy} onClick={() => void onScanAll()} type="button">
-              {scanAllBusy ? "Escaneando wallets..." : "Escanear wallets"}
-            </button>
             <button className="copy-primary-button" onClick={() => setShowAddWallet(true)} type="button">
               Agregar wallet
             </button>
@@ -305,8 +281,8 @@ export function CopyWalletsTable({
               <strong>Lista compacta</strong>
             </div>
             <p className="copy-field-helper">
-              Usa Escanear para revisar una wallet puntual. El panel derecho concentra el detalle largo para evitar scroll
-              gigante.
+              Selecciona una wallet para ver su detalle. El panel derecho concentra el detalle largo para evitar scroll
+              gigante sin disparar escaneos desde la pagina.
             </p>
 
             <div className="copy-wallet-toolbar" aria-label="Busqueda y filtros de wallets">
@@ -541,7 +517,6 @@ export function CopyWalletsTable({
                   onNotice?.("Edita la configuracion de esta wallet y guarda los cambios.");
                 }}
                 onPause={handlePause}
-                onScan={handleScan}
                 pendingAction={pendingActionByWallet[selectedRow.wallet.id] ?? null}
                 row={selectedRow}
                 scanHealth={watcherHealthByWallet.get(selectedRow.wallet.id) ?? null}
@@ -597,7 +572,6 @@ function WalletDetailPanel({
   onDelete,
   onEdit,
   onPause,
-  onScan,
   pendingAction,
   row,
   scanHealth,
@@ -606,7 +580,6 @@ function WalletDetailPanel({
   onDelete: (wallet: CopyWallet) => Promise<void>;
   onEdit: () => void;
   onPause: (wallet: CopyWallet) => Promise<void>;
-  onScan: (wallet: CopyWallet) => Promise<void>;
   pendingAction: RowAction;
   row: WalletRow;
   scanHealth: CopyTradingWatcherWalletScanResult | null;
@@ -691,16 +664,6 @@ function WalletDetailPanel({
               : row.wallet.enabled
                 ? "Pausar"
                 : "Reactivar"}
-          </button>
-          <button
-            aria-label="Escanea esta wallet una vez ahora."
-            className="copy-action-button"
-            disabled={pendingAction !== null}
-            onClick={() => void onScan(row.wallet)}
-            title="Escanea esta wallet una vez ahora."
-            type="button"
-          >
-            {pendingAction === "scan" ? "Escaneando..." : "Escanear"}
           </button>
           <button className="copy-danger-button" disabled={pendingAction !== null} onClick={() => void onDelete(row.wallet)} type="button">
             {pendingAction === "delete" ? "Eliminando..." : "Eliminar"}
@@ -1166,25 +1129,6 @@ function buildRecentActivity(row: WalletRow): WalletActivityEvent[] {
     .sort((left, right) => compareNullableString(right.timestamp, left.timestamp))
     .slice(0, 6)
     .map(({ timestamp: _timestamp, ...event }) => event);
-}
-
-function getWalletScanMessage(summary: CopyTradingTickSummary): string {
-  if (summary.errors.length > 0) {
-    return "No pudimos escanear esta wallet ahora.";
-  }
-  if (summary.orders_simulated > 0) {
-    return `Escaneo completado. Se generaron ${summary.orders_simulated} orden${summary.orders_simulated === 1 ? "" : "es"} demo.`;
-  }
-  if (summary.historical_trades > 0) {
-    return `Escaneo completado. Se detectaron ${summary.historical_trades} trades historicos para esta wallet.`;
-  }
-  if (summary.recent_outside_window > 0) {
-    return `Escaneo completado. Se detectaron ${summary.recent_outside_window} trades fuera de ventana para esta wallet.`;
-  }
-  if (summary.new_trades === 0) {
-    return "Escaneo completado. No se detectaron trades nuevos para esta wallet.";
-  }
-  return `Escaneo completado. Se detectaron ${summary.new_trades} trades nuevos para esta wallet.`;
 }
 
 function scanHealthLabel(
