@@ -17,6 +17,8 @@ Use these checks after a production deploy. Correct domains:
 7. Confirm it returns `200` even if `positions` is empty.
 8. Open `https://polisygnal.onrender.com/copy-trading/demo/pnl-summary`.
 9. Confirm it returns `200` with a healthy empty summary on a clean DB.
+9b. If the worker feature is present but still not activated, `/copy-trading/status`
+    may report `worker_status: not_started`; that is healthy for the current stage.
 10. Open `https://polisygnal-web.vercel.app/api/backend/copy-trading/status`.
 11. Confirm the proxy returns `200` and does not expose CORS issues.
 12. Open `https://polisygnal-web.vercel.app/api/backend/copy-trading/wallets`.
@@ -26,6 +28,8 @@ Use these checks after a production deploy. Correct domains:
 15. If one proxy request returns 502, 503, or 504, wait briefly and retry before
    declaring the page broken. A persistent failure across retries is still a
    production issue.
+16. Do not treat `worker_status: not_started` as an outage while the background
+    worker is still pending manual activation.
 
 ## Legacy Markets
 

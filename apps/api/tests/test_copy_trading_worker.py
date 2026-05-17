@@ -6,12 +6,15 @@ from collections.abc import Generator
 from datetime import UTC, datetime
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.commands.copy_trading_worker import CopyTradingWorkerCommand, main
 from app.db.base import Base
+from app.db.session import get_db
+from app.main import app
 from app.models.copy_worker_state import CopyWorkerState
 from app.schemas.copy_trading import CopyTradingWatcherLastResult, CopyTradingWatcherStatusResponse
 from app.services.copy_trading_watcher import CopyTradingDemoWatcher, CopyTradingWatcherRunResult
@@ -367,6 +370,42 @@ def test_copy_trading_worker_success_resets_consecutive_errors(
         assert state.consecutive_errors == 0
         assert state.last_error is None
         assert state.last_result_json["errors_count"] == 0
+
+
+def test_copy_trading_worker_once_writes_state_that_api_can_read(
+    worker_db: tuple[sessionmaker[Session], object],
+) -> None:
+    testing_session_factory, testing_engine = worker_db
+    command = CopyTradingWorkerCommand(
+        engine_instance=testing_engine,
+        session_factory=testing_session_factory,
+        watcher_factory=lambda _args: FakeWatcher(),
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        env={},
+    )
+
+    assert command.run(["--once"]) == 0
+
+    def override_get_db() -> Generator[Session, None, None]:
+        session = testing_session_factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            response = client.get("/copy-trading/status")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["worker_status"] == "stopped"
+    assert payload["last_result_json"]["loops_completed"] == 1
+    assert payload["demo_only"] is True
 
 
 def _read_last_json(output: str) -> dict[str, object]:

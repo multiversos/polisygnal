@@ -59,6 +59,13 @@ Checkpoint Copy Trading:
   de cada merge verificar `Vercel READY`, `/api/build-info` con el commit
   esperado, la UI afectada visible en produccion y `smoke:production` en verde
   antes de asumir un bug de codigo.
+- Worker persistente v1 preparado solo en local/dev:
+  - migracion `0021_copy_worker_state`
+  - comando `python -m app.commands.copy_trading_worker`
+  - advisory lock PostgreSQL
+  - heartbeat persistido
+  - estado visible en `/copy-trading/status` y `/copy-trading/watcher/status`
+  - no activado en produccion todavia
 
 Estado visible verificado:
 
