@@ -47,7 +47,7 @@ export type PolymarketLinkResolveResult = {
   normalizedUrl: string;
   source: "clob" | "gamma" | "polymarket" | "unknown";
   sport?: string;
-  status: "error" | "not_found" | "ok" | "unsupported";
+  status: "error" | "not_found" | "ok" | "partial" | "unsupported";
   warnings: string[];
 };
 

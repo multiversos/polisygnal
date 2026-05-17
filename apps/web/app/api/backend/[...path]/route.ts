@@ -21,6 +21,7 @@ const SAFE_GET_PREFIXES = [
   "/research",
   "/sources",
   "/tags",
+  "/polysignal-market-signals",
   "/wallet-analysis",
   "/wallet-profiles",
   "/watchlist",
@@ -40,6 +41,8 @@ const SAFE_WRITE_RULES = [
   { method: "POST", pattern: /^\/wallet-analysis\/jobs\/[^/]+\/run-once$/ },
   { method: "POST", pattern: /^\/wallet-analysis\/candidates\/[^/]+\/save-profile$/ },
   { method: "POST", pattern: /^\/wallet-profiles$/ },
+  { method: "PATCH", pattern: /^\/wallet-profiles\/[^/]+$/ },
+  { method: "POST", pattern: /^\/wallet-profiles\/[^/]+\/demo-follow$/ },
 ];
 
 type RouteContext = {

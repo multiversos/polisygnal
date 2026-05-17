@@ -2901,14 +2901,16 @@ export default function AnalyzePage() {
           normalizedUrl,
         }),
       );
-      if (resolved.status === "ok" && resolved.markets.length > 0) {
+      if ((resolved.status === "ok" || resolved.status === "partial") && resolved.markets.length > 0) {
         const matches = buildMatchesFromPolymarketResult(resolved);
         setState({
           matches,
           message:
             matches.length > 1
               ? "Polymarket devolvio este evento con varios mercados. Selecciona uno para analizar."
-              : `Mercado unico detectado. Continuamos automaticamente con Polymarket, Wallet Intelligence y ${analysisAgent.name}.`,
+              : resolved.status === "partial"
+                ? `Mercado detectado con metadata parcial. Continuamos con advertencias visibles antes del analisis profundo.`
+                : `Mercado unico detectado. Continuamos automaticamente con Polymarket, Wallet Intelligence y ${analysisAgent.name}.`,
           normalizedUrl,
           status: "needs_selection",
         });
@@ -2918,13 +2920,17 @@ export default function AnalyzePage() {
             detail:
               matches.length > 1
                 ? "Polymarket devolvio varias opciones reales para este evento."
-                : "Polymarket devolvio un mercado unico para este enlace.",
+                : resolved.status === "partial"
+                  ? "Polymarket devolvio el mercado, pero con metadata parcial y warnings."
+                  : "Polymarket devolvio un mercado unico para este enlace.",
             status: "completed_with_data",
             statusLabel: matches.length > 1 ? "Opciones encontradas" : "Mercado detectado",
             summary:
               matches.length > 1
                 ? `${matches.length} opciones requieren seleccion.`
-                : "Se continuara automaticamente con el mercado detectado.",
+                : resolved.status === "partial"
+                  ? "Se continuara con el mercado detectado y se mostraran advertencias de metadata parcial."
+                  : "Se continuara automaticamente con el mercado detectado.",
           },
         }));
         setProgressStartedAt(null);

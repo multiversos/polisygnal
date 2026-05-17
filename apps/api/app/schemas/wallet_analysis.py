@@ -22,6 +22,7 @@ WalletAnalysisJobStatus = Literal[
 ]
 WalletAnalysisCandidateSortBy = Literal["score", "volume_30d", "win_rate_30d", "pnl_30d", "created_at"]
 SortOrder = Literal["asc", "desc"]
+WalletAnalysisResolveStatus = Literal["ok", "partial", "not_found", "unsupported", "error"]
 MarketSignalStatus = Literal[
     "pending_resolution",
     "resolved_hit",
@@ -42,13 +43,28 @@ class WalletAnalysisOutcomeRead(BaseModel):
     token_id: str | None = None
 
 
+class WalletAnalysisResolvedLinkRead(BaseModel):
+    source_url: str
+    normalized_url: str
+    status: WalletAnalysisResolveStatus
+    raw_source: str
+    market_title: str | None = None
+    condition_id: str | None = None
+    market_slug: str | None = None
+    event_slug: str | None = None
+    sport_or_league: str | None = None
+    outcomes: list[WalletAnalysisOutcomeRead] = Field(default_factory=list)
+    token_ids: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class WalletAnalysisJobProgressRead(BaseModel):
-    wallets_found: int
-    wallets_analyzed: int
-    wallets_with_sufficient_history: int
-    yes_wallets: int
-    no_wallets: int
-    current_batch: int
+    wallets_found: int = 0
+    wallets_analyzed: int = 0
+    wallets_with_sufficient_history: int = 0
+    yes_wallets: int = 0
+    no_wallets: int = 0
+    current_batch: int = 0
 
 
 class WalletAnalysisSignalSummaryRead(BaseModel):
@@ -78,6 +94,7 @@ class WalletAnalysisJobRead(BaseModel):
     progress: WalletAnalysisJobProgressRead
     result_json: dict[str, Any] | None = None
     warnings: list[str] = Field(default_factory=list)
+    status_detail: str | None = None
     error_message: str | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
@@ -110,6 +127,7 @@ class WalletAnalysisJobRunResponse(BaseModel):
     wallets_with_sufficient_history: int
     candidates_count: int
     warnings: list[str] = Field(default_factory=list)
+    status_detail: str | None = None
     signal_id: str | None = None
     signal_status: MarketSignalStatus | None = None
     market: WalletAnalysisJobRead
@@ -233,6 +251,25 @@ class WalletProfileRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class WalletProfileList(BaseModel):
+    items: list[WalletProfileRead]
+    total: int
+
+
+class WalletProfileUpdate(BaseModel):
+    alias: str | None = Field(default=None, max_length=160)
+    status: WalletProfileStatus | None = None
+    notes: str | None = Field(default=None, max_length=4000)
+
+
+class WalletProfileDemoFollowResponse(BaseModel):
+    profile: WalletProfileRead
+    copy_wallet: dict[str, Any]
+    already_following: bool = False
+    baseline_created_at: datetime
+    message: str
 
 
 class PolySignalMarketSignalRead(BaseModel):

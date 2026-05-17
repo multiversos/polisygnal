@@ -14,7 +14,7 @@ from app.clients.polymarket_data import (
 )
 from app.clients.polymarket import PolymarketMarketDetailsPayload, get_polymarket_client
 from app.main import app
-from app.models import PolySignalMarketSignal, WalletProfile
+from app.models import CopyWallet, PolySignalMarketSignal, WalletProfile
 from app.models.wallet_analysis import WalletAnalysisCandidate, WalletAnalysisJob
 
 WALLET = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -307,6 +307,30 @@ def test_create_wallet_analysis_job_from_valid_link(client: TestClient) -> None:
     assert payload["market"]["candidates_count"] == 0
 
 
+def test_wallet_analysis_resolve_link_returns_complete_metadata(client: TestClient) -> None:
+    app.dependency_overrides[get_polymarket_client] = lambda: DummyGammaAnalysisClient()
+    try:
+        response = client.post("/wallet-analysis/resolve-link", json={"polymarket_url": MARKET_URL})
+    finally:
+        app.dependency_overrides.pop(get_polymarket_client, None)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["market_title"] == "Will BTC finish May above 110k?"
+    assert payload["condition_id"] == CONDITION_ID
+    assert payload["market_slug"] == "will-btc-finish-may-above-110k"
+    assert payload["token_ids"] == [TOKEN_YES, TOKEN_NO]
+    assert payload["outcomes"][0]["label"] == "Yes"
+
+
+def test_wallet_analysis_resolve_link_rejects_invalid_url(client: TestClient) -> None:
+    response = client.post("/wallet-analysis/resolve-link", json={"polymarket_url": "https://example.com/not-polymarket"})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "invalid_polymarket_url"
+
+
 def test_get_wallet_analysis_job_returns_initial_progress(client: TestClient) -> None:
     app.dependency_overrides[get_polymarket_client] = lambda: DummyGammaAnalysisClient()
     try:
@@ -322,8 +346,10 @@ def test_get_wallet_analysis_job_returns_initial_progress(client: TestClient) ->
     payload = response.json()
     assert payload["status"] == "pending"
     assert payload["progress"]["wallets_analyzed"] == 0
+    assert payload["progress"]["current_batch"] == 0
     assert payload["result_json"] is None
     assert payload["warnings"] == []
+    assert payload["status_detail"] is None
 
 
 def test_wallet_analysis_candidates_endpoint_returns_empty_list(client: TestClient) -> None:
@@ -468,6 +494,36 @@ def test_wallet_analysis_job_detail_includes_signal_summary(client: TestClient, 
     assert payload["signal_summary"]["confidence"] == "medium"
 
 
+def test_wallet_analysis_job_detail_partial_has_clean_progress_and_status_detail(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    job = WalletAnalysisJob(
+        source_url=MARKET_URL,
+        normalized_url=MARKET_URL,
+        market_slug="will-btc-finish-may-above-110k",
+        condition_id=CONDITION_ID,
+        market_title="Will BTC finish May above 110k?",
+        status="partial",
+        outcomes_json=[{"label": "Yes", "side": "YES", "token_id": TOKEN_YES}],
+        token_ids_json=[TOKEN_YES],
+        warnings_json=["wallet_discovery_truncated"],
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    response = client.get(f"/wallet-analysis/jobs/{job.id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["progress"]["wallets_found"] == 0
+    assert payload["progress"]["wallets_analyzed"] == 0
+    assert payload["progress"]["yes_wallets"] == 0
+    assert payload["progress"]["no_wallets"] == 0
+    assert payload["warnings"] == ["wallet_discovery_truncated"]
+    assert "limite configurado de wallets" in payload["status_detail"]
+
+
 def test_wallet_analysis_candidates_support_filters_and_sort(client: TestClient, db_session: Session) -> None:
     job = WalletAnalysisJob(
         source_url=MARKET_URL,
@@ -573,3 +629,110 @@ def test_save_candidate_as_profile_preserves_manual_notes(client: TestClient, db
     payload = response.json()
     assert payload["wallet_address"] == WALLET
     assert payload["notes"] == "nota manual que no debe borrarse"
+
+
+def test_wallet_profiles_list_and_patch_status(client: TestClient, db_session: Session) -> None:
+    profile = WalletProfile(
+        wallet_address=WALLET,
+        alias="alpha",
+        status="candidate",
+        confidence="medium",
+        notes="nota inicial",
+    )
+    db_session.add(profile)
+    db_session.commit()
+
+    listed = client.get("/wallet-profiles?status=candidate&limit=10&offset=0")
+    assert listed.status_code == 200
+    listed_payload = listed.json()
+    assert listed_payload["total"] == 1
+    assert listed_payload["items"][0]["wallet_address"] == WALLET
+
+    patched = client.patch(
+        f"/wallet-profiles/{profile.id}",
+        json={"status": "watching", "notes": "nota actualizada"},
+    )
+    assert patched.status_code == 200
+    patched_payload = patched.json()
+    assert patched_payload["status"] == "watching"
+    assert patched_payload["notes"] == "nota actualizada"
+
+
+def test_wallet_profile_demo_follow_creates_copy_wallet_once(client: TestClient, db_session: Session) -> None:
+    profile = WalletProfile(
+        wallet_address=WALLET,
+        alias="alpha",
+        status="candidate",
+        confidence="medium",
+    )
+    db_session.add(profile)
+    db_session.commit()
+
+    first = client.post(f"/wallet-profiles/{profile.id}/demo-follow")
+    second = client.post(f"/wallet-profiles/{profile.id}/demo-follow")
+
+    assert first.status_code == 200
+    first_payload = first.json()
+    assert first_payload["profile"]["status"] == "demo_follow"
+    assert first_payload["already_following"] is False
+    assert first_payload["copy_wallet"]["proxy_wallet"] == WALLET
+    assert first_payload["copy_wallet"]["mode"] == "demo"
+    assert first_payload["copy_wallet"]["real_trading_enabled"] is False
+    assert first_payload["baseline_created_at"]
+
+    assert second.status_code == 200
+    second_payload = second.json()
+    assert second_payload["already_following"] is True
+    assert second_payload["copy_wallet"]["proxy_wallet"] == WALLET
+    assert second_payload["copy_wallet"]["real_trading_enabled"] is False
+
+    wallets = db_session.query(CopyWallet).filter(CopyWallet.proxy_wallet == WALLET).count()
+    assert wallets == 1
+
+
+def test_polysignal_market_signals_endpoints_list_and_detail(client: TestClient, db_session: Session) -> None:
+    job = WalletAnalysisJob(
+        source_url=MARKET_URL,
+        normalized_url=MARKET_URL,
+        market_slug="will-btc-finish-may-above-110k",
+        condition_id=CONDITION_ID,
+        market_title="Will BTC finish May above 110k?",
+        status="completed",
+        outcomes_json=[{"label": "Yes", "side": "YES", "token_id": TOKEN_YES}],
+        token_ids_json=[TOKEN_YES, TOKEN_NO],
+    )
+    db_session.add(job)
+    db_session.flush()
+    signal = PolySignalMarketSignal(
+        job_id=job.id,
+        source_url=MARKET_URL,
+        market_slug=job.market_slug,
+        condition_id=job.condition_id,
+        market_title=job.market_title,
+        predicted_side="YES",
+        predicted_outcome="YES",
+        polysignal_score=Decimal("0.8400"),
+        confidence="high",
+        yes_score=Decimal("1.50"),
+        no_score=Decimal("0.28"),
+        outcome_scores_json={"YES": "1.50", "NO": "0.28"},
+        wallets_analyzed=12,
+        wallets_with_sufficient_history=8,
+        warnings_json=["signal_ready"],
+        signal_status="pending_resolution",
+    )
+    db_session.add(signal)
+    db_session.commit()
+
+    listed = client.get(f"/polysignal-market-signals?job_id={job.id}&limit=10&offset=0")
+    assert listed.status_code == 200
+    listed_payload = listed.json()
+    assert listed_payload["total"] == 1
+    assert listed_payload["items"][0]["id"] == signal.id
+
+    detail = client.get(f"/polysignal-market-signals/{signal.id}")
+    assert detail.status_code == 200
+    detail_payload = detail.json()
+    assert detail_payload["id"] == signal.id
+    assert detail_payload["predicted_side"] == "YES"
+    assert detail_payload["signal_status"] == "pending_resolution"

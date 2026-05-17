@@ -76,12 +76,20 @@ def list_market_signals(
     *,
     limit: int = 50,
     offset: int = 0,
+    job_id: str | None = None,
+    market_slug: str | None = None,
     signal_status: str | None = None,
 ) -> PolySignalMarketSignalList:
     safe_limit = max(1, min(limit, 100))
     safe_offset = max(0, offset)
     stmt = select(PolySignalMarketSignal)
     count_stmt = select(func.count()).select_from(PolySignalMarketSignal)
+    if job_id:
+        stmt = stmt.where(PolySignalMarketSignal.job_id == job_id)
+        count_stmt = count_stmt.where(PolySignalMarketSignal.job_id == job_id)
+    if market_slug:
+        stmt = stmt.where(PolySignalMarketSignal.market_slug == market_slug)
+        count_stmt = count_stmt.where(PolySignalMarketSignal.market_slug == market_slug)
     if signal_status:
         stmt = stmt.where(PolySignalMarketSignal.signal_status == signal_status)
         count_stmt = count_stmt.where(PolySignalMarketSignal.signal_status == signal_status)

@@ -2291,11 +2291,61 @@ async function validateAnalyzePolymarketLinkRoute() {
   try {
     const calls = [];
     globalThis.fetch = async (url, init) => {
-      calls.push({ init, url: String(url) });
-      if (String(url).startsWith("https://gamma-api.polymarket.com/markets?slug=")) {
+      const requestUrl = String(url);
+      calls.push({ init, url: requestUrl });
+      if (requestUrl === "https://polisygnal.onrender.com/wallet-analysis/resolve-link") {
+        const body = JSON.parse(String(init?.body || "{}"));
+        if (body.polymarket_url === "https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11") {
+          return new Response(
+            JSON.stringify({
+              condition_id: "0xabc",
+              event_slug: "nba-okc-lal-2026-05-11",
+              market_slug: "nba-okc-lal-2026-05-11",
+              market_title: "Thunder vs. Lakers",
+              normalized_url: body.polymarket_url,
+              outcomes: [
+                { label: "Thunder", side: "UNKNOWN", token_id: "thunder" },
+                { label: "Lakers", side: "UNKNOWN", token_id: "lakers" },
+              ],
+              raw_source: "gamma",
+              source_url: body.polymarket_url,
+              status: "ok",
+              token_ids: ["thunder", "lakers"],
+              warnings: [],
+            }),
+            { headers: { "Content-Type": "application/json" }, status: 200 },
+          );
+        }
+        if (body.polymarket_url === "https://polymarket.com/market/lal-cel-lev-2026-05-12-cel") {
+          return new Response(
+            JSON.stringify({
+              condition_id: "0xdef",
+              event_slug: "lal-cel-lev-2026-05-12",
+              market_slug: "lal-cel-lev-2026-05-12-cel",
+              market_title: "Will RC Celta de Vigo win on 2026-05-12?",
+              normalized_url: body.polymarket_url,
+              outcomes: [
+                { label: "Yes", side: "YES", token_id: "cel-yes" },
+                { label: "No", side: "NO", token_id: "cel-no" },
+              ],
+              raw_source: "gamma",
+              source_url: body.polymarket_url,
+              status: "ok",
+              token_ids: ["cel-yes", "cel-no"],
+              warnings: [],
+            }),
+            { headers: { "Content-Type": "application/json" }, status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({ detail: "not_found" }), {
+          headers: { "Content-Type": "application/json" },
+          status: 404,
+        });
+      }
+      if (requestUrl.startsWith("https://gamma-api.polymarket.com/markets?slug=")) {
         return new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" }, status: 200 });
       }
-      if (String(url).includes("slug=lal-cel-lev-2026-05-12")) {
+      if (requestUrl.includes("slug=lal-cel-lev-2026-05-12")) {
         return new Response(
           JSON.stringify([
             {
@@ -2378,7 +2428,10 @@ async function validateAnalyzePolymarketLinkRoute() {
     assert(body.markets?.[0]?.question === "Thunder vs. Lakers", "expected route to normalize the returned market");
     assert(!JSON.stringify(body).includes("SECRET"), "analyze route leaked raw payload");
     assert(!JSON.stringify(body).includes("Sevilla"), "analyze route included unrelated soccer market");
-    assert(String(calls[0]?.url).startsWith("https://gamma-api.polymarket.com/events?slug="), "route did not call allowlisted Gamma events endpoint");
+    assert(
+      String(calls[0]?.url) === "https://polisygnal.onrender.com/wallet-analysis/resolve-link",
+      "route did not use backend wallet-analysis resolver first",
+    );
 
     const marketResolved = await route.POST(
       new Request("https://example.test/api/analyze-polymarket-link", {

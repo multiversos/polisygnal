@@ -73,6 +73,31 @@ El runner:
 - persiste progreso y warnings
 - termina en `completed`, `partial` o `failed`
 
+## Resolver canonico del link
+
+La fuente de verdad para resolver metadata del mercado ahora es el backend:
+
+```powershell
+POST /wallet-analysis/resolve-link
+{
+  "polymarket_url": "https://polymarket.com/market/..."
+}
+```
+
+La respuesta intenta devolver metadata completa y consistente:
+
+- `source_url`
+- `normalized_url`
+- `market_title`
+- `condition_id`
+- `market_slug`
+- `event_slug`
+- `outcomes`
+- `token_ids`
+- `warnings`
+
+Si falta metadata importante, el backend devuelve `status = partial` y deja warnings explicitos. La UI de `/analyze` debe tratar este resolver como la fuente principal y dejar el resolver TypeScript viejo solo como compatibilidad.
+
 ### Flujo minimo desde la API
 
 1. Crear job desde el link de Polymarket:
@@ -113,6 +138,27 @@ GET /wallet-analysis/jobs/{job_id}/candidates?sort_by=score&sort_order=desc&limi
 ```powershell
 POST /wallet-analysis/candidates/{candidate_id}/save-profile
 ```
+
+6. Listar o actualizar perfiles guardados:
+
+```powershell
+GET /wallet-profiles?status=watching&limit=20
+PATCH /wallet-profiles/{profile_id}
+```
+
+7. Activar demo-follow controlado para un perfil:
+
+```powershell
+POST /wallet-profiles/{profile_id}/demo-follow
+```
+
+Este paso:
+
+- hace upsert en `copy_wallets`
+- mantiene `mode = demo`
+- mantiene `real_trading_enabled = false`
+- usa `copy_wallets.created_at` como baseline
+- no copia trades historicos anteriores al alta
 
 El endpoint `run-once` es de control/manual para este sprint. No es un proceso `forever`, no reemplaza un worker persistente y no debe usarse como request larga sin limites.
 
@@ -182,12 +228,20 @@ Estados de resolucion preparados para un sprint posterior:
 
 En este sprint la resolucion real del mercado queda preparada, pero el settlement automatico completo se implementara despues.
 
+Endpoints minimos:
+
+```powershell
+GET /polysignal-market-signals?limit=25
+GET /polysignal-market-signals/{signal_id}
+```
+
 ## Copy Trading Demo
 
 Cuando una wallet candidata pase mas adelante a `demo_follow`, el alta en `copy_wallets` debe usar el baseline actual:
 
 - `copy_wallets.created_at` marca el inicio de seguimiento efectivo
 - trades anteriores a ese momento no son validos para Copy Trading demo
+- el worker demo solo procesara trades nuevos desde ese momento
 
 ## Advertencia de producto
 

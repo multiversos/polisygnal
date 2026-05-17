@@ -4,12 +4,15 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from decimal import Decimal
 import re
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.copy_trading import CopyWallet
 from app.clients.polymarket import PolymarketGammaClient
 from app.models.wallet_analysis import WalletAnalysisCandidate, WalletAnalysisJob, WalletProfile
+from app.schemas.copy_trading import CopyWalletRead
 from app.schemas.wallet_analysis import (
     SortOrder,
     WalletAnalysisCandidateList,
@@ -17,10 +20,15 @@ from app.schemas.wallet_analysis import (
     WalletAnalysisCandidateSortBy,
     WalletAnalysisJobProgressRead,
     WalletAnalysisJobRead,
+    WalletAnalysisResolvedLinkRead,
     WalletAnalysisSignalSummaryRead,
+    WalletProfileDemoFollowResponse,
+    WalletProfileList,
     WalletProfileRead,
+    WalletProfileUpdate,
     WalletProfileUpsert,
 )
+from app.services.copy_trading_service import add_copy_event, build_copy_wallet_read
 from app.services.polysignal_market_signals import get_latest_market_signal_for_job
 from app.services.polymarket_link_resolver import (
     PolymarketLinkResolverError,
@@ -43,6 +51,54 @@ class WalletAnalysisJobNotFoundError(Exception):
 
 class WalletAnalysisCandidateNotFoundError(Exception):
     pass
+
+
+class WalletProfileNotFoundError(Exception):
+    pass
+
+
+def resolve_wallet_analysis_link(
+    *,
+    polymarket_url: str,
+    gamma_client: PolymarketGammaClient,
+) -> WalletAnalysisResolvedLinkRead:
+    try:
+        resolved = resolve_polymarket_market_from_link(
+            gamma_client=gamma_client,
+            polymarket_url=polymarket_url,
+        )
+    except PolymarketLinkResolverError as exc:
+        reason = exc.args[0]
+        if reason == "market_not_found":
+            return WalletAnalysisResolvedLinkRead(
+                source_url=polymarket_url.strip(),
+                normalized_url=polymarket_url.strip(),
+                status="not_found",
+                raw_source="gamma",
+                warnings=["No pudimos obtener este mercado desde Polymarket."],
+            )
+        if reason == "unsupported_polymarket_url":
+            return WalletAnalysisResolvedLinkRead(
+                source_url=polymarket_url.strip(),
+                normalized_url=polymarket_url.strip(),
+                status="unsupported",
+                raw_source="gamma",
+                warnings=["Este tipo de enlace todavia no esta soportado."],
+            )
+        if reason == "invalid_polymarket_url":
+            raise WalletAnalysisValidationError(reason) from exc
+        return WalletAnalysisResolvedLinkRead(
+            source_url=polymarket_url.strip(),
+            normalized_url=polymarket_url.strip(),
+            status="error",
+            raw_source="gamma",
+            warnings=["No pudimos consultar Polymarket ahora."],
+        )
+
+    return serialize_resolved_wallet_analysis_link(
+        source_url=polymarket_url,
+        resolved=resolved,
+    )
 
 
 def create_wallet_analysis_job_from_link(
@@ -225,6 +281,136 @@ def save_candidate_as_profile(
     return create_or_update_wallet_profile(db, payload)
 
 
+def list_wallet_profiles(
+    db: Session,
+    *,
+    status: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> WalletProfileList:
+    safe_limit = max(1, min(limit, 100))
+    safe_offset = max(0, offset)
+    stmt = select(WalletProfile)
+    count_stmt = select(func.count()).select_from(WalletProfile)
+    if status:
+        stmt = stmt.where(WalletProfile.status == status)
+        count_stmt = count_stmt.where(WalletProfile.status == status)
+    stmt = stmt.order_by(
+        WalletProfile.updated_at.desc(),
+        WalletProfile.score.desc().nullslast(),
+        WalletProfile.created_at.desc(),
+    )
+    items = list(db.scalars(stmt.offset(safe_offset).limit(safe_limit)).all())
+    total = int(db.scalar(count_stmt) or 0)
+    return WalletProfileList(
+        items=[serialize_wallet_profile(item) for item in items],
+        total=total,
+    )
+
+
+def get_wallet_profile(db: Session, profile_id: str) -> WalletProfile:
+    profile = db.get(WalletProfile, profile_id)
+    if profile is None:
+        raise WalletProfileNotFoundError(profile_id)
+    return profile
+
+
+def update_wallet_profile(
+    db: Session,
+    *,
+    profile_id: str,
+    payload: WalletProfileUpdate,
+) -> WalletProfile:
+    profile = get_wallet_profile(db, profile_id)
+    if "alias" in payload.model_fields_set:
+        profile.alias = _clean_optional(payload.alias, 160)
+    if "status" in payload.model_fields_set and payload.status is not None:
+        profile.status = payload.status
+    if "notes" in payload.model_fields_set:
+        profile.notes = _clean_optional(payload.notes, 4000)
+    db.add(profile)
+    db.flush()
+    db.refresh(profile)
+    return profile
+
+
+def follow_wallet_profile_in_demo(
+    db: Session,
+    *,
+    profile_id: str,
+) -> WalletProfileDemoFollowResponse:
+    profile = get_wallet_profile(db, profile_id)
+    existing_wallet = db.scalar(
+        select(CopyWallet)
+        .where(CopyWallet.proxy_wallet == profile.wallet_address)
+        .limit(1)
+    )
+    already_following = existing_wallet is not None
+    wallet = existing_wallet or CopyWallet(
+        id=str(uuid4()),
+        label=_default_copy_wallet_label(profile),
+        profile_url=_build_polymarket_profile_url(profile.wallet_address),
+        proxy_wallet=profile.wallet_address,
+        enabled=True,
+        mode="demo",
+        real_trading_enabled=False,
+        copy_buys=True,
+        copy_sells=True,
+        copy_amount_mode="preset",
+        copy_amount_usd=Decimal("5"),
+        max_trade_usd=Decimal("20"),
+        max_daily_usd=Decimal("100"),
+        max_slippage_bps=300,
+        max_delay_seconds=10,
+        sports_only=False,
+    )
+    if existing_wallet is not None:
+        wallet.enabled = True
+        wallet.mode = "demo"
+        wallet.real_trading_enabled = False
+        wallet.copy_buys = True if wallet.copy_buys is None else wallet.copy_buys
+        wallet.copy_sells = True if wallet.copy_sells is None else wallet.copy_sells
+        wallet.copy_amount_mode = wallet.copy_amount_mode or "preset"
+        wallet.copy_amount_usd = wallet.copy_amount_usd or Decimal("5")
+        wallet.max_trade_usd = wallet.max_trade_usd or Decimal("20")
+        wallet.max_daily_usd = wallet.max_daily_usd or Decimal("100")
+        wallet.max_slippage_bps = wallet.max_slippage_bps if wallet.max_slippage_bps is not None else 300
+        wallet.max_delay_seconds = wallet.max_delay_seconds if wallet.max_delay_seconds is not None else 10
+        wallet.sports_only = False
+        wallet.label = wallet.label or _default_copy_wallet_label(profile)
+        wallet.profile_url = wallet.profile_url or _build_polymarket_profile_url(profile.wallet_address)
+
+    profile.status = "demo_follow"
+    db.add(wallet)
+    db.add(profile)
+    db.flush()
+    db.refresh(wallet)
+    db.refresh(profile)
+    add_copy_event(
+        db,
+        wallet_id=wallet.id,
+        level="info",
+        event_type="wallet_analysis_demo_follow_enabled",
+        message="Wallet agregada a Copy Trading demo desde wallet profile. Solo se copiaran trades nuevos desde ahora.",
+        metadata={
+            "profile_id": profile.id,
+            "wallet_address": profile.wallet_address,
+            "source": "wallet_analysis_profile",
+        },
+    )
+    return WalletProfileDemoFollowResponse(
+        profile=serialize_wallet_profile(profile),
+        copy_wallet=CopyWalletRead.model_validate(build_copy_wallet_read(wallet)).model_dump(mode="json"),
+        already_following=already_following,
+        baseline_created_at=wallet.created_at,
+        message=(
+            "Wallet ya estaba en Copy Trading demo. Se mantiene el baseline actual de seguimiento."
+            if already_following
+            else "Wallet agregada a Copy Trading demo. Solo se copiaran trades nuevos desde ahora."
+        ),
+    )
+
+
 def serialize_wallet_analysis_job(
     job: WalletAnalysisJob,
     *,
@@ -246,15 +432,16 @@ def serialize_wallet_analysis_job(
         outcomes=outcomes,
         token_ids=[str(token_id) for token_id in token_ids if isinstance(token_id, str)],
         progress=WalletAnalysisJobProgressRead(
-            wallets_found=job.wallets_found,
-            wallets_analyzed=job.wallets_analyzed,
-            wallets_with_sufficient_history=job.wallets_with_sufficient_history,
-            yes_wallets=job.yes_wallets,
-            no_wallets=job.no_wallets,
-            current_batch=job.current_batch,
+            wallets_found=job.wallets_found or 0,
+            wallets_analyzed=job.wallets_analyzed or 0,
+            wallets_with_sufficient_history=job.wallets_with_sufficient_history or 0,
+            yes_wallets=job.yes_wallets or 0,
+            no_wallets=job.no_wallets or 0,
+            current_batch=job.current_batch or 0,
         ),
         result_json=job.result_json,
         warnings=[str(item) for item in warnings if isinstance(item, str)],
+        status_detail=_job_status_detail(job),
         error_message=_clean_optional(job.error_message, 2000),
         started_at=job.started_at,
         finished_at=job.finished_at,
@@ -325,6 +512,39 @@ def serialize_wallet_profile(profile: WalletProfile) -> WalletProfileRead:
     )
 
 
+def serialize_resolved_wallet_analysis_link(
+    *,
+    source_url: str,
+    resolved: ResolvedPolymarketMarket,
+) -> WalletAnalysisResolvedLinkRead:
+    warnings = _clean_text_list(resolved.warnings)
+    status = "ok"
+    if not resolved.condition_id or not resolved.question or not resolved.outcomes or not resolved.token_ids:
+        warnings = _clean_text_list([*warnings, "resolved_market_metadata_incomplete"])
+        status = "partial"
+    return WalletAnalysisResolvedLinkRead(
+        source_url=source_url.strip(),
+        normalized_url=resolved.normalized_url,
+        status=status,
+        raw_source=resolved.raw_source,
+        market_title=resolved.question or None,
+        condition_id=resolved.condition_id,
+        market_slug=resolved.market_slug,
+        event_slug=resolved.event_slug,
+        sport_or_league=resolved.sport_or_league,
+        outcomes=[
+            {
+                "label": outcome.label,
+                "side": outcome.side,
+                "token_id": outcome.token_id,
+            }
+            for outcome in resolved.outcomes
+        ],
+        token_ids=resolved.token_ids,
+        warnings=warnings,
+    )
+
+
 def count_wallet_analysis_candidates(db: Session, job_id: str) -> int:
     return int(
         db.scalar(
@@ -377,3 +597,30 @@ def _clean_text_list(values: Iterable[str]) -> list[str]:
         if item and item not in cleaned:
             cleaned.append(item)
     return cleaned[:50]
+
+
+def _job_status_detail(job: WalletAnalysisJob) -> str | None:
+    warnings = [str(item) for item in (job.warnings_json or []) if isinstance(item, str)]
+    if job.status == "partial":
+        if "wallet_discovery_truncated" in warnings:
+            return "El analisis quedo parcial porque el discovery alcanzo el limite configurado de wallets."
+        if "trade_discovery_truncated" in warnings:
+            return "El analisis quedo parcial porque la discovery de trades del mercado fue paginada hasta el limite seguro."
+        if any(warning.startswith("wallet_fetch_failed:") for warning in warnings):
+            return "El analisis quedo parcial porque algunas wallets no devolvieron historial completo en esta pasada."
+        return "El analisis quedo parcial por limites de lote, tiempo o datos incompletos de la API."
+    if job.status == "failed" and job.error_message:
+        return "El job fallo y guardo un error sanitizado."
+    if job.status == "completed" and (job.wallets_found or 0) == 0:
+        return "No se detectaron wallets publicas suficientes para este mercado en esta pasada."
+    return None
+
+
+def _default_copy_wallet_label(profile: WalletProfile) -> str:
+    if profile.alias:
+        return profile.alias[:160]
+    return f"Wallet candidata {profile.wallet_address[:6]}...{profile.wallet_address[-4:]}"
+
+
+def _build_polymarket_profile_url(wallet_address: str) -> str:
+    return f"https://polymarket.com/profile/{wallet_address}"

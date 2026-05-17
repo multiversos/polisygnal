@@ -4,13 +4,22 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   createWalletAnalysisJob,
+  fetchPolySignalMarketSignals,
   fetchWalletAnalysisCandidates,
   fetchWalletAnalysisJob,
+  fetchWalletProfiles,
+  followWalletProfileInDemo,
   runWalletAnalysisJobOnce,
   saveWalletAnalysisCandidateAsProfile,
+  updateWalletProfile,
+  type PolySignalMarketSignal,
   type WalletAnalysisCandidate,
   type WalletAnalysisCandidateSortBy,
+  type WalletAnalysisConfidence,
   type WalletAnalysisJobRead,
+  type WalletAnalysisSortOrder,
+  type WalletProfileRead,
+  type WalletProfileStatus,
 } from "../../lib/walletAnalysis";
 
 type WalletAnalysisPanelProps = {
@@ -74,44 +83,159 @@ function formatPercent(value: unknown): string {
   }).format(normalized);
 }
 
-function metricLabel(candidate: WalletAnalysisCandidate, field: "roi" | "win_rate" | "pnl"): string {
-  if (field === "roi") {
-    if (candidate.roi_30d_status === "unavailable") {
-      return "ROI 30d no disponible";
-    }
-    return `ROI 30d ${formatPercent(candidate.roi_30d_value)} (${candidate.roi_30d_status})`;
+function formatDate(value?: string | null): string {
+  if (!value) {
+    return "sin dato";
   }
-  if (field === "win_rate") {
-    if (candidate.win_rate_30d_status === "unavailable") {
-      return "Win rate 30d no disponible";
-    }
-    return `Win rate 30d ${formatPercent(candidate.win_rate_30d_value)} (${candidate.win_rate_30d_status})`;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) {
+    return "sin dato";
   }
-  if (candidate.pnl_30d_status === "unavailable") {
-    return "PnL 30d no disponible";
+  return new Intl.DateTimeFormat("es", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(parsed);
+}
+
+function metricStatusLabel(
+  label: string,
+  status: string,
+  value: unknown,
+  formatter: (value: unknown) => string,
+): string {
+  if (status === "unavailable") {
+    return `${label} no disponible`;
   }
-  return `PnL 30d ${formatUsd(candidate.pnl_30d_value)} (${candidate.pnl_30d_status})`;
+  return `${label} ${formatter(value)} (${status})`;
+}
+
+function jobStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending: "Pendiente",
+    resolving_market: "Resolviendo mercado",
+    discovering_wallets: "Descubriendo wallets",
+    analyzing_wallets: "Analizando wallets",
+    scoring: "Calculando balanza",
+    completed: "Completado",
+    partial: "Parcial",
+    failed: "Fallido",
+    cancelled: "Cancelado",
+  };
+  return labels[status] || status;
+}
+
+function profileStatusLabel(status: WalletProfileStatus): string {
+  const labels: Record<WalletProfileStatus, string> = {
+    candidate: "Candidata",
+    watching: "Observar",
+    demo_follow: "Demo follow",
+    paused: "Pausada",
+    rejected: "Rechazada",
+  };
+  return labels[status];
+}
+
+function scoreEntries(signal: WalletAnalysisJobRead["signal_summary"]) {
+  if (!signal?.outcome_scores_json) {
+    return [];
+  }
+  const entries = Object.entries(signal.outcome_scores_json)
+    .map(([label, value]) => ({
+      label,
+      value: toNumber(value) ?? 0,
+    }))
+    .filter((entry) => entry.value > 0);
+  const total = entries.reduce((sum, entry) => sum + entry.value, 0);
+  return entries.map((entry) => ({
+    label: entry.label,
+    percent: total > 0 ? entry.value / total : 0,
+    raw: entry.value,
+  }));
+}
+
+function SignalDisclaimer({ signalCopy }: { signalCopy: string }) {
+  return (
+    <div className="focus-notice active" role="status">
+      <strong>Senal PolySignal</strong>
+      <span>{signalCopy}</span>
+    </div>
+  );
 }
 
 export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalysisPanelProps) {
   const [job, setJob] = useState<WalletAnalysisJobRead | null>(null);
   const [candidates, setCandidates] = useState<WalletAnalysisCandidate[]>([]);
+  const [profiles, setProfiles] = useState<WalletProfileRead[]>([]);
+  const [signals, setSignals] = useState<PolySignalMarketSignal[]>([]);
   const [jobError, setJobError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [candidatesLoading, setCandidatesLoading] = useState(false);
-  const [savedCandidateIds, setSavedCandidateIds] = useState<Set<string>>(() => new Set());
+  const [profilesLoading, setProfilesLoading] = useState(false);
+  const [signalsLoading, setSignalsLoading] = useState(false);
   const [sortBy, setSortBy] = useState<WalletAnalysisCandidateSortBy>("score");
+  const [sortOrder, setSortOrder] = useState<WalletAnalysisSortOrder>("desc");
+  const [sideFilter, setSideFilter] = useState<string>("ALL");
+  const [confidenceFilter, setConfidenceFilter] = useState<WalletAnalysisConfidence | "ALL">("ALL");
+
+  const profileByWallet = useMemo(() => {
+    const map = new Map<string, WalletProfileRead>();
+    for (const profile of profiles) {
+      map.set(profile.wallet_address.toLowerCase(), profile);
+    }
+    return map;
+  }, [profiles]);
+
+  const scoreSummary = useMemo(() => scoreEntries(job?.signal_summary), [job?.signal_summary]);
+
+  const signalCopy = useMemo(() => {
+    if (!job?.signal_summary) {
+      return "Todavia no hay una senal PolySignal persistida para este job.";
+    }
+    const score = formatPercent(job.signal_summary.polysignal_score);
+    const side = job.signal_summary.predicted_side || job.signal_summary.predicted_outcome || "sin lado dominante";
+    return `${side} ${score}. Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.`;
+  }, [job?.signal_summary]);
 
   useEffect(() => {
     setJob(null);
     setCandidates([]);
+    setProfiles([]);
+    setSignals([]);
     setJobError(null);
     setActionMessage(null);
     setBusy(false);
     setCandidatesLoading(false);
-    setSavedCandidateIds(new Set());
+    setProfilesLoading(false);
+    setSignalsLoading(false);
     setSortBy("score");
+    setSortOrder("desc");
+    setSideFilter("ALL");
+    setConfidenceFilter("ALL");
+  }, [normalizedUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProfilesLoading(true);
+    void fetchWalletProfiles({ limit: 12 })
+      .then((result) => {
+        if (!cancelled) {
+          setProfiles(result.items);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setJobError("No pudimos cargar los perfiles de wallets ahora.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setProfilesLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [normalizedUrl]);
 
   useEffect(() => {
@@ -120,6 +244,9 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     }
     let cancelled = false;
     const intervalId = window.setInterval(async () => {
+      if (document.hidden) {
+        return;
+      }
       try {
         const nextJob = await fetchWalletAnalysisJob(job.id);
         if (!cancelled) {
@@ -144,10 +271,12 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     let cancelled = false;
     setCandidatesLoading(true);
     void fetchWalletAnalysisCandidates({
+      confidence: confidenceFilter === "ALL" ? undefined : confidenceFilter,
       jobId: job.id,
-      limit: 12,
+      limit: 20,
+      side: sideFilter === "ALL" ? undefined : sideFilter,
       sortBy,
-      sortOrder: "desc",
+      sortOrder,
     })
       .then((result) => {
         if (!cancelled) {
@@ -167,16 +296,57 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     return () => {
       cancelled = true;
     };
-  }, [job?.id, sortBy]);
+  }, [confidenceFilter, job?.id, sideFilter, sortBy, sortOrder]);
 
-  const signalCopy = useMemo(() => {
-    if (!job?.signal_summary) {
-      return "Todavia no hay una senal PolySignal persistida para este job.";
+  useEffect(() => {
+    if (!job?.id && !job?.market_slug) {
+      setSignals([]);
+      return;
     }
-    const score = formatPercent(job.signal_summary.polysignal_score);
-    const side = job.signal_summary.predicted_side || job.signal_summary.predicted_outcome || "sin lado dominante";
-    return `${side} ${score}. Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.`;
-  }, [job?.signal_summary]);
+    let cancelled = false;
+    setSignalsLoading(true);
+    void fetchPolySignalMarketSignals({
+      jobId: job?.id || undefined,
+      limit: 6,
+      marketSlug: job?.market_slug || undefined,
+    })
+      .then((result) => {
+        if (!cancelled) {
+          setSignals(result.items);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setJobError("No pudimos cargar el historial de senales ahora.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSignalsLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [job?.id, job?.market_slug]);
+
+  async function refreshProfiles() {
+    const result = await fetchWalletProfiles({ limit: 12 });
+    setProfiles(result.items);
+  }
+
+  async function refreshSignals(nextJob?: WalletAnalysisJobRead | null) {
+    if (!nextJob?.id && !nextJob?.market_slug) {
+      setSignals([]);
+      return;
+    }
+    const result = await fetchPolySignalMarketSignals({
+      jobId: nextJob?.id || undefined,
+      limit: 6,
+      marketSlug: nextJob?.market_slug || undefined,
+    });
+    setSignals(result.items);
+  }
 
   async function handleCreateJob() {
     setBusy(true);
@@ -185,7 +355,8 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     try {
       const created = await createWalletAnalysisJob(normalizedUrl);
       setJob(created.market);
-      setActionMessage("Job de analisis profundo creado. Aun no corrio discovery.");
+      await refreshSignals(created.market);
+      setActionMessage("Job de analisis profundo creado. Ya puedes ejecutar una pasada limitada.");
     } catch {
       setJobError("No pudimos crear el job de analisis profundo desde este enlace.");
     } finally {
@@ -202,13 +373,14 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     setActionMessage(null);
     try {
       const result = await runWalletAnalysisJobOnce({
+        batchSize: 20,
+        historyLimit: 100,
         jobId: job.id,
         maxWallets: 50,
         maxWalletsDiscovery: 100,
-        batchSize: 20,
-        historyLimit: 100,
       });
       setJob(result.market);
+      await Promise.all([refreshProfiles(), refreshSignals(result.market)]);
       setActionMessage(result.message);
     } catch {
       setJobError("No pudimos ejecutar esta pasada limitada del analisis profundo.");
@@ -226,6 +398,7 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     try {
       const refreshed = await fetchWalletAnalysisJob(job.id);
       setJob(refreshed);
+      await refreshSignals(refreshed);
       setActionMessage("Progreso refrescado.");
     } catch {
       setJobError("No pudimos refrescar este job ahora.");
@@ -234,13 +407,13 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     }
   }
 
-  async function handleSaveProfile(candidateId: string) {
+  async function handleSaveProfile(candidate: WalletAnalysisCandidate) {
     setBusy(true);
     setJobError(null);
     setActionMessage(null);
     try {
-      await saveWalletAnalysisCandidateAsProfile(candidateId);
-      setSavedCandidateIds((current) => new Set(current).add(candidateId));
+      await saveWalletAnalysisCandidateAsProfile(candidate.id);
+      await refreshProfiles();
       setActionMessage("Wallet candidata guardada como perfil.");
     } catch {
       setJobError("No pudimos guardar esta wallet candidata como perfil.");
@@ -249,19 +422,59 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     }
   }
 
+  async function handleProfileStatus(profileId: string, status: WalletProfileStatus) {
+    setBusy(true);
+    setJobError(null);
+    setActionMessage(null);
+    try {
+      await updateWalletProfile(profileId, { status });
+      await refreshProfiles();
+      setActionMessage(`Perfil actualizado a ${profileStatusLabel(status)}.`);
+    } catch {
+      setJobError("No pudimos actualizar el estado del perfil.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDemoFollow(profileId: string) {
+    const confirmed = window.confirm(
+      "Solo se copiaran trades nuevos desde ahora. No se copiara historial anterior. Continuar en modo demo?",
+    );
+    if (!confirmed) {
+      return;
+    }
+    setBusy(true);
+    setJobError(null);
+    setActionMessage(null);
+    try {
+      const result = await followWalletProfileInDemo(profileId);
+      await refreshProfiles();
+      setActionMessage(result.message);
+    } catch {
+      setJobError("No pudimos activar este perfil para Copy Trading demo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleViewProfile(profileId: string) {
+    const element = document.getElementById(`wallet-profile-${profileId}`);
+    element?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   return (
     <section className="dashboard-panel" aria-label="Analisis profundo de wallets">
       <div className="panel-heading">
         <div>
           <p className="eyebrow">Analisis profundo de wallets</p>
-          <h3>{marketTitle || "Analisis de wallets del mercado"}</h3>
+          <h3>{job?.market_title || marketTitle || "Analisis de wallets del mercado"}</h3>
           <p>
-            Reutiliza el analizador viejo para resolver el link y luego corre una pasada limitada del runner real por lotes.
+            Este flujo reutiliza el analizador viejo para resolver el link y usa el backend persistido para jobs,
+            progreso, candidatas, perfiles y senal historica.
           </p>
         </div>
-        <span className="badge muted">
-          {job ? `Job ${job.status}` : "Sin job"}
-        </span>
+        <span className="badge muted">{job ? `Job ${jobStatusLabel(job.status)}` : "Sin job"}</span>
       </div>
 
       <p className="section-note">
@@ -285,12 +498,44 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
         )}
       </div>
 
-      {job ? (
+      {!job ? (
+        <p className="section-note">
+          Crea el job profundo desde este link y luego corre una pasada controlada del runner real. No activa Copy Trading
+          real ni ejecuta dinero real.
+        </p>
+      ) : (
         <>
           <div className="wallet-report-summary">
             <div>
-              <span>Status</span>
-              <strong>{job.status}</strong>
+              <span>Mercado</span>
+              <strong>{job.market_title || "Mercado sin titulo disponible"}</strong>
+            </div>
+            <div>
+              <span>Link</span>
+              <strong>{job.normalized_url}</strong>
+            </div>
+            <div>
+              <span>Condition ID</span>
+              <strong>{job.condition_id || "sin dato"}</strong>
+            </div>
+            <div>
+              <span>Market slug</span>
+              <strong>{job.market_slug || "sin dato"}</strong>
+            </div>
+            <div>
+              <span>Event slug</span>
+              <strong>{job.event_slug || "sin dato"}</strong>
+            </div>
+            <div>
+              <span>Outcomes</span>
+              <strong>{job.outcomes.map((outcome) => outcome.label).join(" / ") || "sin dato"}</strong>
+            </div>
+          </div>
+
+          <div className="wallet-report-summary">
+            <div>
+              <span>Fase actual</span>
+              <strong>{jobStatusLabel(job.status)}</strong>
             </div>
             <div>
               <span>Wallets encontradas</span>
@@ -305,42 +550,69 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
               <strong>{job.progress.wallets_with_sufficient_history}</strong>
             </div>
             <div>
-              <span>YES</span>
+              <span>YES wallets</span>
               <strong>{job.progress.yes_wallets}</strong>
             </div>
             <div>
-              <span>NO</span>
+              <span>NO wallets</span>
               <strong>{job.progress.no_wallets}</strong>
             </div>
+            <div>
+              <span>Lote actual</span>
+              <strong>{job.progress.current_batch}</strong>
+            </div>
+            <div>
+              <span>Candidatas</span>
+              <strong>{job.candidates_count}</strong>
+            </div>
           </div>
+
+          {job.status_detail ? (
+            <div className="focus-notice active" role="status">
+              <strong>Estado del job</strong>
+              <span>{job.status_detail}</span>
+            </div>
+          ) : null}
+
+          <SignalDisclaimer signalCopy={signalCopy} />
+
+          {scoreSummary.length > 0 ? (
+            <div className="wallet-report-summary">
+              {scoreSummary.map((entry) => (
+                <div key={entry.label}>
+                  <span>{entry.label}</span>
+                  <strong>{formatPercent(entry.percent)}</strong>
+                </div>
+              ))}
+              <div>
+                <span>Confianza</span>
+                <strong>{job.signal_summary?.confidence || "sin dato"}</strong>
+              </div>
+              <div>
+                <span>YES score</span>
+                <strong>{formatMetric(job.signal_summary?.yes_score)}</strong>
+              </div>
+              <div>
+                <span>NO score</span>
+                <strong>{formatMetric(job.signal_summary?.no_score)}</strong>
+              </div>
+            </div>
+          ) : null}
 
           <div className="data-health-notes">
-            <span className="badge">Batch actual {job.progress.current_batch}</span>
-            <span className="badge muted">Candidates {job.candidates_count}</span>
             {job.signal_summary ? (
-              <span className="badge external-hint">Senal {job.signal_summary.signal_status}</span>
-            ) : null}
-          </div>
-
-          <div className="wallet-report-summary">
-            <div>
-              <span>Condition ID</span>
-              <strong>{job.condition_id || "sin dato"}</strong>
-            </div>
-            <div>
-              <span>Outcomes</span>
-              <strong>{job.outcomes.map((outcome) => outcome.side || outcome.label).join(" / ") || "sin dato"}</strong>
-            </div>
-          </div>
-
-          <div className="focus-notice active" role="status">
-            <strong>Senal PolySignal</strong>
-            <span>{signalCopy}</span>
+              <span className="badge external-hint">
+                {job.signal_summary.predicted_side || job.signal_summary.predicted_outcome || "sin lado"}{" "}
+                {formatPercent(job.signal_summary.polysignal_score)}
+              </span>
+            ) : (
+              <span className="badge muted">Sin senal persistida todavia</span>
+            )}
           </div>
 
           {job.warnings.length > 0 ? (
             <div className="wallet-warning-list">
-              {job.warnings.slice(0, 6).map((warning) => (
+              {job.warnings.slice(0, 8).map((warning) => (
                 <span className="warning-chip" key={warning}>{warning}</span>
               ))}
             </div>
@@ -349,18 +621,44 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
           <div className="panel-heading" style={{ marginTop: "1rem" }}>
             <div>
               <p className="eyebrow">Wallets candidatas</p>
-              <h4>Candidatas principales</h4>
+              <h4>Candidatas por lado</h4>
             </div>
-            <label className="analyze-secondary-button" style={{ alignItems: "center", display: "inline-flex", gap: "0.5rem" }}>
-              <span>Ordenar</span>
-              <select value={sortBy} onChange={(event) => setSortBy(event.target.value as WalletAnalysisCandidateSortBy)}>
-                <option value="score">Score</option>
-                <option value="volume_30d">Volumen 30d</option>
-                <option value="win_rate_30d">Win rate 30d</option>
-                <option value="pnl_30d">PnL 30d</option>
-                <option value="created_at">Mas recientes</option>
-              </select>
-            </label>
+            <div className="watchlist-actions">
+              <label className="analyze-secondary-button" style={{ alignItems: "center", display: "inline-flex", gap: "0.5rem" }}>
+                <span>Lado</span>
+                <select value={sideFilter} onChange={(event) => setSideFilter(event.target.value)}>
+                  <option value="ALL">Todos</option>
+                  <option value="YES">YES</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+              <label className="analyze-secondary-button" style={{ alignItems: "center", display: "inline-flex", gap: "0.5rem" }}>
+                <span>Confianza</span>
+                <select value={confidenceFilter} onChange={(event) => setConfidenceFilter(event.target.value as WalletAnalysisConfidence | "ALL")}>
+                  <option value="ALL">Todas</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </label>
+              <label className="analyze-secondary-button" style={{ alignItems: "center", display: "inline-flex", gap: "0.5rem" }}>
+                <span>Ordenar</span>
+                <select value={sortBy} onChange={(event) => setSortBy(event.target.value as WalletAnalysisCandidateSortBy)}>
+                  <option value="score">Score</option>
+                  <option value="volume_30d">Volumen 30d</option>
+                  <option value="win_rate_30d">Win rate 30d</option>
+                  <option value="pnl_30d">PnL 30d</option>
+                  <option value="created_at">Mas recientes</option>
+                </select>
+              </label>
+              <label className="analyze-secondary-button" style={{ alignItems: "center", display: "inline-flex", gap: "0.5rem" }}>
+                <span>Orden</span>
+                <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value as WalletAnalysisSortOrder)}>
+                  <option value="desc">Desc</option>
+                  <option value="asc">Asc</option>
+                </select>
+              </label>
+            </div>
           </div>
 
           {candidatesLoading ? (
@@ -371,35 +669,135 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
             </p>
           ) : (
             <div className="wallet-report-table" role="list">
-              {candidates.map((candidate) => (
-                <div className="wallet-report-row" key={candidate.id} role="listitem">
-                  <div>
-                    <strong>{formatShortWallet(candidate.wallet_address)}</strong>
-                    <span>{candidate.side || candidate.outcome || "lado sin confirmar"}</span>
+              {candidates.map((candidate) => {
+                const profile = profileByWallet.get(candidate.wallet_address.toLowerCase());
+                return (
+                  <div className="wallet-report-row" key={candidate.id} role="listitem">
+                    <div>
+                      <strong>{formatShortWallet(candidate.wallet_address)}</strong>
+                      <span>{candidate.side || candidate.outcome || "lado sin confirmar"}</span>
+                    </div>
+                    <span>Score {formatMetric(candidate.score)}</span>
+                    <span>Volumen {formatUsd(candidate.volume_30d)}</span>
+                    <span>{metricStatusLabel("ROI 30d", candidate.roi_30d_status, candidate.roi_30d_value, formatPercent)}</span>
+                    <span>{metricStatusLabel("Win rate 30d", candidate.win_rate_30d_status, candidate.win_rate_30d_value, formatPercent)}</span>
+                    <span>{metricStatusLabel("PnL 30d", candidate.pnl_30d_status, candidate.pnl_30d_value, formatUsd)}</span>
+                    <span>Trades 30d {candidate.trades_30d ?? 0}</span>
+                    <span>Confianza {candidate.confidence}</span>
+                    <span>Reasons {candidate.reasons_json.slice(0, 2).join(" | ") || "sin detalle"}</span>
+                    <span>Risks {candidate.risks_json.slice(0, 2).join(" | ") || "sin riesgos nuevos"}</span>
+                    <div className="watchlist-actions">
+                      {!profile ? (
+                        <button className="watchlist-button active" disabled={busy} onClick={() => void handleSaveProfile(candidate)} type="button">
+                          Guardar perfil
+                        </button>
+                      ) : (
+                        <>
+                          <button className="watchlist-button" disabled={busy} onClick={() => handleViewProfile(profile.id)} type="button">
+                            Ver perfil
+                          </button>
+                          <button className="watchlist-button" disabled={busy} onClick={() => void handleProfileStatus(profile.id, "watching")} type="button">
+                            Observar
+                          </button>
+                          <button className="watchlist-button" disabled={busy} onClick={() => void handleProfileStatus(profile.id, "rejected")} type="button">
+                            Rechazar
+                          </button>
+                          <button className="watchlist-button active" disabled={busy} onClick={() => void handleDemoFollow(profile.id)} type="button">
+                            Seguir en demo
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <span>Score {formatMetric(candidate.score)}</span>
-                  <span>Volumen {formatUsd(candidate.volume_30d)}</span>
-                  <span>{metricLabel(candidate, "win_rate")}</span>
-                  <span>{metricLabel(candidate, "roi")}</span>
-                  <span>{metricLabel(candidate, "pnl")}</span>
-                  <span>Confianza {candidate.confidence}</span>
-                  <button
-                    className={`watchlist-button ${savedCandidateIds.has(candidate.id) ? "active" : ""}`}
-                    disabled={busy}
-                    onClick={() => void handleSaveProfile(candidate.id)}
-                    type="button"
-                  >
-                    {savedCandidateIds.has(candidate.id) ? "Perfil guardado" : "Guardar perfil"}
-                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="panel-heading" style={{ marginTop: "1rem" }}>
+            <div>
+              <p className="eyebrow">Wallet Profiles</p>
+              <h4>Perfiles guardados</h4>
+            </div>
+            <span className="badge muted">{profiles.length} perfiles</span>
+          </div>
+
+          {profilesLoading ? (
+            <p className="section-note">Cargando perfiles guardados...</p>
+          ) : profiles.length === 0 ? (
+            <p className="section-note">Todavia no hay perfiles guardados desde este flujo.</p>
+          ) : (
+            <div className="wallet-report-table" role="list">
+              {profiles.map((profile) => (
+                <div className="wallet-report-row" id={`wallet-profile-${profile.id}`} key={profile.id} role="listitem">
+                  <div>
+                    <strong>{profile.alias || formatShortWallet(profile.wallet_address)}</strong>
+                    <span>{profileStatusLabel(profile.status)}</span>
+                  </div>
+                  <span>Score {formatMetric(profile.score)}</span>
+                  <span>Confianza {profile.confidence}</span>
+                  <span>{metricStatusLabel("ROI 30d", profile.roi_30d_status, profile.roi_30d_value, formatPercent)}</span>
+                  <span>{metricStatusLabel("Win rate 30d", profile.win_rate_30d_status, profile.win_rate_30d_value, formatPercent)}</span>
+                  <span>{metricStatusLabel("PnL 30d", profile.pnl_30d_status, profile.pnl_30d_value, formatUsd)}</span>
+                  <span>Trades 30d {profile.trades_30d ?? 0}</span>
+                  <span>Volumen {formatUsd(profile.volume_30d)}</span>
+                  <span>Ultima actividad {formatDate(profile.last_activity_at)}</span>
+                  <span>{profile.discovered_from_market || "mercado no disponible"}</span>
+                  <span>Reasons {profile.reasons_json.slice(0, 2).join(" | ") || "sin detalle"}</span>
+                  <span>Risks {profile.risks_json.slice(0, 2).join(" | ") || "sin riesgos nuevos"}</span>
+                  <div className="watchlist-actions">
+                    <button className="watchlist-button" disabled={busy} onClick={() => void handleProfileStatus(profile.id, "candidate")} type="button">
+                      Candidate
+                    </button>
+                    <button className="watchlist-button" disabled={busy} onClick={() => void handleProfileStatus(profile.id, "watching")} type="button">
+                      Observar
+                    </button>
+                    <button className="watchlist-button" disabled={busy} onClick={() => void handleProfileStatus(profile.id, "paused")} type="button">
+                      Pausar
+                    </button>
+                    <button className="watchlist-button" disabled={busy} onClick={() => void handleProfileStatus(profile.id, "rejected")} type="button">
+                      Rechazar
+                    </button>
+                    <button className="watchlist-button active" disabled={busy} onClick={() => void handleDemoFollow(profile.id)} type="button">
+                      Seguir en demo
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="panel-heading" style={{ marginTop: "1rem" }}>
+            <div>
+              <p className="eyebrow">Historial de senales</p>
+              <h4>Senales PolySignal guardadas</h4>
+            </div>
+            <span className="badge muted">{signals.length} senales</span>
+          </div>
+
+          {signalsLoading ? (
+            <p className="section-note">Cargando senales historicas...</p>
+          ) : signals.length === 0 ? (
+            <p className="section-note">Todavia no hay senales guardadas para este mercado o job.</p>
+          ) : (
+            <div className="wallet-report-table" role="list">
+              {signals.map((signal) => (
+                <div className="wallet-report-row" key={signal.id} role="listitem">
+                  <div>
+                    <strong>{signal.market_title || signal.market_slug || "Mercado sin titulo disponible"}</strong>
+                    <span>{signal.signal_status}</span>
+                  </div>
+                  <span>{signal.predicted_side || signal.predicted_outcome || "sin lado claro"}</span>
+                  <span>Score {formatPercent(signal.polysignal_score)}</span>
+                  <span>Confianza {signal.confidence}</span>
+                  <span>Wallets analizadas {signal.wallets_analyzed ?? 0}</span>
+                  <span>Historial suficiente {signal.wallets_with_sufficient_history ?? 0}</span>
+                  <span>Creada {formatDate(signal.created_at)}</span>
                 </div>
               ))}
             </div>
           )}
         </>
-      ) : (
-        <p className="section-note">
-          Crea el job profundo desde este mismo link y luego corre una pasada controlada del runner real. No activa copy trading ni ejecuta nada en dinero real.
-        </p>
       )}
 
       {jobError ? (
@@ -408,9 +806,7 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
         </div>
       ) : null}
 
-      {actionMessage ? (
-        <p className="section-note">{actionMessage}</p>
-      ) : null}
+      {actionMessage ? <p className="section-note">{actionMessage}</p> : null}
     </section>
   );
 }

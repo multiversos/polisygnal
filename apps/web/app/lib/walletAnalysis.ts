@@ -16,6 +16,14 @@ export type WalletAnalysisJobStatus =
   | "cancelled";
 export type WalletAnalysisCandidateSortBy = "created_at" | "pnl_30d" | "score" | "volume_30d" | "win_rate_30d";
 export type WalletAnalysisSortOrder = "asc" | "desc";
+export type WalletProfileStatus = "candidate" | "watching" | "demo_follow" | "paused" | "rejected";
+export type MarketSignalStatus =
+  | "pending_resolution"
+  | "resolved_hit"
+  | "resolved_miss"
+  | "cancelled"
+  | "unknown"
+  | "no_clear_signal";
 
 export type WalletAnalysisOutcome = {
   label: string;
@@ -41,13 +49,7 @@ export type WalletAnalysisSignalSummary = {
   yes_score?: string | number | null;
   no_score?: string | number | null;
   outcome_scores_json?: Record<string, unknown> | null;
-  signal_status:
-    | "pending_resolution"
-    | "resolved_hit"
-    | "resolved_miss"
-    | "cancelled"
-    | "unknown"
-    | "no_clear_signal";
+  signal_status: MarketSignalStatus;
   warnings_json: string[];
 };
 
@@ -65,6 +67,7 @@ export type WalletAnalysisJobRead = {
   progress: WalletAnalysisJobProgress;
   result_json?: Record<string, unknown> | null;
   warnings: string[];
+  status_detail?: string | null;
   error_message?: string | null;
   started_at?: string | null;
   finished_at?: string | null;
@@ -90,6 +93,7 @@ export type WalletAnalysisRunResponse = {
   wallets_with_sufficient_history: number;
   candidates_count: number;
   warnings: string[];
+  status_detail?: string | null;
   signal_id?: string | null;
   signal_status?: string | null;
   market: WalletAnalysisJobRead;
@@ -131,8 +135,71 @@ export type WalletProfileRead = {
   id: string;
   wallet_address: string;
   alias?: string | null;
-  status: "candidate" | "watching" | "demo_follow" | "paused" | "rejected";
+  status: WalletProfileStatus;
+  score?: string | number | null;
+  confidence: WalletAnalysisConfidence;
+  roi_30d_status: WalletAnalysisMetricStatus;
+  roi_30d_value?: string | number | null;
+  win_rate_30d_status: WalletAnalysisMetricStatus;
+  win_rate_30d_value?: string | number | null;
+  pnl_30d_status: WalletAnalysisMetricStatus;
+  pnl_30d_value?: string | number | null;
+  trades_30d?: number | null;
+  volume_30d?: string | number | null;
+  drawdown_30d_status: WalletAnalysisMetricStatus;
+  drawdown_30d_value?: string | number | null;
+  markets_traded_30d?: number | null;
+  last_activity_at?: string | null;
+  discovered_from_market?: string | null;
+  discovered_from_url?: string | null;
+  discovered_at?: string | null;
+  reasons_json: string[];
+  risks_json: string[];
   notes?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WalletProfileList = {
+  items: WalletProfileRead[];
+  total: number;
+};
+
+export type WalletProfileDemoFollowResponse = {
+  profile: WalletProfileRead;
+  copy_wallet: Record<string, unknown>;
+  already_following: boolean;
+  baseline_created_at: string;
+  message: string;
+};
+
+export type PolySignalMarketSignal = {
+  id: string;
+  job_id?: string | null;
+  source_url?: string | null;
+  market_slug?: string | null;
+  event_slug?: string | null;
+  condition_id?: string | null;
+  market_title?: string | null;
+  predicted_side?: string | null;
+  predicted_outcome?: string | null;
+  polysignal_score?: string | number | null;
+  confidence: WalletAnalysisConfidence;
+  yes_score?: string | number | null;
+  no_score?: string | number | null;
+  outcome_scores_json?: Record<string, unknown> | null;
+  wallets_analyzed?: number | null;
+  wallets_with_sufficient_history?: number | null;
+  warnings_json: string[];
+  signal_status: MarketSignalStatus;
+  final_outcome?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PolySignalMarketSignalList = {
+  items: PolySignalMarketSignal[];
+  total: number;
 };
 
 export async function createWalletAnalysisJob(polymarketUrl: string): Promise<WalletAnalysisJobCreateResponse> {
@@ -200,4 +267,63 @@ export async function saveWalletAnalysisCandidateAsProfile(candidateId: string):
       method: "POST",
     },
   );
+}
+
+export async function fetchWalletProfiles(input?: {
+  status?: WalletProfileStatus;
+  limit?: number;
+  offset?: number;
+}): Promise<WalletProfileList> {
+  const params = new URLSearchParams();
+  params.set("limit", String(input?.limit ?? 20));
+  params.set("offset", String(input?.offset ?? 0));
+  if (input?.status) {
+    params.set("status", input.status);
+  }
+  return fetchApiJson<WalletProfileList>(`/wallet-profiles?${params.toString()}`);
+}
+
+export async function updateWalletProfile(
+  profileId: string,
+  payload: {
+    alias?: string | null;
+    status?: WalletProfileStatus;
+    notes?: string | null;
+  },
+): Promise<WalletProfileRead> {
+  return fetchApiJson<WalletProfileRead>(`/wallet-profiles/${encodeURIComponent(profileId)}`, {
+    body: JSON.stringify(payload),
+    method: "PATCH",
+  });
+}
+
+export async function followWalletProfileInDemo(profileId: string): Promise<WalletProfileDemoFollowResponse> {
+  return fetchApiJson<WalletProfileDemoFollowResponse>(
+    `/wallet-profiles/${encodeURIComponent(profileId)}/demo-follow`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function fetchPolySignalMarketSignals(input?: {
+  jobId?: string;
+  limit?: number;
+  marketSlug?: string;
+  offset?: number;
+  signalStatus?: MarketSignalStatus;
+}): Promise<PolySignalMarketSignalList> {
+  const params = new URLSearchParams();
+  params.set("limit", String(input?.limit ?? 10));
+  params.set("offset", String(input?.offset ?? 0));
+  if (input?.jobId) {
+    params.set("job_id", input.jobId);
+  }
+  if (input?.marketSlug) {
+    params.set("market_slug", input.marketSlug);
+  }
+  if (input?.signalStatus) {
+    params.set("signal_status", input.signalStatus);
+  }
+  return fetchApiJson<PolySignalMarketSignalList>(`/polysignal-market-signals?${params.toString()}`);
 }

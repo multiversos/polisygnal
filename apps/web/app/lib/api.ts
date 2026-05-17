@@ -40,6 +40,7 @@ const SAFE_PROXY_GET_PREFIXES = [
   "/research",
   "/sources",
   "/tags",
+  "/polysignal-market-signals",
   "/wallet-analysis",
   "/wallet-profiles",
   "/watchlist",
