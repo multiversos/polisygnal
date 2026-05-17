@@ -14,6 +14,7 @@ import {
   AnalysisPreview,
   type AnalysisPreviewProps,
 } from "../components/analyze/AnalysisPreview";
+import { WalletAnalysisPanel } from "../components/analyze/WalletAnalysisPanel";
 import { AnalyzerReport } from "../components/AnalyzerReport";
 import { MainNavigation } from "../components/MainNavigation";
 import { MarketDataDetails } from "../components/MarketDataDetails";
@@ -3919,6 +3920,10 @@ export default function AnalyzePage() {
                     relatedHistory={relatedHistory}
                     saved={saved}
                     watchlisted={Boolean(match.item.market?.id && watchlistByMarketId.has(match.item.market.id))}
+                  />
+                  <WalletAnalysisPanel
+                    marketTitle={marketTitle(match.item)}
+                    normalizedUrl={analyzedNormalizedUrl}
                   />
                   <ProfileAlertsBlock
                     alerts={profileAlerts}

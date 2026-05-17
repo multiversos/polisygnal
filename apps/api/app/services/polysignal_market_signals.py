@@ -62,6 +62,15 @@ def get_market_signal(db: Session, signal_id: str) -> PolySignalMarketSignal:
     return signal
 
 
+def get_latest_market_signal_for_job(db: Session, job_id: str) -> PolySignalMarketSignal | None:
+    return db.scalar(
+        select(PolySignalMarketSignal)
+        .where(PolySignalMarketSignal.job_id == job_id)
+        .order_by(PolySignalMarketSignal.created_at.desc())
+        .limit(1)
+    )
+
+
 def list_market_signals(
     db: Session,
     *,

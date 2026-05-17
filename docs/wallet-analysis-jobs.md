@@ -73,6 +73,49 @@ El runner:
 - persiste progreso y warnings
 - termina en `completed`, `partial` o `failed`
 
+### Flujo minimo desde la API
+
+1. Crear job desde el link de Polymarket:
+
+```powershell
+POST /wallet-analysis/jobs
+{
+  "polymarket_url": "https://polymarket.com/market/..."
+}
+```
+
+2. Ejecutar una pasada limitada y controlada:
+
+```powershell
+POST /wallet-analysis/jobs/{job_id}/run-once
+{
+  "max_wallets": 50,
+  "max_wallets_discovery": 100,
+  "batch_size": 20,
+  "history_limit": 100
+}
+```
+
+3. Leer progreso y resumen del job:
+
+```powershell
+GET /wallet-analysis/jobs/{job_id}
+```
+
+4. Leer candidatas del job con paginacion, filtros y orden:
+
+```powershell
+GET /wallet-analysis/jobs/{job_id}/candidates?sort_by=score&sort_order=desc&limit=10
+```
+
+5. Guardar una candidata como perfil:
+
+```powershell
+POST /wallet-analysis/candidates/{candidate_id}/save-profile
+```
+
+El endpoint `run-once` es de control/manual para este sprint. No es un proceso `forever`, no reemplaza un worker persistente y no debe usarse como request larga sin limites.
+
 Interpretacion de estado:
 
 - `completed`: el job termino dentro de los limites configurados.
@@ -90,6 +133,13 @@ Interpretacion de estado:
 - razones y riesgos
 
 Desde un candidate se puede crear o actualizar un `wallet_profile`.
+
+Guardar una candidata como perfil:
+
+- crea o actualiza por `wallet_address`
+- conserva notas manuales existentes
+- no activa Copy Trading automaticamente
+- deja el status inicial en `candidate`
 
 ### Estados de metricas 30d
 

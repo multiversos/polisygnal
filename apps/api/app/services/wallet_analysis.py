@@ -11,13 +11,17 @@ from sqlalchemy.orm import Session
 from app.clients.polymarket import PolymarketGammaClient
 from app.models.wallet_analysis import WalletAnalysisCandidate, WalletAnalysisJob, WalletProfile
 from app.schemas.wallet_analysis import (
+    SortOrder,
     WalletAnalysisCandidateList,
     WalletAnalysisCandidateRead,
+    WalletAnalysisCandidateSortBy,
     WalletAnalysisJobProgressRead,
     WalletAnalysisJobRead,
+    WalletAnalysisSignalSummaryRead,
     WalletProfileRead,
     WalletProfileUpsert,
 )
+from app.services.polysignal_market_signals import get_latest_market_signal_for_job
 from app.services.polymarket_link_resolver import (
     PolymarketLinkResolverError,
     ResolvedPolymarketMarket,
@@ -94,6 +98,8 @@ def list_wallet_analysis_candidates(
     side: str | None = None,
     outcome: str | None = None,
     confidence: str | None = None,
+    sort_by: WalletAnalysisCandidateSortBy = "score",
+    sort_order: SortOrder = "desc",
     limit: int = 50,
     offset: int = 0,
 ) -> WalletAnalysisCandidateList:
@@ -114,7 +120,16 @@ def list_wallet_analysis_candidates(
         stmt = stmt.where(WalletAnalysisCandidate.confidence == confidence)
         count_stmt = count_stmt.where(WalletAnalysisCandidate.confidence == confidence)
 
+    sort_column = {
+        "score": WalletAnalysisCandidate.score,
+        "volume_30d": WalletAnalysisCandidate.volume_30d,
+        "win_rate_30d": WalletAnalysisCandidate.win_rate_30d_value,
+        "pnl_30d": WalletAnalysisCandidate.pnl_30d_value,
+        "created_at": WalletAnalysisCandidate.created_at,
+    }[sort_by]
+    primary_order = sort_column.asc().nullslast() if sort_order == "asc" else sort_column.desc().nullslast()
     stmt = stmt.order_by(
+        primary_order,
         WalletAnalysisCandidate.score.desc().nullslast(),
         WalletAnalysisCandidate.observed_market_position_usd.desc().nullslast(),
         WalletAnalysisCandidate.created_at.asc(),
@@ -164,7 +179,11 @@ def create_or_update_wallet_profile(
     profile.discovered_at = payload.discovered_at or profile.discovered_at or now
     profile.reasons_json = _clean_text_list(payload.reasons_json)
     profile.risks_json = _clean_text_list(payload.risks_json)
-    profile.notes = _clean_optional(payload.notes, 4000)
+    next_notes = _clean_optional(payload.notes, 4000)
+    if next_notes is not None:
+        profile.notes = next_notes
+    elif existing is None:
+        profile.notes = None
     db.add(profile)
     db.flush()
     db.refresh(profile)
@@ -206,7 +225,12 @@ def save_candidate_as_profile(
     return create_or_update_wallet_profile(db, payload)
 
 
-def serialize_wallet_analysis_job(job: WalletAnalysisJob, *, candidates_count: int) -> WalletAnalysisJobRead:
+def serialize_wallet_analysis_job(
+    job: WalletAnalysisJob,
+    *,
+    candidates_count: int,
+    signal_summary: WalletAnalysisSignalSummaryRead | None = None,
+) -> WalletAnalysisJobRead:
     outcomes = job.outcomes_json if isinstance(job.outcomes_json, list) else []
     token_ids = job.token_ids_json if isinstance(job.token_ids_json, list) else []
     warnings = job.warnings_json if isinstance(job.warnings_json, list) else []
@@ -237,6 +261,7 @@ def serialize_wallet_analysis_job(job: WalletAnalysisJob, *, candidates_count: i
         created_at=job.created_at,
         updated_at=job.updated_at,
         candidates_count=candidates_count,
+        signal_summary=signal_summary,
     )
 
 
@@ -308,6 +333,24 @@ def count_wallet_analysis_candidates(db: Session, job_id: str) -> int:
             .where(WalletAnalysisCandidate.job_id == job_id)
         )
         or 0
+    )
+
+
+def build_wallet_analysis_signal_summary(db: Session, job_id: str) -> WalletAnalysisSignalSummaryRead | None:
+    signal = get_latest_market_signal_for_job(db, job_id)
+    if signal is None:
+        return None
+    return WalletAnalysisSignalSummaryRead(
+        id=signal.id,
+        predicted_side=signal.predicted_side,
+        predicted_outcome=signal.predicted_outcome,
+        polysignal_score=signal.polysignal_score,
+        confidence=signal.confidence,
+        yes_score=signal.yes_score,
+        no_score=signal.no_score,
+        outcome_scores_json=signal.outcome_scores_json,
+        signal_status=signal.signal_status,
+        warnings_json=_clean_text_list(signal.warnings_json or []),
     )
 
 

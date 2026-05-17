@@ -20,6 +20,8 @@ WalletAnalysisJobStatus = Literal[
     "failed",
     "cancelled",
 ]
+WalletAnalysisCandidateSortBy = Literal["score", "volume_30d", "win_rate_30d", "pnl_30d", "created_at"]
+SortOrder = Literal["asc", "desc"]
 MarketSignalStatus = Literal[
     "pending_resolution",
     "resolved_hit",
@@ -49,6 +51,19 @@ class WalletAnalysisJobProgressRead(BaseModel):
     current_batch: int
 
 
+class WalletAnalysisSignalSummaryRead(BaseModel):
+    id: str
+    predicted_side: str | None = None
+    predicted_outcome: str | None = None
+    polysignal_score: Decimal | None = None
+    confidence: WalletConfidence
+    yes_score: Decimal | None = None
+    no_score: Decimal | None = None
+    outcome_scores_json: dict[str, Any] | None = None
+    signal_status: MarketSignalStatus
+    warnings_json: list[str] = Field(default_factory=list)
+
+
 class WalletAnalysisJobRead(BaseModel):
     id: str
     source_url: str
@@ -69,12 +84,34 @@ class WalletAnalysisJobRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     candidates_count: int = 0
+    signal_summary: WalletAnalysisSignalSummaryRead | None = None
 
 
 class WalletAnalysisJobCreateResponse(BaseModel):
     job_id: str
     status: WalletAnalysisJobStatus
     message: str
+    market: WalletAnalysisJobRead
+
+
+class WalletAnalysisJobRunRequest(BaseModel):
+    max_wallets: int = Field(default=50, ge=1, le=250)
+    max_wallets_discovery: int = Field(default=100, ge=1, le=500)
+    batch_size: int = Field(default=20, ge=1, le=100)
+    history_limit: int = Field(default=100, ge=1, le=250)
+
+
+class WalletAnalysisJobRunResponse(BaseModel):
+    job_id: str
+    status: WalletAnalysisJobStatus
+    message: str
+    wallets_found: int
+    wallets_analyzed: int
+    wallets_with_sufficient_history: int
+    candidates_count: int
+    warnings: list[str] = Field(default_factory=list)
+    signal_id: str | None = None
+    signal_status: MarketSignalStatus | None = None
     market: WalletAnalysisJobRead
 
 

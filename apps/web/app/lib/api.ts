@@ -40,6 +40,8 @@ const SAFE_PROXY_GET_PREFIXES = [
   "/research",
   "/sources",
   "/tags",
+  "/wallet-analysis",
+  "/wallet-profiles",
   "/watchlist",
 ];
 
@@ -88,7 +90,7 @@ function shouldUseSameOriginProxy(path: string, init?: RequestInit): boolean {
   if (method === "GET") {
     return isSafeProxyGetPath(path);
   }
-  return SAFE_PROXY_WRITE_PREFIXES.some((prefix) => {
+  return [...SAFE_PROXY_WRITE_PREFIXES, "/wallet-analysis", "/wallet-profiles"].some((prefix) => {
     const pathname = backendPathname(path);
     return pathname === prefix || pathname.startsWith(`${prefix}/`);
   });
