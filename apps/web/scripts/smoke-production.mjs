@@ -1064,7 +1064,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(reportSource.includes("Pendiente de integracion"), "AnalyzerReport should label future layers as pending");
   assert(reportSource.includes("Lectura rapida de"), "AnalyzerReport missing public agent reading workflow");
   assert(reportSource.includes("NEXT_PUBLIC_SHOW_ANALYZER_DEBUG_TOOLS"), "AnalyzerReport should gate manual debug tools");
-  assert(reportSource.includes("Guardar como seguimiento"), "AnalyzerReport missing save/follow-up action");
+  assert(reportSource.includes("Guardar como seguimiento"), "AnalyzerReport legacy reference should keep save/follow-up action");
   assert(reportSource.includes("parseSamanthaResearchReport"), "AnalyzerReport missing Samantha report validation");
   assert(reportSource.includes("buildSamanthaTaskPacket"), "AnalyzerReport missing Samantha task packet builder");
   assert(reportSource.includes("/api/analysis-agent/research-status"), "AnalyzerReport should query agent status only through same-origin route");
@@ -2257,10 +2257,35 @@ async function main() {
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Guardar analisis", "Guardar análisis", "Guardar como seguimiento", "Guardado en historial", "Analizar este mercado"],
-      "analyze save history action",
+      ["Guardar analisis", "Guardar análisis", "Crear job de wallets", "Analizar wallets del mercado"],
+      "analyze primary action",
     );
   }
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    ["Analizar wallets del mercado", "Crear job de wallets"],
+    "analyze wallet-analysis primary CTA",
+  );
+  assertTextIncludesOneOf(
+    validAnalyzeText,
+    [
+      "Esta no es una probabilidad garantizada de victoria; es una balanza estadística basada en wallets analizadas.",
+      "Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.",
+    ],
+    "analyze wallet-analysis disclaimer",
+  );
+  assertTextExcludes(
+    validAnalyzeText,
+    [
+      "Samantha automático",
+      "Samantha automatico",
+      "Sin estimación propia suficiente",
+      "Sin estimacion propia suficiente",
+      "Cuenta para Historial: No, falta estimación propia",
+      "Cuenta para Historial: No, falta estimacion propia",
+    ],
+    "analyze legacy primary copy",
+  );
   assertTextExcludes(validAnalyzeText, PUBLIC_TECHNICAL_TEXT, "analyze valid public copy");
   assertTextExcludes(validAnalyzeText, PUBLIC_SECURITY_TEXT, "analyze valid secret leakage");
   const blockedProxy = await fetchJsonAllowFailure("/api/backend/https:%2F%2Fexample.com");

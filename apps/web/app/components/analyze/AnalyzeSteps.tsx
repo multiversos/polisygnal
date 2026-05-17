@@ -14,9 +14,9 @@ const steps = [
     tone: "blue",
   },
   {
-    copy: "Samantha procesa las fuentes disponibles y entrega una lectura clara.",
+    copy: "PolySignal crea un job persistido, analiza wallets por lotes y calcula la balanza estadistica del mercado.",
     icon: "sparkles" as const,
-    title: "Recibir lectura clara",
+    title: "Analizar wallets",
     tone: "violet",
   },
 ];

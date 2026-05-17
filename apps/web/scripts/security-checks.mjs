@@ -942,6 +942,19 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes("AbortController"), "expected analyzer requests to be abortable");
   assert(analyzePage.includes("AnalyzeLoadingPanel"), "expected /analyze to render the loading panel");
   assert(analyzePage.includes("MarketSelectionPanel"), "expected /analyze to render the confirmation selector");
+  assert(analyzePage.includes("WalletAnalysisPanel"), "expected /analyze to render wallet-analysis as the main flow");
+  assert(
+    !analyzePage.includes("<AnalyzerReport"),
+    "expected /analyze to remove AnalyzerReport from the main page render tree",
+  );
+  assert(
+    !analyzePage.includes("<AnalysisPreview"),
+    "expected /analyze to stop rendering the old Samantha preview as a primary panel",
+  );
+  assert(
+    analyzePage.includes("Mercado confirmado. Ya puedes ejecutar el analisis profundo de wallets de este mercado."),
+    "expected /analyze to guide users into the wallet-analysis flow after resolving the market",
+  );
   assert(analyzePage.includes("analyzeSelectedMarket"), "expected /analyze to analyze only a selected market");
   assert(analyzePage.includes("/api/analyze-polymarket-link"), "expected /analyze to resolve links through the safe Polymarket route");
   assert(analyzePage.includes("getPolymarketWalletIntelligence"), "expected /analyze to use Polymarket-first wallet intelligence");
@@ -958,9 +971,7 @@ function validateAnalyzeLoadingPanelSource() {
   assert(analyzePage.includes('advancePhase("context")'), "expected /analyze loader to enter context phase");
   assert(analyzePage.includes('advancePhase("readiness")'), "expected /analyze loader to enter readiness phase");
   assert(analyzePage.includes('advancePhase("research")'), "expected /analyze loader to enter research phase");
-  assert(analyzePage.includes('advancePhase("preparing_samantha")'), "expected /analyze loader to prepare analysis agent task");
-  assert(analyzePage.includes('advancePhase("sending_samantha")'), "expected /analyze loader to try the safe analysis agent bridge");
-  assert(analyzePage.includes("/api/analysis-agent/send-research"), "expected /analyze to call the generic analysis agent route");
+  assert(analyzePage.includes("WalletAnalysisPanel"), "expected /analyze primary flow to hand off to wallet-analysis");
   assert(analyzePage.includes("progressIssue"), "expected /analyze to keep progress recovery visible after timeout or error");
 
   return { phases: expectedSteps.length, recovery_actions: 4, timeout_guard: true };
@@ -995,7 +1006,7 @@ function validateAnalyzerReportSource() {
     "PolySignal separa el precio del mercado de su estimacion propia",
   ];
 
-  assert(analyzePage.includes("AnalyzerReport"), "expected /analyze to render AnalyzerReport");
+  assert(!analyzePage.includes("<AnalyzerReport"), "expected /analyze not to render AnalyzerReport in the primary page");
   assert(source.includes("buildAnalyzerResult"), "expected AnalyzerReport to use unified analyzer result model");
   assert(source.includes("buildDeepAnalysisFromPolymarketMarket"), "expected AnalyzerReport to build deep analyzer readiness");
   assert(source.includes("buildSamanthaResearchBrief"), "expected AnalyzerReport to build compatible research briefs");
@@ -1721,11 +1732,7 @@ function validateDeepAnalysisJobRules() {
   assert(!storageSource.includes("raw payload"), "deep analysis job storage should not store raw payloads");
   assert(analyzePage.includes("createDeepAnalysisJob"), "analyze page should create local deep analysis jobs");
   assert(analyzePage.includes("getLatestDeepAnalysisJobForUrl(normalizedUrl)"), "analyze page should reuse pending jobs by URL");
-  assert(analyzePage.includes("existingBridgeTaskId"), "analyze page should not duplicate Samantha sends when continuing a job");
-  assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page should keep safe partial state when bridge is unavailable");
-  assert(analyzePage.includes("ANALYSIS_AGENT_POLL_TIMEOUT_MS"), "analyze page should cap Samantha polling");
-  assert(analyzePage.includes("handleContinueWithPartial"), "analyze page should allow continuing without Samantha after timeout");
-  assert(analyzePage.includes("markJobSendingToSamantha"), "analyze page should expose automatic bridge states");
+  assert(analyzePage.includes("WalletAnalysisPanel"), "analyze page should hand off the primary experience to wallet-analysis");
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
   assert(reportSource.includes("Detalles avanzados del analisis"), "AnalyzerReport should keep advanced details behind a collapsed section");
   assert(reportSource.includes("Estado del motor"), "AnalyzerReport should expose an accessible job-state label");

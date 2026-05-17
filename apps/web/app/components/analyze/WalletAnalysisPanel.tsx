@@ -564,12 +564,12 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
       <div className="watchlist-actions">
         {!job ? (
           <button className="watchlist-button active" disabled={busy} onClick={() => void handleCreateJob()} type="button">
-            {busy ? "Creando..." : "Crear job profundo"}
+            {busy ? "Creando..." : "Crear job de wallets"}
           </button>
         ) : (
           <>
             <button className="watchlist-button active" disabled={busy} onClick={() => void handleRunOnce()} type="button">
-              {busy ? "Ejecutando..." : "Ejecutar analisis limitado"}
+              {busy ? "Ejecutando..." : "Analizar wallets del mercado"}
             </button>
             <button className="watchlist-button" disabled={busy} onClick={() => void handleRefreshJob()} type="button">
               Refrescar progreso

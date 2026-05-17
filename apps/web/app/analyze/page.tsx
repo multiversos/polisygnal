@@ -10,12 +10,8 @@ import {
 } from "../components/AnalyzeLoadingPanel";
 import { AnalyzeHero } from "../components/analyze/AnalyzeHero";
 import { AnalyzeSteps } from "../components/analyze/AnalyzeSteps";
-import {
-  AnalysisPreview,
-  type AnalysisPreviewProps,
-} from "../components/analyze/AnalysisPreview";
+import type { AnalysisPreviewProps } from "../components/analyze/AnalysisPreview";
 import { WalletAnalysisPanel } from "../components/analyze/WalletAnalysisPanel";
-import { AnalyzerReport } from "../components/AnalyzerReport";
 import { MainNavigation } from "../components/MainNavigation";
 import { MarketDataDetails } from "../components/MarketDataDetails";
 import { WalletIntelligenceDetails } from "../components/WalletIntelligenceDetails";
@@ -3345,107 +3341,18 @@ export default function AnalyzePage() {
         }));
       }
 
-      if (!(await advancePhase("preparing_samantha"))) {
-        return;
-      }
-      void refreshAnalysisAgentDiagnostics(runController.signal);
-      setProgressStepOverrides((current) => ({
-        ...current,
-        preparing_samantha: buildAgentProgress({ agentName: analysisAgent.name, job }),
-      }));
-      job = persistDeepAnalysisJob(markJobSamanthaBriefReady(job, {
-        agentId: analysisAgent.id,
-        agentName: analysisAgent.name,
-      }));
-      const existingBridgeTaskId =
-        job.samanthaBridge?.bridgeTaskId ?? job.samanthaBridge?.taskId;
-      if (
-        existingBridgeTaskId ||
-        [
-          "awaiting_samantha",
-          "ready_to_score",
-          "receiving_samantha_report",
-          "samantha_researching",
-          "validating_samantha_report",
-        ].includes(job.status)
-      ) {
-        if (job.status === "awaiting_samantha" && !(await advancePhase("awaiting_samantha"))) {
-          return;
-        }
-        if (job.status === "samantha_researching" && !(await advancePhase("samantha_researching"))) {
-          return;
-        }
-        if (job.status === "ready_to_score" && !(await advancePhase("ready_to_score"))) {
-          return;
-        }
-        setState({
-          externalOddsComparison: enrichedMatch.item.externalOddsComparison ?? externalOddsComparison,
-          match: enrichedMatch,
-          message:
-            existingBridgeTaskId
-              ? `Analisis profundo restaurado: ${analysisAgent.name} ya recibio la tarea y la investigacion sigue pendiente.`
-              : "Analisis profundo restaurado: la investigacion externa sigue pendiente.",
-          normalizedUrl,
-          status: "result",
-        });
-        return;
-      }
-      if (!(await advancePhase("sending_samantha"))) {
-        return;
-      }
-      setProgressStepOverrides((current) => ({
-        ...current,
-        preparing_samantha: buildAgentProgress({ agentName: analysisAgent.name, job }),
-      }));
-      const bridgeResult = await tryAutomaticAnalysisAgentBridge({
-        isCurrentRun,
-        item: enrichedMatch.item,
-        job,
-        normalizedUrl,
-        signal: runController.signal,
-        walletSummary,
-      });
-      if (!isCurrentRun()) {
-        return;
-      }
-      job = bridgeResult.job;
-      setSamanthaAutoReportResult(bridgeResult.reportResult);
-      setProgressStepOverrides((current) => ({
-        ...current,
-        preparing_samantha: buildAgentProgress({
-          agentName: job.analysisAgent?.agentName || analysisAgent.name,
-          job,
-          message: bridgeResult.message,
-        }),
-      }));
-      if (job.status === "awaiting_samantha" && !(await advancePhase("awaiting_samantha"))) {
-        return;
-      }
-      if (job.status === "samantha_researching" && !(await advancePhase("samantha_researching"))) {
-        return;
-      }
-      if (
-        (job.status === "receiving_samantha_report" || job.status === "validating_samantha_report") &&
-        !(await advancePhase("validating_report"))
-      ) {
-        return;
-      }
-      if (job.status === "ready_to_score" && !(await advancePhase("ready_to_score"))) {
-        return;
-      }
       setState({
         externalOddsComparison: enrichedMatch.item.externalOddsComparison ?? externalOddsComparison,
         match: enrichedMatch,
-        message:
-          job.status === "completed"
-            ? `Analisis profundo actualizado con reporte de ${analysisAgent.name} validado.`
-            : `Analisis profundo iniciado: Polymarket leido, Wallet Intelligence revisada y ${bridgeResult.message}`,
+        message: "Mercado confirmado. Ya puedes ejecutar el analisis profundo de wallets de este mercado.",
         normalizedUrl,
         status: "result",
       });
-      if (!jobAwaitsResearch(job)) {
-        setProgressStartedAt(null);
-      }
+      setProgressStartedAt(null);
+      setActionMessage(
+        "El flujo principal ahora usa wallet-analysis persistido: crea el job, analiza wallets del mercado y guarda senales historicas.",
+      );
+      return;
     } catch (error) {
       if (!isCurrentRun()) {
         return;
@@ -3620,10 +3527,9 @@ export default function AnalyzePage() {
     state.status === "needs_selection" || state.status === "no_exact_match" || state.status === "result"
       ? state.normalizedUrl
       : "";
-  const samanthaProgressPending = state.status === "result" && jobAwaitsResearch(deepAnalysisJob);
+  const samanthaProgressPending = false;
   const radarVisible = loading || Boolean(progressIssue) || samanthaProgressPending;
   const radarPhase = loadingPhaseFromJob(deepAnalysisJob) ?? loadingPhase;
-  const previewProps = previewPropsForState({ deepAnalysisJob, state });
   const canSaveProgressForLater =
     state.status === "result" && Boolean(state.match.item.market?.id || state.match.item.market?.market_slug);
 
@@ -3809,7 +3715,6 @@ export default function AnalyzePage() {
             onSubmit={() => void runAnalysis()}
           />
           <AnalyzeSteps />
-          <AnalysisPreview {...previewProps} />
         </>
       ) : null}
 
@@ -3879,10 +3784,11 @@ export default function AnalyzePage() {
         <section className="dashboard-panel">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Analisis seleccionado</p>
+              <p className="eyebrow">Wallet Analysis</p>
               <h2>{state.message}</h2>
               <p>
-                Esta es una sola ficha profunda para el mercado que confirmaste.
+                Este mercado ya esta listo para el flujo principal: job persistido, progreso real, candidatas y senales
+                PolySignal.
               </p>
             </div>
             <span className="badge muted">1 mercado</span>
@@ -3909,24 +3815,6 @@ export default function AnalyzePage() {
                       <span className="badge" key={reason}>{reason}</span>
                     ))}
                   </div>
-                  <AnalyzerReport
-                    busy={actionBusy}
-                    deepAnalysisJob={deepAnalysisJob}
-                    analysisAgentName={deepAnalysisJob?.analysisAgent?.agentName || analysisAgent.name}
-                    externalOddsComparison={state.externalOddsComparison ?? null}
-                    initialSamanthaReportResult={samanthaAutoReportResult}
-                    item={match.item}
-                    matchScore={match.score}
-                    normalizedUrl={analyzedNormalizedUrl}
-                    onDeepAnalysisJobChange={persistDeepAnalysisJob}
-                    onOpenMarketDetails={() => setMarketDetailsOpen(true)}
-                    onOpenWalletDetails={() => setWalletDetailsOpen(true)}
-                    onSaveHistory={handleSaveHistory}
-                    onToggleWatchlist={handleToggleWatchlist}
-                    relatedHistory={relatedHistory}
-                    saved={saved}
-                    watchlisted={Boolean(match.item.market?.id && watchlistByMarketId.has(match.item.market.id))}
-                  />
                   <WalletAnalysisPanel
                     marketTitle={marketTitle(match.item)}
                     normalizedUrl={analyzedNormalizedUrl}
@@ -3952,9 +3840,7 @@ export default function AnalyzePage() {
       {actionMessage ? (
         <section className="focus-notice active" role="status">
           <strong>Resultado</strong>
-          <span>
-            {actionMessage} <a href="/history">Ver historial</a>
-          </span>
+          <span>{actionMessage}</span>
         </section>
       ) : null}
       <MarketDataDetails

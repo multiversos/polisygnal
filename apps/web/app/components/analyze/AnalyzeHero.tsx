@@ -19,9 +19,10 @@ export function AnalyzeHero({
     <section className="analyze-hero">
       <div className="analyze-hero-copy">
         <span className="analyze-hero-badge">ANALIZAR ENLACE</span>
-        <h1>Analizar enlace</h1>
+        <h1>Analizar wallets de Polymarket</h1>
         <p>
-          Pega el enlace. Samantha analiza el resto con las fuentes automaticas disponibles.
+          Pega un enlace de Polymarket para resolver el mercado, crear un job persistido y analizar wallets del
+          mercado con PolySignal.
         </p>
         <div className="analyze-hero-form" role="search">
           <label className="analyze-link-field">
@@ -47,11 +48,8 @@ export function AnalyzeHero({
             onClick={onSubmit}
             type="button"
           >
-            {loading ? "Analizando" : "Analizar →"}
+            {loading ? "Resolviendo" : "Resolver mercado →"}
           </button>
-          <a className="analyze-secondary-button" href="/history">
-            Ver historial
-          </a>
           {input ? (
             <button className="analyze-ghost-button" onClick={onClear} type="button">
               Limpiar
