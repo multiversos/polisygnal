@@ -1,13 +1,19 @@
 import { formatDateTime } from "../../lib/copyTrading";
 import type { CopyTradingStatus } from "../../lib/copyTradingTypes";
 
-export function CopyTradingMetrics({ status }: { status: CopyTradingStatus | null }) {
+export function CopyTradingMetrics({
+  loading = false,
+  status,
+}: {
+  loading?: boolean;
+  status: CopyTradingStatus | null;
+}) {
   const metrics = [
-    ["Wallets seguidas", status?.wallets_enabled ?? 0],
-    ["Trades detectados", status?.trades_detected ?? 0],
-    ["Copias simuladas", status?.orders_simulated ?? 0],
-    ["Saltados", status?.orders_skipped ?? 0],
-    ["Ultimo escaneo", formatDateTime(status?.last_scan_at)],
+    ["Wallets seguidas", loading ? "—" : String(status?.wallets_enabled ?? 0)],
+    ["Trades detectados", loading ? "—" : String(status?.trades_detected ?? 0)],
+    ["Copias simuladas", loading ? "—" : String(status?.orders_simulated ?? 0)],
+    ["Saltados", loading ? "—" : String(status?.orders_skipped ?? 0)],
+    ["Ultimo escaneo", loading ? "Consultando..." : formatDateTime(status?.last_scan_at)],
   ];
 
   return (

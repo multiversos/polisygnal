@@ -2828,7 +2828,18 @@ function validateAnalyzerFirstProductSource() {
   assert(editCopyWalletForm.includes("2 minutos"), "wallet editor should expose 2-minute window");
   assert(editCopyWalletForm.includes("5 minutos"), "wallet editor should expose 5-minute window");
   assert(copyTradingDashboard.includes("visibilityState"), "copy trading auto-refresh should respect hidden tabs");
-  assert(copyTradingDashboard.includes("isRefreshingRef"), "copy trading auto-refresh should avoid overlapping refresh requests");
+  assert(copyTradingDashboard.includes("inFlightRef"), "copy trading auto-refresh should avoid overlapping refresh requests");
+  assert(
+    copyTradingDashboard.includes("getCopyTradingStatusData") &&
+      copyTradingDashboard.includes("getCopyTradingWatcherStatusData") &&
+      !copyTradingDashboard.includes("getCopyTradingPrimaryData"),
+    "copy trading dashboard should fetch worker state progressively instead of waiting on a blocking primary bundle",
+  );
+  assert(
+    copyTradingDashboard.includes("Consultando estado del worker...") &&
+      copyTradingDashboard.includes("Cargando esta seccion..."),
+    "copy trading dashboard should expose progressive loading copy for worker state and slower sections",
+  );
   assert(copyOrdersTable.includes("formatCopyOrderReason"), "copy orders should translate technical reasons");
   assert(
     copyOrdersTable.includes("Historico: fuera de la ventana de copia.")

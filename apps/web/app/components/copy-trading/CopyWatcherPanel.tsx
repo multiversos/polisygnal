@@ -8,13 +8,23 @@ import type {
 import { formatDateTime, formatDurationMs } from "../../lib/copyTrading";
 
 type CopyWatcherPanelProps = {
-  status: CopyTradingStatus;
-  watcher: CopyTradingWatcherStatus;
+  error?: string | null;
+  loading?: boolean;
+  status: CopyTradingStatus | null;
+  statusLoading?: boolean;
+  watcher: CopyTradingWatcherStatus | null;
 };
 
-export function CopyWatcherPanel({ status, watcher }: CopyWatcherPanelProps) {
-  const persistedStateLabel = describeWorkerState(watcher.worker_status);
-  const walletScanResults = watcher.last_result?.wallet_scan_results ?? [];
+export function CopyWatcherPanel({
+  error = null,
+  loading = false,
+  status,
+  statusLoading = false,
+  watcher,
+}: CopyWatcherPanelProps) {
+  const persistedStateLabel =
+    loading && !watcher ? "Consultando estado del worker..." : describeWorkerState(watcher?.worker_status ?? "unknown");
+  const walletScanResults = watcher?.last_result?.wallet_scan_results ?? [];
   const topSlowWallets = walletScanResults
     .filter((entry) => entry.status === "slow")
     .sort((left, right) => (right.duration_ms ?? 0) - (left.duration_ms ?? 0))
@@ -24,34 +34,37 @@ export function CopyWatcherPanel({ status, watcher }: CopyWatcherPanelProps) {
     .filter((entry) => entry.status === "skipped_budget" || entry.status === "skipped_priority")
     .slice(0, 4);
   const scannedWallets = getLastResultNumber(
-    watcher.last_result_json,
+    watcher?.last_result_json ?? null,
     "wallets_scanned",
-    watcher.last_result?.scanned_wallet_count ?? watcher.scanned_wallet_count ?? 0,
+    watcher?.last_result?.scanned_wallet_count ?? watcher?.scanned_wallet_count ?? 0,
   );
-  const pendingWallets = watcher.last_result?.pending_wallet_count ?? watcher.pending_wallet_count ?? 0;
+  const pendingWallets = watcher?.last_result?.pending_wallet_count ?? watcher?.pending_wallet_count ?? 0;
   const tradesDetected = getLastResultNumber(
-    watcher.last_result_json,
+    watcher?.last_result_json ?? null,
     "trades_detected",
-    watcher.last_result?.trades_detected ?? 0,
+    watcher?.last_result?.trades_detected ?? 0,
   );
   const demoOrdersCreated = getLastResultNumber(
-    watcher.last_result_json,
+    watcher?.last_result_json ?? null,
     "demo_orders_created",
-    watcher.last_result?.orders_simulated ?? 0,
+    watcher?.last_result?.orders_simulated ?? 0,
   );
-  const positionsOpened = getLastResultNumber(watcher.last_result_json, "positions_opened", 0);
-  const positionsClosed = getLastResultNumber(watcher.last_result_json, "positions_closed", 0);
-  const nextRunLabel = formatDateTime(watcher.next_run_at);
-  const cycleMessage = watcher.last_result?.cycle_budget_exceeded
+  const positionsOpened = getLastResultNumber(watcher?.last_result_json ?? null, "positions_opened", 0);
+  const positionsClosed = getLastResultNumber(watcher?.last_result_json ?? null, "positions_closed", 0);
+  const nextRunLabel = formatDateTime(watcher?.next_run_at);
+  const cycleMessage = watcher?.last_result?.cycle_budget_exceeded
     ? "Ciclo recortado por carga"
-    : watcher.is_over_interval
+    : watcher?.is_over_interval
       ? "Atrasado por carga"
       : persistedStateLabel;
-  const resultSummary = watcher.last_result_json
+  const resultSummary = watcher?.last_result_json
     ? `Ultimo resultado: wallets ${scannedWallets} | trades ${tradesDetected} | ordenes demo ${demoOrdersCreated} | posiciones abiertas ${positionsOpened} | posiciones cerradas ${positionsClosed}`
-    : "Ultimo resultado: sin ejecuciones todavia";
-  const persistentSummary =
-    watcher.worker_status === "not_started"
+    : loading
+      ? "Ultimo resultado: consultando..."
+      : "Ultimo resultado: sin ejecuciones todavia";
+  const persistentSummary = !watcher
+    ? "Consultando estado del worker..."
+    : watcher.worker_status === "not_started"
       ? "Worker demo no iniciado todavia."
       : `${persistedStateLabel}. Heartbeat ${formatDateTime(watcher.last_heartbeat_at)}.`;
 
@@ -65,23 +78,30 @@ export function CopyWatcherPanel({ status, watcher }: CopyWatcherPanelProps) {
         El worker demo en Render escanea wallets, detecta trades y actualiza el estado persistido. Esta pagina solo
         muestra estado y resultados. No ejecuta operaciones reales.
       </p>
+      {error ? (
+        <div className="copy-status-strip" aria-live="polite">
+          <span className="copy-badge locked">{error}</span>
+        </div>
+      ) : null}
       <div className="copy-wallet-details">
         <small>Estado persistido del worker: {persistedStateLabel}</small>
         <small>{persistentSummary}</small>
         <small>Modo demo: no ejecuta dinero real.</small>
-        <small>Wallets activas: {status.wallets_enabled}</small>
-        <small>Posiciones abiertas: {status.open_demo_positions_count}</small>
-        <small>Ultimo heartbeat: {formatDateTime(watcher.last_heartbeat_at)}</small>
-        <small>Ultimo loop iniciado: {formatDateTime(watcher.last_loop_started_at)}</small>
-        <small>Ultimo loop terminado: {formatDateTime(watcher.last_loop_finished_at)}</small>
-        <small>Ultimo exito: {formatDateTime(watcher.last_success_at)}</small>
-        <small>Errores consecutivos: {watcher.consecutive_errors}</small>
-        <small>Intervalo objetivo: {watcher.interval_seconds} segundos</small>
-        <small>Budget maximo por ciclo: {watcher.cycle_budget_seconds} segundos</small>
-        <small>Ciclo en curso desde {formatDateTime(watcher.current_run_started_at)}</small>
-        <small>Ultimo escaneo {formatDateTime(watcher.last_run_at)}</small>
-        <small>Ultimo ciclo: {formatDurationMs(watcher.last_run_duration_ms)}</small>
-        <small>Promedio reciente: {formatDurationMs(watcher.average_run_duration_ms)}</small>
+        <small>Wallets activas: {statusLoading && !status ? "Cargando..." : String(status?.wallets_enabled ?? "—")}</small>
+        <small>
+          Posiciones abiertas: {statusLoading && !status ? "Cargando..." : String(status?.open_demo_positions_count ?? "—")}
+        </small>
+        <small>Ultimo heartbeat: {formatDateTime(watcher?.last_heartbeat_at)}</small>
+        <small>Ultimo loop iniciado: {formatDateTime(watcher?.last_loop_started_at)}</small>
+        <small>Ultimo loop terminado: {formatDateTime(watcher?.last_loop_finished_at)}</small>
+        <small>Ultimo exito: {formatDateTime(watcher?.last_success_at)}</small>
+        <small>Errores consecutivos: {watcher?.consecutive_errors ?? "—"}</small>
+        <small>Intervalo objetivo: {watcher?.interval_seconds ?? "—"} segundos</small>
+        <small>Budget maximo por ciclo: {watcher?.cycle_budget_seconds ?? "—"} segundos</small>
+        <small>Ciclo en curso desde {formatDateTime(watcher?.current_run_started_at)}</small>
+        <small>Ultimo escaneo {formatDateTime(watcher?.last_run_at)}</small>
+        <small>Ultimo ciclo: {formatDurationMs(watcher?.last_run_duration_ms)}</small>
+        <small>Promedio reciente: {formatDurationMs(watcher?.average_run_duration_ms)}</small>
         <small>Proximo escaneo {nextRunLabel}</small>
         <small>Estado: {cycleMessage}</small>
         <small>Escaneadas: {scannedWallets}</small>
@@ -90,20 +110,20 @@ export function CopyWatcherPanel({ status, watcher }: CopyWatcherPanelProps) {
         <small>Posiciones abiertas por el worker: {positionsOpened}</small>
         <small>Posiciones cerradas por el worker: {positionsClosed}</small>
         <small>Pendientes: {pendingWallets}</small>
-        <small>Wallets lentas: {watcher.slow_wallet_count}</small>
-        <small>Timeouts reales: {watcher.timeout_count}</small>
-        <small>Saltadas por budget: {watcher.skipped_due_to_budget_count}</small>
-        <small>Saltadas por prioridad: {watcher.skipped_due_to_priority_count}</small>
-        <small>Con aviso: {watcher.errored_wallet_count}</small>
+        <small>Wallets lentas: {watcher?.slow_wallet_count ?? "—"}</small>
+        <small>Timeouts reales: {watcher?.timeout_count ?? "—"}</small>
+        <small>Saltadas por budget: {watcher?.skipped_due_to_budget_count ?? "—"}</small>
+        <small>Saltadas por prioridad: {watcher?.skipped_due_to_priority_count ?? "—"}</small>
+        <small>Con aviso: {watcher?.errored_wallet_count ?? "—"}</small>
         <small>Escaneadas / pendientes: {scannedWallets} / {pendingWallets}</small>
-        {watcher.is_over_interval ? (
+        {watcher?.is_over_interval ? (
           <small>Atrasado por carga: {watcher.behind_by_seconds}s sobre el intervalo</small>
         ) : null}
-        {watcher.last_result?.cycle_budget_exceeded ? (
+        {watcher?.last_result?.cycle_budget_exceeded ? (
           <small>Ciclo recortado por carga para dejar wallets pendientes en el proximo barrido.</small>
         ) : null}
         <small>{resultSummary}</small>
-        {watcher.last_error ? <small>Ultimo error: {watcher.last_error}</small> : null}
+        {watcher?.last_error ? <small>Ultimo error: {watcher.last_error}</small> : null}
       </div>
 
       {topSlowWallets.length > 0 ? (
@@ -143,10 +163,10 @@ export function CopyWatcherPanel({ status, watcher }: CopyWatcherPanelProps) {
 
       <div className="copy-status-strip">
         <span className="copy-badge subtle">La automatizacion corre en Render. Esta vista solo refresca estado y resultados.</span>
-        {watcher.skipped_due_to_budget_count > 0 ? (
+        {watcher && watcher.skipped_due_to_budget_count > 0 ? (
           <span className="copy-badge warning">Pendiente por carga no es error: vuelve en el proximo ciclo.</span>
         ) : null}
-        {watcher.timeout_count > 0 ? (
+        {watcher && watcher.timeout_count > 0 ? (
           <span className="copy-badge locked">Timeout real: una wallet o la API tardaron demasiado.</span>
         ) : null}
       </div>

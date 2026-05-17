@@ -23,26 +23,101 @@ type DemoPnlSummaryResponse = { summary: CopyTradingDemoPnlSummary };
 const COPY_TRADING_PRIMARY_TIMEOUT_MS = 15_000;
 const COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS = 20_000;
 
+export async function getCopyTradingStatusData(): Promise<CopyTradingStatus> {
+  return fetchApiJson<CopyTradingStatus>(
+    "/copy-trading/status",
+    undefined,
+    COPY_TRADING_PRIMARY_TIMEOUT_MS,
+  );
+}
+
+export async function getCopyTradingWatcherStatusData(): Promise<CopyTradingWatcherStatus> {
+  return fetchApiJson<CopyTradingWatcherStatus>(
+    "/copy-trading/watcher/status",
+    undefined,
+    COPY_TRADING_PRIMARY_TIMEOUT_MS,
+  );
+}
+
+export async function getCopyTradingWalletsData(): Promise<CopyWallet[]> {
+  const response = await fetchApiJson<WalletsResponse>(
+    "/copy-trading/wallets",
+    undefined,
+    COPY_TRADING_PRIMARY_TIMEOUT_MS,
+  );
+  return response.wallets;
+}
+
+export async function getCopyTradingTradesData(): Promise<CopyDetectedTrade[]> {
+  const response = await fetchApiJson<TradesResponse>(
+    "/copy-trading/trades?limit=20",
+    undefined,
+    COPY_TRADING_PRIMARY_TIMEOUT_MS,
+  );
+  return response.trades;
+}
+
+export async function getCopyTradingOrdersData(): Promise<CopyOrder[]> {
+  const response = await fetchApiJson<OrdersResponse>(
+    "/copy-trading/orders?limit=20",
+    undefined,
+    COPY_TRADING_PRIMARY_TIMEOUT_MS,
+  );
+  return response.orders;
+}
+
+export async function getCopyTradingEventsData(): Promise<CopyBotEvent[]> {
+  const response = await fetchApiJson<EventsResponse>(
+    "/copy-trading/events?limit=20",
+    undefined,
+    COPY_TRADING_PRIMARY_TIMEOUT_MS,
+  );
+  return response.events;
+}
+
+export async function getCopyTradingOpenPositionsData(): Promise<CopyDemoPosition[]> {
+  const response = await fetchApiJson<DemoPositionsResponse>(
+    "/copy-trading/demo/positions/open",
+    undefined,
+    COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
+  );
+  return response.positions;
+}
+
+export async function getCopyTradingClosedPositionsData(): Promise<CopyDemoPosition[]> {
+  const response = await fetchApiJson<DemoPositionsResponse>(
+    "/copy-trading/demo/positions/history?limit=20",
+    undefined,
+    COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
+  );
+  return response.positions;
+}
+
+export async function getCopyTradingDemoPnlSummaryData(): Promise<CopyTradingDemoPnlSummary> {
+  const response = await fetchApiJson<DemoPnlSummaryResponse>(
+    "/copy-trading/demo/pnl-summary",
+    undefined,
+    COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
+  );
+  return response.summary;
+}
+
 export async function getCopyTradingPrimaryData(): Promise<CopyTradingDashboardData> {
   const [status, watcher, wallets, trades, orders, events] = await Promise.all([
-    fetchApiJson<CopyTradingStatus>("/copy-trading/status", undefined, COPY_TRADING_PRIMARY_TIMEOUT_MS),
-    fetchApiJson<CopyTradingWatcherStatus>(
-      "/copy-trading/watcher/status",
-      undefined,
-      COPY_TRADING_PRIMARY_TIMEOUT_MS,
-    ),
-    fetchApiJson<WalletsResponse>("/copy-trading/wallets", undefined, COPY_TRADING_PRIMARY_TIMEOUT_MS),
-    fetchApiJson<TradesResponse>("/copy-trading/trades?limit=20", undefined, COPY_TRADING_PRIMARY_TIMEOUT_MS),
-    fetchApiJson<OrdersResponse>("/copy-trading/orders?limit=20", undefined, COPY_TRADING_PRIMARY_TIMEOUT_MS),
-    fetchApiJson<EventsResponse>("/copy-trading/events?limit=20", undefined, COPY_TRADING_PRIMARY_TIMEOUT_MS),
+    getCopyTradingStatusData(),
+    getCopyTradingWatcherStatusData(),
+    getCopyTradingWalletsData(),
+    getCopyTradingTradesData(),
+    getCopyTradingOrdersData(),
+    getCopyTradingEventsData(),
   ]);
   return {
     status,
     watcher,
-    wallets: wallets.wallets,
-    trades: trades.trades,
-    orders: orders.orders,
-    events: events.events,
+    wallets,
+    trades,
+    orders,
+    events,
     open_demo_positions: [],
     closed_demo_positions: [],
     demo_pnl_summary: null,
@@ -58,21 +133,9 @@ export async function getCopyTradingSupplementalData(): Promise<
   >
 > {
   const [openPositions, closedPositions, demoPnlSummary] = await Promise.allSettled([
-    fetchApiJson<DemoPositionsResponse>(
-      "/copy-trading/demo/positions/open",
-      undefined,
-      COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
-    ),
-    fetchApiJson<DemoPositionsResponse>(
-      "/copy-trading/demo/positions/history?limit=20",
-      undefined,
-      COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
-    ),
-    fetchApiJson<DemoPnlSummaryResponse>(
-      "/copy-trading/demo/pnl-summary",
-      undefined,
-      COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
-    ),
+    getCopyTradingOpenPositionsData(),
+    getCopyTradingClosedPositionsData(),
+    getCopyTradingDemoPnlSummaryData(),
   ]);
   const supplemental: Partial<
     Pick<
@@ -82,13 +145,13 @@ export async function getCopyTradingSupplementalData(): Promise<
   > = {};
 
   if (openPositions.status === "fulfilled") {
-    supplemental.open_demo_positions = openPositions.value.positions;
+    supplemental.open_demo_positions = openPositions.value;
   }
   if (closedPositions.status === "fulfilled") {
-    supplemental.closed_demo_positions = closedPositions.value.positions;
+    supplemental.closed_demo_positions = closedPositions.value;
   }
   if (demoPnlSummary.status === "fulfilled") {
-    supplemental.demo_pnl_summary = demoPnlSummary.value.summary;
+    supplemental.demo_pnl_summary = demoPnlSummary.value;
   }
 
   return supplemental;

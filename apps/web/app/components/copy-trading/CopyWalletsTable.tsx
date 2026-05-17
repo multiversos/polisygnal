@@ -29,13 +29,18 @@ import { EditCopyWalletForm } from "./EditCopyWalletForm";
 
 type CopyWalletsTableProps = {
   closedPositions: CopyDemoPosition[];
+  openPositionsLoading?: boolean;
   onChanged: () => Promise<void> | void;
   onNotice?: (message: string) => void;
   openPositions: CopyDemoPosition[];
+  positionsHistoryLoading?: boolean;
   summary: CopyTradingDemoPnlSummary | null;
+  summaryLoading?: boolean;
   trades: CopyDetectedTrade[];
   wallets: CopyWallet[];
-  watcher: CopyTradingWatcherStatus;
+  walletsError?: string | null;
+  walletsLoading?: boolean;
+  watcher: CopyTradingWatcherStatus | null;
 };
 
 type RowAction = "delete" | "pause" | null;
@@ -49,12 +54,17 @@ const COPY_WINDOW_OPTIONS = [10, 30, 60, 120, 300];
 
 export function CopyWalletsTable({
   closedPositions,
+  openPositionsLoading = false,
   onChanged,
   onNotice,
   openPositions,
+  positionsHistoryLoading = false,
   summary,
+  summaryLoading = false,
   trades,
   wallets,
+  walletsError = null,
+  walletsLoading = false,
   watcher,
 }: CopyWalletsTableProps) {
   const [pendingActionByWallet, setPendingActionByWallet] = useState<Record<string, RowAction>>({});
@@ -119,8 +129,8 @@ export function CopyWalletsTable({
   }, [positionsByWallet, tradesByWallet, wallets]);
 
   const watcherHealthByWallet = useMemo(() => {
-    return new Map((watcher.last_result?.wallet_scan_results ?? []).map((entry) => [entry.wallet_id, entry]));
-  }, [watcher.last_result?.wallet_scan_results]);
+    return new Map((watcher?.last_result?.wallet_scan_results ?? []).map((entry) => [entry.wallet_id, entry]));
+  }, [watcher?.last_result?.wallet_scan_results]);
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -187,6 +197,9 @@ export function CopyWalletsTable({
   const activeWallets = wallets.filter((wallet) => wallet.enabled).length;
   const openCopies = summary?.open_positions_count ?? openPositions.length;
   const editingWallet = editingWalletId ? wallets.find((wallet) => wallet.id === editingWalletId) ?? null : null;
+  const walletMetricsLoading = walletsLoading;
+  const openPositionsMetricsLoading = openPositionsLoading && !summary;
+  const latestTradeLoading = walletsLoading || positionsHistoryLoading;
 
   async function handlePause(wallet: CopyWallet) {
     setPendingAction(wallet.id, "pause", setPendingActionByWallet);
@@ -247,30 +260,60 @@ export function CopyWalletsTable({
 
         <section className="copy-wallets-kpi-grid" aria-label="Metricas rapidas de wallets">
           <MetricCard
-            helper={walletsFollowed === 0 ? "Sin seguimiento activo" : `${activeWallets} activas`}
+            helper={
+              walletMetricsLoading
+                ? "Cargando wallets..."
+                : walletsFollowed === 0
+                  ? "Sin seguimiento activo"
+                  : `${activeWallets} activas`
+            }
             label="Wallets seguidas"
-            value={String(walletsFollowed)}
+            value={walletMetricsLoading ? "—" : String(walletsFollowed)}
           />
           <MetricCard
-            helper={walletsFollowed === 0 ? "Sin wallets cargadas" : `${walletsFollowed - activeWallets} pausadas`}
+            helper={
+              walletMetricsLoading
+                ? "Consultando estado..."
+                : walletsFollowed === 0
+                  ? "Sin wallets cargadas"
+                  : `${walletsFollowed - activeWallets} pausadas`
+            }
             label="Activas"
-            value={String(activeWallets)}
+            value={walletMetricsLoading ? "—" : String(activeWallets)}
           />
           <MetricCard
-            helper={openCopies > 0 ? "En ejecucion" : "Sin posiciones abiertas"}
+            helper={
+              openPositionsMetricsLoading
+                ? "Cargando posiciones..."
+                : openCopies > 0
+                  ? "En ejecucion"
+                  : "Sin posiciones abiertas"
+            }
             label="Copias abiertas"
-            value={String(openCopies)}
+            value={openPositionsMetricsLoading ? "—" : String(openCopies)}
           />
           <MetricCard
-            helper={summary?.demo_roi_percent ? `ROI ${formatPercent(summary.demo_roi_percent)}` : "Pendiente"}
+            helper={
+              summaryLoading
+                ? "Cargando PnL demo..."
+                : summary?.demo_roi_percent
+                  ? `ROI ${formatPercent(summary.demo_roi_percent)}`
+                  : "Pendiente"
+            }
             label="PnL total demo"
             tone={pnlTone(summary?.total_demo_pnl_usd ?? null)}
-            value={formatPnl(summary?.total_demo_pnl_usd ?? null)}
+            value={summaryLoading && !summary ? "—" : formatPnl(summary?.total_demo_pnl_usd ?? null)}
           />
           <MetricCard
-            helper={latestTradeAcrossWallets ? formatTradeAge(ageSecondsFromNow(latestTradeAcrossWallets)) : "Sin actividad"}
+            helper={
+              latestTradeLoading
+                ? "Cargando actividad..."
+                : latestTradeAcrossWallets
+                  ? formatTradeAge(ageSecondsFromNow(latestTradeAcrossWallets))
+                  : "Sin actividad"
+            }
             label="Ultimo trade"
-            value={formatDateTime(latestTradeAcrossWallets)}
+            value={latestTradeLoading ? "—" : formatDateTime(latestTradeAcrossWallets)}
           />
         </section>
 
@@ -346,7 +389,11 @@ export function CopyWalletsTable({
               </label>
             </div>
 
-            {wallets.length === 0 ? (
+            {walletsLoading ? (
+              <div className="copy-empty-state">Cargando wallets...</div>
+            ) : walletsError && wallets.length === 0 ? (
+              <div className="copy-empty-state">{walletsError}</div>
+            ) : wallets.length === 0 ? (
               <div className="copy-empty-state">
                 Sin wallets. Agrega una direccion publica para iniciar el modo demo.
               </div>

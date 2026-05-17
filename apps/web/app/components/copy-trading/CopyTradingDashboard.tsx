@@ -1,8 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getCopyTradingPrimaryData, getCopyTradingSupplementalData } from "../../lib/copyTrading";
-import type { CopyTradingDashboardData, CopyTradingStatus, CopyTradingWatcherStatus } from "../../lib/copyTradingTypes";
+import {
+  getCopyTradingClosedPositionsData,
+  getCopyTradingDemoPnlSummaryData,
+  getCopyTradingEventsData,
+  getCopyTradingOpenPositionsData,
+  getCopyTradingOrdersData,
+  getCopyTradingStatusData,
+  getCopyTradingTradesData,
+  getCopyTradingWalletsData,
+  getCopyTradingWatcherStatusData,
+} from "../../lib/copyTrading";
+import type {
+  CopyBotEvent,
+  CopyDemoPosition,
+  CopyDetectedTrade,
+  CopyOrder,
+  CopyTradingDemoPnlSummary,
+  CopyTradingStatus,
+  CopyTradingWatcherStatus,
+  CopyWallet,
+} from "../../lib/copyTradingTypes";
 import { CopyBotEvents } from "./CopyBotEvents";
 import { CopyClosedDemoPositionsTable } from "./CopyClosedDemoPositionsTable";
 import { CopyDemoPnlSummaryPanel } from "./CopyDemoPnlSummaryPanel";
@@ -24,184 +43,308 @@ const DASHBOARD_TABS = [
 ] as const;
 
 type CopyTradingDashboardTab = (typeof DASHBOARD_TABS)[number]["id"];
+type DashboardSectionKey = "worker" | "wallets" | "open" | "history" | "pnl" | "audit";
 
-const DEFAULT_WATCHER: CopyTradingWatcherStatus = {
-  enabled: false,
-  running: false,
-  demo_only: true,
-  interval_seconds: 5,
-  cycle_budget_seconds: 8,
-  current_run_started_at: null,
-  last_run_started_at: null,
-  last_run_at: null,
-  last_run_finished_at: null,
-  last_run_duration_ms: null,
-  average_run_duration_ms: null,
-  next_run_at: null,
-  last_result: null,
-  error_count: 0,
-  scanned_wallet_count: 0,
-  slow_wallet_count: 0,
-  timeout_count: 0,
-  errored_wallet_count: 0,
-  skipped_due_to_budget_count: 0,
-  skipped_due_to_priority_count: 0,
-  pending_wallet_count: 0,
-  is_over_interval: false,
-  behind_by_seconds: 0,
-  last_error: null,
-  message: null,
-  worker_status: "not_started",
-  worker_owner_id: null,
-  last_heartbeat_at: null,
-  last_loop_started_at: null,
-  last_loop_finished_at: null,
-  last_success_at: null,
-  last_result_json: null,
-  consecutive_errors: 0,
-  stale_after_seconds: 30,
+type CopyTradingDashboardState = {
+  closedDemoPositions: CopyDemoPosition[] | null;
+  demoPnlSummary: CopyTradingDemoPnlSummary | null;
+  events: CopyBotEvent[] | null;
+  openDemoPositions: CopyDemoPosition[] | null;
+  orders: CopyOrder[] | null;
+  status: CopyTradingStatus | null;
+  trades: CopyDetectedTrade[] | null;
+  wallets: CopyWallet[] | null;
+  watcher: CopyTradingWatcherStatus | null;
 };
 
-const DEFAULT_STATUS: CopyTradingStatus = {
-  mode_default: "demo",
-  demo_only: true,
-  real_trading_available: false,
-  real_trading_block_reason: "real_trading_not_configured",
-  wallets_total: 0,
-  wallets_enabled: 0,
-  trades_detected: 0,
-  orders_simulated: 0,
-  orders_skipped: 0,
-  orders_blocked: 0,
-  open_demo_positions_count: 0,
-  last_scan_at: null,
-  worker_status: "not_started",
-  worker_owner_id: null,
-  last_heartbeat_at: null,
-  last_loop_started_at: null,
-  last_loop_finished_at: null,
-  last_success_at: null,
-  last_error: null,
-  last_result_json: null,
-  consecutive_errors: 0,
-  stale_after_seconds: 30,
+type SectionState = {
+  error: string | null;
+  loaded: boolean;
+  loading: boolean;
+  refreshing: boolean;
+};
+
+type DashboardSectionsState = Record<DashboardSectionKey, SectionState>;
+
+const INITIAL_DATA: CopyTradingDashboardState = {
+  closedDemoPositions: null,
+  demoPnlSummary: null,
+  events: null,
+  openDemoPositions: null,
+  orders: null,
+  status: null,
+  trades: null,
+  wallets: null,
+  watcher: null,
+};
+
+const INITIAL_SECTIONS: DashboardSectionsState = {
+  audit: { error: null, loaded: false, loading: true, refreshing: false },
+  history: { error: null, loaded: false, loading: true, refreshing: false },
+  open: { error: null, loaded: false, loading: true, refreshing: false },
+  pnl: { error: null, loaded: false, loading: true, refreshing: false },
+  wallets: { error: null, loaded: false, loading: true, refreshing: false },
+  worker: { error: null, loaded: false, loading: true, refreshing: false },
 };
 
 export function CopyTradingDashboard() {
-  const [data, setData] = useState<CopyTradingDashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<CopyTradingDashboardState>(INITIAL_DATA);
+  const [sections, setSections] = useState<DashboardSectionsState>(INITIAL_SECTIONS);
   const [notice, setNotice] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [supplementalLoading, setSupplementalLoading] = useState(true);
-  const [supplementalRefreshing, setSupplementalRefreshing] = useState(false);
-  const [supplementalError, setSupplementalError] = useState<string | null>(null);
   const [pageVisible, setPageVisible] = useState(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastUpdatedLabel, setLastUpdatedLabel] = useState("Sin datos todavia");
   const [activeTab, setActiveTab] = useState<CopyTradingDashboardTab>("summary");
-  const isRefreshingRef = useRef(false);
-  const supplementalRefreshInFlightRef = useRef(false);
-  const hasLoadedSupplementalOnceRef = useRef(false);
-  const dataRef = useRef<CopyTradingDashboardData | null>(null);
+  const inFlightRef = useRef<Record<DashboardSectionKey, boolean>>({
+    audit: false,
+    history: false,
+    open: false,
+    pnl: false,
+    wallets: false,
+    worker: false,
+  });
 
-  const setDashboardData = useCallback(
-    (updater: CopyTradingDashboardData | null | ((current: CopyTradingDashboardData | null) => CopyTradingDashboardData | null)) => {
-      setData((current) => {
-        const nextValue = typeof updater === "function" ? updater(current) : updater;
-        dataRef.current = nextValue;
-        return nextValue;
-      });
+  const patchData = useCallback((patch: Partial<CopyTradingDashboardState>) => {
+    setData((current) => ({ ...current, ...patch }));
+  }, []);
+
+  const beginSection = useCallback((key: DashboardSectionKey, isBackground = false) => {
+    setSections((current) => {
+      const section = current[key];
+      return {
+        ...current,
+        [key]: {
+          ...section,
+          error: null,
+          loading: !section.loaded && !isBackground,
+          refreshing: section.loaded || isBackground,
+        },
+      };
+    });
+  }, []);
+
+  const completeSection = useCallback((key: DashboardSectionKey, error: string | null = null, markLoaded = true) => {
+    setSections((current) => ({
+      ...current,
+      [key]: {
+        error,
+        loaded: current[key].loaded || markLoaded,
+        loading: false,
+        refreshing: false,
+      },
+    }));
+  }, []);
+
+  const markRefreshed = useCallback(() => {
+    setLastUpdatedAt(new Date());
+  }, []);
+
+  const refreshWorkerSection = useCallback(
+    async (options?: { isBackground?: boolean }) => {
+      if (inFlightRef.current.worker) {
+        return false;
+      }
+      inFlightRef.current.worker = true;
+      beginSection("worker", options?.isBackground);
+      try {
+        const [statusResult, watcherResult] = await Promise.allSettled([
+          getCopyTradingStatusData(),
+          getCopyTradingWatcherStatusData(),
+        ]);
+
+        if (statusResult.status === "fulfilled") {
+          patchData({ status: statusResult.value });
+        }
+        if (watcherResult.status === "fulfilled") {
+          patchData({ watcher: watcherResult.value });
+        }
+
+        if (statusResult.status === "fulfilled" || watcherResult.status === "fulfilled") {
+          markRefreshed();
+          const partialFailure =
+            statusResult.status === "rejected" || watcherResult.status === "rejected"
+              ? "Mostrando estado parcial del worker. Intentaremos completar el resto en el proximo refresh."
+              : null;
+          completeSection("worker", partialFailure);
+          return true;
+        }
+
+        completeSection("worker", "No pudimos consultar el estado del worker ahora.");
+        return false;
+      } finally {
+        inFlightRef.current.worker = false;
+      }
     },
-    [],
+    [beginSection, completeSection, markRefreshed, patchData],
   );
 
-  const refreshSupplemental = useCallback(async () => {
-    if (supplementalRefreshInFlightRef.current) {
-      return false;
-    }
-    supplementalRefreshInFlightRef.current = true;
-    const currentData = dataRef.current;
-    const hasExistingSupplementalData = Boolean(
-      currentData?.demo_pnl_summary ||
-        (currentData?.open_demo_positions.length ?? 0) > 0 ||
-        (currentData?.closed_demo_positions.length ?? 0) > 0,
-    );
-    setSupplementalError(null);
-    if (hasExistingSupplementalData || hasLoadedSupplementalOnceRef.current) {
-      setSupplementalRefreshing(true);
-      setSupplementalLoading(false);
-    } else {
-      setSupplementalLoading(true);
-      setSupplementalRefreshing(false);
-    }
-
-    try {
-      const supplemental = await getCopyTradingSupplementalData();
-      if (Object.keys(supplemental).length > 0) {
-        hasLoadedSupplementalOnceRef.current = true;
-        setDashboardData((current) =>
-          current
-            ? {
-                ...current,
-                ...supplemental,
-                open_demo_positions: supplemental.open_demo_positions ?? current.open_demo_positions,
-                closed_demo_positions: supplemental.closed_demo_positions ?? current.closed_demo_positions,
-                demo_pnl_summary: supplemental.demo_pnl_summary ?? current.demo_pnl_summary,
-              }
-            : current,
-        );
-      } else if (!hasExistingSupplementalData) {
-        hasLoadedSupplementalOnceRef.current = true;
+  const refreshWalletsSection = useCallback(
+    async (options?: { isBackground?: boolean }) => {
+      if (inFlightRef.current.wallets) {
+        return false;
       }
-      return true;
-    } catch {
-      setSupplementalError("No pudimos actualizar metricas demo ahora. Mostrando ultimo dato disponible.");
-      return false;
-    } finally {
-      supplementalRefreshInFlightRef.current = false;
-      setSupplementalLoading(false);
-      setSupplementalRefreshing(false);
-    }
-  }, [setDashboardData]);
-
-  const refresh = useCallback(async (options?: { isBackground?: boolean }) => {
-    if (isRefreshingRef.current) {
-      return false;
-    }
-    isRefreshingRef.current = true;
-    setRefreshing(true);
-    if (!options?.isBackground) {
-      setError(null);
-    }
-    try {
-      const loadedPrimaryData = await getCopyTradingPrimaryData();
-      setDashboardData((current) => ({
-        ...loadedPrimaryData,
-        open_demo_positions: current?.open_demo_positions ?? loadedPrimaryData.open_demo_positions,
-        closed_demo_positions: current?.closed_demo_positions ?? loadedPrimaryData.closed_demo_positions,
-        demo_pnl_summary: current?.demo_pnl_summary ?? loadedPrimaryData.demo_pnl_summary,
-      }));
-      setLastUpdatedAt(new Date());
-      if (options?.isBackground) {
-        setError(null);
+      inFlightRef.current.wallets = true;
+      beginSection("wallets", options?.isBackground);
+      try {
+        const wallets = await getCopyTradingWalletsData();
+        patchData({ wallets });
+        markRefreshed();
+        completeSection("wallets");
+        return true;
+      } catch {
+        completeSection("wallets", "No pudimos actualizar la lista de wallets ahora.");
+        return false;
+      } finally {
+        inFlightRef.current.wallets = false;
       }
-    } catch {
-      setError("No pudimos actualizar Copy Trading ahora. Seguiremos intentando.");
-      return false;
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      isRefreshingRef.current = false;
-    }
+    },
+    [beginSection, completeSection, markRefreshed, patchData],
+  );
 
-    void refreshSupplemental();
-    return true;
-  }, [refreshSupplemental, setDashboardData]);
+  const refreshOpenPositionsSection = useCallback(
+    async (options?: { isBackground?: boolean }) => {
+      if (inFlightRef.current.open) {
+        return false;
+      }
+      inFlightRef.current.open = true;
+      beginSection("open", options?.isBackground);
+      try {
+        const openDemoPositions = await getCopyTradingOpenPositionsData();
+        patchData({ openDemoPositions });
+        markRefreshed();
+        completeSection("open");
+        return true;
+      } catch {
+        completeSection("open", "No pudimos actualizar las copias demo abiertas ahora.");
+        return false;
+      } finally {
+        inFlightRef.current.open = false;
+      }
+    },
+    [beginSection, completeSection, markRefreshed, patchData],
+  );
+
+  const refreshHistorySection = useCallback(
+    async (options?: { isBackground?: boolean }) => {
+      if (inFlightRef.current.history) {
+        return false;
+      }
+      inFlightRef.current.history = true;
+      beginSection("history", options?.isBackground);
+      try {
+        const [tradesResult, ordersResult, closedPositionsResult] = await Promise.allSettled([
+          getCopyTradingTradesData(),
+          getCopyTradingOrdersData(),
+          getCopyTradingClosedPositionsData(),
+        ]);
+
+        const patch: Partial<CopyTradingDashboardState> = {};
+        const failures: string[] = [];
+        if (tradesResult.status === "fulfilled") {
+          patch.trades = tradesResult.value;
+        } else {
+          failures.push("trades");
+        }
+        if (ordersResult.status === "fulfilled") {
+          patch.orders = ordersResult.value;
+        } else {
+          failures.push("ordenes");
+        }
+        if (closedPositionsResult.status === "fulfilled") {
+          patch.closedDemoPositions = closedPositionsResult.value;
+        } else {
+          failures.push("historial demo");
+        }
+
+        if (Object.keys(patch).length > 0) {
+          patchData(patch);
+          markRefreshed();
+          completeSection(
+            "history",
+            failures.length > 0
+              ? `Mostrando historial parcial. Falto actualizar: ${failures.join(", ")}.`
+              : null,
+          );
+          return true;
+        }
+
+        completeSection("history", "No pudimos actualizar el historial ahora.");
+        return false;
+      } finally {
+        inFlightRef.current.history = false;
+      }
+    },
+    [beginSection, completeSection, markRefreshed, patchData],
+  );
+
+  const refreshPnlSection = useCallback(
+    async (options?: { isBackground?: boolean }) => {
+      if (inFlightRef.current.pnl) {
+        return false;
+      }
+      inFlightRef.current.pnl = true;
+      beginSection("pnl", options?.isBackground);
+      try {
+        const demoPnlSummary = await getCopyTradingDemoPnlSummaryData();
+        patchData({ demoPnlSummary });
+        markRefreshed();
+        completeSection("pnl");
+        return true;
+      } catch {
+        completeSection("pnl", "No pudimos actualizar el PnL demo ahora.");
+        return false;
+      } finally {
+        inFlightRef.current.pnl = false;
+      }
+    },
+    [beginSection, completeSection, markRefreshed, patchData],
+  );
+
+  const refreshAuditSection = useCallback(
+    async (options?: { isBackground?: boolean }) => {
+      if (inFlightRef.current.audit) {
+        return false;
+      }
+      inFlightRef.current.audit = true;
+      beginSection("audit", options?.isBackground);
+      try {
+        const events = await getCopyTradingEventsData();
+        patchData({ events });
+        markRefreshed();
+        completeSection("audit");
+        return true;
+      } catch {
+        completeSection("audit", "No pudimos actualizar la auditoria ahora.");
+        return false;
+      } finally {
+        inFlightRef.current.audit = false;
+      }
+    },
+    [beginSection, completeSection, markRefreshed, patchData],
+  );
+
+  const refreshAll = useCallback(
+    (options?: { isBackground?: boolean }) => {
+      void refreshWorkerSection(options);
+      void refreshWalletsSection(options);
+      void refreshOpenPositionsSection(options);
+      void refreshHistorySection(options);
+      void refreshPnlSection(options);
+      void refreshAuditSection(options);
+    },
+    [
+      refreshAuditSection,
+      refreshHistorySection,
+      refreshOpenPositionsSection,
+      refreshPnlSection,
+      refreshWalletsSection,
+      refreshWorkerSection,
+    ],
+  );
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    refreshAll();
+  }, [refreshAll]);
 
   useEffect(() => {
     function updateVisibility() {
@@ -215,13 +358,13 @@ export function CopyTradingDashboard() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      if (!pageVisible || isRefreshingRef.current) {
+      if (!pageVisible || Object.values(inFlightRef.current).some(Boolean)) {
         return;
       }
-      void refresh({ isBackground: true });
+      refreshAll({ isBackground: true });
     }, AUTO_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
-  }, [pageVisible, refresh]);
+  }, [pageVisible, refreshAll]);
 
   useEffect(() => {
     function updateLastUpdatedLabel() {
@@ -250,12 +393,22 @@ export function CopyTradingDashboard() {
 
   async function handleManualRefresh() {
     setNotice(null);
-    await refresh();
+    refreshAll();
   }
+
+  const isRefreshingAny = Object.values(sections).some((section) => section.loading || section.refreshing);
+  const primaryStatusLoading = sections.worker.loading && !data.status;
+  const watcherLoading = sections.worker.loading && !data.watcher;
+  const openPositions = data.openDemoPositions ?? [];
+  const closedDemoPositions = data.closedDemoPositions ?? [];
+  const trades = data.trades ?? [];
+  const orders = data.orders ?? [];
+  const events = data.events ?? [];
+  const wallets = data.wallets ?? [];
 
   return (
     <main className="copy-trading-page">
-      <CopyTradingHeader status={data?.status ?? null} />
+      <CopyTradingHeader status={data.status} />
 
       <nav className="copy-tabs" aria-label="Navegacion interna de Copy Trading">
         {DASHBOARD_TABS.map((tab) => (
@@ -271,25 +424,13 @@ export function CopyTradingDashboard() {
         ))}
       </nav>
 
-      {error ? <div className="copy-error-state">{error}</div> : null}
-      {notice ? <div className="copy-empty-state">{notice}</div> : null}
-      {loading ? (
-        <section className="copy-loading-shell" aria-label="Cargando Copy Trading">
-          <div className="copy-loading-card copy-loading-card-hero">
-            <span className="copy-section-kicker">Cargando wallets y posiciones demo</span>
-            <strong>Preparando el dashboard de Copy Trading...</strong>
-            <p>Las posiciones demo y el PnL pueden tardar algunos segundos mas en llegar.</p>
-          </div>
-          <div className="copy-loading-grid">
-            <div className="copy-loading-card" />
-            <div className="copy-loading-card" />
-            <div className="copy-loading-card" />
-          </div>
-        </section>
+      {sections.worker.error && !data.status && !data.watcher ? (
+        <div className="copy-error-state">{sections.worker.error}</div>
       ) : null}
+      {notice ? <div className="copy-empty-state">{notice}</div> : null}
 
       <section className="copy-tab-panel" hidden={activeTab !== "summary"}>
-        <CopyTradingMetrics status={data?.status ?? null} />
+        <CopyTradingMetrics loading={primaryStatusLoading} status={data.status} />
 
         <section className="copy-control-bar" aria-label="Estado del modo demo">
           <div className="copy-control-copy">
@@ -304,66 +445,120 @@ export function CopyTradingDashboard() {
                 Refresh visual {pageVisible ? "cada 15s" : "en pausa por pestana oculta"}
               </span>
               <span className="copy-badge subtle">Modo demo: no ejecuta dinero real</span>
-              {supplementalLoading && !loading ? <span className="copy-badge subtle">Metricas demo cargando...</span> : null}
-              {supplementalRefreshing ? <span className="copy-badge subtle">Actualizando metricas...</span> : null}
-              {supplementalError ? <span className="copy-badge locked">{supplementalError}</span> : null}
+              {sections.worker.loading && !data.watcher ? (
+                <span className="copy-badge subtle">Consultando estado del worker...</span>
+              ) : null}
+              {sections.wallets.loading && !data.wallets ? <span className="copy-badge subtle">Wallets cargando...</span> : null}
+              {sections.pnl.loading && !data.demoPnlSummary ? <span className="copy-badge subtle">Metricas demo cargando...</span> : null}
             </div>
           </div>
           <div className="copy-action-row">
             <button
-              aria-label={refreshing ? "Actualizando Copy Trading" : "Refrescar Copy Trading ahora"}
+              aria-label={isRefreshingAny ? "Actualizando Copy Trading" : "Refrescar Copy Trading ahora"}
               className="copy-primary-button"
               data-testid="copy-refresh-now"
-              disabled={loading || refreshing}
-              onClick={handleManualRefresh}
+              disabled={isRefreshingAny}
+              onClick={() => void handleManualRefresh()}
               type="button"
             >
-              {refreshing ? "Actualizando..." : "Actualizar vista"}
+              {isRefreshingAny ? "Actualizando..." : "Actualizar vista"}
             </button>
           </div>
         </section>
 
         <div className="copy-dashboard-grid two copy-summary-layout">
           <CopyDemoPnlSummaryPanel
-            loading={supplementalLoading}
-            refreshing={supplementalRefreshing}
-            statusMessage={supplementalError}
-            summary={data?.demo_pnl_summary ?? null}
+            loading={sections.pnl.loading && !data.demoPnlSummary}
+            refreshing={sections.pnl.refreshing}
+            statusMessage={sections.pnl.error}
+            summary={data.demoPnlSummary}
           />
-          <CopyWatcherPanel status={data?.status ?? DEFAULT_STATUS} watcher={data?.watcher ?? DEFAULT_WATCHER} />
+          <CopyWatcherPanel
+            error={sections.worker.error}
+            loading={watcherLoading}
+            status={data.status}
+            statusLoading={primaryStatusLoading}
+            watcher={data.watcher}
+          />
         </div>
       </section>
 
       <section className="copy-tab-panel" hidden={activeTab !== "wallets"}>
         <CopyWalletsTable
-          closedPositions={data?.closed_demo_positions ?? []}
+          closedPositions={closedDemoPositions}
           onChanged={async () => {
-            await refresh();
+            refreshAll();
           }}
           onNotice={setNotice}
-          openPositions={data?.open_demo_positions ?? []}
-          summary={data?.demo_pnl_summary ?? null}
-          trades={data?.trades ?? []}
-          wallets={data?.wallets ?? []}
-          watcher={data?.watcher ?? DEFAULT_WATCHER}
+          openPositions={openPositions}
+          openPositionsLoading={sections.open.loading && !data.openDemoPositions}
+          positionsHistoryLoading={sections.history.loading && !data.closedDemoPositions}
+          summary={data.demoPnlSummary}
+          summaryLoading={sections.pnl.loading && !data.demoPnlSummary}
+          trades={trades}
+          wallets={wallets}
+          walletsError={sections.wallets.error}
+          walletsLoading={sections.wallets.loading && !data.wallets}
+          watcher={data.watcher}
         />
       </section>
 
       <section className="copy-tab-panel" hidden={activeTab !== "open"}>
-        <CopyOpenDemoPositionsTable positions={data?.open_demo_positions ?? []} summary={data?.demo_pnl_summary ?? null} />
+        {sections.open.loading && !data.openDemoPositions ? (
+          <SectionStatusMessage>Cargando esta seccion...</SectionStatusMessage>
+        ) : sections.open.error && !data.openDemoPositions ? (
+          <SectionStatusMessage tone="locked">{sections.open.error}</SectionStatusMessage>
+        ) : (
+          <>
+            {sections.open.error ? <SectionStatusMessage tone="locked">{sections.open.error}</SectionStatusMessage> : null}
+            <CopyOpenDemoPositionsTable positions={openPositions} summary={data.demoPnlSummary} />
+          </>
+        )}
       </section>
 
       <section className="copy-tab-panel" hidden={activeTab !== "history"}>
-        <CopyClosedDemoPositionsTable positions={data?.closed_demo_positions ?? []} summary={data?.demo_pnl_summary ?? null} />
-        <div className="copy-dashboard-grid two copy-history-grid">
-          <CopyTradesTable trades={data?.trades ?? []} />
-          <CopyOrdersTable orders={data?.orders ?? []} />
-        </div>
+        {sections.history.loading && !data.trades && !data.orders && !data.closedDemoPositions ? (
+          <SectionStatusMessage>Cargando esta seccion...</SectionStatusMessage>
+        ) : sections.history.error && !data.trades && !data.orders && !data.closedDemoPositions ? (
+          <SectionStatusMessage tone="locked">{sections.history.error}</SectionStatusMessage>
+        ) : (
+          <>
+            {sections.history.error ? <SectionStatusMessage tone="locked">{sections.history.error}</SectionStatusMessage> : null}
+            <CopyClosedDemoPositionsTable positions={closedDemoPositions} summary={data.demoPnlSummary} />
+            <div className="copy-dashboard-grid two copy-history-grid">
+              <CopyTradesTable trades={trades} />
+              <CopyOrdersTable orders={orders} />
+            </div>
+          </>
+        )}
       </section>
 
       <section className="copy-tab-panel" hidden={activeTab !== "audit"}>
-        <CopyBotEvents events={data?.events ?? []} />
+        {sections.audit.loading && !data.events ? (
+          <SectionStatusMessage>Cargando esta seccion...</SectionStatusMessage>
+        ) : sections.audit.error && !data.events ? (
+          <SectionStatusMessage tone="locked">{sections.audit.error}</SectionStatusMessage>
+        ) : (
+          <>
+            {sections.audit.error ? <SectionStatusMessage tone="locked">{sections.audit.error}</SectionStatusMessage> : null}
+            <CopyBotEvents events={events} />
+          </>
+        )}
       </section>
     </main>
+  );
+}
+
+function SectionStatusMessage({
+  children,
+  tone = "subtle",
+}: {
+  children: string;
+  tone?: "locked" | "subtle";
+}) {
+  return (
+    <div className="copy-status-strip" aria-live="polite">
+      <span className={`copy-badge ${tone}`}>{children}</span>
+    </div>
   );
 }
