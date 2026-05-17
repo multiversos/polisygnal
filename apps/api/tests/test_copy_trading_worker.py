@@ -53,6 +53,26 @@ class FakeWatcher:
         return CopyTradingWatcherRunResult(status=status, executed=True)
 
 
+class FailingWatcher:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def run_once(self, *, now: datetime | None = None) -> CopyTradingWatcherRunResult:
+        self.calls += 1
+        result = CopyTradingWatcherLastResult(errors=["No se pudo leer actividad publica."])
+        status = CopyTradingWatcherStatusResponse(
+            enabled=False,
+            running=False,
+            interval_seconds=1,
+            cycle_budget_seconds=1,
+            last_run_started_at=now,
+            last_run_finished_at=now,
+            last_result=result,
+            message="Watcher demo fallo al escanear.",
+        )
+        return CopyTradingWatcherRunResult(status=status, executed=False)
+
+
 @pytest.fixture
 def worker_db() -> Generator[tuple[sessionmaker[Session], object], None, None]:
     engine = create_engine(
@@ -105,7 +125,7 @@ def test_copy_trading_worker_once_succeeds_on_empty_db(worker_db: tuple[sessionm
     exit_code = command.run(["--once"])
 
     assert exit_code == 0
-    payload = json.loads(stdout.getvalue())
+    payload = _read_last_json(stdout.getvalue())
     assert payload["status"] == "ok"
     assert payload["loops_completed"] == 1
     with testing_session_factory() as session:
@@ -117,6 +137,9 @@ def test_copy_trading_worker_once_succeeds_on_empty_db(worker_db: tuple[sessionm
         assert state.last_loop_finished_at is not None
         assert state.last_success_at is not None
         assert state.last_result_json is not None
+        assert state.last_result_json["loops_completed"] == 1
+        assert state.last_result_json["wallets_scanned"] == 0
+        assert state.last_result_json["demo_orders_created"] == 0
         assert state.consecutive_errors == 0
 
 
@@ -155,7 +178,7 @@ def test_copy_trading_worker_returns_cleanly_when_lock_is_held(
         exit_code = command.run(["--once"])
 
         assert exit_code == 0
-        payload = json.loads(stdout.getvalue())
+        payload = _read_last_json(stdout.getvalue())
         assert payload["status"] == "lock_unavailable"
         assert payload["state"] is None
     finally:
@@ -181,7 +204,7 @@ def test_copy_trading_worker_does_not_require_private_key_seed_or_clob(
     exit_code = command.run(["--once"])
 
     assert exit_code == 0
-    payload = json.loads(stdout.getvalue())
+    payload = _read_last_json(stdout.getvalue())
     assert payload["status"] == "ok"
     assert "private" not in stdout.getvalue().lower()
     assert "seed" not in stdout.getvalue().lower()
@@ -209,6 +232,121 @@ def test_copy_trading_worker_loop_respects_max_loops(
 
     assert exit_code == 0
     assert fake_watcher.calls == 2
-    payload = json.loads(stdout.getvalue())
+    payload = _read_last_json(stdout.getvalue())
     assert payload["status"] == "ok"
     assert payload["loops_completed"] == 2
+
+
+def test_copy_trading_worker_rejects_unbounded_loop_without_flag_or_env(
+    worker_db: tuple[sessionmaker[Session], object],
+) -> None:
+    testing_session_factory, testing_engine = worker_db
+    command = CopyTradingWorkerCommand(
+        engine_instance=testing_engine,
+        session_factory=testing_session_factory,
+        watcher_factory=lambda _args: FakeWatcher(),
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        env={},
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        command.run(["--loop"])
+
+    assert exc.value.code == 2
+
+
+def test_copy_trading_worker_allows_forever_flag(
+    worker_db: tuple[sessionmaker[Session], object],
+) -> None:
+    testing_session_factory, testing_engine = worker_db
+    stdout = io.StringIO()
+    command = CopyTradingWorkerCommand(
+        engine_instance=testing_engine,
+        session_factory=testing_session_factory,
+        watcher_factory=lambda _args: FakeWatcher(),
+        stdout=stdout,
+        stderr=io.StringIO(),
+        env={},
+        sleep_fn=lambda _seconds: None,
+    )
+
+    exit_code = command.run(["--loop", "--forever", "--max-loops", "1", "--sleep-seconds", "0"])
+
+    assert exit_code == 0
+    payload = _read_last_json(stdout.getvalue())
+    assert payload["status"] == "ok"
+    assert payload["loops_completed"] == 1
+
+
+def test_copy_trading_worker_error_increments_consecutive_errors(
+    worker_db: tuple[sessionmaker[Session], object],
+) -> None:
+    testing_session_factory, testing_engine = worker_db
+    command = CopyTradingWorkerCommand(
+        engine_instance=testing_engine,
+        session_factory=testing_session_factory,
+        watcher_factory=lambda _args: FailingWatcher(),
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        env={"POLYSIGNAL_COPY_WORKER_ERROR_BACKOFF_SECONDS": "0"},
+        sleep_fn=lambda _seconds: None,
+    )
+
+    exit_code = command.run(["--once"])
+
+    assert exit_code == 0
+    with testing_session_factory() as session:
+        state = session.get(CopyWorkerState, COPY_TRADING_WORKER_ID)
+        assert state is not None
+        assert state.consecutive_errors == 1
+        assert state.last_result_json == {
+            "loops_completed": 1,
+            "wallets_scanned": 0,
+            "trades_detected": 0,
+            "demo_orders_created": 0,
+            "positions_opened": 0,
+            "positions_closed": 0,
+            "settlement_checked": 0,
+            "duration_ms": state.last_result_json["duration_ms"],
+            "errors_count": 1,
+        }
+
+
+def test_copy_trading_worker_success_resets_consecutive_errors(
+    worker_db: tuple[sessionmaker[Session], object],
+) -> None:
+    testing_session_factory, testing_engine = worker_db
+    failing_command = CopyTradingWorkerCommand(
+        engine_instance=testing_engine,
+        session_factory=testing_session_factory,
+        watcher_factory=lambda _args: FailingWatcher(),
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        env={"POLYSIGNAL_COPY_WORKER_ERROR_BACKOFF_SECONDS": "0"},
+        sleep_fn=lambda _seconds: None,
+    )
+    success_command = CopyTradingWorkerCommand(
+        engine_instance=testing_engine,
+        session_factory=testing_session_factory,
+        watcher_factory=lambda _args: FakeWatcher(),
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        env={},
+    )
+
+    assert failing_command.run(["--once"]) == 0
+    assert success_command.run(["--once"]) == 0
+
+    with testing_session_factory() as session:
+        state = session.get(CopyWorkerState, COPY_TRADING_WORKER_ID)
+        assert state is not None
+        assert state.consecutive_errors == 0
+        assert state.last_error is None
+        assert state.last_result_json["errors_count"] == 0
+
+
+def _read_last_json(output: str) -> dict[str, object]:
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    assert lines
+    return json.loads(lines[-1])
