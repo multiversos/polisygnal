@@ -27,6 +27,7 @@ from app.services.copy_trading_demo_positions import (
     list_closed_demo_positions,
     list_open_demo_positions,
 )
+from app.services.copy_trading_demo_reconciliation import reconcile_open_demo_positions
 from app.services.copy_trading_demo_settlement import settle_open_demo_positions
 from app.services.copy_trading_risk_rules import CopyTradeForRules, evaluate_demo_trade
 from app.services.copy_trading_service import (
@@ -34,6 +35,7 @@ from app.services.copy_trading_service import (
     InvalidCopyWalletInputError,
     build_copy_trade_read,
     build_copy_wallet_read,
+    create_detected_trade,
     create_copy_wallet,
     list_copy_events,
     list_copy_orders,
@@ -528,7 +530,8 @@ def test_demo_tick_creates_simulated_order_for_valid_trade(db_session: Session) 
 
 def test_demo_tick_creates_simulated_sell_order_for_valid_trade(db_session: Session) -> None:
     _create_wallet(db_session, amount=Decimal("5"))
-    reader = FakeTradeReader([_trade("0xsell", side="SELL")])
+    run_demo_tick(db_session, data_client=FakeTradeReader([_trade("0xsell-buy", price="0.50")]), now=_now())
+    reader = FakeTradeReader([_trade("0xsell", side="SELL", price="0.60")])
 
     response = run_demo_tick(db_session, data_client=reader, now=_now())
     orders = list_copy_orders(db_session)
@@ -536,8 +539,7 @@ def test_demo_tick_creates_simulated_sell_order_for_valid_trade(db_session: Sess
     assert response.orders_simulated == 1
     assert response.buy_simulated == 0
     assert response.sell_simulated == 1
-    assert orders[0].action == "sell"
-    assert orders[0].status == "simulated"
+    assert any(order.action == "sell" and order.status == "simulated" for order in orders)
 
 
 def test_demo_tick_does_not_duplicate_processed_trade(db_session: Session) -> None:
@@ -650,7 +652,37 @@ def test_demo_tick_sell_closes_open_demo_position(db_session: Session) -> None:
     assert closed_positions[0].exit_price == Decimal("0.60000000")
     assert closed_positions[0].exit_value_usd == Decimal("6.00")
     assert closed_positions[0].realized_pnl_usd == Decimal("1.00")
-    assert closed_positions[0].close_reason == "wallet_sell"
+    assert closed_positions[0].close_reason == "copied_sell"
+
+
+def test_demo_tick_late_sell_still_closes_open_demo_position(db_session: Session) -> None:
+    _create_wallet(db_session, amount=Decimal("5"))
+
+    run_demo_tick(
+        db_session,
+        data_client=FakeTradeReader([_trade("0xlate-position-buy", price="0.50")]),
+        now=_now(),
+    )
+    late_sell_trade = _trade("0xlate-position-sell", side="SELL", price="0.60") | {
+        "timestamp": (_now() + timedelta(seconds=45)).isoformat()
+    }
+    response = run_demo_tick(
+        db_session,
+        data_client=FakeTradeReader([late_sell_trade]),
+        now=_now() + timedelta(seconds=90),
+    )
+    open_positions = list_open_demo_positions(db_session)
+    closed_positions = list_closed_demo_positions(db_session)
+    orders = list_copy_orders(db_session)
+
+    assert response.orders_simulated == 1
+    assert response.orders_skipped == 0
+    assert response.recent_outside_window == 0
+    assert response.historical_trades == 0
+    assert open_positions == []
+    assert len(closed_positions) == 1
+    assert closed_positions[0].close_reason == "late_copied_sell"
+    assert any(order.action == "sell" and order.reason == "late_copied_sell" for order in orders)
 
 
 def test_demo_tick_sell_without_open_position_does_not_break(db_session: Session) -> None:
@@ -662,10 +694,12 @@ def test_demo_tick_sell_without_open_position_does_not_break(db_session: Session
         now=_now(),
     )
     events = list_copy_events(db_session, limit=10)
+    orders = list_copy_orders(db_session)
 
-    assert response.orders_simulated == 1
+    assert response.orders_simulated == 0
     assert list_open_demo_positions(db_session) == []
     assert list_closed_demo_positions(db_session) == []
+    assert orders == []
     assert any(
         event.wallet_id == wallet.id and event.event_type == "demo_position_unmatched_sell"
         for event in events
@@ -968,6 +1002,155 @@ def test_demo_pnl_summary_keeps_pending_prices_out_of_current_value(db_session: 
     assert summary.price_pending_count == 1
 
 
+def test_demo_pnl_summary_excludes_cancelled_from_win_rate(db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("10"), suffix="66")
+    trade = _trade("0xcancelled-summary", price="0.40", wallet=wallet.proxy_wallet) | {
+        "slug": "cancelled-summary-market",
+        "conditionId": "cond-cancelled-summary",
+        "asset": "asset-cancelled-summary",
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    market = _create_market(
+        db_session,
+        slug="cancelled-summary-market",
+        condition_id="cond-cancelled-summary",
+        yes_token_id="asset-cancelled-summary",
+        no_token_id="asset-cancelled-summary-no",
+        end_date=_now() - timedelta(minutes=1),
+        active=False,
+        closed=True,
+    )
+    _create_market_outcome(db_session, market=market, resolved_outcome="cancelled")
+
+    settle_open_demo_positions(db_session, gamma_client=DummyGammaClient(), now=_now())
+
+    winner_wallet = _create_wallet(db_session, amount=Decimal("5"), suffix="77")
+    scan_copy_wallet(
+        db_session,
+        wallet_id=winner_wallet.id,
+        data_client=FakeTradeReader([
+            _trade("0xwinner-buy", price="0.50", wallet=winner_wallet.proxy_wallet) | {"conditionId": "cond-win-summary", "asset": "asset-win-summary"},
+        ]),
+        now=_now(),
+    )
+    scan_copy_wallet(
+        db_session,
+        wallet_id=winner_wallet.id,
+        data_client=FakeTradeReader([
+            _trade("0xwinner-sell", side="SELL", price="0.60", wallet=winner_wallet.proxy_wallet) | {"conditionId": "cond-win-summary", "asset": "asset-win-summary"},
+        ]),
+        now=_now(),
+    )
+
+    summary = build_demo_pnl_summary([], build_closed_demo_positions_read(list_closed_demo_positions(db_session, limit=10)))
+
+    assert summary.closed_positions_count == 2
+    assert summary.winning_closed_count == 1
+    assert summary.losing_closed_count == 0
+    assert summary.cancelled_closed_count == 1
+    assert summary.win_rate_percent == Decimal("100.00")
+
+
+def test_reconcile_open_demo_positions_dry_run_finds_matching_sell_without_writing(db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("5"), suffix="88")
+    run_demo_tick(
+        db_session,
+        data_client=FakeTradeReader([
+            _trade("0xreconcile-buy", price="0.50", wallet=wallet.proxy_wallet) | {"conditionId": "cond-reconcile", "asset": "asset-reconcile"},
+        ]),
+        now=_now(),
+    )
+    create_detected_trade(
+        db_session,
+        wallet=wallet,
+        source_transaction_hash="0xreconcile-sell",
+        dedupe_key="0xreconcile-sell",
+        source_proxy_wallet=wallet.proxy_wallet,
+        condition_id="cond-reconcile",
+        asset="asset-reconcile",
+        outcome="YES",
+        market_title="Will test market resolve yes?",
+        market_slug="test-market",
+        side="sell",
+        source_price=Decimal("0.60"),
+        source_size=Decimal("100"),
+        source_amount_usd=Decimal("60.00"),
+        source_timestamp=_now() + timedelta(seconds=45),
+        raw_payload={"side": "SELL"},
+        detected_at=_now() + timedelta(seconds=90),
+    )
+    db_session.flush()
+    detected_count_before = len(list_copy_trades(db_session))
+    orders_count_before = len(list_copy_orders(db_session))
+    closed_count_before = len(list_closed_demo_positions(db_session))
+
+    summary = reconcile_open_demo_positions(db_session, dry_run=True, apply=False, limit=20, sample_limit=5, now=_now())
+
+    assert summary.total_open_positions == 1
+    assert summary.positions_with_matching_sell == 1
+    assert summary.positions_without_sell == 0
+    assert summary.would_close_count == 1
+    assert len(list_copy_trades(db_session)) == detected_count_before
+    assert len(list_copy_orders(db_session)) == orders_count_before
+    assert len(list_closed_demo_positions(db_session)) == closed_count_before
+
+
+def test_reconcile_open_demo_positions_apply_closes_matching_position(db_session: Session) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("5"), suffix="90")
+    run_demo_tick(
+        db_session,
+        data_client=FakeTradeReader([
+            _trade("0xreconcile-apply-buy", price="0.50", wallet=wallet.proxy_wallet) | {"conditionId": "cond-reconcile-apply", "asset": "asset-reconcile-apply"},
+        ]),
+        now=_now(),
+    )
+    create_detected_trade(
+        db_session,
+        wallet=wallet,
+        source_transaction_hash="0xreconcile-apply-sell",
+        dedupe_key="0xreconcile-apply-sell",
+        source_proxy_wallet=wallet.proxy_wallet,
+        condition_id="cond-reconcile-apply",
+        asset="asset-reconcile-apply",
+        outcome="YES",
+        market_title="Will test market resolve yes?",
+        market_slug="test-market",
+        side="sell",
+        source_price=Decimal("0.70"),
+        source_size=Decimal("100"),
+        source_amount_usd=Decimal("70.00"),
+        source_timestamp=_now() + timedelta(seconds=45),
+        raw_payload={"side": "SELL"},
+        detected_at=_now() + timedelta(seconds=90),
+    )
+
+    summary = reconcile_open_demo_positions(
+        db_session,
+        dry_run=False,
+        apply=True,
+        confirmed=True,
+        limit=20,
+        sample_limit=5,
+        now=_now() + timedelta(minutes=3),
+    )
+    db_session.commit()
+    closed_positions = list_closed_demo_positions(db_session, limit=10)
+
+    assert summary.closed_count == 1
+    assert any(position.close_reason == "reconciled_sell" for position in closed_positions)
+
+
+def test_reconcile_open_demo_positions_apply_requires_confirmation(db_session: Session) -> None:
+    with pytest.raises(ValueError, match="confirmacion explicita"):
+        reconcile_open_demo_positions(
+            db_session,
+            dry_run=False,
+            apply=True,
+            confirmed=False,
+            limit=20,
+        )
+
+
 def test_demo_positions_do_not_mix_wallets(db_session: Session) -> None:
     first = _create_wallet(db_session, amount=Decimal("5"), suffix="11")
     second = _create_wallet(db_session, amount=Decimal("5"), suffix="22")
@@ -1211,8 +1394,9 @@ def test_watcher_skips_paused_wallets(db_session: Session) -> None:
 def test_watcher_run_once_auto_copies_sell_trade(db_session: Session) -> None:
     _create_wallet(db_session)
     watcher = _build_test_watcher()
+    watcher.run_once(db=db_session, data_client=FakeTradeReader([_trade("0xwatcher-sell-buy", price="0.50")]), now=_now())
 
-    result = watcher.run_once(db=db_session, data_client=FakeTradeReader([_trade("0xwatcher-sell", side="SELL")]), now=_now())
+    result = watcher.run_once(db=db_session, data_client=FakeTradeReader([_trade("0xwatcher-sell", side="SELL", price="0.60")]), now=_now())
 
     assert result.executed is True
     assert result.status.last_result is not None

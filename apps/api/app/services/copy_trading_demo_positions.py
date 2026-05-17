@@ -66,16 +66,12 @@ def open_demo_position(
     return position
 
 
-def close_demo_position_for_sell(
+def find_matching_open_demo_position(
     db: Session,
     *,
     wallet: CopyWallet,
-    order: CopyOrder,
     trade: CopyDetectedTrade,
-    closed_at: datetime | None = None,
 ) -> CopyDemoPosition | None:
-    if order.status != "simulated" or order.action != "sell":
-        return None
     position = db.scalar(
         select(CopyDemoPosition)
         .where(CopyDemoPosition.wallet_id == wallet.id)
@@ -95,6 +91,22 @@ def close_demo_position_for_sell(
             .order_by(CopyDemoPosition.opened_at.desc())
             .limit(1)
         )
+    return position
+
+
+def close_demo_position_for_sell(
+    db: Session,
+    *,
+    wallet: CopyWallet,
+    order: CopyOrder,
+    trade: CopyDetectedTrade,
+    position: CopyDemoPosition | None = None,
+    closed_at: datetime | None = None,
+    close_reason: str = "wallet_sell",
+) -> CopyDemoPosition | None:
+    if order.status != "simulated" or order.action != "sell":
+        return None
+    position = position or find_matching_open_demo_position(db, wallet=wallet, trade=trade)
     if position is None:
         add_copy_event(
             db,
@@ -117,7 +129,7 @@ def close_demo_position_for_sell(
     position.exit_price = exit_price
     position.exit_value_usd = exit_value
     position.realized_pnl_usd = realized_pnl
-    position.close_reason = "wallet_sell"
+    position.close_reason = close_reason
     position.status = "closed"
     position.closed_at = closed_at or datetime.now(tz=UTC)
     db.add(position)
@@ -281,6 +293,9 @@ def build_demo_pnl_summary(
     open_priced_count = 0
     winning_closed_count = 0
     losing_closed_count = 0
+    break_even_closed_count = 0
+    cancelled_closed_count = 0
+    unknown_closed_count = 0
     best_closed_pnl: Decimal | None = None
     worst_closed_pnl: Decimal | None = None
 
@@ -300,10 +315,16 @@ def build_demo_pnl_summary(
         capital_demo_used += position.entry_amount_usd
         pnl = position.realized_pnl_usd or ZERO
         realized_pnl += pnl
-        if pnl > 0:
+        if position.status == "cancelled" or position.close_reason == "market_cancelled":
+            cancelled_closed_count += 1
+        elif position.realized_pnl_usd is None:
+            unknown_closed_count += 1
+        elif pnl > 0:
             winning_closed_count += 1
         elif pnl < 0:
             losing_closed_count += 1
+        else:
+            break_even_closed_count += 1
         if best_closed_pnl is None or pnl > best_closed_pnl:
             best_closed_pnl = pnl
         if worst_closed_pnl is None or pnl < worst_closed_pnl:
@@ -324,9 +345,13 @@ def build_demo_pnl_summary(
 
     win_rate_percent = None
     average_closed_pnl = None
+    resolved_closed_count = winning_closed_count + losing_closed_count
     if closed_items:
-        win_rate_percent = _quantize_percent((Decimal(winning_closed_count) / Decimal(len(closed_items))) * Decimal("100"))
         average_closed_pnl = _quantize_usd(realized_pnl / Decimal(len(closed_items)))
+    if resolved_closed_count > 0:
+        win_rate_percent = _quantize_percent(
+            (Decimal(winning_closed_count) / Decimal(resolved_closed_count)) * Decimal("100")
+        )
 
     return CopyTradingDemoPnlSummary(
         open_positions_count=len(open_items),
@@ -345,6 +370,9 @@ def build_demo_pnl_summary(
         worst_closed_pnl_usd=_quantize_usd(worst_closed_pnl) if worst_closed_pnl is not None else None,
         winning_closed_count=winning_closed_count,
         losing_closed_count=losing_closed_count,
+        break_even_closed_count=break_even_closed_count,
+        cancelled_closed_count=cancelled_closed_count,
+        unknown_closed_count=unknown_closed_count,
         price_pending_count=price_pending_count,
     )
 

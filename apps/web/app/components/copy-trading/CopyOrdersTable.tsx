@@ -54,7 +54,7 @@ export function CopyOrdersTable({ orders }: { orders: CopyOrder[] }) {
                 <span className={`copy-side ${order.action}`}>{order.action.toUpperCase()}</span>
                 <strong>{formatUsd(order.intended_amount_usd)}</strong>
                 <small>{formatCopyOrderReason(order)}</small>
-                {order.freshness_status ? (
+                {shouldShowFreshnessBadge(order) ? (
                   <span className={`copy-badge ${freshnessBadgeClass(order.freshness_status)}`}>
                     {formatFreshnessLabel(order.freshness_status, order.freshness_label)}
                   </span>
@@ -74,6 +74,15 @@ export function CopyOrdersTable({ orders }: { orders: CopyOrder[] }) {
 }
 
 function formatCopyOrderStatus(order: CopyOrder): string {
+  if (order.status === "simulated" && order.reason === "copied_sell") {
+    return "Cierre copiado";
+  }
+  if (order.status === "simulated" && order.reason === "late_copied_sell") {
+    return "Cierre copiado";
+  }
+  if (order.status === "simulated" && order.reason === "reconciled_sell") {
+    return "Cierre reconciliado";
+  }
   if (order.status === "skipped" && order.reason === "trade_too_old" && order.freshness_status === "recent_outside_window") {
     return "Fuera de ventana";
   }
@@ -93,6 +102,12 @@ function formatCopyOrderStatus(order: CopyOrder): string {
 }
 
 function copyOrderStatusClass(order: CopyOrder): string {
+  if (order.status === "simulated" && (order.reason === "copied_sell" || order.reason === "late_copied_sell")) {
+    return "success";
+  }
+  if (order.status === "simulated" && order.reason === "reconciled_sell") {
+    return "historical";
+  }
   if (order.status === "skipped" && order.reason === "trade_too_old" && order.freshness_status === "recent_outside_window") {
     return "locked";
   }
@@ -105,6 +120,15 @@ function copyOrderStatusClass(order: CopyOrder): string {
 function formatCopyOrderReason(order: CopyOrder): string {
   if (!order.reason) {
     return order.status === "simulated" ? "Simulacion creada" : "Sin detalle adicional.";
+  }
+  if (order.reason === "copied_sell") {
+    return "Cierre copiado: la wallet seguida vendio y PolySignal cerro la posicion demo.";
+  }
+  if (order.reason === "late_copied_sell") {
+    return "Cierre copiado: la wallet seguida vendio y PolySignal cerro la posicion demo aunque la salida llego tarde.";
+  }
+  if (order.reason === "reconciled_sell") {
+    return "Cierre reconciliado: detectamos una venta posterior de la wallet seguida y cerramos la posicion demo.";
   }
   if (order.reason === "trade_too_old" && order.freshness_status === "recent_outside_window") {
     return "Omitido por seguridad: detectado tarde para copiar con buen precio.";
@@ -120,4 +144,14 @@ function formatCopyOrderReason(order: CopyOrder): string {
     trade_too_old: "Historico ignorado: anterior a la ventana valida de seguimiento.",
   };
   return reasonLabels[order.reason] || "No se simulo por una regla de seguridad.";
+}
+
+function shouldShowFreshnessBadge(order: CopyOrder): order is CopyOrder & { freshness_status: NonNullable<CopyOrder["freshness_status"]> } {
+  if (!order.freshness_status) {
+    return false;
+  }
+  if (order.status === "simulated" && ["copied_sell", "late_copied_sell", "reconciled_sell"].includes(order.reason ?? "")) {
+    return false;
+  }
+  return true;
 }

@@ -38,7 +38,7 @@ const DASHBOARD_TABS = [
   { id: "summary", label: "Resumen" },
   { id: "wallets", label: "Wallets" },
   { id: "open", label: "Copias abiertas" },
-  { id: "history", label: "Historial de trades" },
+  { id: "history", label: "Copias cerradas" },
   { id: "audit", label: "Auditoria" },
 ] as const;
 

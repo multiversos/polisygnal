@@ -33,10 +33,10 @@ export function CopyClosedDemoPositionsTable({
     <section className="copy-panel">
       <div className="copy-panel-heading">
         <span>Modo demo</span>
-        <strong>Historial de trades</strong>
+        <strong>Copias demo cerradas</strong>
       </div>
       <p className="copy-field-helper">
-        Historial largo de copias demo cerradas, con filtros rapidos para revisar resultado y sesgo del bot.
+        Historial de cierres demo con PnL realizado. Canceladas y no verificables no inflan el win rate.
       </p>
 
       {positions.length === 0 ? (
@@ -47,6 +47,9 @@ export function CopyClosedDemoPositionsTable({
             <MiniStat label="Cerradas" value={String(summary?.closed_positions_count ?? positions.length)} />
             <MiniStat label="Ganadoras" value={String(summary?.winning_closed_count ?? 0)} tone={(summary?.winning_closed_count ?? 0) > 0 ? "positive" : "neutral"} />
             <MiniStat label="Perdedoras" value={String(summary?.losing_closed_count ?? 0)} tone={(summary?.losing_closed_count ?? 0) > 0 ? "negative" : "neutral"} />
+            <MiniStat label="Break-even" value={String(summary?.break_even_closed_count ?? 0)} />
+            <MiniStat label="Canceladas" value={String(summary?.cancelled_closed_count ?? 0)} tone={(summary?.cancelled_closed_count ?? 0) > 0 ? "warning" : "neutral"} />
+            <MiniStat label="No verificables" value={String(summary?.unknown_closed_count ?? 0)} tone={(summary?.unknown_closed_count ?? 0) > 0 ? "warning" : "neutral"} />
             <MiniStat label="PnL realizado" value={formatPnl(summary?.realized_pnl_usd ?? null)} tone={pnlTone(summary?.realized_pnl_usd ?? null)} />
           </div>
 
@@ -85,13 +88,14 @@ export function CopyClosedDemoPositionsTable({
                       <span className="copy-badge">Entrada {Number(position.entry_price).toFixed(3)}</span>
                       <span className="copy-badge">Salida {position.exit_price ? Number(position.exit_price).toFixed(3) : "-"}</span>
                       <span className="copy-badge">Monto {formatUsd(position.entry_amount_usd)}</span>
+                      <span className={`copy-badge ${getOutcomeTone(position)}`}>Resultado {getResolvedOutcomeLabel(position)}</span>
                       {position.resolution_source ? <span className="copy-badge subtle">Fuente {formatResolutionSource(position.resolution_source)}</span> : null}
                     </div>
                   </div>
                   <div className="copy-feed-numbers">
                     <span className={getPnlClassName(position.realized_pnl_usd)}>PnL final {formatPnl(position.realized_pnl_usd)}</span>
                     <span>Cierre {getCloseReasonLabel(position.close_reason)}</span>
-                    <span>Resultado {getResolvedOutcomeLabel(position)}</span>
+                    <span>Valor final {formatUsd(position.exit_value_usd)}</span>
                     <span>Duracion {formatTradeAge(durationSeconds(position.opened_at, position.closed_at))}</span>
                     <small>{formatDateTime(position.closed_at || position.updated_at)}</small>
                   </div>
@@ -188,8 +192,13 @@ function pnlTone(value: string | null): "positive" | "negative" | "neutral" | "w
 
 function getCloseReasonLabel(reason: string | null): string {
   switch (reason) {
+    case "copied_sell":
     case "wallet_sell":
-      return "Wallet vendio";
+      return "Cierre copiado";
+    case "late_copied_sell":
+      return "Cierre copiado";
+    case "reconciled_sell":
+      return "Cierre reconciliado";
     case "market_resolved":
       return "Mercado resuelto";
     case "market_cancelled":
@@ -203,14 +212,37 @@ function getResolvedOutcomeLabel(position: CopyDemoPosition): string {
   if (position.status === "cancelled" || position.close_reason === "market_cancelled") {
     return "Cancelado";
   }
-  const exitPrice = position.exit_price === null ? null : Number(position.exit_price);
-  if (exitPrice === 1) {
-    return "Gano";
+  if (position.realized_pnl_usd === null) {
+    return "No verificable";
   }
-  if (exitPrice === 0) {
-    return "Perdio";
+  const pnl = Number(position.realized_pnl_usd);
+  if (!Number.isFinite(pnl)) {
+    return "No verificable";
   }
-  return "Pendiente";
+  if (pnl > 0) {
+    return "Win";
+  }
+  if (pnl < 0) {
+    return "Loss";
+  }
+  return "Break-even";
+}
+
+function getOutcomeTone(position: CopyDemoPosition): string {
+  if (position.status === "cancelled" || position.close_reason === "market_cancelled") {
+    return "locked";
+  }
+  if (position.realized_pnl_usd === null) {
+    return "subtle";
+  }
+  const pnl = Number(position.realized_pnl_usd);
+  if (pnl > 0) {
+    return "success";
+  }
+  if (pnl < 0) {
+    return "locked";
+  }
+  return "historical";
 }
 
 function formatResolutionSource(value: string): string {

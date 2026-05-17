@@ -28,6 +28,7 @@ def evaluate_demo_trade(
     trade: CopyTradeForRules,
     *,
     now: datetime | None = None,
+    enforce_copy_window: bool = True,
 ) -> CopyTradeIntent:
     current_time = _normalize_datetime(now or datetime.now(tz=UTC))
     side = (trade.side or "").strip().lower() or None
@@ -51,7 +52,7 @@ def evaluate_demo_trade(
         return _skipped("missing_side")
     if price is None or price <= 0:
         return _skipped("missing_price")
-    if trade.timestamp is not None and wallet.max_delay_seconds is not None:
+    if enforce_copy_window and trade.timestamp is not None and wallet.max_delay_seconds is not None:
         source_time = _normalize_datetime(trade.timestamp)
         if (current_time - source_time).total_seconds() > wallet.max_delay_seconds:
             return _skipped("trade_too_old")

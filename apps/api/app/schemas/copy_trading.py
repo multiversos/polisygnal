@@ -287,6 +287,9 @@ class CopyTradingDemoPnlSummary(BaseModel):
     worst_closed_pnl_usd: Decimal | None = None
     winning_closed_count: int = 0
     losing_closed_count: int = 0
+    break_even_closed_count: int = 0
+    cancelled_closed_count: int = 0
+    unknown_closed_count: int = 0
     price_pending_count: int = 0
 
 
