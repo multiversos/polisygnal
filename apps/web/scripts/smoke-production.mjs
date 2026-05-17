@@ -1306,7 +1306,6 @@ async function runCopyTradingSmoke({ buildInfo, securityHeaders }) {
     "Resumen",
     "Wallets",
     "Copias abiertas",
-    "Historial de trades",
     "Auditoria",
     "Ultima vista",
     "Refresh visual",
@@ -1315,6 +1314,7 @@ async function runCopyTradingSmoke({ buildInfo, securityHeaders }) {
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading ${expected}`);
   }
+  assertTextIncludesOneOf(copyTradingText, ["Copias cerradas", "Historial de trades"], "copy trading closed tab");
   assertTextIncludesOneOf(
     copyTradingText,
     ["Copiar Wallets", "Copiar wallets", "Copy Trading"],
@@ -1748,7 +1748,6 @@ async function main() {
     "Resumen",
     "Wallets",
     "Copias abiertas",
-    "Historial de trades",
     "Auditoria",
     "Ultima vista",
     "Refresh visual",
@@ -1766,6 +1765,7 @@ async function main() {
   ]) {
     assertTextIncludes(copyTradingText, expected, `copy trading amount/input ${expected}`);
   }
+  assertTextIncludesOneOf(copyTradingText, ["Copias cerradas", "Historial de trades"], "copy trading closed tab");
   assertTextExcludes(
     copyTradingText,
     [
@@ -1848,7 +1848,7 @@ async function main() {
   assertTextIncludesOneOf(copyTradingText, ["Copiadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo copied summary");
   assertTextIncludesOneOf(copyTradingText, ["Saltadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo skipped summary");
   assertTextIncludesOneOf(copyTradingText, ["Copias demo abiertas", "Todavia no hay copias demo abiertas."], "copy trading open demo positions");
-  assertTextIncludesOneOf(copyTradingText, ["Historial de trades", "Todavia no hay copias demo cerradas."], "copy trading closed demo history");
+  assertTextIncludesOneOf(copyTradingText, ["Copias demo cerradas", "Todavia no hay copias demo cerradas."], "copy trading closed demo history");
   assertTextIncludesOneOf(copyTradingText, ["Rendimiento demo", "Todavia no hay copias demo suficientes para calcular rendimiento."], "copy trading pnl summary");
   assertTextIncludesOneOf(
     copyTradingText,

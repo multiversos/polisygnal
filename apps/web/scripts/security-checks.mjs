@@ -2782,7 +2782,7 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["Ultima vista", "Refresh visual", "Actualizar vista", "Worker demo en Render"]) {
     assert(copyTradingDashboard.includes(text), `copy trading view refresh copy missing text: ${text}`);
   }
-  for (const text of ["Resumen", "Wallets", "Copias abiertas", "Historial de trades", "Auditoria"]) {
+  for (const text of ["Resumen", "Wallets", "Copias abiertas", "Copias cerradas", "Auditoria"]) {
     assert(copyTradingDashboard.includes(text), `copy trading tab navigation missing text: ${text}`);
   }
   for (const text of ["Watcher demo", "Estado del worker en Render", "Estado persistido del worker", "Ultimo heartbeat", "Errores consecutivos"]) {
@@ -2882,11 +2882,11 @@ function validateAnalyzerFirstProductSource() {
   assert(copyOpenDemoPositionsTable.includes("Valor actual"), "open demo positions table should expose current value");
   assert(copyOpenDemoPositionsTable.includes("PnL actual"), "open demo positions table should label current pnl");
   assert(copyOpenDemoPositionsTable.includes("PnL %"), "open demo positions table should label pnl percent");
-  assert(copyClosedDemoPositionsTable.includes("Historial de trades"), "closed demo history should be visible");
+  assert(copyClosedDemoPositionsTable.includes("Copias demo cerradas"), "closed demo history should be visible");
   assert(copyClosedDemoPositionsTable.includes("Ganadoras"), "closed demo history should expose winning filter");
   assert(copyClosedDemoPositionsTable.includes("Perdedoras"), "closed demo history should expose losing filter");
   assert(copyClosedDemoPositionsTable.includes("PnL final"), "closed demo history should label final pnl");
-  assert(copyClosedDemoPositionsTable.includes("Wallet vendio"), "closed demo history should explain wallet-driven closes");
+  assert(copyClosedDemoPositionsTable.includes("Cierre copiado"), "closed demo history should explain wallet-driven closes");
   assert(copyWalletsTable.includes("Pausando..."), "wallet pause button should show loading state");
   assert(copyWalletsTable.includes("Eliminando..."), "wallet delete button should show loading state");
   assert(copyWalletsTable.includes("Editando..."), "wallet edit button should show loading state");

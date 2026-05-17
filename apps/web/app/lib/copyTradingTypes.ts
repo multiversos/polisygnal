@@ -198,6 +198,9 @@ export type CopyTradingDemoPnlSummary = {
   worst_closed_pnl_usd: string | null;
   winning_closed_count: number;
   losing_closed_count: number;
+  break_even_closed_count: number;
+  cancelled_closed_count: number;
+  unknown_closed_count: number;
   price_pending_count: number;
 };
 

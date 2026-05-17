@@ -45,7 +45,7 @@ export function CopyDemoPnlSummaryPanel({
               value={formatPnl(summary.total_demo_pnl_usd)}
             />
             <MetricCard label="ROI demo" tone={pnlTone(summary.demo_roi_percent)} value={formatPercent(summary.demo_roi_percent)} />
-            <MetricCard label="Win rate" tone="neutral" value={formatPercent(summary.win_rate_percent)} />
+            <MetricCard label="Win rate demo" tone="neutral" value={formatPercent(summary.win_rate_percent)} />
           </div>
 
           <div className="copy-performance-row">
@@ -71,6 +71,9 @@ export function CopyDemoPnlSummaryPanel({
             <MiniStat label="Cerradas" value={String(summary.closed_positions_count)} />
             <MiniStat label="Ganadoras" value={String(summary.winning_closed_count)} />
             <MiniStat label="Perdedoras" value={String(summary.losing_closed_count)} />
+            <MiniStat label="Break-even" value={String(summary.break_even_closed_count)} />
+            <MiniStat label="Canceladas" value={String(summary.cancelled_closed_count)} tone={summary.cancelled_closed_count > 0 ? "warning" : "neutral"} />
+            <MiniStat label="No verificables" value={String(summary.unknown_closed_count)} tone={summary.unknown_closed_count > 0 ? "warning" : "neutral"} />
             <MiniStat label="Promedio cerradas" value={formatPnl(summary.average_closed_pnl_usd)} tone={pnlTone(summary.average_closed_pnl_usd)} />
             <MiniStat label="Mejor copia" value={formatPnl(summary.best_closed_pnl_usd)} tone={pnlTone(summary.best_closed_pnl_usd)} />
             <MiniStat label="Peor copia" value={formatPnl(summary.worst_closed_pnl_usd)} tone={pnlTone(summary.worst_closed_pnl_usd)} />

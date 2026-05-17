@@ -12,7 +12,11 @@ from app.clients.polymarket_data import PolymarketDataClient, PolymarketDataClie
 from app.models.copy_trading import CopyWallet
 from app.schemas.copy_trading import CopyTradingTickResponse
 from app.services.copy_trading_risk_rules import CopyTradeForRules, evaluate_demo_trade
-from app.services.copy_trading_demo_positions import close_demo_position_for_sell, open_demo_position
+from app.services.copy_trading_demo_positions import (
+    close_demo_position_for_sell,
+    find_matching_open_demo_position,
+    open_demo_position,
+)
 from app.services.copy_trading_service import (
     add_copy_event,
     classify_trade_freshness,
@@ -222,9 +226,31 @@ def _scan_wallet(
         if trade is None:
             continue
         response.new_trades += 1
-        _record_trade_freshness(response, freshness.status)
+        matching_open_position = (
+            find_matching_open_demo_position(db, wallet=wallet, trade=trade)
+            if normalized.side == "sell"
+            else None
+        )
 
-        if freshness.status in {"recent_outside_window", "historical"}:
+        if normalized.side == "sell" and matching_open_position is None:
+            add_copy_event(
+                db,
+                wallet_id=wallet.id,
+                level="warning",
+                event_type="demo_position_unmatched_sell",
+                message="Venta detectada sin posicion demo abierta para cerrar.",
+                metadata={
+                    "asset": trade.asset,
+                    "outcome": trade.outcome,
+                    "freshness_status": freshness.status,
+                },
+            )
+            continue
+
+        if normalized.side == "buy":
+            _record_trade_freshness(response, freshness.status)
+
+        if normalized.side == "buy" and freshness.status in {"recent_outside_window", "historical"}:
             response.orders_skipped += 1
             _record_skipped_reason(response, "trade_too_old")
             grouped_skips[("trade_too_old", freshness.status)] = (
@@ -236,14 +262,18 @@ def _scan_wallet(
             wallet,
             CopyTradeForRules(side=normalized.side, price=normalized.price, timestamp=normalized.timestamp),
             now=current_time,
+            enforce_copy_window=normalized.side != "sell",
         )
+        order_reason = intent.reason
+        if intent.status == "simulated" and normalized.side == "sell":
+            order_reason = "late_copied_sell" if freshness.status in {"recent_outside_window", "historical"} else "copied_sell"
         order = create_copy_order(
             db,
             wallet=wallet,
             trade=trade,
             action=normalized.side,
             status=intent.status,
-            reason=intent.reason,
+            reason=order_reason,
             intended_amount_usd=intent.intended_amount_usd,
             intended_size=intent.intended_size,
             simulated_price=intent.simulated_price,
@@ -266,7 +296,9 @@ def _scan_wallet(
                     wallet=wallet,
                     order=order,
                     trade=trade,
+                    position=matching_open_position,
                     closed_at=current_time,
+                    close_reason=order.reason or "wallet_sell",
                 )
             add_copy_event(
                 db,
