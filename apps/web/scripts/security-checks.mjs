@@ -1741,6 +1741,17 @@ function validateDeepAnalysisJobRules() {
   assert(analyzePage.includes("deepAnalysisJob"), "analyze page should keep job state");
   assert(walletAnalysisPanelSource.includes("runWalletAnalysisJobStep"), "wallet analysis panel should use the short run-step endpoint");
   assert(walletAnalysisPanelSource.includes("Analizando por lotes"), "wallet analysis panel should explain incremental batch processing");
+  assert(walletAnalysisPanelSource.includes("Balanza PolySignal"), "wallet analysis panel should expose the main balance card");
+  assert(walletAnalysisPanelSource.includes("Analisis parcial utilizable"), "wallet analysis panel should explain partial jobs as usable");
+  assert(walletAnalysisPanelSource.includes("Advertencias tecnicas y detalles del job"), "wallet analysis panel should collapse technical warning details");
+  assert(walletAnalysisPanelSource.includes("Algunas wallets no devolvieron historial completo."), "wallet analysis panel should humanize wallet fetch failures");
+  assert(walletAnalysisPanelSource.includes("El mercado fue normalizado al mercado principal del evento."), "wallet analysis panel should humanize market normalization warnings");
+  assert(walletAnalysisPanelSource.includes("Analizar mas wallets"), "wallet analysis panel should explain multi-batch continuation");
+  assert(walletAnalysisPanelSource.includes("Procesar siguiente lote"), "wallet analysis panel should explain step-by-step batch processing");
+  assert(walletAnalysisPanelSource.includes("Pausar analisis"), "wallet analysis panel should use the updated pause label");
+  assert(!walletAnalysisPanelSource.includes("job.warnings.slice(0, 8).map"), "wallet analysis panel should not render raw warnings as primary chips");
+  assert(!walletAnalysisPanelSource.includes("Pausar avance"), "wallet analysis panel should not keep the old pause label");
+  assert(!walletAnalysisPanelSource.includes("Procesar un lote"), "wallet analysis panel should not keep the old single-batch label");
   assert(walletAnalysisSource.includes("/run-step"), "wallet analysis client should target the short run-step route");
   assert(!walletAnalysisPanelSource.includes("runWalletAnalysisJobOnce("), "wallet analysis panel should not depend on the long run-once request");
   assert(reportSource.includes("Detalles avanzados del analisis"), "AnalyzerReport should keep advanced details behind a collapsed section");
@@ -2782,7 +2793,7 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["Ultima vista", "Refresh visual", "Actualizar vista", "Worker demo en Render"]) {
     assert(copyTradingDashboard.includes(text), `copy trading view refresh copy missing text: ${text}`);
   }
-  for (const text of ["Resumen", "Wallets", "Copias abiertas", "Historial de trades", "Auditoria"]) {
+  for (const text of ["Resumen", "Wallets", "Copias abiertas", "Copias cerradas", "Auditoria"]) {
     assert(copyTradingDashboard.includes(text), `copy trading tab navigation missing text: ${text}`);
   }
   for (const text of ["Watcher demo", "Estado del worker en Render", "Estado persistido del worker", "Ultimo heartbeat", "Errores consecutivos"]) {
@@ -2882,11 +2893,11 @@ function validateAnalyzerFirstProductSource() {
   assert(copyOpenDemoPositionsTable.includes("Valor actual"), "open demo positions table should expose current value");
   assert(copyOpenDemoPositionsTable.includes("PnL actual"), "open demo positions table should label current pnl");
   assert(copyOpenDemoPositionsTable.includes("PnL %"), "open demo positions table should label pnl percent");
-  assert(copyClosedDemoPositionsTable.includes("Historial de trades"), "closed demo history should be visible");
+  assert(copyClosedDemoPositionsTable.includes("Copias demo cerradas"), "closed demo history should be visible");
   assert(copyClosedDemoPositionsTable.includes("Ganadoras"), "closed demo history should expose winning filter");
   assert(copyClosedDemoPositionsTable.includes("Perdedoras"), "closed demo history should expose losing filter");
   assert(copyClosedDemoPositionsTable.includes("PnL final"), "closed demo history should label final pnl");
-  assert(copyClosedDemoPositionsTable.includes("Wallet vendio"), "closed demo history should explain wallet-driven closes");
+  assert(copyClosedDemoPositionsTable.includes("Cierre copiado"), "closed demo history should explain wallet-driven closes");
   assert(copyWalletsTable.includes("Pausando..."), "wallet pause button should show loading state");
   assert(copyWalletsTable.includes("Eliminando..."), "wallet delete button should show loading state");
   assert(copyWalletsTable.includes("Editando..."), "wallet edit button should show loading state");
