@@ -2,6 +2,7 @@ from app.models.evidence_item import EvidenceItem
 from app.models.event import Event
 from app.models.external_market_signal import ExternalMarketSignal
 from app.models.copy_trading import CopyBotEvent, CopyDemoPosition, CopyDetectedTrade, CopyOrder, CopyWallet
+from app.models.copy_worker_state import CopyWorkerState
 from app.models.highlighted_wallet_profile import HighlightedWalletProfile
 from app.models.market import Market
 from app.models.market_decision_log import MarketDecisionLog
@@ -27,6 +28,7 @@ __all__ = [
     "CopyDetectedTrade",
     "CopyOrder",
     "CopyWallet",
+    "CopyWorkerState",
     "HighlightedWalletProfile",
     "Market",
     "MarketDecisionLog",
