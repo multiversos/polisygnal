@@ -29,6 +29,8 @@ const SAFE_WRITE_RULES = [
   { method: "DELETE", pattern: /^\/copy-trading\/wallets\/[^/]+$/ },
   { method: "POST", pattern: /^\/copy-trading\/wallets\/[^/]+\/scan$/ },
   { method: "POST", pattern: /^\/copy-trading\/demo\/tick$/ },
+  // Allow demo-only settlement by market resolution. This does not execute real trading.
+  { method: "POST", pattern: /^\/copy-trading\/demo\/settlement\/run-once$/ },
   { method: "POST", pattern: /^\/copy-trading\/watcher\/start$/ },
   { method: "POST", pattern: /^\/copy-trading\/watcher\/stop$/ },
   { method: "POST", pattern: /^\/copy-trading\/watcher\/run-once$/ },
