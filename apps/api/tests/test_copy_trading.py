@@ -6,6 +6,7 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.clients.polymarket import get_polymarket_client
@@ -1438,6 +1439,108 @@ def test_demo_settlement_run_once_route(client: TestClient, db_session: Session)
 
     assert response.status_code == 200
     assert response.json()["summary"]["closed_by_market_resolution"] == 1
+
+
+def test_demo_settlement_route_keeps_incomplete_position_open_with_safe_reason(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("10"), suffix="33")
+    trade = _trade("0xroute-settlement-incomplete", price="0.40", wallet=wallet.proxy_wallet) | {
+        "slug": None,
+        "conditionId": None,
+        "asset": None,
+        "outcome": None,
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    app.dependency_overrides[get_polymarket_client] = lambda: DummyGammaClient()
+
+    response = client.post("/copy-trading/demo/settlement/run-once")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["errors"] == 0
+    assert payload["summary"]["still_open"] >= 1
+    assert any(
+        item["reason"].startswith("Faltan identificadores suficientes")
+        for item in payload["positions"]
+    )
+
+
+def test_demo_settlement_continues_after_database_error_on_one_position(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_wallet = _create_wallet(db_session, amount=Decimal("10"), suffix="44")
+    second_wallet = _create_wallet(db_session, amount=Decimal("10"), suffix="55")
+
+    first_trade = _trade("0xroute-settlement-first", price="0.40", wallet=first_wallet.proxy_wallet) | {
+        "slug": "route-settlement-first",
+        "conditionId": "cond-route-settlement-first",
+        "asset": "asset-yes-route-first",
+    }
+    second_trade = _trade("0xroute-settlement-second", price="0.45", wallet=second_wallet.proxy_wallet) | {
+        "slug": "route-settlement-second",
+        "conditionId": "cond-route-settlement-second",
+        "asset": "asset-yes-route-second",
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([first_trade]), now=_now())
+    run_demo_tick(db_session, data_client=FakeTradeReader([second_trade]), now=_now())
+
+    first_market = _create_market(
+        db_session,
+        slug="route-settlement-first",
+        condition_id="cond-route-settlement-first",
+        yes_token_id="asset-yes-route-first",
+        no_token_id="asset-no-route-first",
+        end_date=_now() - timedelta(minutes=1),
+        active=False,
+        closed=True,
+    )
+    second_market = _create_market(
+        db_session,
+        slug="route-settlement-second",
+        condition_id="cond-route-settlement-second",
+        yes_token_id="asset-yes-route-second",
+        no_token_id="asset-no-route-second",
+        end_date=_now() - timedelta(minutes=1),
+        active=False,
+        closed=True,
+    )
+    _create_market_outcome(db_session, market=first_market, resolved_outcome="yes")
+    _create_market_outcome(db_session, market=second_market, resolved_outcome="yes")
+
+    original_flush = db_session.flush
+    state = {"failed": False}
+
+    def flaky_flush(*args, **kwargs):
+        if not state["failed"]:
+            target = next(
+                (
+                    obj
+                    for obj in db_session.dirty
+                    if getattr(obj, "condition_id", None) == "cond-route-settlement-first"
+                ),
+                None,
+            )
+            if target is not None:
+                state["failed"] = True
+                raise IntegrityError("mock statement", "mock params", Exception("mock db failure"))
+        return original_flush(*args, **kwargs)
+
+    monkeypatch.setattr(db_session, "flush", flaky_flush)
+
+    response = settle_open_demo_positions(db_session, gamma_client=DummyGammaClient(), now=_now(), limit=10)
+    db_session.commit()
+
+    assert response.summary.errors == 1
+    assert response.summary.closed_by_market_resolution >= 1
+    assert any(entry.reason == "No pudimos revisar esta posicion ahora." for entry in response.positions)
+
+    open_positions = list_open_demo_positions(db_session)
+    closed_positions = list_closed_demo_positions(db_session, limit=10)
+    assert any(position.wallet_id == first_wallet.id for position in open_positions)
+    assert any(position.wallet_id == second_wallet.id and position.close_reason == "market_resolved" for position in closed_positions)
 
 
 def _create_wallet(

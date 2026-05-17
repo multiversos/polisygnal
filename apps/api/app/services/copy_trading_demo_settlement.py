@@ -41,122 +41,17 @@ def settle_open_demo_positions(
         summary.checked_positions += 1
         previous_status = position.status
         try:
-            market = _find_local_market(db, position=position, cache=market_cache)
-            remote_market = _find_remote_market(
-                position=position,
-                gamma_client=gamma_client,
-                cache=remote_cache,
-            )
-            outcome = get_market_outcome(db, market.id) if market is not None else None
-            resolution_source = outcome.resolution_source if outcome is not None else None
-
-            if outcome is not None and outcome.resolved_outcome in {"yes", "no"}:
-                settlement_side = _resolve_position_side(position=position, market=market, remote_market=remote_market)
-                if settlement_side is None:
-                    _mark_unknown_resolution(
-                        db,
-                        position=position,
-                        resolution_source=resolution_source,
-                        current_time=current_time,
-                    )
-                    summary.unknown_resolution += 1
-                    results.append(
-                        _build_result(
-                            position,
-                            previous_status=previous_status,
-                            reason="Resultado no confiable: no pudimos mapear el outcome de la posicion.",
-                        )
-                    )
-                    continue
-
-                _close_for_market_resolution(
+            with db.begin_nested():
+                result_bucket, result_reason = _settle_single_position(
                     db,
                     position=position,
-                    resolved_outcome=outcome.resolved_outcome,
-                    position_side=settlement_side,
-                    resolution_source=resolution_source,
+                    gamma_client=gamma_client,
+                    market_cache=market_cache,
+                    remote_cache=remote_cache,
                     current_time=current_time,
                 )
-                summary.closed_by_market_resolution += 1
-                results.append(
-                    _build_result(
-                        position,
-                        previous_status=previous_status,
-                        reason="Mercado resuelto con resultado confiable.",
-                    )
-                )
-                continue
-
-            if outcome is not None and outcome.resolved_outcome in CANCELLED_OUTCOMES:
-                _cancel_position(
-                    db,
-                    position=position,
-                    resolution_source=resolution_source,
-                    current_time=current_time,
-                )
-                summary.cancelled += 1
-                results.append(
-                    _build_result(
-                        position,
-                        previous_status=previous_status,
-                        reason="Mercado cancelado o invalido. En demo devolvemos el capital sin inventar PnL.",
-                    )
-                )
-                continue
-
-            if outcome is not None and outcome.resolved_outcome == "unknown":
-                _mark_unknown_resolution(
-                    db,
-                    position=position,
-                    resolution_source=resolution_source,
-                    current_time=current_time,
-                )
-                summary.unknown_resolution += 1
-                results.append(
-                    _build_result(
-                        position,
-                        previous_status=previous_status,
-                        reason="La fuente de resolucion devolvio un resultado no confiable.",
-                    )
-                )
-                continue
-
-            if _market_is_expired_or_closed(
-                market=market,
-                remote_market=remote_market,
-                current_time=current_time,
-            ):
-                _mark_waiting_resolution(
-                    db,
-                    position=position,
-                    resolution_source=resolution_source or _source_label_for_remote(remote_market),
-                    current_time=current_time,
-                )
-                summary.waiting_resolution += 1
-                results.append(
-                    _build_result(
-                        position,
-                        previous_status=previous_status,
-                        reason="Mercado vencido o cerrado sin resultado confiable todavia.",
-                    )
-                )
-                continue
-
-            _mark_still_open(
-                db,
-                position=position,
-                resolution_source=resolution_source or _source_label_for_remote(remote_market),
-                current_time=current_time,
-            )
-            summary.still_open += 1
-            results.append(
-                _build_result(
-                    position,
-                    previous_status=previous_status,
-                    reason="Mercado todavia activo. La posicion demo sigue abierta.",
-                )
-            )
         except Exception:
+            db.refresh(position)
             summary.errors += 1
             results.append(
                 CopyTradingDemoSettlementPositionResult(
@@ -172,7 +67,129 @@ def settle_open_demo_positions(
                     reason="No pudimos revisar esta posicion ahora.",
                 )
             )
+            continue
+        _increment_summary(summary, result_bucket)
+        results.append(
+            _build_result(
+                position,
+                previous_status=previous_status,
+                reason=result_reason,
+            )
+        )
     return CopyTradingDemoSettlementResponse(summary=summary, positions=results, ran_at=current_time)
+
+
+def _settle_single_position(
+    db: Session,
+    *,
+    position: CopyDemoPosition,
+    gamma_client: PolymarketGammaClient | None,
+    market_cache: dict[tuple[str, str], Market | None],
+    remote_cache: dict[tuple[str, str], PolymarketMarketDetailsPayload | None],
+    current_time: datetime,
+) -> tuple[str, str]:
+    market = _find_local_market(db, position=position, cache=market_cache)
+    remote_market = _find_remote_market(
+        position=position,
+        gamma_client=gamma_client,
+        cache=remote_cache,
+    )
+    outcome = get_market_outcome(db, market.id) if market is not None else None
+    resolution_source = outcome.resolution_source if outcome is not None else None
+
+    if outcome is not None and outcome.resolved_outcome in {"yes", "no"}:
+        settlement_side = _resolve_position_side(position=position, market=market, remote_market=remote_market)
+        if settlement_side is None:
+            _mark_unknown_resolution(
+                db,
+                position=position,
+                resolution_source=resolution_source,
+                current_time=current_time,
+            )
+            return (
+                "unknown_resolution",
+                "Resultado no confiable: no pudimos mapear el outcome de la posicion.",
+            )
+
+        _close_for_market_resolution(
+            db,
+            position=position,
+            resolved_outcome=outcome.resolved_outcome,
+            position_side=settlement_side,
+            resolution_source=resolution_source,
+            current_time=current_time,
+        )
+        return ("closed_by_market_resolution", "Mercado resuelto con resultado confiable.")
+
+    if outcome is not None and outcome.resolved_outcome in CANCELLED_OUTCOMES:
+        _cancel_position(
+            db,
+            position=position,
+            resolution_source=resolution_source,
+            current_time=current_time,
+        )
+        return (
+            "cancelled",
+            "Mercado cancelado o invalido. En demo devolvemos el capital sin inventar PnL.",
+        )
+
+    if outcome is not None and outcome.resolved_outcome == "unknown":
+        _mark_unknown_resolution(
+            db,
+            position=position,
+            resolution_source=resolution_source,
+            current_time=current_time,
+        )
+        return ("unknown_resolution", "La fuente de resolucion devolvio un resultado no confiable.")
+
+    if _market_is_expired_or_closed(
+        market=market,
+        remote_market=remote_market,
+        current_time=current_time,
+    ):
+        _mark_waiting_resolution(
+            db,
+            position=position,
+            resolution_source=resolution_source or _source_label_for_remote(remote_market),
+            current_time=current_time,
+        )
+        return (
+            "waiting_resolution",
+            "Mercado vencido o cerrado sin resultado confiable todavia.",
+        )
+
+    if market is None and remote_market is None and not position.condition_id and not position.market_slug:
+        _mark_still_open(
+            db,
+            position=position,
+            resolution_source=resolution_source,
+            current_time=current_time,
+        )
+        return (
+            "still_open",
+            "Faltan identificadores suficientes para revisar la resolucion. La posicion demo sigue abierta por seguridad.",
+        )
+
+    _mark_still_open(
+        db,
+        position=position,
+        resolution_source=resolution_source or _source_label_for_remote(remote_market),
+        current_time=current_time,
+    )
+    return ("still_open", "Mercado todavia activo. La posicion demo sigue abierta.")
+
+
+def _increment_summary(summary: CopyTradingDemoSettlementSummary, bucket: str) -> None:
+    if bucket == "closed_by_market_resolution":
+        summary.closed_by_market_resolution += 1
+    elif bucket == "waiting_resolution":
+        summary.waiting_resolution += 1
+    elif bucket == "still_open":
+        summary.still_open += 1
+    elif bucket == "cancelled":
+        summary.cancelled += 1
+    elif bucket == "unknown_resolution":
+        summary.unknown_resolution += 1
 
 
 def _list_settleable_demo_positions(db: Session, *, limit: int | None) -> list[CopyDemoPosition]:
