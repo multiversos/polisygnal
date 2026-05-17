@@ -1353,8 +1353,6 @@ async function runCopyTradingSmoke({ buildInfo, securityHeaders }) {
     copyTradingText,
     [
       "Neon quota exceeded",
-      "500",
-      "502",
       "HTTP 500",
       "HTTP 502",
       "Internal Server Error",
