@@ -2592,6 +2592,11 @@ function validateAnalyzerFirstProductSource() {
     resolve(appRoot, "app/components/copy-trading/CopyTradingHeader.tsx"),
     "utf8",
   );
+  const copyTradingLib = readFileSync(resolve(appRoot, "app/lib/copyTrading.ts"), "utf8");
+  const copyTradingDiagnosticsLib = readFileSync(
+    resolve(appRoot, "app/lib/copyTradingDiagnostics.ts"),
+    "utf8",
+  );
   const copyAmountSelector = readFileSync(
     resolve(appRoot, "app/components/copy-trading/CopyAmountSelector.tsx"),
     "utf8",
@@ -2669,6 +2674,30 @@ function validateAnalyzerFirstProductSource() {
     assert(copyTradingSource.includes(text), `copy trading dashboard missing safe text: ${text}`);
   }
   assert(
+    !copyTradingLib.includes("runCopyTradingDemoTick") &&
+      !copyTradingLib.includes("runCopyTradingDemoSettlementOnce") &&
+      !copyTradingLib.includes("startCopyTradingWatcher") &&
+      !copyTradingLib.includes("stopCopyTradingWatcher") &&
+      !copyTradingLib.includes("runCopyTradingWatcherOnce") &&
+      !copyTradingLib.includes("scanCopyWallet"),
+    "copyTrading.ts should not expose legacy POST helpers in the normal UI data layer",
+  );
+  assert(
+    copyTradingDiagnosticsLib.includes("Do not call these automatically from the browser UI.") &&
+      copyTradingDiagnosticsLib.includes("Render background worker owns automatic scanning"),
+    "copyTradingDiagnostics.ts should clearly mark POST helpers as manual-only diagnostics",
+  );
+  for (const text of [
+    "diagnosticScanCopyWallet",
+    "diagnosticRunCopyTradingDemoTick",
+    "diagnosticRunCopyTradingDemoSettlementOnce",
+    "diagnosticStartCopyTradingWatcher",
+    "diagnosticStopCopyTradingWatcher",
+    "diagnosticRunCopyTradingWatcherOnce",
+  ]) {
+    assert(copyTradingDiagnosticsLib.includes(text), `copy trading diagnostics helper missing: ${text}`);
+  }
+  assert(
     copyTradingHeader.includes("no inicia copias desde el navegador"),
     "copy trading header should explain that the browser no longer starts copy processes",
   );
@@ -2731,6 +2760,18 @@ function validateAnalyzerFirstProductSource() {
   assert(
     copyTradingDashboard.includes("onNotice={setNotice}"),
     "copy trading dashboard should forward wallet scan results to the global notice area",
+  );
+  assert(
+    !copyTradingDashboard.includes("copyTradingDiagnostics") &&
+      !copyWatcherPanel.includes("copyTradingDiagnostics") &&
+      !copyWalletsTable.includes("copyTradingDiagnostics"),
+    "normal copy trading UI should not import the manual diagnostics helper layer",
+  );
+  assert(
+    !copyTradingDashboard.includes("diagnosticRunCopyTrading") &&
+      !copyWatcherPanel.includes("diagnosticRunCopyTrading") &&
+      !copyWalletsTable.includes("diagnosticScanCopyWallet"),
+    "normal copy trading UI should not call manual diagnostic POST helpers",
   );
   assert(
     copyWalletForm.includes("Agregar wallet"),

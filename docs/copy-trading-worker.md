@@ -92,6 +92,13 @@ Campos utiles:
 - `last_result_json`
 - `consecutive_errors`
 
+## UI y helpers manuales
+
+- La UI normal de `/copy-trading` no debe disparar escaneos ni procesos automáticos.
+- El polling visual de la pagina debe quedar en `GET` read-only para estado, wallets, posiciones, PnL e historial.
+- Los `POST` antiguos de watcher, tick, settlement y scan quedan como helpers de diagnostico manual en `apps/web/app/lib/copyTradingDiagnostics.ts`.
+- Esos helpers no deben importarse desde la UI normal del dashboard.
+
 ## Diagnostico rapido
 
 `not_started`

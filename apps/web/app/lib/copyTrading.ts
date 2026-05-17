@@ -2,10 +2,8 @@ import { fetchApiJson } from "./api";
 import type {
   CopyTradingDashboardData,
   CopyTradingDemoPnlSummary,
-  CopyTradingDemoSettlementResponse,
   CopyDemoPosition,
   CopyTradingStatus,
-  CopyTradingTickSummary,
   CopyTradingWatcherStatus,
   CopyWallet,
   CopyWalletCreateInput,
@@ -128,43 +126,6 @@ export async function updateCopyWallet(
 export async function deleteCopyWallet(walletId: string): Promise<void> {
   await fetchApiJson<null>(`/copy-trading/wallets/${encodeURIComponent(walletId)}`, {
     method: "DELETE",
-  });
-}
-
-export async function scanCopyWallet(walletId: string): Promise<CopyTradingTickSummary> {
-  return fetchApiJson<CopyTradingTickSummary>(
-    `/copy-trading/wallets/${encodeURIComponent(walletId)}/scan`,
-    { method: "POST" },
-  );
-}
-
-export async function runCopyTradingDemoTick(): Promise<CopyTradingTickSummary> {
-  return fetchApiJson<CopyTradingTickSummary>("/copy-trading/demo/tick", {
-    method: "POST",
-  });
-}
-
-export async function runCopyTradingDemoSettlementOnce(): Promise<CopyTradingDemoSettlementResponse> {
-  return fetchApiJson<CopyTradingDemoSettlementResponse>("/copy-trading/demo/settlement/run-once", {
-    method: "POST",
-  });
-}
-
-export async function startCopyTradingWatcher(): Promise<CopyTradingWatcherStatus> {
-  return fetchApiJson<CopyTradingWatcherStatus>("/copy-trading/watcher/start", {
-    method: "POST",
-  });
-}
-
-export async function stopCopyTradingWatcher(): Promise<CopyTradingWatcherStatus> {
-  return fetchApiJson<CopyTradingWatcherStatus>("/copy-trading/watcher/stop", {
-    method: "POST",
-  });
-}
-
-export async function runCopyTradingWatcherOnce(): Promise<CopyTradingWatcherStatus> {
-  return fetchApiJson<CopyTradingWatcherStatus>("/copy-trading/watcher/run-once", {
-    method: "POST",
   });
 }
 
