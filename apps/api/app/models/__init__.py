@@ -13,6 +13,7 @@ from app.models.market_tag import MarketTag, MarketTagLink
 from app.models.market_snapshot import MarketSnapshot
 from app.models.prediction_report import PredictionReport
 from app.models.prediction import Prediction
+from app.models.polysignal_market_signal import PolySignalMarketSignal
 from app.models.research_finding import ResearchFinding
 from app.models.refresh_run import RefreshRun
 from app.models.research_run import ResearchRun
@@ -44,6 +45,7 @@ __all__ = [
     "MarketSnapshot",
     "PredictionReport",
     "Prediction",
+    "PolySignalMarketSignal",
     "ResearchFinding",
     "RefreshRun",
     "ResearchRun",

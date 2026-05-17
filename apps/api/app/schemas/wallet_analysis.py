@@ -20,6 +20,14 @@ WalletAnalysisJobStatus = Literal[
     "failed",
     "cancelled",
 ]
+MarketSignalStatus = Literal[
+    "pending_resolution",
+    "resolved_hit",
+    "resolved_miss",
+    "cancelled",
+    "unknown",
+    "no_clear_signal",
+]
 
 
 class WalletAnalysisCreateRequest(BaseModel):
@@ -188,3 +196,37 @@ class WalletProfileRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PolySignalMarketSignalRead(BaseModel):
+    id: str
+    job_id: str | None = None
+    source_url: str | None = None
+    market_slug: str | None = None
+    event_slug: str | None = None
+    condition_id: str | None = None
+    market_title: str | None = None
+    outcomes_json: list[dict[str, Any]] = Field(default_factory=list)
+    token_ids_json: list[str] = Field(default_factory=list)
+    predicted_side: str | None = None
+    predicted_outcome: str | None = None
+    polysignal_score: Decimal | None = None
+    confidence: WalletConfidence
+    yes_score: Decimal | None = None
+    no_score: Decimal | None = None
+    outcome_scores_json: dict[str, Any] | None = None
+    wallets_analyzed: int | None = None
+    wallets_with_sufficient_history: int | None = None
+    top_wallets_json: list[dict[str, Any]] = Field(default_factory=list)
+    warnings_json: list[str] = Field(default_factory=list)
+    signal_status: MarketSignalStatus
+    final_outcome: str | None = None
+    final_resolution_source: str | None = None
+    resolved_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PolySignalMarketSignalList(BaseModel):
+    items: list[PolySignalMarketSignalRead]
+    total: int

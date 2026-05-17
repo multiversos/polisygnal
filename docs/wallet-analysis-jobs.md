@@ -1,9 +1,10 @@
 # Wallet Analysis Jobs
 
-PolySignal mantiene dos conceptos nuevos para el analizador de links de Polymarket:
+PolySignal mantiene tres conceptos nuevos para el analizador de links de Polymarket:
 
 - `wallet_profiles`: perfiles persistidos de wallets candidatas.
 - `wallet_analysis_jobs`: jobs persistidos para analisis profundo de wallets por mercado.
+- `polysignal_market_signals`: snapshots historicos de la balanza que produjo un job.
 
 ## Wallet Profiles
 
@@ -56,7 +57,27 @@ Campos de progreso:
 - `no_wallets`
 - `current_batch`
 
-En este sprint base el job se crea y persiste el mercado resuelto, pero el analisis profundo completo queda para un sprint posterior.
+El runner por lotes de este sprint procesa el job sin bloquear una request larga:
+
+```powershell
+cd apps/api
+.\.venv\Scripts\python.exe -m app.commands.wallet_analysis_runner --once --job-id <job_id> --max-wallets 100
+```
+
+El runner:
+
+- resuelve el job pendiente
+- descubre wallets del mercado por posiciones y trades publicos
+- procesa wallets por lotes
+- guarda candidatos por `side` / `outcome`
+- persiste progreso y warnings
+- termina en `completed`, `partial` o `failed`
+
+Interpretacion de estado:
+
+- `completed`: el job termino dentro de los limites configurados.
+- `partial`: el job termino, pero no pudo analizar todo el universo descubierto por limites de lote o tiempo.
+- `failed`: hubo un error no recuperable y se guardo un error sanitizado.
 
 ## Candidates
 
@@ -69,6 +90,47 @@ En este sprint base el job se crea y persiste el mercado resuelto, pero el anali
 - razones y riesgos
 
 Desde un candidate se puede crear o actualizar un `wallet_profile`.
+
+### Estados de metricas 30d
+
+Cada metrica puede quedar en uno de estos estados:
+
+- `verified`: la API devolvio suficiente historia para justificar la metrica observada.
+- `estimated`: la historia parece parcial o truncada por limites del fetch.
+- `unavailable`: no hay datos suficientes para reportarla honestamente.
+
+Ejemplos:
+
+- `roi_30d_status = unavailable` significa que no hay base suficiente para calcular ROI real.
+- `win_rate_30d_status = estimated` significa que la metrica existe, pero la muestra puede estar incompleta.
+
+## PolySignal Market Signals
+
+`polysignal_market_signals` congela la salida historica del job para poder resolverla despues contra el resultado real del mercado.
+
+Campos relevantes:
+
+- `predicted_side` / `predicted_outcome`
+- `polysignal_score`
+- `confidence`
+- `yes_score` / `no_score`
+- `wallets_analyzed`
+- `wallets_with_sufficient_history`
+- `signal_status`
+
+Estados iniciales:
+
+- `pending_resolution`
+- `no_clear_signal`
+
+Estados de resolucion preparados para un sprint posterior:
+
+- `resolved_hit`
+- `resolved_miss`
+- `cancelled`
+- `unknown`
+
+En este sprint la resolucion real del mercado queda preparada, pero el settlement automatico completo se implementara despues.
 
 ## Copy Trading Demo
 
