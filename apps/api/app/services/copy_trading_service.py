@@ -10,7 +10,8 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models.copy_trading import CopyBotEvent, CopyDetectedTrade, CopyOrder, CopyWallet
+from app.models.copy_trading import CopyBotEvent, CopyDemoPosition, CopyDetectedTrade, CopyOrder, CopyWallet
+from app.services.copy_worker_state import build_worker_runtime_read, load_worker_state
 from app.schemas.copy_trading import (
     COPY_AMOUNT_PRESETS,
     CopyTradingStatusResponse,
@@ -347,7 +348,16 @@ def build_copy_trading_status(db: Session) -> CopyTradingStatusResponse:
     orders_simulated = db.scalar(select(func.count()).select_from(CopyOrder).where(CopyOrder.status == "simulated")) or 0
     orders_skipped = db.scalar(select(func.count()).select_from(CopyOrder).where(CopyOrder.status == "skipped")) or 0
     orders_blocked = db.scalar(select(func.count()).select_from(CopyOrder).where(CopyOrder.status == "blocked")) or 0
+    open_demo_positions_count = (
+        db.scalar(
+            select(func.count())
+            .select_from(CopyDemoPosition)
+            .where(CopyDemoPosition.status.in_(("open", "waiting_resolution", "unknown_resolution")))
+        )
+        or 0
+    )
     last_scan_at = db.scalar(select(func.max(CopyWallet.last_scan_at)))
+    worker_runtime = build_worker_runtime_read(load_worker_state(db))
     return CopyTradingStatusResponse(
         wallets_total=wallets_total,
         wallets_enabled=wallets_enabled,
@@ -355,7 +365,9 @@ def build_copy_trading_status(db: Session) -> CopyTradingStatusResponse:
         orders_simulated=orders_simulated,
         orders_skipped=orders_skipped,
         orders_blocked=orders_blocked,
+        open_demo_positions_count=open_demo_positions_count,
         last_scan_at=last_scan_at,
+        **worker_runtime,
     )
 
 

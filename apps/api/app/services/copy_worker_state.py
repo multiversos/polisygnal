@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from threading import Lock
@@ -9,13 +10,15 @@ from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session
 
 from app.models.copy_worker_state import CopyWorkerState
-from app.services.copy_trading_service import add_copy_event
 
 COPY_TRADING_WORKER_ID = "copy_trading_demo"
 COPY_TRADING_WORKER_LOCK_KEY = 2_021_051_700
+COPY_TRADING_WORKER_STALE_AFTER_SECONDS = 30
 
 _LOCAL_LOCKS_GUARD = Lock()
 _LOCAL_LOCKS: dict[str, Lock] = {}
+_DATABASE_URL_PATTERN = re.compile(r"(postgresql(?:\+\w+)?://|sqlite\+\w+://)[^\s]+", re.IGNORECASE)
+_DATABASE_URL_ASSIGNMENT_PATTERN = re.compile(r"(DATABASE_URL\s*=\s*)(\S+)", re.IGNORECASE)
 
 
 @dataclass(slots=True)
@@ -91,6 +94,8 @@ def mark_worker_started(
     now: datetime | None = None,
     worker_id: str = COPY_TRADING_WORKER_ID,
 ) -> CopyWorkerState:
+    from app.services.copy_trading_service import add_copy_event
+
     current_time = _utc_now(now)
     state = get_or_create_worker_state(db, worker_id=worker_id)
     state.owner_id = owner_id
@@ -138,6 +143,8 @@ def mark_worker_loop_finished(
     now: datetime | None = None,
     worker_id: str = COPY_TRADING_WORKER_ID,
 ) -> CopyWorkerState:
+    from app.services.copy_trading_service import add_copy_event
+
     current_time = _utc_now(now)
     state = get_or_create_worker_state(db, worker_id=worker_id)
     state.owner_id = owner_id
@@ -173,6 +180,8 @@ def mark_worker_stopped(
     now: datetime | None = None,
     worker_id: str = COPY_TRADING_WORKER_ID,
 ) -> CopyWorkerState:
+    from app.services.copy_trading_service import add_copy_event
+
     current_time = _utc_now(now)
     state = get_or_create_worker_state(db, worker_id=worker_id)
     state.owner_id = owner_id
@@ -216,6 +225,33 @@ def serialize_worker_state(state: CopyWorkerState | None) -> dict[str, object] |
     }
 
 
+def build_worker_runtime_read(
+    state: CopyWorkerState | None,
+    *,
+    now: datetime | None = None,
+    stale_after_seconds: int = COPY_TRADING_WORKER_STALE_AFTER_SECONDS,
+) -> dict[str, object]:
+    current_time = _utc_now(now)
+    worker_status = _derive_worker_status(
+        state,
+        now=current_time,
+        stale_after_seconds=stale_after_seconds,
+    )
+    return {
+        "worker_status": worker_status,
+        "worker_owner_id": _mask_owner_id(state.owner_id if state is not None else None),
+        "last_heartbeat_at": state.last_heartbeat_at if state is not None else None,
+        "last_loop_started_at": state.last_loop_started_at if state is not None else None,
+        "last_loop_finished_at": state.last_loop_finished_at if state is not None else None,
+        "last_success_at": state.last_success_at if state is not None else None,
+        "last_error": _sanitize_error_for_read(state.last_error if state is not None else None),
+        "last_result_json": state.last_result_json if state is not None else None,
+        "consecutive_errors": state.consecutive_errors if state is not None else 0,
+        "stale_after_seconds": stale_after_seconds,
+        "demo_only": True,
+    }
+
+
 def load_worker_state(
     db: Session,
     *,
@@ -228,7 +264,11 @@ def _safe_error(error_message: str | None) -> str | None:
     if error_message is None:
         return None
     clean = " ".join(error_message.split()).strip()
-    return clean[:500] if clean else None
+    if not clean:
+        return None
+    clean = _DATABASE_URL_ASSIGNMENT_PATTERN.sub(r"\1[redacted]", clean)
+    clean = _DATABASE_URL_PATTERN.sub("[redacted-url]", clean)
+    return clean[:500]
 
 
 def _serialize_datetime(value: datetime | None) -> str | None:
@@ -245,3 +285,43 @@ def _utc_now(value: datetime | None = None) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _derive_worker_status(
+    state: CopyWorkerState | None,
+    *,
+    now: datetime,
+    stale_after_seconds: int,
+) -> str:
+    if state is None:
+        return "not_started"
+    status = (state.status or "").strip().lower()
+    if status in {"idle", ""}:
+        return "not_started"
+    if status == "stopped":
+        return "stopped"
+    if status == "error":
+        return "error"
+    if status == "running":
+        if state.last_heartbeat_at is None:
+            return "stale"
+        heartbeat = _utc_now(state.last_heartbeat_at)
+        if (now - heartbeat).total_seconds() > stale_after_seconds:
+            return "stale"
+        return "running"
+    return "unknown"
+
+
+def _mask_owner_id(owner_id: str | None) -> str | None:
+    if owner_id is None:
+        return None
+    clean = owner_id.strip()
+    if not clean:
+        return None
+    if len(clean) <= 8:
+        return clean
+    return f"{clean[:8]}..."
+
+
+def _sanitize_error_for_read(error_message: str | None) -> str | None:
+    return _safe_error(error_message)

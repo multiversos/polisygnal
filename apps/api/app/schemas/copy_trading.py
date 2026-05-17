@@ -44,6 +44,7 @@ CopyWatcherWalletScanStatus = Literal[
     "error",
 ]
 CopyWatcherWalletPriority = Literal["high", "normal", "low"]
+CopyTradingWorkerStatus = Literal["not_started", "running", "stale", "stopped", "error", "unknown"]
 
 COPY_AMOUNT_PRESETS = {
     Decimal("1"),
@@ -213,6 +214,7 @@ class CopyBotEventRead(BaseModel):
 
 class CopyTradingStatusResponse(BaseModel):
     mode_default: CopyTradingMode = "demo"
+    demo_only: bool = True
     real_trading_available: bool = False
     real_trading_block_reason: str = "real_trading_not_configured"
     wallets_total: int
@@ -221,7 +223,18 @@ class CopyTradingStatusResponse(BaseModel):
     orders_simulated: int
     orders_skipped: int
     orders_blocked: int
+    open_demo_positions_count: int = 0
     last_scan_at: datetime | None = None
+    worker_status: CopyTradingWorkerStatus = "not_started"
+    worker_owner_id: str | None = None
+    last_heartbeat_at: datetime | None = None
+    last_loop_started_at: datetime | None = None
+    last_loop_finished_at: datetime | None = None
+    last_success_at: datetime | None = None
+    last_error: str | None = None
+    last_result_json: dict[str, object] | None = None
+    consecutive_errors: int = 0
+    stale_after_seconds: int = 30
 
 
 class CopyDemoPositionRead(BaseModel):
@@ -357,6 +370,7 @@ class CopyTradingWatcherWalletScanResult(BaseModel):
 class CopyTradingWatcherStatusResponse(BaseModel):
     enabled: bool
     running: bool
+    demo_only: bool = True
     interval_seconds: int
     cycle_budget_seconds: int
     current_run_started_at: datetime | None = None
@@ -379,6 +393,15 @@ class CopyTradingWatcherStatusResponse(BaseModel):
     behind_by_seconds: int = 0
     last_error: str | None = None
     message: str | None = None
+    worker_status: CopyTradingWorkerStatus = "not_started"
+    worker_owner_id: str | None = None
+    last_heartbeat_at: datetime | None = None
+    last_loop_started_at: datetime | None = None
+    last_loop_finished_at: datetime | None = None
+    last_success_at: datetime | None = None
+    last_result_json: dict[str, object] | None = None
+    consecutive_errors: int = 0
+    stale_after_seconds: int = 30
 
 
 class CopyTradingListResponse(BaseModel):

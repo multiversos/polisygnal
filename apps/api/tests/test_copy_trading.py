@@ -17,6 +17,7 @@ from app.models.market_outcome import MarketOutcome
 from app.api import routes_copy_trading
 from app.clients.polymarket_data import PolymarketDataClientError
 from app.models.copy_trading import CopyWallet
+from app.models.copy_worker_state import CopyWorkerState
 from app.schemas.copy_trading import CopyWalletCreate, CopyWalletUpdate
 from app.services.copy_trading_demo_engine import normalize_public_trade, run_demo_tick, scan_copy_wallet
 from app.services.copy_trading_demo_positions import (
@@ -1412,6 +1413,127 @@ def test_watcher_start_stop_routes(client: TestClient, monkeypatch: pytest.Monke
     assert start_response.json()["enabled"] is True
     assert stop_response.status_code == 200
     assert stop_response.json()["enabled"] is False
+
+
+def test_copy_trading_status_returns_not_started_when_worker_state_missing(client: TestClient) -> None:
+    response = client.get("/copy-trading/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["worker_status"] == "not_started"
+    assert payload["last_heartbeat_at"] is None
+    assert payload["last_result_json"] is None
+    assert payload["demo_only"] is True
+
+
+def test_copy_trading_status_marks_recent_heartbeat_as_running(client: TestClient, db_session: Session) -> None:
+    recent_now = datetime.now(tz=UTC)
+    db_session.add(
+        CopyWorkerState(
+            id="copy_trading_demo",
+            owner_id="12345678-1234-1234-1234-123456789abc",
+            status="running",
+            last_heartbeat_at=recent_now,
+            last_loop_started_at=recent_now,
+            last_loop_finished_at=recent_now,
+            last_success_at=recent_now,
+            last_result_json={"wallets_scanned": 0},
+            consecutive_errors=0,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/copy-trading/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["worker_status"] == "running"
+    assert payload["worker_owner_id"] == "12345678..."
+    assert payload["last_result_json"] == {"wallets_scanned": 0}
+
+
+def test_copy_trading_status_marks_old_heartbeat_as_stale(client: TestClient, db_session: Session) -> None:
+    db_session.add(
+        CopyWorkerState(
+            id="copy_trading_demo",
+            owner_id="12345678-1234-1234-1234-123456789abc",
+            status="running",
+            last_heartbeat_at=_now() - timedelta(seconds=120),
+            consecutive_errors=2,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/copy-trading/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["worker_status"] == "stale"
+    assert payload["consecutive_errors"] == 2
+    assert payload["stale_after_seconds"] == 30
+
+
+def test_copy_trading_status_marks_stopped_worker(client: TestClient, db_session: Session) -> None:
+    db_session.add(
+        CopyWorkerState(
+            id="copy_trading_demo",
+            owner_id="12345678-1234-1234-1234-123456789abc",
+            status="stopped",
+            stopped_at=_now(),
+            last_heartbeat_at=_now(),
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/copy-trading/status")
+
+    assert response.status_code == 200
+    assert response.json()["worker_status"] == "stopped"
+
+
+def test_copy_trading_status_sanitizes_worker_error(client: TestClient, db_session: Session) -> None:
+    db_session.add(
+        CopyWorkerState(
+            id="copy_trading_demo",
+            owner_id="12345678-1234-1234-1234-123456789abc",
+            status="error",
+            last_error="DATABASE_URL=postgresql+psycopg://user:pass@example.com/db timed out",
+            last_heartbeat_at=_now(),
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/copy-trading/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["worker_status"] == "error"
+    assert "postgresql" not in str(payload["last_error"]).lower()
+    assert "user:pass" not in str(payload["last_error"]).lower()
+    assert "[redacted]" in str(payload["last_error"]).lower() or "[redacted-url]" in str(payload["last_error"]).lower()
+
+
+def test_copy_trading_watcher_status_reads_persisted_state(client: TestClient, db_session: Session) -> None:
+    recent_now = datetime.now(tz=UTC)
+    db_session.add(
+        CopyWorkerState(
+            id="copy_trading_demo",
+            owner_id="12345678-1234-1234-1234-123456789abc",
+            status="running",
+            last_heartbeat_at=recent_now,
+            last_success_at=recent_now,
+            last_result_json={"wallets_scanned": 3},
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/copy-trading/watcher/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["worker_status"] == "running"
+    assert payload["last_result_json"] == {"wallets_scanned": 3}
+    assert payload["demo_only"] is True
 
 
 def test_demo_settlement_run_once_route(client: TestClient, db_session: Session) -> None:
