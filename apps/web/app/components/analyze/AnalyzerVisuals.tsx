@@ -74,8 +74,8 @@ export function HeroSignalIllustration() {
       <div className="hero-lens">
         <span />
       </div>
-      <div className="hero-signal-chip chip-a">Samantha</div>
-      <div className="hero-signal-chip chip-b">Signal +</div>
+      <div className="hero-signal-chip chip-a">Wallets</div>
+      <div className="hero-signal-chip chip-b">PolySignal</div>
     </div>
   );
 }
