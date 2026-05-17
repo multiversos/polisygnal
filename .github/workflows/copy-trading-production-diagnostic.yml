@@ -1,0 +1,131 @@
+name: Copy Trading Production Diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type diagnose-copy-trading-production to run a safe production DB diagnostic"
+        required: true
+
+jobs:
+  diagnose:
+    name: Diagnose copy trading production data path
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Confirm explicit diagnostic request
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "diagnose-copy-trading-production" ]; then
+            echo "::error::Confirmation did not match the required diagnostic phrase."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install API dependencies
+        working-directory: apps/api
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Preflight database configuration
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.POLYSIGNAL_NEON_DATABASE_URL }}
+          DATABASE_MIGRATION_URL: ${{ secrets.POLYSIGNAL_NEON_DATABASE_URL }}
+          POLYSIGNAL_ENV: production
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::POLYSIGNAL_NEON_DATABASE_URL secret is not configured."
+            exit 1
+          fi
+          python -m app.commands.check_database_config --connect
+          python -m alembic current
+          python -m alembic heads
+
+      - name: Run safe copy trading diagnostic
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.POLYSIGNAL_NEON_DATABASE_URL }}
+          DATABASE_MIGRATION_URL: ${{ secrets.POLYSIGNAL_NEON_DATABASE_URL }}
+          POLYSIGNAL_ENV: production
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          from sqlalchemy import func, select
+
+          from app.db.session import SessionLocal
+          from app.models.copy_trading import CopyDemoPosition, CopyWallet
+          from app.services.copy_trading_demo_positions import (
+              build_closed_demo_positions_read,
+              list_closed_demo_positions,
+              list_open_demo_positions,
+          )
+          from app.services.copy_trading_service import build_copy_trading_status, build_copy_wallet_read, list_copy_wallets
+
+          db = SessionLocal()
+          try:
+              print("diagnostic_begin")
+              print("status", build_copy_trading_status(db).model_dump())
+
+              wallets = list_copy_wallets(db)
+              print("wallet_count", len(wallets))
+              for wallet in wallets[:5]:
+                  payload = build_copy_wallet_read(wallet).model_dump()
+                  print(
+                      "wallet_ok",
+                      payload["id"],
+                      payload["label"],
+                      payload["mode"],
+                      payload["copy_amount_mode"],
+                      payload["updated_at"],
+                  )
+
+              open_positions = list_open_demo_positions(db)
+              print("open_positions_count", len(open_positions))
+              print(
+                  "open_status_counts",
+                  dict(
+                      db.execute(
+                          select(CopyDemoPosition.status, func.count())
+                          .group_by(CopyDemoPosition.status)
+                          .order_by(CopyDemoPosition.status)
+                      ).all()
+                  ),
+              )
+              for position in open_positions[:10]:
+                  print(
+                      "open_position",
+                      position.id,
+                      position.status,
+                      position.wallet_id,
+                      position.condition_id,
+                      position.asset,
+                      position.outcome,
+                      position.market_slug,
+                      position.resolution_source,
+                  )
+
+              closed_positions = list_closed_demo_positions(db, limit=10)
+              closed_reads = build_closed_demo_positions_read(closed_positions)
+              print("closed_positions_count", len(closed_reads))
+              for position in closed_reads[:5]:
+                  print(
+                      "closed_position",
+                      position.id,
+                      position.status,
+                      position.close_reason,
+                      position.resolution_source,
+                  )
+              print("diagnostic_complete")
+          finally:
+              db.close()
+          PY
