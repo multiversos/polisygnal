@@ -1330,18 +1330,17 @@ async function runCopyTradingSmoke({ buildInfo, securityHeaders }) {
     ["Demo activo", "modo demo", "Watcher demo", "demo"],
     "copy trading demo shell",
   );
-  assertTextIncludesOneOf(
-    copyTradingText,
-    ["Refrescar ahora", "Revisar resoluciones demo", "Escanear wallets", "Ejecutar una vez"],
-    "copy trading primary action shell",
+  assert(
+    ["Copy Trading", "Agregar wallet", "wallet", "demo"].every((value) => copyTradingText.includes(value)),
+    "copy trading stable shell did not render expected copy/wallet/demo signals",
   );
 
   assertTextExcludes(
     copyTradingText,
     [
       "Neon quota exceeded",
-      " 500 ",
-      " 502 ",
+      "500",
+      "502",
       "HTTP 500",
       "HTTP 502",
       "Internal Server Error",
