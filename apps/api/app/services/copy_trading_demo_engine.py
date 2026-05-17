@@ -159,6 +159,7 @@ def _scan_wallet(
 ) -> None:
     current_time = now or datetime.now(tz=UTC)
     grouped_skips: dict[tuple[str, str], int] = {}
+    grouped_ignored_before_tracking = 0
     try:
         raw_trades = data_client.get_trades_for_user(wallet.proxy_wallet, limit=limit, offset=0)
     except PolymarketDataClientError as exc:
@@ -173,6 +174,9 @@ def _scan_wallet(
     response.trades_detected += len(raw_trades)
     for raw_trade in raw_trades:
         normalized = normalize_public_trade(raw_trade, wallet.proxy_wallet)
+        if _is_trade_before_tracking_started(wallet, normalized.timestamp):
+            grouped_ignored_before_tracking += 1
+            continue
         freshness = classify_trade_freshness(
             source_timestamp=normalized.timestamp,
             copy_window_seconds=wallet.max_delay_seconds,
@@ -219,6 +223,14 @@ def _scan_wallet(
             continue
         response.new_trades += 1
         _record_trade_freshness(response, freshness.status)
+
+        if freshness.status in {"recent_outside_window", "historical"}:
+            response.orders_skipped += 1
+            _record_skipped_reason(response, "trade_too_old")
+            grouped_skips[("trade_too_old", freshness.status)] = (
+                grouped_skips.get(("trade_too_old", freshness.status), 0) + 1
+            )
+            continue
 
         intent = evaluate_demo_trade(
             wallet,
@@ -290,8 +302,14 @@ def _scan_wallet(
                 )
             else:
                 grouped_skips[(order.reason or "unknown", freshness.status)] = (
-                    grouped_skips.get((order.reason or "unknown", freshness.status), 0) + 1
+                grouped_skips.get((order.reason or "unknown", freshness.status), 0) + 1
                 )
+    if grouped_ignored_before_tracking > 0:
+        _emit_grouped_ignored_before_tracking_event(
+            db,
+            wallet=wallet,
+            count=grouped_ignored_before_tracking,
+        )
     if not emit_individual_skip_events:
         _emit_grouped_skip_events(db, wallet=wallet, grouped_skips=grouped_skips)
     touch_wallet_scan(db, wallet, now=current_time)
@@ -359,6 +377,24 @@ def _emit_grouped_skip_events(
                 "reason": reason,
             },
         )
+
+
+def _emit_grouped_ignored_before_tracking_event(
+    db: Session,
+    *,
+    wallet: CopyWallet,
+    count: int,
+) -> None:
+    if count <= 0:
+        return
+    add_copy_event(
+        db,
+        wallet_id=wallet.id,
+        level="info",
+        event_type="copy_trade_ignored_before_tracking",
+        message="Trades anteriores al inicio de seguimiento fueron ignorados.",
+        metadata={"count": count, "reason": "before_tracking_started"},
+    )
 
 
 def _trade_payload(raw_trade: object) -> dict[str, object]:
@@ -481,3 +517,13 @@ def _parse_timestamp(value: object) -> datetime | None:
                 return None
             return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
     return None
+
+
+def _is_trade_before_tracking_started(wallet: CopyWallet, timestamp: datetime | None) -> bool:
+    if timestamp is None or wallet.created_at is None:
+        return False
+    trade_time = timestamp if timestamp.tzinfo is not None else timestamp.replace(tzinfo=UTC)
+    tracking_started_at = (
+        wallet.created_at if wallet.created_at.tzinfo is not None else wallet.created_at.replace(tzinfo=UTC)
+    )
+    return trade_time < tracking_started_at

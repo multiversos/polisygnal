@@ -2,17 +2,53 @@ import { freshnessBadgeClass, formatDateTime, formatFreshnessLabel, formatUsd } 
 import type { CopyOrder } from "../../lib/copyTradingTypes";
 
 export function CopyOrdersTable({ orders }: { orders: CopyOrder[] }) {
+  const hiddenHistoricalOrders = orders.filter(
+    (order) => order.status === "skipped" && order.reason === "trade_too_old" && order.freshness_status === "historical",
+  );
+  const hiddenLateOrders = orders.filter(
+    (order) =>
+      order.status === "skipped" &&
+      order.reason === "trade_too_old" &&
+      order.freshness_status === "recent_outside_window",
+  );
+  const visibleOrders = orders.filter(
+    (order) =>
+      !(
+        order.status === "skipped" &&
+        order.reason === "trade_too_old" &&
+        (order.freshness_status === "historical" || order.freshness_status === "recent_outside_window")
+      ),
+  );
+
   return (
     <section className="copy-panel">
       <div className="copy-panel-heading">
         <span>Modo demo</span>
         <strong>Ordenes demo</strong>
       </div>
-      {orders.length === 0 ? (
-        <div className="copy-empty-state">Sin ordenes simuladas todavia.</div>
+      {hiddenHistoricalOrders.length > 0 || hiddenLateOrders.length > 0 ? (
+        <div className="copy-status-strip" aria-live="polite">
+          {hiddenHistoricalOrders.length > 0 ? (
+            <span className="copy-badge historical">
+              {hiddenHistoricalOrders.length} trades historicos ignorados fuera de la vista principal.
+            </span>
+          ) : null}
+          {hiddenLateOrders.length > 0 ? (
+            <span className="copy-badge locked">
+              {hiddenLateOrders.length} trades omitidos por seguridad al llegar tarde para copiar.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      {visibleOrders.length === 0 ? (
+        <div className="copy-empty-state">
+          {orders.length > 0
+            ? "Sin ordenes demo relevantes para mostrar en esta vista."
+            : "Sin ordenes simuladas todavia."}
+        </div>
       ) : (
         <div className="copy-feed">
-          {orders.map((order) => (
+          {visibleOrders.map((order) => (
             <article className="copy-feed-item" key={order.id}>
               <div>
                 <span className={`copy-side ${order.action}`}>{order.action.toUpperCase()}</span>
@@ -71,7 +107,7 @@ function formatCopyOrderReason(order: CopyOrder): string {
     return order.status === "simulated" ? "Simulacion creada" : "Sin detalle adicional.";
   }
   if (order.reason === "trade_too_old" && order.freshness_status === "recent_outside_window") {
-    return "Trade reciente, pero llego tarde para esta ventana.";
+    return "Omitido por seguridad: detectado tarde para copiar con buen precio.";
   }
   const reasonLabels: Record<string, string> = {
     capped_by_max_trade_usd: "Monto limitado por maximo por trade.",
@@ -81,7 +117,7 @@ function formatCopyOrderReason(order: CopyOrder): string {
     missing_price: "Sin precio suficiente para simular.",
     missing_side: "Sin direccion de trade suficiente.",
     real_trading_not_configured: "Modo real bloqueado.",
-    trade_too_old: "Historico: fuera de la ventana de copia.",
+    trade_too_old: "Historico ignorado: anterior a la ventana valida de seguimiento.",
   };
   return reasonLabels[order.reason] || "No se simulo por una regla de seguridad.";
 }

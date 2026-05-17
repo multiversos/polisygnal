@@ -10,6 +10,10 @@ from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session
 
 from app.models.copy_worker_state import CopyWorkerState
+from app.schemas.copy_trading import (
+    CopyTradingWatcherLastResult,
+    CopyTradingWatcherStatusResponse,
+)
 
 COPY_TRADING_WORKER_ID = "copy_trading_demo"
 COPY_TRADING_WORKER_LOCK_KEY = 2_021_051_700
@@ -263,6 +267,61 @@ def build_worker_runtime_read(
     }
 
 
+def apply_persisted_worker_runtime(
+    watcher_status: CopyTradingWatcherStatusResponse,
+    state: CopyWorkerState | None,
+    *,
+    now: datetime | None = None,
+    stale_after_seconds: int = COPY_TRADING_WORKER_STALE_AFTER_SECONDS,
+) -> CopyTradingWatcherStatusResponse:
+    worker_runtime = build_worker_runtime_read(
+        state,
+        now=now,
+        stale_after_seconds=stale_after_seconds,
+    )
+    worker_status = worker_runtime["worker_status"]
+    running = worker_status == "running"
+    enabled = worker_status in {"running", "stale", "error"} or watcher_status.enabled
+    duration_ms = _extract_last_result_number(state.last_result_json if state is not None else None, "duration_ms")
+    last_result = watcher_status.last_result
+    if last_result is None and state is not None and state.last_result_json:
+        last_result = CopyTradingWatcherLastResult(
+            wallets_scanned=_extract_last_result_number(state.last_result_json, "wallets_scanned") or 0,
+            scanned_wallet_count=_extract_last_result_number(state.last_result_json, "wallets_scanned") or 0,
+            trades_detected=_extract_last_result_number(state.last_result_json, "trades_detected") or 0,
+            orders_simulated=_extract_last_result_number(state.last_result_json, "demo_orders_created") or 0,
+            errors=[worker_runtime["last_error"]] if worker_runtime["last_error"] else [],
+        )
+
+    return watcher_status.model_copy(
+        update={
+            "enabled": enabled,
+            "running": running,
+            "last_run_started_at": (
+                state.last_loop_started_at
+                if state is not None and state.last_loop_started_at is not None
+                else watcher_status.last_run_started_at
+            ),
+            "last_run_at": (
+                state.last_loop_finished_at
+                if state is not None and state.last_loop_finished_at is not None
+                else state.last_loop_started_at
+                if state is not None and state.last_loop_started_at is not None
+                else watcher_status.last_run_at
+            ),
+            "last_run_finished_at": (
+                state.last_loop_finished_at
+                if state is not None and state.last_loop_finished_at is not None
+                else watcher_status.last_run_finished_at
+            ),
+            "last_run_duration_ms": duration_ms if duration_ms is not None else watcher_status.last_run_duration_ms,
+            "average_run_duration_ms": duration_ms if duration_ms is not None else watcher_status.average_run_duration_ms,
+            "last_result": last_result,
+            **worker_runtime,
+        }
+    )
+
+
 def load_worker_state(
     db: Session,
     *,
@@ -336,3 +395,12 @@ def _mask_owner_id(owner_id: str | None) -> str | None:
 
 def _sanitize_error_for_read(error_message: str | None) -> str | None:
     return _safe_error(error_message)
+
+
+def _extract_last_result_number(payload: dict[str, object] | None, key: str) -> int | None:
+    if payload is None:
+        return None
+    value = payload.get(key)
+    if isinstance(value, int):
+        return value
+    return None

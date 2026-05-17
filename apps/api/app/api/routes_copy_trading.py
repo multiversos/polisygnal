@@ -49,7 +49,11 @@ from app.services.copy_trading_service import (
     update_copy_wallet,
 )
 from app.services.copy_trading_watcher import demo_watcher
-from app.services.copy_worker_state import build_worker_runtime_read, load_worker_state
+from app.services.copy_worker_state import (
+    apply_persisted_worker_runtime,
+    build_worker_runtime_read,
+    load_worker_state,
+)
 
 router = APIRouter(prefix="/copy-trading", tags=["copy-trading"])
 
@@ -233,8 +237,8 @@ def post_copy_trading_demo_tick(
 @router.get("/watcher/status", response_model=CopyTradingWatcherStatusResponse)
 def get_copy_trading_watcher_status(db: Session = Depends(get_db)) -> CopyTradingWatcherStatusResponse:
     status_response = demo_watcher.get_status()
-    worker_runtime = build_worker_runtime_read(load_worker_state(db))
-    return status_response.model_copy(update=worker_runtime)
+    worker_state = load_worker_state(db)
+    return apply_persisted_worker_runtime(status_response, worker_state)
 
 
 @router.post("/watcher/start", response_model=CopyTradingWatcherStatusResponse)

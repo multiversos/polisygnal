@@ -2842,11 +2842,15 @@ function validateAnalyzerFirstProductSource() {
   );
   assert(copyOrdersTable.includes("formatCopyOrderReason"), "copy orders should translate technical reasons");
   assert(
-    copyOrdersTable.includes("Historico: fuera de la ventana de copia.")
-      || copyOrdersTable.includes("Trade historico: fuera de la ventana de copia."),
-    "historical copy orders need humane copy",
+    copyOrdersTable.includes("trades historicos ignorados fuera de la vista principal.") &&
+      copyOrdersTable.includes("Historico ignorado: anterior a la ventana valida de seguimiento."),
+    "historical copy orders should stay grouped and clearly marked as ignored",
   );
-  assert(copyOrdersTable.includes("Trade reciente, pero llego tarde para esta ventana."), "recent late trades need humane copy");
+  assert(
+    copyOrdersTable.includes("trades omitidos por seguridad al llegar tarde para copiar.") &&
+      copyOrdersTable.includes("Omitido por seguridad: detectado tarde para copiar con buen precio."),
+    "recent late trades should stay grouped behind humane safety copy",
+  );
   assert(copyOrdersTable.includes("Historico"), "historical copy orders need a visible status label");
   assert(copyBotEvents.includes("groupCopyBotEvents"), "copy bot events should group repeated audit messages");
   assert(copyBotEvents.includes("Trades historicos detectados fuera de la ventana de copia."), "historical audit events need humane copy");

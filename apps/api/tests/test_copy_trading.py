@@ -397,7 +397,7 @@ def test_wallet_demo_summary_counts_skipped_orders(db_session: Session) -> None:
     assert summary.demo_copied_count == 0
     assert summary.demo_buy_count == 0
     assert summary.demo_sell_count == 0
-    assert summary.demo_skipped_count == 1
+    assert summary.demo_skipped_count == 0
     assert summary.last_demo_copy_at is None
 
 
@@ -573,20 +573,21 @@ def test_demo_tick_with_wallet_without_trades_returns_clean_summary(db_session: 
 
 def test_demo_tick_counts_historical_skips(db_session: Session) -> None:
     _create_wallet(db_session)
-    old_trade = _trade("0xhistorical") | {"timestamp": (_now() - timedelta(seconds=90)).isoformat()}
+    old_trade = _trade("0xhistorical") | {"timestamp": (_now() - timedelta(minutes=10)).isoformat()}
 
     response = run_demo_tick(db_session, data_client=FakeTradeReader([old_trade]), now=_now())
     orders = list_copy_orders(db_session)
+    trades = list_copy_trades(db_session)
 
-    assert response.new_trades == 1
+    assert response.new_trades == 0
     assert response.orders_simulated == 0
-    assert response.orders_skipped == 1
+    assert response.orders_skipped == 0
     assert response.live_candidates == 0
     assert response.recent_outside_window == 0
-    assert response.historical_trades == 1
-    assert response.skipped_reasons == {"trade_too_old": 1}
-    assert orders[0].status == "skipped"
-    assert orders[0].reason == "trade_too_old"
+    assert response.historical_trades == 0
+    assert response.skipped_reasons == {}
+    assert orders == []
+    assert trades == []
 
 
 def test_demo_tick_counts_recent_trades_outside_window(db_session: Session) -> None:
@@ -595,14 +596,15 @@ def test_demo_tick_counts_recent_trades_outside_window(db_session: Session) -> N
 
     response = run_demo_tick(db_session, data_client=FakeTradeReader([recent_trade]), now=_now())
     orders = list_copy_orders(db_session)
+    trades = list_copy_trades(db_session)
 
     assert response.new_trades == 1
     assert response.live_candidates == 0
     assert response.recent_outside_window == 1
     assert response.historical_trades == 0
     assert response.skipped_reasons == {"trade_too_old": 1}
-    assert orders[0].status == "skipped"
-    assert orders[0].reason == "trade_too_old"
+    assert len(trades) == 1
+    assert orders == []
 
 
 def test_demo_tick_buy_opens_demo_position(db_session: Session) -> None:
@@ -621,7 +623,7 @@ def test_demo_tick_buy_opens_demo_position(db_session: Session) -> None:
 
 def test_demo_tick_skipped_buy_does_not_open_demo_position(db_session: Session) -> None:
     _create_wallet(db_session, amount=Decimal("10"))
-    old_trade = _trade("0xposition-skipped", price="0.40") | {"timestamp": (_now() - timedelta(minutes=10)).isoformat()}
+    old_trade = _trade("0xposition-skipped", price="0.40") | {"timestamp": (_now() - timedelta(seconds=45)).isoformat()}
 
     response = run_demo_tick(db_session, data_client=FakeTradeReader([old_trade]), now=_now())
 
@@ -1285,7 +1287,7 @@ def test_watcher_groups_repeated_historical_skip_events(db_session: Session) -> 
     watcher = _build_test_watcher()
     old_trade = {
         **_trade("0xold-1"),
-        "timestamp": (_now() - timedelta(minutes=20)).isoformat(),
+        "timestamp": (_now() - timedelta(seconds=45)).isoformat(),
     }
 
     watcher.run_once(
@@ -1297,8 +1299,25 @@ def test_watcher_groups_repeated_historical_skip_events(db_session: Session) -> 
 
     grouped = [event for event in events if event.event_type == "demo_order_skipped_grouped"]
     assert len(grouped) == 1
-    assert grouped[0].message == "Trades historicos detectados fuera de la ventana de copia."
+    assert grouped[0].message == "Trades recientes detectados fuera de la ventana de copia."
     assert grouped[0].event_metadata["count"] == 3
+
+
+def test_demo_tick_ignores_trades_before_tracking_started(db_session: Session) -> None:
+    wallet = _create_wallet(db_session)
+    ignored_trade = _trade("0xignored-before-tracking") | {
+        "timestamp": (_wallet_tracking_started_at(wallet) - timedelta(seconds=1)).isoformat()
+    }
+
+    response = run_demo_tick(db_session, data_client=FakeTradeReader([ignored_trade]), now=_now())
+    events = list_copy_events(db_session, limit=10)
+
+    assert response.new_trades == 0
+    assert response.orders_skipped == 0
+    assert response.skipped_reasons == {}
+    assert list_copy_trades(db_session) == []
+    assert list_copy_orders(db_session) == []
+    assert any(event.event_type == "copy_trade_ignored_before_tracking" for event in events)
 
 
 def test_watcher_marks_over_interval_and_counts_timeout(db_session: Session) -> None:
@@ -1520,9 +1539,11 @@ def test_copy_trading_watcher_status_reads_persisted_state(client: TestClient, d
             id="copy_trading_demo",
             owner_id="12345678-1234-1234-1234-123456789abc",
             status="running",
+            last_loop_started_at=recent_now,
+            last_loop_finished_at=recent_now,
             last_heartbeat_at=recent_now,
             last_success_at=recent_now,
-            last_result_json={"wallets_scanned": 3},
+            last_result_json={"wallets_scanned": 3, "trades_detected": 5, "duration_ms": 1200},
         )
     )
     db_session.commit()
@@ -1532,8 +1553,67 @@ def test_copy_trading_watcher_status_reads_persisted_state(client: TestClient, d
     assert response.status_code == 200
     payload = response.json()
     assert payload["worker_status"] == "running"
-    assert payload["last_result_json"] == {"wallets_scanned": 3}
+    assert payload["running"] is True
+    assert payload["enabled"] is True
+    assert payload["last_result_json"] == {"wallets_scanned": 3, "trades_detected": 5, "duration_ms": 1200}
+    assert payload["last_result"]["wallets_scanned"] == 3
+    assert payload["last_result"]["trades_detected"] == 5
+    assert payload["last_run_duration_ms"] == 1200
     assert payload["demo_only"] is True
+
+
+def test_copy_trading_watcher_status_defaults_to_not_started_without_worker_state(client: TestClient) -> None:
+    response = client.get("/copy-trading/watcher/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["worker_status"] == "not_started"
+    assert payload["running"] is False
+    assert payload["enabled"] is False
+
+
+def test_copy_trading_watcher_status_marks_stale_worker_as_not_running(client: TestClient, db_session: Session) -> None:
+    db_session.add(
+        CopyWorkerState(
+            id="copy_trading_demo",
+            owner_id="12345678-1234-1234-1234-123456789abc",
+            status="running",
+            last_heartbeat_at=_now() - timedelta(seconds=120),
+            last_result_json={"wallets_scanned": 2},
+            consecutive_errors=1,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/copy-trading/watcher/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["worker_status"] == "stale"
+    assert payload["running"] is False
+    assert payload["enabled"] is True
+
+
+def test_copy_trading_watcher_status_marks_stopped_worker_as_disabled(client: TestClient, db_session: Session) -> None:
+    db_session.add(
+        CopyWorkerState(
+            id="copy_trading_demo",
+            owner_id="12345678-1234-1234-1234-123456789abc",
+            status="stopped",
+            last_heartbeat_at=_now(),
+            stopped_at=_now(),
+            last_result_json={"wallets_scanned": 1},
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/copy-trading/watcher/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["worker_status"] == "stopped"
+    assert payload["running"] is False
+    assert payload["enabled"] is False
 
 
 def test_demo_settlement_run_once_route(client: TestClient, db_session: Session) -> None:
@@ -1671,6 +1751,7 @@ def _create_wallet(
     amount: Decimal = Decimal("5"),
     amount_mode: str = "preset",
     suffix: str = "11",
+    tracking_started_at: datetime | None = None,
 ) -> CopyWallet:
     wallet_input = f"0x{suffix.zfill(40)}"
     wallet = create_copy_wallet(
@@ -1681,7 +1762,12 @@ def _create_wallet(
             copy_amount_usd=amount,
         ),
     )
+    started_at = tracking_started_at or (_now() - timedelta(minutes=5))
+    wallet.created_at = started_at
+    wallet.updated_at = started_at
+    db_session.add(wallet)
     db_session.commit()
+    db_session.refresh(wallet)
     return wallet
 
 
@@ -1713,6 +1799,11 @@ def _build_test_watcher() -> CopyTradingDemoWatcher:
         data_client_factory=DummyDataClient,
         gamma_client_factory=DummyGammaClient,
     )
+
+
+def _wallet_tracking_started_at(wallet: CopyWallet) -> datetime:
+    assert wallet.created_at is not None
+    return wallet.created_at if wallet.created_at.tzinfo is not None else wallet.created_at.replace(tzinfo=UTC)
 
 
 def _create_market(
