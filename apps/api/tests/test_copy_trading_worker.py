@@ -158,6 +158,29 @@ def test_copy_trading_worker_lock_acquired_and_second_lock_rejected(
         first_lock.release()
 
 
+def test_copy_trading_worker_releases_lock_after_exit(
+    worker_db: tuple[sessionmaker[Session], object],
+) -> None:
+    testing_session_factory, testing_engine = worker_db
+    command = CopyTradingWorkerCommand(
+        engine_instance=testing_engine,
+        session_factory=testing_session_factory,
+        watcher_factory=lambda _args: FakeWatcher(),
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        env={},
+    )
+
+    assert command.run(["--once"]) == 0
+
+    lock_after_exit = acquire_worker_lock(testing_engine)
+    try:
+        assert lock_after_exit is not None
+    finally:
+        assert lock_after_exit is not None
+        lock_after_exit.release()
+
+
 def test_copy_trading_worker_returns_cleanly_when_lock_is_held(
     worker_db: tuple[sessionmaker[Session], object],
 ) -> None:

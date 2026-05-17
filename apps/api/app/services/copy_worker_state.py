@@ -25,6 +25,7 @@ _DATABASE_URL_ASSIGNMENT_PATTERN = re.compile(r"(DATABASE_URL\s*=\s*)(\S+)", re.
 class WorkerLockHandle:
     worker_id: str
     backend: str
+    lock_key: int
     connection: Connection | None = None
     local_lock: Lock | None = None
     released: bool = False
@@ -36,7 +37,7 @@ class WorkerLockHandle:
             try:
                 self.connection.execute(
                     text("SELECT pg_advisory_unlock(:key)"),
-                    {"key": COPY_TRADING_WORKER_LOCK_KEY},
+                    {"key": self.lock_key},
                 )
             finally:
                 self.connection.close()
@@ -62,14 +63,24 @@ def acquire_worker_lock(
         if not acquired:
             connection.close()
             return None
-        return WorkerLockHandle(worker_id=worker_id, backend="postgresql", connection=connection)
+        return WorkerLockHandle(
+            worker_id=worker_id,
+            backend="postgresql",
+            lock_key=lock_key,
+            connection=connection,
+        )
 
     with _LOCAL_LOCKS_GUARD:
         local_lock = _LOCAL_LOCKS.setdefault(worker_id, Lock())
     acquired = local_lock.acquire(blocking=False)
     if not acquired:
         return None
-    return WorkerLockHandle(worker_id=worker_id, backend="local", local_lock=local_lock)
+    return WorkerLockHandle(
+        worker_id=worker_id,
+        backend="local",
+        lock_key=lock_key,
+        local_lock=local_lock,
+    )
 
 
 def get_or_create_worker_state(
