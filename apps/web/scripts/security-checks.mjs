@@ -2809,8 +2809,13 @@ function validateAnalyzerFirstProductSource() {
   for (const text of ["Watcher demo", "Estado del worker en Render", "Estado persistido del worker", "Ultimo heartbeat", "Errores consecutivos"]) {
     assert(copyWatcherPanel.includes(text), `copy watcher panel missing text: ${text}`);
   }
+  for (const text of ["Detalles tecnicos del worker", "Actividad del watcher", "Resumen operativo", "Wallets activas", "Ultimo resultado"]) {
+    assert(copyWatcherPanel.includes(text), `copy watcher panel missing structured text: ${text}`);
+  }
   assert(
-    copyWatcherPanel.includes("Intervalo:") || copyWatcherPanel.includes("Intervalo objetivo:"),
+    copyWatcherPanel.includes("Intervalo:") ||
+      copyWatcherPanel.includes("Intervalo objetivo:") ||
+      copyWatcherPanel.includes("Intervalo objetivo"),
     "copy watcher panel missing interval text",
   );
   assert(
@@ -2901,6 +2906,9 @@ function validateAnalyzerFirstProductSource() {
   assert(copyDemoPnlSummaryPanel.includes("Datos parciales"), "demo pnl panel should expose partial status label");
   assert(copyDemoPnlSummaryPanel.includes("Precio pendiente:"), "demo pnl panel should surface pending price count in the header");
   assert(copyDemoPnlSummaryPanel.includes("Hay posiciones abiertas, pero algunas no tienen precio actual disponible."), "demo pnl panel should explain partial pricing states");
+  assert(copyDemoPnlSummaryPanel.includes("Cobertura de precio"), "demo pnl panel should expose price coverage");
+  assert(copyDemoPnlSummaryPanel.includes("Con precio"), "demo pnl panel should expose priced open positions");
+  assert(copyDemoPnlSummaryPanel.includes("Sin precio"), "demo pnl panel should expose open positions without price");
   assert(copyDemoPnlSummaryPanel.includes("El win rate aparecera cuando existan copias cerradas con resultado confiable."), "demo pnl panel should explain pending win rate when there are no closed copies");
   assert(!copyDemoPnlSummaryPanel.includes("Todavia no hay copias demo suficientes para calcular rendimiento."), "demo pnl panel should not use the old insufficient-copy placeholder");
   assert(copyOpenDemoPositionsTable.includes("Copias demo abiertas"), "open demo positions table should be visible");

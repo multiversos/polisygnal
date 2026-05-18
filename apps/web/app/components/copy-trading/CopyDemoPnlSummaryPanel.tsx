@@ -72,6 +72,42 @@ export function CopyDemoPnlSummaryPanel({
             </div>
           ) : null}
 
+          {openPositionsCount > 0 ? (
+            <div className="copy-price-coverage-panel">
+              <div className="copy-price-coverage-copy">
+                <span>Cobertura de precio</span>
+                <strong>
+                  {pendingPriceCount > 0
+                    ? `Datos parciales: ${pendingPriceCount} posiciones abiertas no tienen precio actual disponible.`
+                    : "Todas las posiciones abiertas tienen precio actual disponible en esta pasada."}
+                </strong>
+                <small>
+                  {pendingPriceCount > 0
+                    ? "El PnL abierto se calcula con las posiciones que si tienen precio."
+                    : "El PnL abierto ya refleja todas las posiciones abiertas con precio visible."}
+                </small>
+              </div>
+              <div className="copy-price-coverage-metrics">
+                <MiniStat label="Abiertas totales" value={String(openPositionsCount)} />
+                <MiniStat
+                  label="Con precio"
+                  tone={pricedOpenCount > 0 ? "positive" : "neutral"}
+                  value={String(pricedOpenCount)}
+                />
+                <MiniStat
+                  label="Sin precio"
+                  tone={pendingPriceCount > 0 ? "warning" : "neutral"}
+                  value={String(pendingPriceCount)}
+                />
+                <MiniStat
+                  label="Cobertura"
+                  tone={pendingPriceCount > 0 ? "warning" : "positive"}
+                  value={priceCoveragePercent === null ? "Pendiente" : formatPercent(priceCoveragePercent)}
+                />
+              </div>
+            </div>
+          ) : null}
+
           <div className="copy-performance-primary-grid">
             <MetricCard
               detail="Capital comprometido"

@@ -730,7 +730,7 @@
 
 .copy-summary-layout {
   align-items: start;
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr) !important;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 1fr) !important;
 }
 
 .copy-history-grid {
@@ -773,6 +773,45 @@
 
 .copy-performance-banner small {
   color: var(--muted-foreground);
+}
+
+.copy-price-coverage-panel {
+  display: grid;
+  gap: 14px;
+  padding: 14px 15px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(18, 31, 51, 0.8), rgba(12, 23, 40, 0.76)),
+    rgba(15, 23, 42, 0.52);
+}
+
+.copy-price-coverage-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.copy-price-coverage-copy span {
+  color: var(--muted-foreground);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.copy-price-coverage-copy strong {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.copy-price-coverage-copy small {
+  color: var(--muted-foreground);
+  line-height: 1.4;
+}
+
+.copy-price-coverage-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .copy-performance-banner.warning {
@@ -927,6 +966,14 @@
     rgba(15, 23, 42, 0.56);
 }
 
+.copy-performance-list.compact {
+  padding: 4px 14px;
+}
+
+.copy-performance-list.compact .copy-performance-list-item {
+  padding: 10px 0;
+}
+
 .copy-performance-list-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1076,6 +1123,137 @@
   border-color: rgba(250, 204, 21, 0.28);
 }
 
+.copy-watcher-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.copy-watcher-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.copy-watcher-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.copy-watcher-primary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.copy-watcher-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 14px 15px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(18, 31, 51, 0.88), rgba(12, 23, 40, 0.82)),
+    rgba(15, 23, 42, 0.58);
+}
+
+.copy-watcher-card span {
+  color: var(--muted-foreground);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.copy-watcher-card strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(1.05rem, 1.65vw, 1.4rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.12;
+}
+
+.copy-watcher-card small {
+  color: var(--muted-foreground);
+  line-height: 1.4;
+}
+
+.copy-watcher-card.wide {
+  grid-column: 1 / -1;
+}
+
+.copy-watcher-card.positive {
+  border-color: rgba(34, 197, 94, 0.28);
+  background:
+    linear-gradient(180deg, rgba(16, 42, 30, 0.78), rgba(10, 24, 19, 0.76)),
+    rgba(34, 197, 94, 0.08);
+}
+
+.copy-watcher-card.negative,
+.copy-watcher-card.locked {
+  border-color: rgba(251, 113, 133, 0.28);
+  background:
+    linear-gradient(180deg, rgba(49, 20, 29, 0.8), rgba(27, 13, 18, 0.76)),
+    rgba(251, 113, 133, 0.08);
+}
+
+.copy-watcher-card.warning {
+  border-color: rgba(250, 204, 21, 0.28);
+  background:
+    linear-gradient(180deg, rgba(55, 44, 18, 0.78), rgba(32, 24, 10, 0.74)),
+    rgba(250, 204, 21, 0.08);
+}
+
+.copy-watcher-technical {
+  display: grid;
+  gap: 12px;
+  padding: 14px 15px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(14, 26, 44, 0.8), rgba(10, 20, 36, 0.78)),
+    rgba(15, 23, 42, 0.5);
+}
+
+.copy-watcher-technical summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.copy-watcher-technical summary::-webkit-details-marker {
+  display: none;
+}
+
+.copy-watcher-technical summary span {
+  color: #dce7f5;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.copy-watcher-technical summary small {
+  color: var(--muted-foreground);
+  text-align: right;
+}
+
+.copy-watcher-technical-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.copy-watcher-technical-sections {
+  display: grid;
+  gap: 12px;
+}
+
 @media (max-width: 1480px) {
   .copy-summary-layout {
     grid-template-columns: 1fr !important;
@@ -1112,6 +1290,30 @@
 
 .copy-position-item {
   align-items: start;
+}
+
+@media (max-width: 1120px) {
+  .copy-price-coverage-metrics,
+  .copy-watcher-primary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .copy-watcher-header {
+    flex-direction: column;
+  }
+
+  .copy-price-coverage-metrics,
+  .copy-performance-section-grid,
+  .copy-watcher-primary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-watcher-technical summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 .copy-wallets-shell {
