@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 WalletProfileStatus = Literal["candidate", "watching", "demo_follow", "paused", "rejected"]
 WalletMetricStatus = Literal["verified", "estimated", "unavailable"]
 WalletConfidence = Literal["low", "medium", "high"]
+WalletSignalStrength = Literal["weak", "moderate", "strong"]
 WalletAnalysisJobStatus = Literal[
     "pending",
     "resolving_market",
@@ -75,9 +76,13 @@ class WalletAnalysisSignalSummaryRead(BaseModel):
     predicted_outcome: str | None = None
     polysignal_score: Decimal | None = None
     confidence: WalletConfidence
+    data_confidence: WalletConfidence | None = None
+    signal_strength: WalletSignalStrength | None = None
+    signal_margin: Decimal | None = None
     yes_score: Decimal | None = None
     no_score: Decimal | None = None
     outcome_scores_json: dict[str, Any] | None = None
+    outcome_wallet_counts_json: dict[str, int] | None = None
     signal_status: MarketSignalStatus
     warnings_json: list[str] = Field(default_factory=list)
 
@@ -292,9 +297,13 @@ class PolySignalMarketSignalRead(BaseModel):
     predicted_outcome: str | None = None
     polysignal_score: Decimal | None = None
     confidence: WalletConfidence
+    data_confidence: WalletConfidence | None = None
+    signal_strength: WalletSignalStrength | None = None
+    signal_margin: Decimal | None = None
     yes_score: Decimal | None = None
     no_score: Decimal | None = None
     outcome_scores_json: dict[str, Any] | None = None
+    outcome_wallet_counts_json: dict[str, int] | None = None
     wallets_analyzed: int | None = None
     wallets_with_sufficient_history: int | None = None
     top_wallets_json: list[dict[str, Any]] = Field(default_factory=list)

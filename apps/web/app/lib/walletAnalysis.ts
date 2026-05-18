@@ -4,6 +4,7 @@ import { fetchApiJson } from "./api";
 
 export type WalletAnalysisMetricStatus = "estimated" | "unavailable" | "verified";
 export type WalletAnalysisConfidence = "high" | "low" | "medium";
+export type WalletAnalysisSignalStrength = "strong" | "moderate" | "weak";
 export type WalletAnalysisJobStatus =
   | "pending"
   | "resolving_market"
@@ -48,9 +49,13 @@ export type WalletAnalysisSignalSummary = {
   predicted_outcome?: string | null;
   polysignal_score?: string | number | null;
   confidence: WalletAnalysisConfidence;
+  data_confidence?: WalletAnalysisConfidence | null;
+  signal_strength?: WalletAnalysisSignalStrength | null;
+  signal_margin?: string | number | null;
   yes_score?: string | number | null;
   no_score?: string | number | null;
   outcome_scores_json?: Record<string, unknown> | null;
+  outcome_wallet_counts_json?: Record<string, number> | null;
   signal_status: MarketSignalStatus;
   warnings_json: string[];
 };
@@ -190,9 +195,13 @@ export type PolySignalMarketSignal = {
   predicted_outcome?: string | null;
   polysignal_score?: string | number | null;
   confidence: WalletAnalysisConfidence;
+  data_confidence?: WalletAnalysisConfidence | null;
+  signal_strength?: WalletAnalysisSignalStrength | null;
+  signal_margin?: string | number | null;
   yes_score?: string | number | null;
   no_score?: string | number | null;
   outcome_scores_json?: Record<string, unknown> | null;
+  outcome_wallet_counts_json?: Record<string, number> | null;
   wallets_analyzed?: number | null;
   wallets_with_sufficient_history?: number | null;
   warnings_json: string[];

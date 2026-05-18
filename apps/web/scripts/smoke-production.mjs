@@ -2234,52 +2234,63 @@ async function main() {
   } else if (validAnalyzeWalletResult) {
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Wallet Analysis", "Balanza PolySignal", "Analizar wallets del mercado"],
+      ["Wallet Analysis", "Balanza PolySignal", "Analizando wallets automaticamente", "Analizar mas wallets"],
       "analyze confirm-before-deep-analysis",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Balanza PolySignal", "Confianza alta", "Confianza media", "Confianza baja", "Analizar wallets del mercado"],
+      [
+        "Balanza PolySignal",
+        "Confianza de datos",
+        "Fuerza de senal",
+        "Margen",
+        "Analizando wallets automaticamente",
+        "Confianza alta",
+        "Confianza media",
+        "Confianza baja",
+        "Analizar wallets del mercado",
+        "Wallet Analysis",
+      ],
       "analyze market reading",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Wallet Analysis", "Balanza PolySignal", "Analizar wallets del mercado"],
+      ["Wallet Analysis", "Balanza PolySignal", "Analizando wallets automaticamente", "Analizar mas wallets"],
       "analyze product center summary",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Advertencias tecnicas y detalles del job", "Analisis parcial utilizable", "Balanza PolySignal", "Analizar wallets del mercado"],
+      ["Advertencias tecnicas y detalles del job", "Analisis parcial utilizable", "Balanza PolySignal", "Analizando wallets automaticamente", "Analizar wallets del mercado"],
       "analyze deep analyzer readiness",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Analisis parcial utilizable", "Balanza PolySignal", "Wallets candidatas", "Analizar wallets del mercado"],
+      ["Analisis parcial utilizable", "Balanza PolySignal", "Wallets candidatas", "Analizar mas wallets", "Analizar wallets del mercado"],
       "analyze future layers are not presented as active",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Wallet Analysis", "Balanza PolySignal", "Wallets candidatas", "Analizar wallets del mercado"],
+      ["Wallet Analysis", "Balanza PolySignal", "Wallets candidatas", "Analizando wallets automaticamente", "Analizar wallets del mercado"],
       "analyze found summary",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Advertencias tecnicas y detalles del job", "Analisis parcial utilizable", "Wallets candidatas", "Analizar wallets del mercado"],
+      ["Advertencias tecnicas y detalles del job", "Analisis parcial utilizable", "Wallets candidatas", "Analizar mas wallets", "Analizar wallets del mercado"],
       "analyze reviewed layers",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["senal historica", "Guardar perfil", "Ver perfil", "Wallets candidatas", "Analizar wallets del mercado"],
+      ["senal historica", "Guardar perfil", "Ver perfil", "Wallets candidatas", "Analizar mas wallets", "Analizar wallets del mercado"],
       "analyze related history layer",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Balanza PolySignal", "YES", "NO", "Confianza", "Analizar wallets del mercado"],
+      ["Balanza PolySignal", "Confianza de datos", "Fuerza de senal", "Margen", "Analizar mas wallets", "Analizar wallets del mercado", "YES", "NO", "Confianza"],
       "analyze market probability",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Balanza PolySignal", "YES", "NO", "Confianza", "Analizar wallets del mercado"],
+      ["Balanza PolySignal", "Confianza de datos", "Fuerza de senal", "Margen", "Analizando wallets automaticamente", "Analizar wallets del mercado", "YES", "NO", "Confianza"],
       "analyze polysignal probability",
     );
     assertTextIncludesOneOf(
@@ -2292,22 +2303,22 @@ async function main() {
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Analisis parcial utilizable", "Wallets candidatas", "Advertencias tecnicas y detalles del job", "Analizar wallets del mercado"],
+      ["Analisis parcial utilizable", "Wallets candidatas", "Advertencias tecnicas y detalles del job", "Analizar mas wallets", "Analizar wallets del mercado"],
       "analyze estimate readiness",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Advertencias tecnicas y detalles del job", "Analisis parcial utilizable", "Analizar wallets del mercado"],
+      ["Advertencias tecnicas y detalles del job", "Analisis parcial utilizable", "Analizar mas wallets", "Analizando wallets automaticamente", "Analizar wallets del mercado"],
       "analyze soccer context",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Advertencias tecnicas y detalles del job", "Wallets candidatas", "Analizar wallets del mercado"],
+      ["Advertencias tecnicas y detalles del job", "Wallets candidatas", "Analizar mas wallets", "Analizando wallets automaticamente", "Analizar wallets del mercado"],
       "analyze external research readiness",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Analizar wallets del mercado", "Wallets candidatas", "Guardar perfil"],
+      ["Analizar mas wallets", "Wallets candidatas", "Guardar perfil", "Analizando wallets automaticamente", "Analizar wallets del mercado"],
       "analyze wallet intelligence readiness",
     );
     assertTextIncludesOneOf(
@@ -2316,18 +2327,19 @@ async function main() {
         "Algunas wallets no devolvieron historial completo.",
         "wallets con historial suficiente favorecen",
         "Wallets candidatas",
+        "Analizar mas wallets",
         "Analizar wallets del mercado",
       ],
       "analyze wallet privacy copy",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Advertencias tecnicas y detalles del job", "Guardar perfil", "Ver perfil", "Wallets candidatas", "Analizar wallets del mercado"],
+      ["Advertencias tecnicas y detalles del job", "Guardar perfil", "Ver perfil", "Wallets candidatas", "Analizar mas wallets", "Analizar wallets del mercado"],
       "analyze no fake external sources",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Analisis parcial utilizable", "Wallet Analysis", "Analizar wallets del mercado"],
+      ["Analisis parcial utilizable", "Wallet Analysis", "Analizar mas wallets", "Analizando wallets automaticamente", "Analizar wallets del mercado"],
       "analyze non predictive readiness",
     );
     assertTextIncludesOneOf(
@@ -2406,18 +2418,18 @@ async function main() {
     assertTextIncludesOneOf(validAnalyzeText, ["Decision de PolySignal", "Analizar este mercado", "Balanza PolySignal", "Wallet Analysis"], "analyze clear decision panel");
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["umbral de decision del 55%", "umbral de decisi?n del 55%", "Analizar este mercado", "Confianza alta", "Confianza media", "Confianza baja", "Balanza PolySignal"],
+      ["Analizar este mercado", "Balanza PolySignal", "Confianza de datos", "Fuerza de senal", "Margen"],
       "analyze clear decision threshold copy",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Guardar analisis", "Guardar análisis", "Guardar anÃ¡lisis", "Crear job de wallets", "Analizar wallets del mercado"],
+      ["Guardar analisis", "Guardar análisis", "Guardar anÃ¡lisis", "Analizar wallets del mercado", "Analizar mas wallets"],
       "analyze primary action",
     );
   }
   assertTextIncludesOneOf(
     validAnalyzeText,
-    ["Analizar wallets del mercado", "Crear job de wallets"],
+    ["Analizar wallets del mercado", "Analizar mas wallets", "Analizando wallets automaticamente"],
     "analyze wallet-analysis primary CTA",
   );
   assertTextIncludesOneOf(

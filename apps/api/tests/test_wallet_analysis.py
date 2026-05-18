@@ -511,6 +511,7 @@ def test_wallet_analysis_job_detail_includes_signal_summary(client: TestClient, 
         status="completed",
         outcomes_json=[{"label": "Yes", "side": "YES", "token_id": TOKEN_YES}],
         token_ids_json=[TOKEN_YES],
+        result_json={"outcome_wallet_counts": {"YES": 3, "NO": 1}},
     )
     db_session.add(job)
     db_session.flush()
@@ -543,6 +544,9 @@ def test_wallet_analysis_job_detail_includes_signal_summary(client: TestClient, 
     assert payload["signal_summary"]["id"] == signal.id
     assert payload["signal_summary"]["predicted_side"] == "YES"
     assert payload["signal_summary"]["confidence"] == "medium"
+    assert payload["signal_summary"]["data_confidence"] == "medium"
+    assert payload["signal_summary"]["signal_strength"] == "strong"
+    assert payload["signal_summary"]["outcome_wallet_counts_json"] == {"YES": 3, "NO": 1}
 
 
 def test_wallet_analysis_job_detail_partial_has_clean_progress_and_status_detail(

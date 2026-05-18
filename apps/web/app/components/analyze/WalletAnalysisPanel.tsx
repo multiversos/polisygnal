@@ -20,6 +20,7 @@ import {
   type WalletAnalysisCandidateSortBy,
   type WalletAnalysisConfidence,
   type WalletAnalysisJobRead,
+  type WalletAnalysisSignalStrength,
   type WalletAnalysisSortOrder,
   type WalletProfileRead,
   type WalletProfileStatus,
@@ -36,6 +37,16 @@ const ACTIVE_JOB_STATUSES = new Set([
   "analyzing_wallets",
   "scoring",
 ]);
+
+const AUTO_BATCH_SIZE = 10;
+const AUTO_HISTORY_LIMIT = 100;
+const AUTO_MAX_RUNTIME_SECONDS = 12;
+const AUTO_MAX_WALLETS_INITIAL = 60;
+const AUTO_MAX_WALLETS_DISCOVERY_INITIAL = 150;
+const AUTO_MAX_WALLETS_INCREMENT = 40;
+const AUTO_MAX_WALLETS_DISCOVERY_INCREMENT = 100;
+const AUTO_MAX_WALLETS_CAP = 220;
+const AUTO_MAX_WALLETS_DISCOVERY_CAP = 400;
 
 function formatShortWallet(wallet: string): string {
   return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
@@ -224,6 +235,31 @@ function confidenceBadgeLabel(confidence?: WalletAnalysisConfidence | null): str
   return labels[confidence];
 }
 
+function signalStrengthLabel(signalStrength?: WalletAnalysisSignalStrength | null): string {
+  const labels: Record<WalletAnalysisSignalStrength, string> = {
+    strong: "Fuerte",
+    moderate: "Moderada",
+    weak: "Debil",
+  };
+  if (!signalStrength) {
+    return "Sin dato";
+  }
+  return labels[signalStrength];
+}
+
+function signalStrengthNarrative(signalStrength?: WalletAnalysisSignalStrength | null): string {
+  if (signalStrength === "weak") {
+    return "Balanza muy ajustada. El margen entre outcomes es estrecho.";
+  }
+  if (signalStrength === "moderate") {
+    return "La balanza muestra una diferencia util, pero todavia moderada.";
+  }
+  if (signalStrength === "strong") {
+    return "La balanza muestra una diferencia clara entre outcomes.";
+  }
+  return "Todavia no hay suficiente informacion para medir la fuerza de la senal.";
+}
+
 function normalizeSideLabel(value?: string | null): string {
   if (!value) {
     return "Sin lado claro";
@@ -267,15 +303,6 @@ function uniqueStrings(values: Array<string | null | undefined>): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value && value.trim())))];
 }
 
-function SignalDisclaimer({ signalCopy }: { signalCopy: string }) {
-  return (
-    <div className="focus-notice active" role="status">
-      <strong>Senal PolySignal</strong>
-      <span>{signalCopy}</span>
-    </div>
-  );
-}
-
 export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalysisPanelProps) {
   const [job, setJob] = useState<WalletAnalysisJobRead | null>(null);
   const [candidates, setCandidates] = useState<WalletAnalysisCandidate[]>([]);
@@ -291,12 +318,21 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
   const [signalsLoading, setSignalsLoading] = useState(false);
   const [stepAutoAdvance, setStepAutoAdvance] = useState(false);
   const [stepInFlight, setStepInFlight] = useState(false);
+  const [analysisPaused, setAnalysisPaused] = useState(false);
+  const [analysisLimits, setAnalysisLimits] = useState({
+    batchSize: AUTO_BATCH_SIZE,
+    historyLimit: AUTO_HISTORY_LIMIT,
+    maxRuntimeSeconds: AUTO_MAX_RUNTIME_SECONDS,
+    maxWallets: AUTO_MAX_WALLETS_INITIAL,
+    maxWalletsDiscovery: AUTO_MAX_WALLETS_DISCOVERY_INITIAL,
+  });
   const [sortBy, setSortBy] = useState<WalletAnalysisCandidateSortBy>("score");
   const [sortOrder, setSortOrder] = useState<WalletAnalysisSortOrder>("desc");
   const [sideFilter, setSideFilter] = useState<string>("ALL");
   const [confidenceFilter, setConfidenceFilter] = useState<WalletAnalysisConfidence | "ALL">("ALL");
   const [signalStatusFilter, setSignalStatusFilter] = useState<string>("ALL");
   const stepTimerRef = useRef<number | null>(null);
+  const autoCreateRef = useRef<string | null>(null);
 
   const profileByWallet = useMemo(() => {
     const map = new Map<string, WalletProfileRead>();
@@ -307,6 +343,15 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
   }, [profiles]);
 
   const scoreSummary = useMemo(() => scoreEntries(job?.signal_summary), [job?.signal_summary]);
+  const outcomeWalletCounts = useMemo(() => {
+    const rawCounts = job?.signal_summary?.outcome_wallet_counts_json;
+    if (!rawCounts) {
+      return {} as Record<string, number>;
+    }
+    return Object.fromEntries(
+      Object.entries(rawCounts).map(([key, value]) => [key, typeof value === "number" ? value : 0]),
+    );
+  }, [job?.signal_summary?.outcome_wallet_counts_json]);
   const favoredScore = scoreSummary[0] ?? null;
   const secondaryScore = scoreSummary[1] ?? null;
   const favoredSideLabel = normalizeSideLabel(
@@ -320,6 +365,52 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     () => uniqueStrings(technicalWarnings.map((warning) => humanizeTechnicalWarning(warning))).slice(0, 3),
     [technicalWarnings],
   );
+  const resultAnalysisLimit = toNumber(job?.result_json?.analysis_limit) ?? 0;
+  const resultDiscoveryLimit = toNumber(job?.result_json?.discovery_limit) ?? 0;
+  const discoveryMayHaveMore = Boolean(job?.result_json?.discovery_may_have_more);
+  const canExpandCoverage = Boolean(
+    job &&
+      job.status === "partial" &&
+      (analysisLimits.maxWallets > resultAnalysisLimit || analysisLimits.maxWalletsDiscovery > resultDiscoveryLimit),
+  );
+  const coverageSummary = useMemo(() => {
+    if (!job) {
+      return null;
+    }
+    if ((job.progress.wallets_found || 0) === 0) {
+      return "La fuente de datos no devolvio wallets publicas suficientes para este mercado en esta pasada.";
+    }
+    if ((job.progress.wallets_found || 0) <= 3) {
+      return "La fuente de datos devolvio pocas wallets para este mercado. La lectura puede ser util, pero con cobertura limitada.";
+    }
+    if (discoveryMayHaveMore) {
+      return "Se analizaron parte de las wallets descubiertas por el limite seguro de esta pasada. Puedes ampliar el analisis procesando mas lotes.";
+    }
+    if (job.progress.wallets_with_sufficient_history <= 2 && job.progress.wallets_found > 0) {
+      return "Se encontraron wallets, pero pocas tenian historial suficiente para reforzar la lectura.";
+    }
+    return null;
+  }, [discoveryMayHaveMore, job]);
+  const outcomeFilterOptions = useMemo(() => {
+    const values = new Map<string, string>();
+    for (const outcome of job?.outcomes || []) {
+      if (outcome.side) {
+        values.set(outcome.side, normalizeSideLabel(outcome.label || outcome.side));
+      }
+    }
+    for (const entry of scoreSummary) {
+      values.set(entry.label, normalizeSideLabel(entry.label));
+    }
+    for (const candidate of candidates) {
+      const value = candidate.side || candidate.outcome || "";
+      if (value) {
+        values.set(value, normalizeSideLabel(candidate.outcome || candidate.side || value));
+      }
+    }
+    return Array.from(values.entries())
+      .filter(([, label]) => label !== "Sin lado claro")
+      .sort((left, right) => left[1].localeCompare(right[1]));
+  }, [candidates, job?.outcomes, scoreSummary]);
   const signalCopy = useMemo(() => {
     if (!job?.signal_summary || !favoredScore) {
       return "Todavia no hay una senal PolySignal persistida para este job.";
@@ -328,7 +419,7 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     const runnerUp = secondaryScore
       ? `${normalizeSideLabel(secondaryScore.label)} ${formatPercent(secondaryScore.percent)}`
       : "sin contraparte clara";
-    return `${favored} domina la balanza con ${formatPercent(favoredScore.percent)} frente a ${runnerUp}. Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.`;
+    return `${favored} domina la balanza con ${formatPercent(favoredScore.percent)} frente a ${runnerUp}.`;
   }, [favoredScore, job?.signal_summary, secondaryScore]);
 
   useEffect(() => {
@@ -350,11 +441,20 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     setSignalsLoading(false);
     setStepAutoAdvance(false);
     setStepInFlight(false);
+    setAnalysisPaused(false);
+    setAnalysisLimits({
+      batchSize: AUTO_BATCH_SIZE,
+      historyLimit: AUTO_HISTORY_LIMIT,
+      maxRuntimeSeconds: AUTO_MAX_RUNTIME_SECONDS,
+      maxWallets: AUTO_MAX_WALLETS_INITIAL,
+      maxWalletsDiscovery: AUTO_MAX_WALLETS_DISCOVERY_INITIAL,
+    });
     setSortBy("score");
     setSortOrder("desc");
     setSideFilter("ALL");
     setConfidenceFilter("ALL");
     setSignalStatusFilter("ALL");
+    autoCreateRef.current = null;
   }, [normalizedUrl]);
 
   useEffect(() => {
@@ -364,6 +464,14 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!normalizedUrl || job || autoCreateRef.current === normalizedUrl) {
+      return;
+    }
+    autoCreateRef.current = normalizedUrl;
+    void handleCreateJob("auto");
+  }, [job, normalizedUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -414,6 +522,39 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
       window.clearInterval(intervalId);
     };
   }, [job?.id, job?.status]);
+
+  useEffect(() => {
+    if (stepTimerRef.current !== null) {
+      window.clearTimeout(stepTimerRef.current);
+      stepTimerRef.current = null;
+    }
+    if (!job?.id || analysisPaused || stepInFlight) {
+      if (!stepInFlight) {
+        setStepAutoAdvance(false);
+      }
+      return;
+    }
+    if (typeof document !== "undefined" && document.hidden) {
+      setStepAutoAdvance(false);
+      return;
+    }
+    const shouldContinue =
+      job.status === "pending" || ACTIVE_JOB_STATUSES.has(job.status) || canExpandCoverage;
+    if (!shouldContinue) {
+      setStepAutoAdvance(false);
+      return;
+    }
+    setStepAutoAdvance(true);
+    stepTimerRef.current = window.setTimeout(() => {
+      void runJobStep(job.id, "auto");
+    }, job.status === "pending" ? 200 : 900);
+    return () => {
+      if (stepTimerRef.current !== null) {
+        window.clearTimeout(stepTimerRef.current);
+        stepTimerRef.current = null;
+      }
+    };
+  }, [analysisPaused, canExpandCoverage, job?.id, job?.status, stepInFlight]);
 
   useEffect(() => {
     if (!job?.id) {
@@ -508,16 +649,20 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     setSignalMetrics(result.metrics);
   }
 
-  async function handleCreateJob() {
+  async function handleCreateJob(mode: "auto" | "manual") {
     setBusy(true);
     setJobError(null);
     setActionMessage(null);
     try {
       const created = await createWalletAnalysisJob(normalizedUrl);
       setJob(created.market);
-      setStepAutoAdvance(false);
+      setAnalysisPaused(false);
       await refreshSignals(created.market);
-      setActionMessage("Job de analisis profundo creado. Ya puedes ejecutar una pasada limitada.");
+      setActionMessage(
+        mode === "auto"
+          ? "Job de wallet analysis creado. El analisis por lotes cortos arranca automaticamente."
+          : "Job de wallet analysis creado. El analisis por lotes cortos arranca automaticamente.",
+      );
     } catch {
       setJobError("No pudimos crear el job de analisis profundo desde este enlace.");
     } finally {
@@ -525,7 +670,7 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     }
   }
 
-  async function runJobStep(jobId: string, autoAdvance: boolean) {
+  async function runJobStep(jobId: string, _trigger: "auto" | "manual") {
     if (stepTimerRef.current !== null) {
       window.clearTimeout(stepTimerRef.current);
       stepTimerRef.current = null;
@@ -539,12 +684,12 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     setActionMessage(null);
     try {
       const result = await runWalletAnalysisJobStep({
-        batchSize: 10,
-        historyLimit: 100,
+        batchSize: analysisLimits.batchSize,
+        historyLimit: analysisLimits.historyLimit,
         jobId,
-        maxRuntimeSeconds: 12,
-        maxWallets: 50,
-        maxWalletsDiscovery: 100,
+        maxRuntimeSeconds: analysisLimits.maxRuntimeSeconds,
+        maxWallets: analysisLimits.maxWallets,
+        maxWalletsDiscovery: analysisLimits.maxWalletsDiscovery,
       });
       setJob(result.market);
       await Promise.all([refreshProfiles(), refreshSignals(result.market)]);
@@ -552,23 +697,21 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
         result.run_state === "already_running"
           ? "Ya hay otro lote corto procesandose para este job."
           : result.message;
-      setActionMessage(
-        result.has_more
-          ? `${baseMessage} Quedan mas wallets por procesar en lotes cortos.`
-          : baseMessage,
-      );
-      if (autoAdvance && result.has_more && result.run_state !== "already_running" && !document.hidden) {
+      if (result.run_state === "already_running") {
         setStepAutoAdvance(true);
-        stepTimerRef.current = window.setTimeout(() => {
-          void runJobStep(jobId, true);
-        }, 1200);
-      } else if (autoAdvance && result.has_more && document.hidden) {
+        setActionMessage(`${baseMessage} Esperando a que termine el lote corto activo.`);
+      } else if (result.has_more) {
+        setStepAutoAdvance(true);
+        setActionMessage(`${baseMessage} El analisis sigue automaticamente con otro lote corto.`);
+      } else if (result.market.status === "partial") {
         setStepAutoAdvance(false);
         setActionMessage(
-          `${baseMessage} Quedan mas wallets por procesar. Reanuda el analisis cuando vuelvas a esta pestana.`,
+          result.market.status_detail ||
+            "Analisis parcial utilizable. Puedes ampliar la cobertura para analizar mas wallets.",
         );
       } else {
         setStepAutoAdvance(false);
+        setActionMessage(baseMessage);
       }
     } catch {
       setStepAutoAdvance(false);
@@ -579,18 +722,30 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
     }
   }
 
-  async function handleRunStep(autoAdvance: boolean) {
+  async function handleRunStep(mode: "manual" | "expand") {
     if (!job?.id) {
       return;
     }
-    if (!autoAdvance && stepTimerRef.current !== null) {
+    if (stepTimerRef.current !== null) {
       window.clearTimeout(stepTimerRef.current);
       stepTimerRef.current = null;
     }
-    if (!autoAdvance) {
-      setStepAutoAdvance(false);
+    if (mode === "expand") {
+      setAnalysisLimits((current) => ({
+        ...current,
+        maxWallets: Math.min(current.maxWallets + AUTO_MAX_WALLETS_INCREMENT, AUTO_MAX_WALLETS_CAP),
+        maxWalletsDiscovery: Math.min(
+          current.maxWalletsDiscovery + AUTO_MAX_WALLETS_DISCOVERY_INCREMENT,
+          AUTO_MAX_WALLETS_DISCOVERY_CAP,
+        ),
+      }));
+      setActionMessage("Ampliando cobertura para descubrir y analizar mas wallets en lotes cortos.");
+      setAnalysisPaused(false);
+      setStepAutoAdvance(true);
+      return;
     }
-    await runJobStep(job.id, autoAdvance);
+    setAnalysisPaused(false);
+    await runJobStep(job.id, "manual");
   }
 
   function handlePauseStep() {
@@ -598,8 +753,15 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
       window.clearTimeout(stepTimerRef.current);
       stepTimerRef.current = null;
     }
+    setAnalysisPaused(true);
     setStepAutoAdvance(false);
-    setActionMessage("Avance automatico pausado. Puedes continuar el analisis por lotes cuando quieras.");
+    setActionMessage("Analisis automatico pausado. Puedes reanudarlo cuando quieras.");
+  }
+
+  function handleResumeStep() {
+    setAnalysisPaused(false);
+    setStepAutoAdvance(true);
+    setActionMessage("Reanudando el analisis automatico por lotes cortos.");
   }
 
   async function handleRefreshJob() {
@@ -723,38 +885,44 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
           <p className="eyebrow">Analisis profundo de wallets</p>
           <h3>{job?.market_title || marketTitle || "Analisis de wallets del mercado"}</h3>
           <p>
-            Este flujo reutiliza el analizador viejo para resolver el link y usa el backend persistido para jobs,
-            progreso, candidatas, perfiles y senal historica.
+            Este flujo confirma el mercado, crea un job persistido y analiza wallets por steps cortos con progreso,
+            candidatas, perfiles y senal historica.
           </p>
         </div>
         <span className="badge muted">{job ? `Job ${jobStatusLabel(job.status)}` : "Sin job"}</span>
       </div>
 
-      <p className="section-note">
-        Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.
-      </p>
-
       <div className="watchlist-actions">
         {!job ? (
-          <button className="watchlist-button active" disabled={busy} onClick={() => void handleCreateJob()} type="button">
-            {busy ? "Creando..." : "Analizar wallets del mercado"}
+          <button className="watchlist-button active" disabled={busy} onClick={() => void handleCreateJob("manual")} type="button">
+            {busy ? "Preparando analisis..." : "Analizar wallets del mercado"}
           </button>
         ) : (
           <>
-            <button className="watchlist-button active" disabled={busy} onClick={() => void handleRunStep(true)} type="button">
+            <button
+              className="watchlist-button active"
+              disabled={busy || stepAutoAdvance || ACTIVE_JOB_STATUSES.has(job.status)}
+              onClick={() => void handleRunStep("expand")}
+              type="button"
+            >
               {busy
                 ? "Procesando lote..."
                 : stepAutoAdvance
-                  ? "Continuar analisis por lotes"
-                  : job.progress.wallets_analyzed > 0
+                  ? "Analizando wallets automaticamente"
+                  : job.status === "partial"
                     ? "Analizar mas wallets"
-                    : "Analizar wallets del mercado"}
+                    : "Reintentar analisis"}
             </button>
-            <button className="watchlist-button" disabled={busy || !stepAutoAdvance} onClick={handlePauseStep} type="button">
+            <button className="watchlist-button" disabled={busy || analysisPaused || !stepAutoAdvance} onClick={handlePauseStep} type="button">
               Pausar analisis
             </button>
-            <button className="watchlist-button" disabled={busy} onClick={() => void handleRunStep(false)} type="button">
-              Procesar siguiente lote
+            <button
+              className="watchlist-button"
+              disabled={busy || (!analysisPaused && stepAutoAdvance)}
+              onClick={handleResumeStep}
+              type="button"
+            >
+              Reanudar analisis
             </button>
             <button className="watchlist-button" disabled={busy} onClick={() => void handleRefreshJob()} type="button">
               Refrescar progreso
@@ -765,7 +933,7 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
 
       {!job ? (
         <p className="section-note">
-          Crea el job profundo desde este link y luego corre una pasada controlada del runner real. No activa Copy Trading
+          El job profundo se crea automaticamente al confirmar el mercado y corre por steps cortos. No activa Copy Trading
           real ni ejecuta dinero real.
         </p>
       ) : (
@@ -800,12 +968,18 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
                 <p className="wallet-balance-copy">
                   Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.
                 </p>
+                {job.signal_summary ? (
+                  <p className="wallet-balance-copy">
+                    {signalStrengthNarrative(job.signal_summary.signal_strength)}
+                  </p>
+                ) : null}
               </div>
               <div className="data-health-notes">
                 {job.signal_summary ? (
                   <>
                     <span className="badge external-hint">{favoredSideLabel}</span>
-                    <span className="badge">Confianza {confidenceBadgeLabel(job.signal_summary.confidence)}</span>
+                    <span className="badge">Datos {confidenceBadgeLabel(job.signal_summary.data_confidence || job.signal_summary.confidence)}</span>
+                    <span className="badge">Senal {signalStrengthLabel(job.signal_summary.signal_strength)}</span>
                     <span className="badge muted">{job.signal_summary.signal_status}</span>
                   </>
                 ) : (
@@ -828,16 +1002,20 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
                 <strong>{secondaryScore ? formatPercent(secondaryScore.percent) : "sin dato"}</strong>
               </div>
               <div>
-                <span>Confianza</span>
-                <strong>{job.signal_summary ? `Confianza ${confidenceLabel(job.signal_summary.confidence)}` : "sin dato"}</strong>
+                <span>Confianza de datos</span>
+                <strong>
+                  {job.signal_summary
+                    ? `Confianza ${confidenceLabel(job.signal_summary.data_confidence || job.signal_summary.confidence)}`
+                    : "sin dato"}
+                </strong>
               </div>
               <div>
-                <span>YES score</span>
-                <strong>{formatMetric(job.signal_summary?.yes_score)}</strong>
+                <span>Fuerza de senal</span>
+                <strong>{signalStrengthLabel(job.signal_summary?.signal_strength)}</strong>
               </div>
               <div>
-                <span>NO score</span>
-                <strong>{formatMetric(job.signal_summary?.no_score)}</strong>
+                <span>Margen</span>
+                <strong>{formatPercent(job.signal_summary?.signal_margin)}</strong>
               </div>
               <div>
                 <span>Wallets encontradas</span>
@@ -852,18 +1030,29 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
                 <strong>{formatCount(job.progress.wallets_with_sufficient_history)}</strong>
               </div>
               <div>
-                <span>YES wallets</span>
-                <strong>{formatCount(job.progress.yes_wallets)}</strong>
-              </div>
-              <div>
-                <span>NO wallets</span>
-                <strong>{formatCount(job.progress.no_wallets)}</strong>
-              </div>
-              <div>
                 <span>Candidatas</span>
                 <strong>{formatCount(job.candidates_count)}</strong>
               </div>
+              <div>
+                <span>Lote actual</span>
+                <strong>{formatCount(job.progress.current_batch)}</strong>
+              </div>
             </div>
+
+            {scoreSummary.length > 0 ? (
+              <div className="wallet-report-table" role="list">
+                {scoreSummary.map((entry) => (
+                  <div className="wallet-report-row" key={entry.label} role="listitem">
+                    <div>
+                      <strong>{normalizeSideLabel(entry.label)}</strong>
+                      <span>{formatCount(outcomeWalletCounts[entry.label])} wallets con historial suficiente</span>
+                    </div>
+                    <span>{formatPercent(entry.percent)}</span>
+                    <span>Score {formatMetric(entry.raw)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </section>
 
           {job.status === "partial" ? (
@@ -872,8 +1061,15 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
               <span>
                 Se analizaron {formatCount(job.progress.wallets_analyzed)} de {formatCount(job.progress.wallets_found)} wallets encontradas.{" "}
                 {formatCount(job.progress.wallets_with_sufficient_history)} wallets tenian historial suficiente. La senal se calculo con los datos disponibles.
-                Puedes procesar otro lote para ampliar el analisis.
+                Puedes ampliar el analisis para cubrir mas wallets.
               </span>
+            </div>
+          ) : null}
+
+          {coverageSummary ? (
+            <div className="focus-notice active" role="status">
+              <strong>Cobertura del analisis</strong>
+              <span>{coverageSummary}</span>
             </div>
           ) : null}
 
@@ -886,15 +1082,21 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
 
           {ACTIVE_JOB_STATUSES.has(job.status) || stepAutoAdvance ? (
             <div className="focus-notice active" role="status">
-              <strong>Analizando por lotes</strong>
+              <strong>{analysisPaused ? "Analisis pausado" : "Analizando wallets automaticamente"}</strong>
               <span>
-                Ultimo lote procesado: {job.progress.current_batch || 0}. La pagina no depende de una request larga:
-                puedes continuar el analisis por steps cortos y refrescar el progreso cuando quieras.
+                Wallets encontradas: {formatCount(job.progress.wallets_found)}. Wallets analizadas: {formatCount(job.progress.wallets_analyzed)}.
+                Lote actual: {formatCount(job.progress.current_batch)}. Candidatas: {formatCount(job.candidates_count)}. La pagina no depende
+                de una request larga: este flujo sigue por run-step cortos.
               </span>
             </div>
           ) : null}
 
-          <SignalDisclaimer signalCopy="Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas." />
+          {analysisPaused && job.status !== "completed" && job.status !== "cancelled" && job.status !== "failed" ? (
+            <div className="focus-notice active" role="status">
+              <strong>Analisis pausado</strong>
+              <span>El job conserva el progreso actual. Puedes reanudar el analisis o ampliar cobertura sin reiniciar el trabajo.</span>
+            </div>
+          ) : null}
 
           {warningSummary.length > 0 ? (
             <div className="focus-notice active" role="status">
@@ -954,15 +1156,18 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
           <div className="panel-heading" style={{ marginTop: "1rem" }}>
             <div>
               <p className="eyebrow">Wallets candidatas</p>
-              <h4>Candidatas por lado</h4>
+              <h4>Candidatas por outcome</h4>
             </div>
             <div className="watchlist-actions">
               <label className="analyze-secondary-button" style={{ alignItems: "center", display: "inline-flex", gap: "0.5rem" }}>
-                <span>Lado</span>
+                <span>Outcome</span>
                 <select value={sideFilter} onChange={(event) => setSideFilter(event.target.value)}>
                   <option value="ALL">Todos</option>
-                  <option value="YES">YES</option>
-                  <option value="NO">NO</option>
+                  {outcomeFilterOptions.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="analyze-secondary-button" style={{ alignItems: "center", display: "inline-flex", gap: "0.5rem" }}>
@@ -1222,7 +1427,8 @@ export function WalletAnalysisPanel({ marketTitle, normalizedUrl }: WalletAnalys
                   </div>
                   <span>{signal.predicted_side || signal.predicted_outcome || "sin lado claro"}</span>
                   <span>Score {formatPercent(signal.polysignal_score)}</span>
-                  <span>Confianza {signal.confidence}</span>
+                  <span>Datos {confidenceBadgeLabel(signal.data_confidence || signal.confidence)}</span>
+                  <span>Senal {signalStrengthLabel(signal.signal_strength)}</span>
                   <span>Resultado final {signal.final_outcome || "pendiente"}</span>
                   <span>Resuelta {formatDate(signal.resolved_at)}</span>
                   <span>Wallets analizadas {signal.wallets_analyzed ?? 0}</span>

@@ -46,7 +46,8 @@ def create_market_signal_from_analysis_result(
 ) -> PolySignalMarketSignal:
     side_scores = _build_side_scores(candidates)
     total_score = sum(side_scores.values(), Decimal("0"))
-    predicted_side, predicted_outcome, polysignal_score, signal_status = _derive_signal(side_scores, total_score)
+    predicted_side, predicted_outcome, polysignal_score, signal_status, signal_margin = _derive_signal(side_scores, total_score)
+    data_confidence = _derive_confidence(job, candidates)
 
     signal = PolySignalMarketSignal(
         job_id=job.id,
@@ -60,14 +61,20 @@ def create_market_signal_from_analysis_result(
         predicted_side=predicted_side,
         predicted_outcome=predicted_outcome,
         polysignal_score=polysignal_score,
-        confidence=_derive_confidence(job, candidates),
+        confidence=data_confidence,
         yes_score=side_scores.get("YES"),
         no_score=side_scores.get("NO"),
         outcome_scores_json={key: str(value) for key, value in side_scores.items()},
         wallets_analyzed=job.wallets_analyzed,
         wallets_with_sufficient_history=job.wallets_with_sufficient_history,
         top_wallets_json=_top_wallets(candidates),
-        warnings_json=_signal_warnings(job, candidates, signal_status),
+        warnings_json=_signal_warnings(
+            job,
+            candidates,
+            signal_status,
+            signal_margin=signal_margin,
+            data_confidence=data_confidence,
+        ),
         signal_status=signal_status,
     )
     db.add(signal)
@@ -263,6 +270,7 @@ def settle_pending_market_signals(
 
 
 def serialize_market_signal(signal: PolySignalMarketSignal) -> PolySignalMarketSignalRead:
+    signal_margin = _derive_signal_margin(signal.outcome_scores_json)
     return PolySignalMarketSignalRead(
         id=signal.id,
         job_id=signal.job_id,
@@ -277,9 +285,13 @@ def serialize_market_signal(signal: PolySignalMarketSignal) -> PolySignalMarketS
         predicted_outcome=signal.predicted_outcome,
         polysignal_score=signal.polysignal_score,
         confidence=signal.confidence,
+        data_confidence=signal.confidence,
+        signal_strength=_signal_strength_from_margin(signal_margin),
+        signal_margin=signal_margin,
         yes_score=signal.yes_score,
         no_score=signal.no_score,
         outcome_scores_json=signal.outcome_scores_json,
+        outcome_wallet_counts_json=_coerce_int_dict(_top_wallet_counts(signal.top_wallets_json)),
         wallets_analyzed=signal.wallets_analyzed,
         wallets_with_sufficient_history=signal.wallets_with_sufficient_history,
         top_wallets_json=signal.top_wallets_json or [],
@@ -553,15 +565,17 @@ def _normalize_resolution_hint(value: str) -> str:
 def _derive_signal(
     side_scores: dict[str, Decimal],
     total_score: Decimal,
-) -> tuple[str | None, str | None, Decimal | None, str]:
+) -> tuple[str | None, str | None, Decimal | None, str, Decimal | None]:
     if total_score <= Decimal("0") or not side_scores:
-        return None, None, None, "no_clear_signal"
-    winner = max(side_scores.items(), key=lambda item: item[1])
+        return None, None, None, "no_clear_signal", None
+    ranked = sorted(side_scores.items(), key=lambda item: item[1], reverse=True)
+    winner = ranked[0]
     winner_score = winner[1]
     share = winner_score / total_score if total_score > 0 else Decimal("0")
-    if share < Decimal("0.55"):
-        return None, None, share.quantize(Decimal("0.0001")), "no_clear_signal"
-    return winner[0], winner[0], share.quantize(Decimal("0.0001")), "pending_resolution"
+    second_share = (ranked[1][1] / total_score) if len(ranked) > 1 and total_score > 0 else Decimal("0")
+    margin = (share - second_share).quantize(Decimal("0.0001"))
+    signal_status = "no_clear_signal" if margin < Decimal("0.0300") else "pending_resolution"
+    return winner[0], winner[0], share.quantize(Decimal("0.0001")), signal_status, margin
 
 
 def _derive_confidence(job: WalletAnalysisJob, candidates: list[WalletAnalysisCandidate]) -> str:
@@ -602,6 +616,9 @@ def _signal_warnings(
     job: WalletAnalysisJob,
     candidates: list[WalletAnalysisCandidate],
     signal_status: str,
+    *,
+    signal_margin: Decimal | None,
+    data_confidence: str,
 ) -> list[str]:
     inherited_warnings = [str(item) for item in (job.warnings_json or []) if isinstance(item, str)]
     warnings: list[str] = [
@@ -614,9 +631,61 @@ def _signal_warnings(
         warnings.append("No hubo wallets con historial suficiente para una senal fuerte.")
     if signal_status == "no_clear_signal":
         warnings.append("No hay una balanza suficientemente clara para fijar una senal principal.")
+    if signal_margin is not None and signal_margin < Decimal("0.0300"):
+        warnings.append("La balanza quedo muy ajustada entre outcomes.")
+    if data_confidence == "high" and signal_margin is not None and signal_margin < Decimal("0.0800"):
+        warnings.append("La cobertura de datos puede ser alta aunque la diferencia entre outcomes siga siendo estrecha.")
     if any(candidate.confidence == "low" for candidate in candidates):
         warnings.append("Parte del score depende de wallets con confianza baja o muestra limitada.")
     return _dedupe(warnings)
+
+
+def _derive_signal_margin(outcome_scores_json: dict[str, object] | None) -> Decimal | None:
+    if not isinstance(outcome_scores_json, dict):
+        return None
+    values: list[Decimal] = []
+    for raw_value in outcome_scores_json.values():
+        try:
+            value = Decimal(str(raw_value))
+        except Exception:
+            continue
+        if value > 0:
+            values.append(value)
+    if not values:
+        return None
+    values.sort(reverse=True)
+    total = sum(values, Decimal("0"))
+    if total <= 0:
+        return None
+    first = values[0] / total
+    second = values[1] / total if len(values) > 1 else Decimal("0")
+    return (first - second).quantize(Decimal("0.0001"))
+
+
+def _signal_strength_from_margin(margin: Decimal | None) -> str | None:
+    if margin is None:
+        return None
+    if margin < Decimal("0.0300"):
+        return "weak"
+    if margin < Decimal("0.0800"):
+        return "moderate"
+    return "strong"
+
+
+def _top_wallet_counts(top_wallets_json: list[dict[str, object]] | None) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in top_wallets_json or []:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("side") or item.get("outcome") or "").strip()[:160]
+        if not key:
+            continue
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _coerce_int_dict(value: dict[str, int]) -> dict[str, int] | None:
+    return value or None
 
 
 def _same_outcome(left: str, right: str) -> bool:
