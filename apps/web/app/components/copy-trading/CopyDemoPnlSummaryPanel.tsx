@@ -25,6 +25,9 @@ export function CopyDemoPnlSummaryPanel({
   const pendingPriceCount = summary?.pending_price_count ?? summary?.price_pending_count ?? 0;
   const winCount = summary?.win_count ?? summary?.winning_closed_count ?? 0;
   const lossCount = summary?.loss_count ?? summary?.losing_closed_count ?? 0;
+  const openPositionsCount = summary?.open_positions_count ?? 0;
+  const pricedOpenCount = Math.max(0, openPositionsCount - pendingPriceCount);
+  const priceCoveragePercent = openPositionsCount > 0 ? ((pricedOpenCount / openPositionsCount) * 100).toFixed(2) : null;
   const statusLabel = getStatusLabel(summary?.status ?? null, statusMessage);
   const backendUpdatedAt = summary?.last_updated_at ? formatDateTime(summary.last_updated_at) : null;
 
@@ -71,21 +74,21 @@ export function CopyDemoPnlSummaryPanel({
 
           <div className="copy-performance-primary-grid">
             <MetricCard
-              detail="Capital comprometido en la simulacion"
+              detail="Capital comprometido"
               emphasis="primary"
               label="Capital demo usado"
               tone="neutral"
               value={formatUsd(capitalUsed)}
             />
             <MetricCard
-              detail="Suma del PnL abierto y realizado"
+              detail="Abierto + realizado"
               emphasis="hero"
               label="PnL total demo"
               tone={pnlTone(totalPnl)}
               value={formatPnl(totalPnl)}
             />
             <MetricCard
-              detail="Retorno sobre el capital demo usado"
+              detail="Retorno sobre capital"
               emphasis="primary"
               label="ROI demo"
               tone={pnlTone(summary.demo_roi_percent)}
@@ -110,19 +113,46 @@ export function CopyDemoPnlSummaryPanel({
                 <span>Posiciones abiertas</span>
                 <strong>Exposicion actual</strong>
               </div>
-              <div className="copy-performance-secondary-grid">
-                <MetricCard compact detail="Variacion de posiciones abiertas" label="PnL abierto" tone={pnlTone(summary.open_pnl_usd)} value={formatPnl(summary.open_pnl_usd)} />
-                <MetricCard compact detail="Capital aun expuesto" label="Capital abierto" tone="neutral" value={formatUsd(summary.open_capital_usd)} />
-                <MetricCard
-                  compact
-                  detail={pendingPriceCount > 0 ? "Hay mercados sin precio actual confiable" : "Valorizacion abierta actual"}
-                  label="Valor actual abierto"
-                  tone={pendingPriceCount > 0 ? "warning" : "neutral"}
-                  value={pendingPriceCount > 0 && !currentOpenValue ? "Pendiente" : formatUsd(currentOpenValue)}
-                />
-                <MetricCard compact detail="Copias demo todavia activas" label="Abiertas" tone="neutral" value={String(summary.open_positions_count)} />
-                <MetricCard compact detail="Abiertas sin precio actual disponible" label="Precio pendiente" tone={pendingPriceCount > 0 ? "warning" : "neutral"} value={String(pendingPriceCount)} />
-              </div>
+              <MetricList
+                items={[
+                  {
+                    detail: "Variacion abierta de posiciones activas",
+                    label: "PnL abierto",
+                    tone: pnlTone(summary.open_pnl_usd),
+                    value: formatPnl(summary.open_pnl_usd),
+                  },
+                  {
+                    detail: "Capital aun expuesto en demo",
+                    label: "Capital abierto",
+                    tone: "neutral",
+                    value: formatUsd(summary.open_capital_usd),
+                  },
+                  {
+                    detail: pendingPriceCount > 0 ? "Solo sobre posiciones con precio actual visible" : "Valorizacion abierta actual",
+                    label: "Valor actual abierto",
+                    tone: pendingPriceCount > 0 ? "warning" : "neutral",
+                    value: pendingPriceCount > 0 && !currentOpenValue ? "Pendiente" : formatUsd(currentOpenValue),
+                  },
+                  {
+                    detail: "Copias demo todavia activas",
+                    label: "Abiertas",
+                    tone: "neutral",
+                    value: String(openPositionsCount),
+                  },
+                  {
+                    detail: "Sin precio actual disponible",
+                    label: "Precio pendiente",
+                    tone: pendingPriceCount > 0 ? "warning" : "neutral",
+                    value: String(pendingPriceCount),
+                  },
+                  {
+                    detail: "Porcentaje de abiertas con precio visible",
+                    label: "Cobertura de precio",
+                    tone: pendingPriceCount > 0 ? "warning" : "neutral",
+                    value: priceCoveragePercent === null ? "Pendiente" : formatPercent(priceCoveragePercent),
+                  },
+                ]}
+              />
             </section>
 
             <section className="copy-performance-subsection">
@@ -130,18 +160,50 @@ export function CopyDemoPnlSummaryPanel({
                 <span>Copias cerradas</span>
                 <strong>Resultado realizado</strong>
               </div>
-              <div className="copy-performance-secondary-grid">
-                <MetricCard compact detail="Resultado ya cerrado" label="PnL realizado" tone={pnlTone(summary.realized_pnl_usd)} value={formatPnl(summary.realized_pnl_usd)} />
-                <MetricCard compact detail="Posiciones demo ya finalizadas" label="Cerradas" tone="neutral" value={String(summary.closed_positions_count)} />
-                <MetricCard compact detail="Solo win confirmadas" label="Ganadoras" tone={winCount > 0 ? "positive" : "neutral"} value={String(winCount)} />
-                <MetricCard compact detail="Solo loss confirmadas" label="Perdedoras" tone={lossCount > 0 ? "negative" : "neutral"} value={String(lossCount)} />
-                <MetricCard compact detail="Capital ya realizado" label="Capital cerrado" tone="neutral" value={formatUsd(summary.closed_capital_usd)} />
-              </div>
+              <MetricList
+                items={[
+                  {
+                    detail: "Resultado ya cerrado",
+                    label: "PnL realizado",
+                    tone: pnlTone(summary.realized_pnl_usd),
+                    value: formatPnl(summary.realized_pnl_usd),
+                  },
+                  {
+                    detail: "Posiciones demo ya finalizadas",
+                    label: "Cerradas",
+                    tone: "neutral",
+                    value: String(summary.closed_positions_count),
+                  },
+                  {
+                    detail: "Solo win confirmadas",
+                    label: "Ganadoras",
+                    tone: winCount > 0 ? "positive" : "neutral",
+                    value: String(winCount),
+                  },
+                  {
+                    detail: "Solo loss confirmadas",
+                    label: "Perdedoras",
+                    tone: lossCount > 0 ? "negative" : "neutral",
+                    value: String(lossCount),
+                  },
+                  {
+                    detail: "Capital ya realizado",
+                    label: "Capital cerrado",
+                    tone: "neutral",
+                    value: formatUsd(summary.closed_capital_usd),
+                  },
+                  {
+                    detail: "Sin mover win/loss",
+                    label: "Break-even",
+                    tone: "neutral",
+                    value: String(summary.break_even_closed_count),
+                  },
+                ]}
+              />
             </section>
           </div>
 
           <div className="copy-performance-mini-grid copy-performance-tertiary-grid">
-            <MiniStat label="Break-even" value={String(summary.break_even_closed_count)} />
             <MiniStat label="Canceladas" tone={summary.cancelled_closed_count > 0 ? "warning" : "neutral"} value={String(summary.cancelled_closed_count)} />
             <MiniStat label="No verificables" tone={summary.unknown_closed_count > 0 ? "warning" : "neutral"} value={String(summary.unknown_closed_count)} />
             <MiniStat label="Promedio cerradas" tone={pnlTone(summary.average_closed_pnl_usd)} value={formatPnl(summary.average_closed_pnl_usd)} />
@@ -187,21 +249,44 @@ function MetricCard({
   label,
   value,
   tone,
-  compact = false,
 }: {
   detail?: string | null;
   emphasis?: "hero" | "primary" | "secondary";
   label: string;
   value: string;
   tone: "positive" | "negative" | "neutral" | "warning";
-  compact?: boolean;
 }) {
   return (
-    <article className={`copy-performance-card ${tone} ${compact ? "compact" : ""} ${emphasis}`}>
+    <article className={`copy-performance-card ${tone} ${emphasis}`}>
       <span>{label}</span>
       <strong>{value}</strong>
       {detail ? <small>{detail}</small> : null}
     </article>
+  );
+}
+
+function MetricList({
+  items,
+}: {
+  items: Array<{
+    detail: string;
+    label: string;
+    tone: "positive" | "negative" | "neutral" | "warning";
+    value: string;
+  }>;
+}) {
+  return (
+    <div className="copy-performance-list">
+      {items.map((item) => (
+        <div className="copy-performance-list-item" key={item.label}>
+          <div className="copy-performance-list-copy">
+            <span>{item.label}</span>
+            <small>{item.detail}</small>
+          </div>
+          <strong className={`copy-performance-list-value ${item.tone}`}>{item.value}</strong>
+        </div>
+      ))}
+    </div>
   );
 }
 

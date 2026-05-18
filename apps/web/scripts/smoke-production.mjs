@@ -1867,94 +1867,6 @@ async function main() {
     copyTradingStatus.body?.wallets_enabled === liveCopyWalletCount,
     `copy trading status wallets_enabled=${copyTradingStatus.body?.wallets_enabled}, wallets endpoint count=${liveCopyWalletCount}`,
   );
-<<<<<<< HEAD
-  assert(copyTradingDom.includes("Escanea esta wallet una vez ahora."), "copy trading scan button helper missing");
-  assertTextExcludes(copyTradingText, ["Editar modo"], "copy trading legacy edit label");
-  assertTextIncludesOneOf(copyTradingText, ["Demo activo", "Real no conectado"], "copy trading mode badges");
-  assertTextIncludesOneOf(
-    copyTradingText,
-    ["Bloqueado hasta configurar credenciales", "Real bloqueado"],
-    "copy trading real lock",
-  );
-  assertTextIncludesOneOf(copyTradingText, ["Estado actual", "Sin wallets."], "copy trading current status summary");
-  assertTextIncludesOneOf(copyTradingText, ["Ultimo trade", "Sin wallets."], "copy trading last trade summary");
-  assertTextIncludesOneOf(copyTradingText, ["Actividad", "Sin wallets."], "copy trading activity summary");
-  assertTextIncludesOneOf(
-    copyTradingText,
-    [
-      "Wallets lentas",
-      "Timeouts reales",
-      "Pendientes",
-      "escanea todas las wallets activas cada 5s",
-      "mantener el escaneo live",
-    ],
-    "copy trading watcher health summary",
-  );
-  assertTextIncludesOneOf(
-    copyTradingText,
-    ["Escaneadas / pendientes", "Ciclo recortado por carga", "Timeouts reales", "Wallets lentas"],
-    "copy trading watcher pending semantics",
-  );
-  assertTextIncludesOneOf(copyTradingText, ["Demo", "Sin wallets."], "copy trading demo summary");
-  assertTextIncludesOneOf(copyTradingText, ["Copiadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo copied summary");
-  assertTextIncludesOneOf(copyTradingText, ["Saltadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo skipped summary");
-  assertTextIncludesOneOf(copyTradingText, ["Copias demo abiertas", "Todavia no hay copias demo abiertas."], "copy trading open demo positions");
-  assertTextIncludesOneOf(
-    copyTradingText,
-    ["Copias demo cerradas", "Aun no hay copias demo cerradas."],
-    "copy trading closed demo history",
-  );
-  assertTextIncludesOneOf(
-    copyTradingText,
-    ["Rendimiento demo", "Aun no hay copias demo abiertas ni cerradas."],
-    "copy trading pnl summary",
-  );
-  assertTextIncludesOneOf(
-    copyTradingText,
-    [
-      "Capital demo usado",
-      "Aun no hay copias demo abiertas ni cerradas.",
-      "Cargando metricas demo...",
-      "Actualizando metricas...",
-    ],
-    "copy trading capital used",
-  );
-  assertTextIncludesOneOf(
-    copyTradingText,
-    [
-      "PnL total demo",
-      "Aun no hay copias demo abiertas ni cerradas.",
-      "Cargando metricas demo...",
-      "Actualizando metricas...",
-    ],
-    "copy trading total pnl",
-  );
-  assertTextIncludesOneOf(
-    copyTradingText,
-    ["ROI demo", "Aun no hay copias demo abiertas ni cerradas.", "Cargando metricas demo...", "Actualizando metricas..."],
-    "copy trading roi",
-  );
-  assertTextIncludesOneOf(
-    copyTradingText,
-    ["Win rate", "Pendiente", "Cargando metricas demo...", "Actualizando metricas..."],
-    "copy trading win rate",
-  );
-  assertTextIncludesOneOf(
-    copyTradingText,
-    ["PnL abierto", "Aun no hay copias demo abiertas ni cerradas.", "Cargando metricas demo...", "Actualizando metricas..."],
-    "copy trading open pnl",
-  );
-  assertTextIncludesOneOf(
-    copyTradingText,
-    ["PnL realizado", "Aun no hay copias demo abiertas ni cerradas.", "Cargando metricas demo...", "Actualizando metricas..."],
-    "copy trading realized pnl",
-  );
-  assertTextIncludesOneOf(
-    copyTradingText,
-    ["Precio actual pendiente", "PnL actual", "Hay posiciones abiertas, pero algunas no tienen precio actual disponible.", "Todavia no hay copias demo abiertas."],
-    "copy trading open position pricing",
-  );
-=======
   if (PRODUCT_MODE === "copy-trading") {
     assert(copyTradingDom.includes("Escanea esta wallet una vez ahora."), "copy trading scan button helper missing");
     assertTextExcludes(copyTradingText, ["Editar modo"], "copy trading legacy edit label");
@@ -1987,13 +1899,13 @@ async function main() {
     assertTextIncludesOneOf(copyTradingText, ["Copiadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo copied summary");
     assertTextIncludesOneOf(copyTradingText, ["Saltadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo skipped summary");
     assertTextIncludesOneOf(copyTradingText, ["Copias demo abiertas", "Todavia no hay copias demo abiertas."], "copy trading open demo positions");
-    assertTextIncludesOneOf(copyTradingText, ["Copias demo cerradas", "Todavia no hay copias demo cerradas."], "copy trading closed demo history");
-    assertTextIncludesOneOf(copyTradingText, ["Rendimiento demo", "Todavia no hay copias demo suficientes para calcular rendimiento."], "copy trading pnl summary");
+    assertTextIncludesOneOf(copyTradingText, ["Copias demo cerradas", "Aun no hay copias demo cerradas."], "copy trading closed demo history");
+    assertTextIncludesOneOf(copyTradingText, ["Rendimiento demo", "Aun no hay copias demo abiertas ni cerradas."], "copy trading pnl summary");
     assertTextIncludesOneOf(
       copyTradingText,
       [
         "Capital demo usado",
-        "Todavia no hay copias demo suficientes para calcular rendimiento.",
+        "Aun no hay copias demo abiertas ni cerradas.",
         "Cargando metricas demo...",
         "Actualizando metricas...",
       ],
@@ -2003,7 +1915,7 @@ async function main() {
       copyTradingText,
       [
         "PnL total demo",
-        "Todavia no hay copias demo suficientes para calcular rendimiento.",
+        "Aun no hay copias demo abiertas ni cerradas.",
         "Cargando metricas demo...",
         "Actualizando metricas...",
       ],
@@ -2011,22 +1923,22 @@ async function main() {
     );
     assertTextIncludesOneOf(
       copyTradingText,
-      ["ROI demo", "Todavia no hay copias demo suficientes para calcular rendimiento.", "Cargando metricas demo...", "Actualizando metricas..."],
+      ["ROI demo", "Aun no hay copias demo abiertas ni cerradas.", "Cargando metricas demo...", "Actualizando metricas..."],
       "copy trading roi",
     );
     assertTextIncludesOneOf(
       copyTradingText,
-      ["Win rate", "Todavia no hay copias demo suficientes para calcular rendimiento.", "Cargando metricas demo...", "Actualizando metricas..."],
+      ["Win rate", "Pendiente", "Cargando metricas demo...", "Actualizando metricas..."],
       "copy trading win rate",
     );
     assertTextIncludesOneOf(
       copyTradingText,
-      ["PnL abierto", "Todavia no hay copias demo suficientes para calcular rendimiento.", "Cargando metricas demo...", "Actualizando metricas..."],
+      ["PnL abierto", "Aun no hay copias demo abiertas ni cerradas.", "Cargando metricas demo...", "Actualizando metricas..."],
       "copy trading open pnl",
     );
     assertTextIncludesOneOf(
       copyTradingText,
-      ["PnL realizado", "Todavia no hay copias demo suficientes para calcular rendimiento.", "Cargando metricas demo...", "Actualizando metricas..."],
+      ["PnL realizado", "Aun no hay copias demo abiertas ni cerradas.", "Cargando metricas demo...", "Actualizando metricas..."],
       "copy trading realized pnl",
     );
     assertTextIncludesOneOf(
@@ -2041,7 +1953,6 @@ async function main() {
       "copy trading open position pricing",
     );
   }
->>>>>>> 7e08832 (test(analyze): align smoke with wallet analysis flow)
   assertTextExcludes(
     copyTradingText,
     [
