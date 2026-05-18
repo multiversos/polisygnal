@@ -560,15 +560,22 @@ def build_wallet_analysis_signal_summary(db: Session, job_id: str) -> WalletAnal
     signal = get_latest_market_signal_for_job(db, job_id)
     if signal is None:
         return None
+    job = get_wallet_analysis_job(db, job_id)
+    signal_derivatives = _derive_signal_details(signal.outcome_scores_json)
+    public_result = _public_job_result_json(job.result_json) or {}
     return WalletAnalysisSignalSummaryRead(
         id=signal.id,
         predicted_side=signal.predicted_side,
         predicted_outcome=signal.predicted_outcome,
         polysignal_score=signal.polysignal_score,
         confidence=signal.confidence,
+        data_confidence=signal.confidence,
+        signal_strength=signal_derivatives["signal_strength"],
+        signal_margin=signal_derivatives["signal_margin"],
         yes_score=signal.yes_score,
         no_score=signal.no_score,
         outcome_scores_json=signal.outcome_scores_json,
+        outcome_wallet_counts_json=_coerce_int_dict(public_result.get("outcome_wallet_counts")),
         signal_status=signal.signal_status,
         warnings_json=_clean_text_list(signal.warnings_json or []),
     )
@@ -619,6 +626,63 @@ def _job_status_detail(job: WalletAnalysisJob) -> str | None:
     if job.status == "completed" and (job.wallets_found or 0) == 0:
         return "No se detectaron wallets publicas suficientes para este mercado en esta pasada."
     return None
+
+
+def _derive_signal_details(
+    outcome_scores_json: dict[str, object] | None,
+) -> dict[str, Decimal | str | None]:
+    entries: list[tuple[str, Decimal]] = []
+    if isinstance(outcome_scores_json, dict):
+        for label, raw_value in outcome_scores_json.items():
+            try:
+                value = Decimal(str(raw_value))
+            except Exception:
+                continue
+            if value > 0:
+                entries.append((label, value))
+    if not entries:
+        return {
+            "signal_margin": None,
+            "signal_strength": None,
+        }
+    entries.sort(key=lambda item: item[1], reverse=True)
+    total = sum((value for _, value in entries), Decimal("0"))
+    if total <= 0:
+        return {
+            "signal_margin": None,
+            "signal_strength": None,
+        }
+    top_share = entries[0][1] / total
+    second_share = entries[1][1] / total if len(entries) > 1 else Decimal("0")
+    margin = (top_share - second_share).quantize(Decimal("0.0001"))
+    return {
+        "signal_margin": margin,
+        "signal_strength": _signal_strength_from_margin(margin),
+    }
+
+
+def _signal_strength_from_margin(margin: Decimal | None) -> str | None:
+    if margin is None:
+        return None
+    if margin < Decimal("0.0300"):
+        return "weak"
+    if margin < Decimal("0.0800"):
+        return "moderate"
+    return "strong"
+
+
+def _coerce_int_dict(value: object) -> dict[str, int] | None:
+    if not isinstance(value, dict):
+        return None
+    coerced: dict[str, int] = {}
+    for key, raw_value in value.items():
+        if not isinstance(key, str):
+            continue
+        try:
+            coerced[key] = int(raw_value)
+        except Exception:
+            continue
+    return coerced or None
 
 
 def _public_job_result_json(value: object) -> dict[str, object] | None:

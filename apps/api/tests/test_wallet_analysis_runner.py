@@ -400,6 +400,56 @@ def test_runner_marks_estimated_metrics_and_partial_when_limits_cut_analysis(db_
     assert all(candidate.roi_30d_status == "estimated" for candidate in candidates)
 
 
+def test_runner_partial_job_can_resume_with_higher_limit(db_session: Session) -> None:
+    now = datetime(2026, 5, 17, 19, 5, tzinfo=UTC)
+    job = _create_job(db_session, created_at=now - timedelta(minutes=4))
+    client = DummyDataClient(
+        market_positions=[
+            _build_market_position(WALLET_YES, "Yes", TOKEN_YES, "700"),
+            _build_market_position(WALLET_NO, "No", TOKEN_NO, "600"),
+            _build_market_position(WALLET_THIRD, "Yes", TOKEN_YES, "550"),
+        ],
+        closed_positions_by_wallet={
+            WALLET_YES: [_build_user_position(wallet=WALLET_YES, outcome="Yes", timestamp=now - timedelta(days=1), realized_pnl="8")],
+            WALLET_NO: [_build_user_position(wallet=WALLET_NO, outcome="No", timestamp=now - timedelta(days=1), realized_pnl="4")],
+            WALLET_THIRD: [_build_user_position(wallet=WALLET_THIRD, outcome="Yes", timestamp=now - timedelta(days=2), realized_pnl="3")],
+        },
+        trades_by_wallet={
+            WALLET_YES: [_build_trade(wallet=WALLET_YES, outcome="Yes", timestamp=now - timedelta(days=1))],
+            WALLET_NO: [_build_trade(wallet=WALLET_NO, outcome="No", timestamp=now - timedelta(days=1))],
+            WALLET_THIRD: [_build_trade(wallet=WALLET_THIRD, outcome="Yes", timestamp=now - timedelta(days=2))],
+        },
+    )
+
+    run_wallet_analysis_job_once(
+        db_session,
+        job_id=job.id,
+        data_client=client,
+        config=WalletAnalysisRunnerConfig(batch_size=1, max_wallets_analyze=2, max_wallets_discovery=10, user_history_limit=10),
+        now=now,
+    )
+    db_session.commit()
+    db_session.refresh(job)
+
+    assert job.status == "partial"
+    assert job.wallets_analyzed == 2
+
+    resumed = run_wallet_analysis_job_batch(
+        db_session,
+        job_id=job.id,
+        data_client=client,
+        config=WalletAnalysisRunnerConfig(batch_size=1, max_wallets_analyze=3, max_wallets_discovery=10, user_history_limit=10),
+        now=now + timedelta(minutes=1),
+    )
+    db_session.commit()
+    db_session.refresh(job)
+
+    assert resumed.run_state == "progressed"
+    assert resumed.has_more is False
+    assert job.status == "completed"
+    assert job.wallets_analyzed == 3
+
+
 def test_runner_sanitizes_discovery_failures_into_warnings_and_creates_no_clear_signal(db_session: Session) -> None:
     now = datetime(2026, 5, 17, 19, 30, tzinfo=UTC)
     job = _create_job(db_session, created_at=now - timedelta(minutes=2))

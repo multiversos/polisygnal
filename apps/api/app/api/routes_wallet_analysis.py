@@ -170,7 +170,7 @@ def _run_wallet_analysis_job_step(
     except WalletAnalysisJobNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="wallet_analysis_job_not_found") from exc
 
-    if existing_job.status in {"completed", "partial", "cancelled"}:
+    if existing_job.status in {"completed", "cancelled"}:
         return _serialize_wallet_analysis_step_response(
             db=db,
             result=WalletAnalysisJobBatchResult(
