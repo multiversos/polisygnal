@@ -87,17 +87,18 @@ export function CopyClosedDemoPositionsTable({
                     <small>{position.outcome || "Outcome no informado"}</small>
                     <div className="copy-status-strip">
                       <span className="copy-badge historical">Cerrada</span>
+                      <span className={`copy-badge ${getOutcomeTone(position)}`}>Resultado {getResolvedOutcomeLabel(position)}</span>
+                      <span className="copy-badge subtle">{getCloseReasonLabel(position.close_reason)}</span>
                       <span className="copy-badge">Entrada {Number(position.entry_price).toFixed(3)}</span>
                       <span className="copy-badge">Salida {position.exit_price ? Number(position.exit_price).toFixed(3) : "-"}</span>
                       <span className="copy-badge">Monto {formatUsd(position.entry_amount_usd)}</span>
-                      <span className={`copy-badge ${getOutcomeTone(position)}`}>Resultado {getResolvedOutcomeLabel(position)}</span>
                       {position.resolution_source ? <span className="copy-badge subtle">Fuente {formatResolutionSource(position.resolution_source)}</span> : null}
                     </div>
                   </div>
                   <div className="copy-feed-numbers">
                     <span className={getPnlClassName(position.realized_pnl_usd)}>PnL final {formatPnl(position.realized_pnl_usd)}</span>
                     <span className={getPnlClassName(position.realized_pnl_percent)}>PnL % {formatPercent(position.realized_pnl_percent)}</span>
-                    <span>Cierre {getCloseReasonLabel(position.close_reason)}</span>
+                    <span>Wallet {formatWalletAddress(position.proxy_wallet || position.wallet_id)}</span>
                     <span>Valor final {formatUsd(position.exit_value_usd)}</span>
                     <span>Apertura {formatDateTime(position.opened_at)}</span>
                     <span>Cierre {formatDateTime(position.closed_at || position.updated_at)}</span>
@@ -200,13 +201,13 @@ function getCloseReasonLabel(reason: string | null): string {
     case "wallet_sell":
       return "Cierre copiado";
     case "late_copied_sell":
-      return "Cierre copiado";
+      return "Cierre copiado tarde";
     case "reconciled_sell":
       return "Cierre reconciliado";
     case "market_resolved":
       return "Mercado resuelto";
     case "market_cancelled":
-      return "Mercado cancelado";
+      return "Cancelado";
     case "no_reliable_resolution":
       return "Sin resolucion confiable";
     case "unknown":

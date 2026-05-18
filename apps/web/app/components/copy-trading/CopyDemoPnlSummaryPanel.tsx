@@ -1,15 +1,17 @@
 "use client";
 
-import { formatPercent, formatPnl, formatUsd } from "../../lib/copyTrading";
+import { formatDateTime, formatPercent, formatPnl, formatUsd } from "../../lib/copyTrading";
 import type { CopyTradingDemoPnlSummary } from "../../lib/copyTradingTypes";
 
 export function CopyDemoPnlSummaryPanel({
   loading = false,
+  lastUpdatedLabel = null,
   refreshing = false,
   statusMessage = null,
   summary,
 }: {
   loading?: boolean;
+  lastUpdatedLabel?: string | null;
   refreshing?: boolean;
   statusMessage?: string | null;
   summary: CopyTradingDemoPnlSummary | null;
@@ -23,12 +25,22 @@ export function CopyDemoPnlSummaryPanel({
   const pendingPriceCount = summary?.pending_price_count ?? summary?.price_pending_count ?? 0;
   const winCount = summary?.win_count ?? summary?.winning_closed_count ?? 0;
   const lossCount = summary?.loss_count ?? summary?.losing_closed_count ?? 0;
+  const statusLabel = getStatusLabel(summary?.status ?? null, statusMessage);
+  const backendUpdatedAt = summary?.last_updated_at ? formatDateTime(summary.last_updated_at) : null;
 
   return (
     <section className="copy-panel copy-performance-panel">
-      <div className="copy-panel-heading">
-        <span>Modo demo</span>
-        <strong>Rendimiento demo</strong>
+      <div className="copy-performance-header">
+        <div className="copy-panel-heading">
+          <span>Modo demo</span>
+          <strong>Rendimiento demo</strong>
+        </div>
+        <div className="copy-status-strip" aria-live="polite">
+          <span className={`copy-badge ${effectiveTone}`}>{statusLabel}</span>
+          {backendUpdatedAt ? <span className="copy-badge subtle">Backend {backendUpdatedAt}</span> : null}
+          {lastUpdatedLabel ? <span className="copy-badge subtle">Vista {lastUpdatedLabel}</span> : null}
+          {pendingPriceCount > 0 ? <span className="copy-badge warning">Precio pendiente: {pendingPriceCount}</span> : null}
+        </div>
       </div>
       <p className="copy-field-helper">
         Vista financiera simulada del copy trading demo. No representa dinero real ni ganancias garantizadas.
@@ -46,61 +58,123 @@ export function CopyDemoPnlSummaryPanel({
       ) : (
         <div className="copy-performance-grid">
           {effectiveMessage ? (
-            <div className="copy-status-strip" aria-live="polite">
-              <span className={`copy-badge ${effectiveTone}`}>{effectiveMessage}</span>
+            <div className={`copy-performance-banner ${effectiveTone}`} aria-live="polite">
+              <div>
+                <span>{statusLabel}</span>
+                <strong>{effectiveMessage}</strong>
+              </div>
+              {summary.warnings.length > 0 ? (
+                <small>{summary.warnings.length} advertencia(s) informativa(s) en esta pasada.</small>
+              ) : null}
             </div>
           ) : null}
 
-          <div className="copy-performance-row copy-performance-row-primary">
-            <MetricCard label="Capital demo usado" tone="neutral" value={formatUsd(capitalUsed)} />
+          <div className="copy-performance-primary-grid">
             <MetricCard
+              detail="Capital comprometido en la simulacion"
+              emphasis="primary"
+              label="Capital demo usado"
+              tone="neutral"
+              value={formatUsd(capitalUsed)}
+            />
+            <MetricCard
+              detail="Suma del PnL abierto y realizado"
+              emphasis="hero"
               label="PnL total demo"
               tone={pnlTone(totalPnl)}
               value={formatPnl(totalPnl)}
             />
-            <MetricCard label="ROI demo" tone={pnlTone(summary.demo_roi_percent)} value={formatPercent(summary.demo_roi_percent)} />
             <MetricCard
+              detail="Retorno sobre el capital demo usado"
+              emphasis="primary"
+              label="ROI demo"
+              tone={pnlTone(summary.demo_roi_percent)}
+              value={formatPercent(summary.demo_roi_percent)}
+            />
+            <MetricCard
+              detail={
+                summary.win_rate_percent === null
+                  ? "Aparece cuando existan copias cerradas con resultado confiable"
+                  : "Solo cuenta copias cerradas win/loss"
+              }
+              emphasis="primary"
               label="Win rate demo"
               tone={summary.win_rate_percent === null ? "warning" : "neutral"}
               value={summary.win_rate_percent === null ? "Pendiente" : formatPercent(summary.win_rate_percent)}
             />
           </div>
 
-          <div className="copy-performance-row">
-            <MetricCard label="PnL abierto" tone={pnlTone(summary.open_pnl_usd)} value={formatPnl(summary.open_pnl_usd)} compact />
-            <MetricCard
-              label="PnL realizado"
-              tone={pnlTone(summary.realized_pnl_usd)}
-              value={formatPnl(summary.realized_pnl_usd)}
-              compact
-            />
-            <MetricCard label="Capital abierto" tone="neutral" value={formatUsd(summary.open_capital_usd)} compact />
-            <MetricCard
-              label="Valor actual abierto"
-              tone="neutral"
-              value={pendingPriceCount > 0 && !currentOpenValue ? "Pendiente" : formatUsd(currentOpenValue)}
-              compact
-            />
-            <MetricCard label="Precio pendiente" tone={pendingPriceCount > 0 ? "warning" : "neutral"} value={String(pendingPriceCount)} compact />
+          <div className="copy-performance-section-grid">
+            <section className="copy-performance-subsection">
+              <div className="copy-performance-subsection-heading">
+                <span>Posiciones abiertas</span>
+                <strong>Exposicion actual</strong>
+              </div>
+              <div className="copy-performance-secondary-grid">
+                <MetricCard compact detail="Variacion de posiciones abiertas" label="PnL abierto" tone={pnlTone(summary.open_pnl_usd)} value={formatPnl(summary.open_pnl_usd)} />
+                <MetricCard compact detail="Capital aun expuesto" label="Capital abierto" tone="neutral" value={formatUsd(summary.open_capital_usd)} />
+                <MetricCard
+                  compact
+                  detail={pendingPriceCount > 0 ? "Hay mercados sin precio actual confiable" : "Valorizacion abierta actual"}
+                  label="Valor actual abierto"
+                  tone={pendingPriceCount > 0 ? "warning" : "neutral"}
+                  value={pendingPriceCount > 0 && !currentOpenValue ? "Pendiente" : formatUsd(currentOpenValue)}
+                />
+                <MetricCard compact detail="Copias demo todavia activas" label="Abiertas" tone="neutral" value={String(summary.open_positions_count)} />
+                <MetricCard compact detail="Abiertas sin precio actual disponible" label="Precio pendiente" tone={pendingPriceCount > 0 ? "warning" : "neutral"} value={String(pendingPriceCount)} />
+              </div>
+            </section>
+
+            <section className="copy-performance-subsection">
+              <div className="copy-performance-subsection-heading">
+                <span>Copias cerradas</span>
+                <strong>Resultado realizado</strong>
+              </div>
+              <div className="copy-performance-secondary-grid">
+                <MetricCard compact detail="Resultado ya cerrado" label="PnL realizado" tone={pnlTone(summary.realized_pnl_usd)} value={formatPnl(summary.realized_pnl_usd)} />
+                <MetricCard compact detail="Posiciones demo ya finalizadas" label="Cerradas" tone="neutral" value={String(summary.closed_positions_count)} />
+                <MetricCard compact detail="Solo win confirmadas" label="Ganadoras" tone={winCount > 0 ? "positive" : "neutral"} value={String(winCount)} />
+                <MetricCard compact detail="Solo loss confirmadas" label="Perdedoras" tone={lossCount > 0 ? "negative" : "neutral"} value={String(lossCount)} />
+                <MetricCard compact detail="Capital ya realizado" label="Capital cerrado" tone="neutral" value={formatUsd(summary.closed_capital_usd)} />
+              </div>
+            </section>
           </div>
 
-          <div className="copy-performance-mini-grid">
-            <MiniStat label="Abiertas" value={String(summary.open_positions_count)} />
-            <MiniStat label="Cerradas" value={String(summary.closed_positions_count)} />
-            <MiniStat label="Ganadoras" value={String(winCount)} />
-            <MiniStat label="Perdedoras" value={String(lossCount)} />
+          <div className="copy-performance-mini-grid copy-performance-tertiary-grid">
             <MiniStat label="Break-even" value={String(summary.break_even_closed_count)} />
-            <MiniStat label="Canceladas" value={String(summary.cancelled_closed_count)} tone={summary.cancelled_closed_count > 0 ? "warning" : "neutral"} />
-            <MiniStat label="No verificables" value={String(summary.unknown_closed_count)} tone={summary.unknown_closed_count > 0 ? "warning" : "neutral"} />
-            <MiniStat label="Promedio cerradas" value={formatPnl(summary.average_closed_pnl_usd)} tone={pnlTone(summary.average_closed_pnl_usd)} />
-            <MiniStat label="Mejor copia" value={formatPnl(summary.best_closed_pnl_usd)} tone={pnlTone(summary.best_closed_pnl_usd)} />
-            <MiniStat label="Peor copia" value={formatPnl(summary.worst_closed_pnl_usd)} tone={pnlTone(summary.worst_closed_pnl_usd)} />
-            <MiniStat label="Capital cerrado" value={formatUsd(summary.closed_capital_usd)} />
+            <MiniStat label="Canceladas" tone={summary.cancelled_closed_count > 0 ? "warning" : "neutral"} value={String(summary.cancelled_closed_count)} />
+            <MiniStat label="No verificables" tone={summary.unknown_closed_count > 0 ? "warning" : "neutral"} value={String(summary.unknown_closed_count)} />
+            <MiniStat label="Promedio cerradas" tone={pnlTone(summary.average_closed_pnl_usd)} value={formatPnl(summary.average_closed_pnl_usd)} />
+            <MiniStat label="Mejor copia" tone={pnlTone(summary.best_closed_pnl_usd)} value={formatPnl(summary.best_closed_pnl_usd)} />
+            <MiniStat label="Peor copia" tone={pnlTone(summary.worst_closed_pnl_usd)} value={formatPnl(summary.worst_closed_pnl_usd)} />
           </div>
 
-          {!hasAnyDemoActivity ? (
-            <div className="copy-empty-state">Aun no hay copias demo abiertas ni cerradas.</div>
+          {summary.best_closed_copy || summary.worst_closed_copy ? (
+            <div className="copy-performance-insights">
+              {summary.best_closed_copy ? (
+                <InsightCard
+                  detail={summary.best_closed_copy.close_reason}
+                  label="Mejor cerrada"
+                  market={summary.best_closed_copy.market_title}
+                  outcome={summary.best_closed_copy.outcome}
+                  tone={pnlTone(summary.best_closed_copy.realized_pnl_usd)}
+                  value={formatPnl(summary.best_closed_copy.realized_pnl_usd)}
+                />
+              ) : null}
+              {summary.worst_closed_copy ? (
+                <InsightCard
+                  detail={summary.worst_closed_copy.close_reason}
+                  label="Peor cerrada"
+                  market={summary.worst_closed_copy.market_title}
+                  outcome={summary.worst_closed_copy.outcome}
+                  tone={pnlTone(summary.worst_closed_copy.realized_pnl_usd)}
+                  value={formatPnl(summary.worst_closed_copy.realized_pnl_usd)}
+                />
+              ) : null}
+            </div>
           ) : null}
+
+          {!hasAnyDemoActivity ? <div className="copy-empty-state">Aun no hay copias demo abiertas ni cerradas.</div> : null}
         </div>
       )}
     </section>
@@ -108,20 +182,53 @@ export function CopyDemoPnlSummaryPanel({
 }
 
 function MetricCard({
+  detail = null,
+  emphasis = "secondary",
   label,
   value,
   tone,
   compact = false,
 }: {
+  detail?: string | null;
+  emphasis?: "hero" | "primary" | "secondary";
   label: string;
   value: string;
   tone: "positive" | "negative" | "neutral" | "warning";
   compact?: boolean;
 }) {
   return (
-    <article className={`copy-performance-card ${tone} ${compact ? "compact" : ""}`}>
+    <article className={`copy-performance-card ${tone} ${compact ? "compact" : ""} ${emphasis}`}>
       <span>{label}</span>
       <strong>{value}</strong>
+      {detail ? <small>{detail}</small> : null}
+    </article>
+  );
+}
+
+function InsightCard({
+  detail,
+  label,
+  market,
+  outcome,
+  tone,
+  value,
+}: {
+  detail: string | null;
+  label: string;
+  market: string | null;
+  outcome: string | null;
+  tone: "positive" | "negative" | "neutral" | "warning";
+  value: string;
+}) {
+  return (
+    <article className={`copy-performance-insight ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{market || "Mercado Polymarket"}</small>
+      <div className="copy-status-strip">
+        {outcome ? <span className="copy-badge subtle">{outcome}</span> : null}
+        {detail ? <span className="copy-badge historical">{formatCloseReason(detail)}</span> : null}
+      </div>
     </article>
   );
 }
@@ -174,6 +281,26 @@ function statusTone(status: CopyTradingDemoPnlSummary["status"] | null): "neutra
   }
 }
 
+function getStatusLabel(
+  status: CopyTradingDemoPnlSummary["status"] | null,
+  statusMessage: string | null,
+): string {
+  if (statusMessage) {
+    return "Error real";
+  }
+  switch (status) {
+    case "ok":
+      return "Datos demo actualizados";
+    case "partial":
+      return "Datos parciales";
+    case "error":
+      return "Error real";
+    case "no_data":
+    default:
+      return "Sin datos demo";
+  }
+}
+
 function fallbackSummaryMessage(summary: CopyTradingDemoPnlSummary | null): string | null {
   if (!summary) {
     return null;
@@ -188,4 +315,24 @@ function fallbackSummaryMessage(summary: CopyTradingDemoPnlSummary | null): stri
     return "El win rate aparecera cuando existan copias cerradas con resultado confiable.";
   }
   return null;
+}
+
+function formatCloseReason(reason: string): string {
+  switch (reason) {
+    case "copied_sell":
+    case "wallet_sell":
+      return "Cierre copiado";
+    case "late_copied_sell":
+      return "Cierre copiado tarde";
+    case "reconciled_sell":
+      return "Cierre reconciliado";
+    case "market_resolved":
+      return "Mercado resuelto";
+    case "market_cancelled":
+      return "Cancelado";
+    case "unknown":
+      return "No verificable";
+    default:
+      return reason.replaceAll("_", " ");
+  }
 }

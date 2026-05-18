@@ -214,6 +214,12 @@
   color: #f2d06d;
 }
 
+.copy-badge.warning {
+  border-color: rgba(250, 204, 21, 0.28);
+  background: rgba(250, 204, 21, 0.14);
+  color: #f7dc86;
+}
+
 .copy-status-pill.subtle,
 .copy-badge.subtle {
   border-color: rgba(56, 189, 248, 0.18);
@@ -650,10 +656,12 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.58);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(18, 30, 48, 0.82), rgba(12, 21, 37, 0.8)),
+    rgba(15, 23, 42, 0.58);
 }
 
 .copy-feed-item > div,
@@ -664,11 +672,12 @@
 }
 
 .copy-feed-item .copy-status-strip {
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .copy-feed-numbers {
   justify-items: end;
+  min-width: 185px;
   text-align: right;
 }
 
@@ -729,7 +738,94 @@
 
 .copy-performance-panel {
   display: grid;
-  gap: 16px;
+  gap: 18px;
+}
+
+.copy-performance-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.copy-performance-banner {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(56, 72, 95, 0.58);
+  border-radius: 10px;
+  background: rgba(8, 17, 31, 0.66);
+}
+
+.copy-performance-banner span {
+  color: var(--muted-foreground);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.copy-performance-banner strong {
+  display: block;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.copy-performance-banner small {
+  color: var(--muted-foreground);
+}
+
+.copy-performance-banner.warning {
+  border-color: rgba(250, 204, 21, 0.32);
+  background: rgba(250, 204, 21, 0.09);
+}
+
+.copy-performance-banner.locked {
+  border-color: rgba(251, 113, 133, 0.28);
+  background: rgba(251, 113, 133, 0.1);
+}
+
+.copy-performance-banner.neutral {
+  border-color: rgba(56, 189, 248, 0.18);
+}
+
+.copy-performance-primary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.copy-performance-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.copy-performance-subsection {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.copy-performance-subsection-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.copy-performance-subsection-heading span {
+  color: var(--muted-foreground);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.copy-performance-subsection-heading strong {
+  font-size: 0.98rem;
+}
+
+.copy-performance-secondary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .copy-performance-grid,
@@ -751,10 +847,13 @@
   display: grid;
   gap: 8px;
   min-width: 0;
-  padding: 14px;
+  padding: 14px 15px;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.58);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(18, 31, 51, 0.88), rgba(12, 23, 40, 0.8)),
+    rgba(15, 23, 42, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .copy-performance-card span,
@@ -765,8 +864,15 @@
 }
 
 .copy-performance-card strong {
-  font-size: 1.45rem;
-  line-height: 1.1;
+  font-size: 1.55rem;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.copy-performance-card small {
+  color: var(--muted-foreground);
+  line-height: 1.35;
+  font-size: 0.79rem;
 }
 
 .copy-performance-card.compact strong,
@@ -774,25 +880,93 @@
   font-size: 1.02rem;
 }
 
+.copy-performance-card.hero {
+  padding-block: 18px;
+}
+
+.copy-performance-card.hero strong {
+  font-size: clamp(1.9rem, 3vw, 2.55rem);
+}
+
+.copy-performance-card.primary strong {
+  font-size: clamp(1.45rem, 2vw, 1.95rem);
+}
+
 .copy-performance-card.positive,
 .copy-performance-mini.positive {
   border-color: rgba(34, 197, 94, 0.28);
+  background:
+    linear-gradient(180deg, rgba(16, 42, 30, 0.78), rgba(10, 24, 19, 0.76)),
+    rgba(34, 197, 94, 0.08);
 }
 
 .copy-performance-card.negative,
 .copy-performance-mini.negative {
   border-color: rgba(251, 113, 133, 0.28);
+  background:
+    linear-gradient(180deg, rgba(49, 20, 29, 0.8), rgba(27, 13, 18, 0.76)),
+    rgba(251, 113, 133, 0.08);
 }
 
 .copy-performance-card.warning,
 .copy-performance-mini.warning {
   border-color: rgba(250, 204, 21, 0.28);
+  background:
+    linear-gradient(180deg, rgba(55, 44, 18, 0.78), rgba(32, 24, 10, 0.74)),
+    rgba(250, 204, 21, 0.08);
 }
 
 .copy-performance-mini-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+
+.copy-performance-tertiary-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.copy-performance-insights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.copy-performance-insight {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 15px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  background: rgba(10, 19, 35, 0.86);
+}
+
+.copy-performance-insight span {
+  color: var(--muted-foreground);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.copy-performance-insight strong {
+  font-size: 1.3rem;
+}
+
+.copy-performance-insight small {
+  color: #dce7f5;
+}
+
+.copy-performance-insight.positive {
+  border-color: rgba(34, 197, 94, 0.28);
+}
+
+.copy-performance-insight.negative {
+  border-color: rgba(251, 113, 133, 0.28);
+}
+
+.copy-performance-insight.warning {
+  border-color: rgba(250, 204, 21, 0.28);
 }
 
 .copy-open-summary-grid {
@@ -1592,9 +1766,13 @@
   .copy-dashboard-grid.two,
   .copy-dashboard-grid.three,
   .copy-amount-presets,
+  .copy-performance-primary-grid,
+  .copy-performance-section-grid,
+  .copy-performance-secondary-grid,
   .copy-performance-row-primary,
   .copy-performance-row,
   .copy-performance-mini-grid,
+  .copy-performance-insights,
   .copy-wallets-kpi-grid,
   .copy-wallets-master-detail,
   .copy-wallet-toolbar,
@@ -1607,6 +1785,11 @@
 
   .copy-filter-row {
     flex-direction: column;
+  }
+
+  .copy-performance-header {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .copy-wallet-row-actions,

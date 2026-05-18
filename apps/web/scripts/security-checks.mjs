@@ -2898,6 +2898,8 @@ function validateAnalyzerFirstProductSource() {
   assert(copyDemoPnlSummaryPanel.includes("PnL realizado"), "demo pnl panel should expose realized pnl");
   assert(copyDemoPnlSummaryPanel.includes("Mejor copia"), "demo pnl panel should expose best closed pnl");
   assert(copyDemoPnlSummaryPanel.includes("Peor copia"), "demo pnl panel should expose worst closed pnl");
+  assert(copyDemoPnlSummaryPanel.includes("Datos parciales"), "demo pnl panel should expose partial status label");
+  assert(copyDemoPnlSummaryPanel.includes("Precio pendiente:"), "demo pnl panel should surface pending price count in the header");
   assert(copyDemoPnlSummaryPanel.includes("Hay posiciones abiertas, pero algunas no tienen precio actual disponible."), "demo pnl panel should explain partial pricing states");
   assert(copyDemoPnlSummaryPanel.includes("El win rate aparecera cuando existan copias cerradas con resultado confiable."), "demo pnl panel should explain pending win rate when there are no closed copies");
   assert(!copyDemoPnlSummaryPanel.includes("Todavia no hay copias demo suficientes para calcular rendimiento."), "demo pnl panel should not use the old insufficient-copy placeholder");
@@ -2917,6 +2919,7 @@ function validateAnalyzerFirstProductSource() {
     assert(copyClosedDemoPositionsTable.includes("PnL final"), "closed demo history should label final pnl");
     assert(copyClosedDemoPositionsTable.includes("PnL %"), "closed demo history should expose realized pnl percent");
     assert(copyClosedDemoPositionsTable.includes("Cierre copiado"), "closed demo history should explain wallet-driven closes");
+    assert(copyClosedDemoPositionsTable.includes("Cierre copiado tarde"), "closed demo history should explain late copied sells");
   }
   assert(copyWalletsTable.includes("Pausando..."), "wallet pause button should show loading state");
   assert(copyWalletsTable.includes("Eliminando..."), "wallet delete button should show loading state");

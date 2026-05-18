@@ -468,6 +468,7 @@ export function CopyTradingDashboard() {
 
         <div className="copy-dashboard-grid two copy-summary-layout">
           <CopyDemoPnlSummaryPanel
+            lastUpdatedLabel={lastUpdatedLabel}
             loading={sections.pnl.loading && !data.demoPnlSummary}
             refreshing={sections.pnl.refreshing}
             statusMessage={sections.pnl.error}
