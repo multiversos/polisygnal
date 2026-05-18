@@ -121,6 +121,14 @@ export type CopyDemoPositionStatus =
   | "cancelled"
   | "price_pending";
 
+export type CopyDemoPositionResult =
+  | "win"
+  | "loss"
+  | "break_even"
+  | "cancelled"
+  | "unknown"
+  | "pending";
+
 export type CopyTradingDemoSettlementPositionResult = {
   position_id: string;
   wallet_alias: string | null;
@@ -171,27 +179,48 @@ export type CopyDemoPosition = {
   unrealized_pnl_usd: string | null;
   unrealized_pnl_percent: string | null;
   realized_pnl_usd: string | null;
+  realized_pnl_percent: string | null;
   exit_price: string | null;
   exit_value_usd: string | null;
   close_reason: string | null;
   resolution_source: string | null;
+  result: CopyDemoPositionResult | null;
   status: CopyDemoPositionStatus;
   opened_at: string;
   closed_at: string | null;
   updated_at: string;
 };
 
+export type CopyTradingDemoPnlHighlight = {
+  position_id: string;
+  wallet_label: string | null;
+  market_title: string | null;
+  outcome: string | null;
+  realized_pnl_usd: string | null;
+  realized_pnl_percent: string | null;
+  close_reason: string | null;
+  closed_at: string | null;
+};
+
 export type CopyTradingDemoPnlSummary = {
+  status: "ok" | "partial" | "no_data" | "error";
+  message: string | null;
+  warnings: string[];
   open_positions_count: number;
   closed_positions_count: number;
+  demo_capital_used_usd: string | null;
   capital_demo_used_usd: string | null;
   open_capital_usd: string | null;
   closed_capital_usd: string | null;
+  current_open_value_usd: string | null;
   open_current_value_usd: string | null;
   open_pnl_usd: string | null;
   realized_pnl_usd: string | null;
+  total_pnl_usd: string | null;
   total_demo_pnl_usd: string | null;
   demo_roi_percent: string | null;
+  win_count: number;
+  loss_count: number;
   win_rate_percent: string | null;
   average_closed_pnl_usd: string | null;
   best_closed_pnl_usd: string | null;
@@ -201,7 +230,11 @@ export type CopyTradingDemoPnlSummary = {
   break_even_closed_count: number;
   cancelled_closed_count: number;
   unknown_closed_count: number;
+  pending_price_count: number;
   price_pending_count: number;
+  best_closed_copy: CopyTradingDemoPnlHighlight | null;
+  worst_closed_copy: CopyTradingDemoPnlHighlight | null;
+  last_updated_at: string | null;
 };
 
 export type CopyTradingStatus = {

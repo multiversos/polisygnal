@@ -45,6 +45,8 @@ CopyWatcherWalletScanStatus = Literal[
 ]
 CopyWatcherWalletPriority = Literal["high", "normal", "low"]
 CopyTradingWorkerStatus = Literal["not_started", "running", "stale", "stopped", "error", "unknown"]
+CopyTradingDemoPnlStatus = Literal["ok", "partial", "no_data", "error"]
+CopyDemoPositionResult = Literal["win", "loss", "break_even", "cancelled", "unknown", "pending"]
 
 COPY_AMOUNT_PRESETS = {
     Decimal("1"),
@@ -258,10 +260,12 @@ class CopyDemoPositionRead(BaseModel):
     unrealized_pnl_usd: Decimal | None = None
     unrealized_pnl_percent: Decimal | None = None
     realized_pnl_usd: Decimal | None = None
+    realized_pnl_percent: Decimal | None = None
     exit_price: Decimal | None = None
     exit_value_usd: Decimal | None = None
     close_reason: str | None = None
     resolution_source: str | None = None
+    result: CopyDemoPositionResult | None = None
     status: CopyDemoPositionStatus
     opened_at: datetime
     closed_at: datetime | None = None
@@ -270,17 +274,36 @@ class CopyDemoPositionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CopyTradingDemoPnlHighlight(BaseModel):
+    position_id: str
+    wallet_label: str | None = None
+    market_title: str | None = None
+    outcome: str | None = None
+    realized_pnl_usd: Decimal | None = None
+    realized_pnl_percent: Decimal | None = None
+    close_reason: str | None = None
+    closed_at: datetime | None = None
+
+
 class CopyTradingDemoPnlSummary(BaseModel):
+    status: CopyTradingDemoPnlStatus = "no_data"
+    message: str | None = None
+    warnings: list[str] = Field(default_factory=list)
     open_positions_count: int = 0
     closed_positions_count: int = 0
+    demo_capital_used_usd: Decimal | None = None
     capital_demo_used_usd: Decimal | None = None
     open_capital_usd: Decimal | None = None
     closed_capital_usd: Decimal | None = None
+    current_open_value_usd: Decimal | None = None
     open_current_value_usd: Decimal | None = None
     open_pnl_usd: Decimal | None = None
     realized_pnl_usd: Decimal | None = None
+    total_pnl_usd: Decimal | None = None
     total_demo_pnl_usd: Decimal | None = None
     demo_roi_percent: Decimal | None = None
+    win_count: int = 0
+    loss_count: int = 0
     win_rate_percent: Decimal | None = None
     average_closed_pnl_usd: Decimal | None = None
     best_closed_pnl_usd: Decimal | None = None
@@ -290,7 +313,11 @@ class CopyTradingDemoPnlSummary(BaseModel):
     break_even_closed_count: int = 0
     cancelled_closed_count: int = 0
     unknown_closed_count: int = 0
+    pending_price_count: int = 0
     price_pending_count: int = 0
+    best_closed_copy: CopyTradingDemoPnlHighlight | None = None
+    worst_closed_copy: CopyTradingDemoPnlHighlight | None = None
+    last_updated_at: datetime | None = None
 
 
 class CopyTradingTickResponse(BaseModel):
@@ -424,6 +451,8 @@ class CopyTradingEventsResponse(BaseModel):
 
 
 class CopyTradingDemoPositionsResponse(BaseModel):
+    status: Literal["ok", "no_data"] = "ok"
+    message: str | None = None
     positions: list[CopyDemoPositionRead] = Field(default_factory=list)
 
 

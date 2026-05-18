@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatDateTime, formatPnl, formatTradeAge, formatUsd, formatWalletAddress } from "../../lib/copyTrading";
+import { formatDateTime, formatPercent, formatPnl, formatTradeAge, formatUsd, formatWalletAddress } from "../../lib/copyTrading";
 import type { CopyDemoPosition, CopyTradingDemoPnlSummary } from "../../lib/copyTradingTypes";
 
 type HistoryFilter = "all" | "winners" | "losers";
@@ -40,7 +40,9 @@ export function CopyClosedDemoPositionsTable({
       </p>
 
       {positions.length === 0 ? (
-        <div className="copy-empty-state">Todavia no hay copias demo cerradas.</div>
+        <div className="copy-empty-state">
+          Aun no hay copias demo cerradas. Las posiciones apareceran aqui cuando el mercado cierre o la wallet seguida venda.
+        </div>
       ) : (
         <>
           <div className="copy-performance-mini-grid copy-history-summary-grid">
@@ -94,10 +96,12 @@ export function CopyClosedDemoPositionsTable({
                   </div>
                   <div className="copy-feed-numbers">
                     <span className={getPnlClassName(position.realized_pnl_usd)}>PnL final {formatPnl(position.realized_pnl_usd)}</span>
+                    <span className={getPnlClassName(position.realized_pnl_percent)}>PnL % {formatPercent(position.realized_pnl_percent)}</span>
                     <span>Cierre {getCloseReasonLabel(position.close_reason)}</span>
                     <span>Valor final {formatUsd(position.exit_value_usd)}</span>
+                    <span>Apertura {formatDateTime(position.opened_at)}</span>
+                    <span>Cierre {formatDateTime(position.closed_at || position.updated_at)}</span>
                     <span>Duracion {formatTradeAge(durationSeconds(position.opened_at, position.closed_at))}</span>
-                    <small>{formatDateTime(position.closed_at || position.updated_at)}</small>
                   </div>
                 </article>
               ))}
@@ -203,46 +207,46 @@ function getCloseReasonLabel(reason: string | null): string {
       return "Mercado resuelto";
     case "market_cancelled":
       return "Mercado cancelado";
+    case "no_reliable_resolution":
+      return "Sin resolucion confiable";
+    case "unknown":
+      return "Cierre no verificable";
     default:
       return "Cierre demo";
   }
 }
 
 function getResolvedOutcomeLabel(position: CopyDemoPosition): string {
-  if (position.status === "cancelled" || position.close_reason === "market_cancelled") {
-    return "Cancelado";
+  switch (position.result) {
+    case "win":
+      return "Win";
+    case "loss":
+      return "Loss";
+    case "break_even":
+      return "Break-even";
+    case "cancelled":
+      return "Cancelado";
+    case "unknown":
+      return "No verificable";
+    default:
+      return "Pendiente";
   }
-  if (position.realized_pnl_usd === null) {
-    return "No verificable";
-  }
-  const pnl = Number(position.realized_pnl_usd);
-  if (!Number.isFinite(pnl)) {
-    return "No verificable";
-  }
-  if (pnl > 0) {
-    return "Win";
-  }
-  if (pnl < 0) {
-    return "Loss";
-  }
-  return "Break-even";
 }
 
 function getOutcomeTone(position: CopyDemoPosition): string {
-  if (position.status === "cancelled" || position.close_reason === "market_cancelled") {
-    return "locked";
+  switch (position.result) {
+    case "win":
+      return "success";
+    case "loss":
+      return "locked";
+    case "break_even":
+      return "historical";
+    case "cancelled":
+      return "locked";
+    case "unknown":
+    default:
+      return "subtle";
   }
-  if (position.realized_pnl_usd === null) {
-    return "subtle";
-  }
-  const pnl = Number(position.realized_pnl_usd);
-  if (pnl > 0) {
-    return "success";
-  }
-  if (pnl < 0) {
-    return "locked";
-  }
-  return "historical";
 }
 
 function formatResolutionSource(value: string): string {

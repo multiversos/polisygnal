@@ -15,7 +15,7 @@ from app.models.event import Event
 from app.models.market import Market
 from app.models.market_outcome import MarketOutcome
 from app.api import routes_copy_trading
-from app.clients.polymarket_data import PolymarketDataClientError
+from app.clients.polymarket_data import PolymarketDataClientError, get_polymarket_data_client
 from app.models.copy_trading import CopyWallet
 from app.models.copy_worker_state import CopyWorkerState
 from app.schemas.copy_trading import CopyWalletCreate, CopyWalletUpdate
@@ -970,13 +970,22 @@ def test_demo_pnl_summary_counts_open_and_closed_positions(db_session: Session) 
     assert summary.open_pnl_usd == Decimal("3.75")
     assert summary.realized_pnl_usd == Decimal("1.50")
     assert summary.total_demo_pnl_usd == Decimal("5.25")
+    assert summary.total_pnl_usd == Decimal("5.25")
     assert summary.demo_roi_percent == Decimal("35.00")
     assert summary.win_rate_percent == Decimal("100.00")
     assert summary.average_closed_pnl_usd == Decimal("1.50")
     assert summary.best_closed_pnl_usd == Decimal("1.50")
     assert summary.worst_closed_pnl_usd == Decimal("1.50")
+    assert summary.status == "ok"
+    assert summary.message == "Datos demo actualizados."
+    assert summary.current_open_value_usd == Decimal("13.75")
+    assert summary.demo_capital_used_usd == Decimal("15.00")
+    assert summary.win_count == 1
+    assert summary.loss_count == 0
     assert summary.winning_closed_count == 1
     assert summary.losing_closed_count == 0
+    assert summary.best_closed_copy is not None
+    assert summary.best_closed_copy.realized_pnl_usd == Decimal("1.50")
     assert summary.price_pending_count == 0
 
 
@@ -999,6 +1008,8 @@ def test_demo_pnl_summary_keeps_pending_prices_out_of_current_value(db_session: 
     assert summary.open_pnl_usd is None
     assert summary.total_demo_pnl_usd is None
     assert summary.demo_roi_percent is None
+    assert summary.status == "partial"
+    assert "precio actual disponible" in (summary.message or "")
     assert summary.price_pending_count == 1
 
 
@@ -1049,6 +1060,84 @@ def test_demo_pnl_summary_excludes_cancelled_from_win_rate(db_session: Session) 
     assert summary.losing_closed_count == 0
     assert summary.cancelled_closed_count == 1
     assert summary.win_rate_percent == Decimal("100.00")
+
+
+def test_demo_pnl_summary_returns_no_data_when_there_are_no_positions() -> None:
+    summary = build_demo_pnl_summary([], [])
+
+    assert summary.status == "no_data"
+    assert summary.message == "Aun no hay copias demo abiertas ni cerradas."
+    assert summary.open_positions_count == 0
+    assert summary.closed_positions_count == 0
+    assert summary.win_rate_percent is None
+
+
+def test_demo_pnl_summary_route_returns_partial_message_without_prices(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    _create_wallet(db_session, amount=Decimal("10"), suffix="ab12")
+    trade = _trade("0xroute-pnl-partial", price="0.40") | {
+        "conditionId": "cond-route-pnl-partial",
+        "asset": "asset-route-pnl-partial",
+    }
+    run_demo_tick(db_session, data_client=FakeTradeReader([trade]), now=_now())
+    app.dependency_overrides[get_polymarket_data_client] = lambda: PriceAwareDataClient()
+
+    try:
+        response = client.get("/copy-trading/demo/pnl-summary")
+    finally:
+        app.dependency_overrides.pop(get_polymarket_data_client, None)
+
+    assert response.status_code == 200
+    payload = response.json()["summary"]
+    assert payload["status"] == "partial"
+    assert "precio actual disponible" in payload["message"]
+    assert payload["pending_price_count"] == 1
+    assert payload["price_pending_count"] == 1
+    assert payload["win_rate_percent"] is None
+
+
+def test_demo_positions_history_route_returns_result_and_percent(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    wallet = _create_wallet(db_session, amount=Decimal("5"), suffix="cdef")
+    scan_copy_wallet(
+        db_session,
+        wallet_id=wallet.id,
+        data_client=FakeTradeReader([
+            _trade("0xhistory-buy", price="0.50", wallet=wallet.proxy_wallet) | {"conditionId": "cond-history", "asset": "asset-history"},
+        ]),
+        now=_now(),
+    )
+    scan_copy_wallet(
+        db_session,
+        wallet_id=wallet.id,
+        data_client=FakeTradeReader([
+            _trade("0xhistory-sell", side="SELL", price="0.65", wallet=wallet.proxy_wallet) | {"conditionId": "cond-history", "asset": "asset-history"},
+        ]),
+        now=_now(),
+    )
+
+    response = client.get("/copy-trading/demo/positions/history")
+
+    assert response.status_code == 200
+    payload = response.json()["positions"]
+    assert len(payload) == 1
+    assert payload[0]["result"] == "win"
+    assert payload[0]["realized_pnl_percent"] == "30.00"
+    assert payload[0]["close_reason"] in {"wallet_sell", "copied_sell", "late_copied_sell"}
+
+
+def test_demo_positions_history_route_returns_no_data_when_empty(client: TestClient) -> None:
+    response = client.get("/copy-trading/demo/positions/history")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "no_data"
+    assert "Aun no hay copias demo cerradas" in payload["message"]
+    assert payload["positions"] == []
 
 
 def test_reconcile_open_demo_positions_dry_run_finds_matching_sell_without_writing(db_session: Session) -> None:

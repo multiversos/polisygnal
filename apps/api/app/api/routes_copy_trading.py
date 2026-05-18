@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
@@ -25,7 +27,7 @@ from app.schemas.copy_trading import (
 from app.services.copy_trading_demo_engine import run_demo_tick, scan_copy_wallet
 from app.services.copy_trading_demo_positions import (
     build_closed_demo_positions_read,
-    build_demo_pnl_summary,
+    build_demo_pnl_summary_snapshot,
     build_open_demo_positions_read,
     list_closed_demo_positions,
     list_open_demo_positions,
@@ -167,8 +169,11 @@ def get_copy_open_demo_positions(
     data_client: PolymarketDataClient = Depends(get_polymarket_data_client),
 ) -> CopyTradingDemoPositionsResponse:
     positions = list_open_demo_positions(db)
+    reads = build_open_demo_positions_read(positions, data_client=data_client)
     return CopyTradingDemoPositionsResponse(
-        positions=build_open_demo_positions_read(positions, data_client=data_client)
+        status="ok" if reads else "no_data",
+        message=None if reads else "Aun no hay copias demo abiertas.",
+        positions=reads,
     )
 
 
@@ -178,8 +183,15 @@ def get_copy_closed_demo_positions(
     db: Session = Depends(get_db),
 ) -> CopyTradingDemoPositionsResponse:
     positions = list_closed_demo_positions(db, limit=limit)
+    reads = build_closed_demo_positions_read(positions)
     return CopyTradingDemoPositionsResponse(
-        positions=build_closed_demo_positions_read(positions)
+        status="ok" if reads else "no_data",
+        message=(
+            None
+            if reads
+            else "Aun no hay copias demo cerradas. Las posiciones apareceran aqui cuando el mercado cierre o la wallet seguida venda."
+        ),
+        positions=reads,
     )
 
 
@@ -189,10 +201,15 @@ def get_copy_demo_pnl_summary(
     db: Session = Depends(get_db),
     data_client: PolymarketDataClient = Depends(get_polymarket_data_client),
 ) -> CopyTradingDemoPnlSummaryResponse:
-    open_positions = build_open_demo_positions_read(list_open_demo_positions(db), data_client=data_client)
-    closed_positions = build_closed_demo_positions_read(list_closed_demo_positions(db, limit=history_limit))
+    open_positions = list_open_demo_positions(db)
+    closed_positions = list_closed_demo_positions(db, limit=history_limit)
     return CopyTradingDemoPnlSummaryResponse(
-        summary=build_demo_pnl_summary(open_positions, closed_positions)
+        summary=build_demo_pnl_summary_snapshot(
+            open_positions,
+            closed_positions,
+            data_client=data_client,
+            now=datetime.now(tz=UTC),
+        )
     )
 
 

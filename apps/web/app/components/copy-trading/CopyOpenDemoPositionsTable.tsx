@@ -10,6 +10,9 @@ export function CopyOpenDemoPositionsTable({
   positions: CopyDemoPosition[];
   summary: CopyTradingDemoPnlSummary | null;
 }) {
+  const currentOpenValue = summary?.current_open_value_usd ?? summary?.open_current_value_usd ?? null;
+  const pendingPriceCount = summary?.pending_price_count ?? summary?.price_pending_count ?? 0;
+
   return (
     <section className="copy-panel">
       <div className="copy-panel-heading">
@@ -27,9 +30,9 @@ export function CopyOpenDemoPositionsTable({
           <div className="copy-performance-mini-grid copy-open-summary-grid">
             <MiniStat label="Abiertas" value={String(summary?.open_positions_count ?? positions.length)} />
             <MiniStat label="Capital abierto" value={formatUsd(summary?.open_capital_usd ?? null)} />
-            <MiniStat label="Valor actual abierto" value={formatUsd(summary?.open_current_value_usd ?? null)} />
+            <MiniStat label="Valor actual abierto" value={formatUsd(currentOpenValue)} />
             <MiniStat label="PnL abierto" value={formatPnl(summary?.open_pnl_usd ?? null)} tone={pnlTone(summary?.open_pnl_usd ?? null)} />
-            <MiniStat label="Precio pendiente" value={String(summary?.price_pending_count ?? 0)} tone={(summary?.price_pending_count ?? 0) > 0 ? "warning" : "neutral"} />
+            <MiniStat label="Precio pendiente" value={String(pendingPriceCount)} tone={pendingPriceCount > 0 ? "warning" : "neutral"} />
           </div>
           <div className="copy-feed">
             {positions.map((position) => (

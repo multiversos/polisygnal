@@ -21,7 +21,9 @@ type EventsResponse = { events: CopyBotEvent[] };
 type DemoPositionsResponse = { positions: CopyDemoPosition[] };
 type DemoPnlSummaryResponse = { summary: CopyTradingDemoPnlSummary };
 const COPY_TRADING_PRIMARY_TIMEOUT_MS = 15_000;
-const COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS = 20_000;
+const COPY_TRADING_OPEN_POSITIONS_TIMEOUT_MS = 45_000;
+const COPY_TRADING_HISTORY_TIMEOUT_MS = 20_000;
+const COPY_TRADING_PNL_TIMEOUT_MS = 35_000;
 
 export async function getCopyTradingStatusData(): Promise<CopyTradingStatus> {
   return fetchApiJson<CopyTradingStatus>(
@@ -79,7 +81,7 @@ export async function getCopyTradingOpenPositionsData(): Promise<CopyDemoPositio
   const response = await fetchApiJson<DemoPositionsResponse>(
     "/copy-trading/demo/positions/open",
     undefined,
-    COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
+    COPY_TRADING_OPEN_POSITIONS_TIMEOUT_MS,
   );
   return response.positions;
 }
@@ -88,7 +90,7 @@ export async function getCopyTradingClosedPositionsData(): Promise<CopyDemoPosit
   const response = await fetchApiJson<DemoPositionsResponse>(
     "/copy-trading/demo/positions/history?limit=20",
     undefined,
-    COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
+    COPY_TRADING_HISTORY_TIMEOUT_MS,
   );
   return response.positions;
 }
@@ -97,7 +99,7 @@ export async function getCopyTradingDemoPnlSummaryData(): Promise<CopyTradingDem
   const response = await fetchApiJson<DemoPnlSummaryResponse>(
     "/copy-trading/demo/pnl-summary",
     undefined,
-    COPY_TRADING_SUPPLEMENTAL_TIMEOUT_MS,
+    COPY_TRADING_PNL_TIMEOUT_MS,
   );
   return response.summary;
 }
