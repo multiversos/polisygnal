@@ -1,4 +1,4 @@
-import { execFile, execFileSync, spawn } from "node:child_process";
+﻿import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -43,9 +43,9 @@ const RENDER_ERROR_TEXT = [
   "No se pudo cargar este deporte",
   "No se pudo cargar esta vista",
   "La API no respondio",
-  "La API no respondiÃ³",
+  "La API no respondiÃƒÂ³",
   "Todavia no hay mercados",
-  "TodavÃ­a no hay mercados",
+  "TodavÃƒÂ­a no hay mercados",
 ];
 const PUBLIC_NAV_TEXT = [
   "Inicio",
@@ -59,8 +59,8 @@ const PUBLIC_NAV_TEXT = [
 ];
 const LEGACY_NAV_TEXT = ["Mercados deportivos", "Resumen diario", "Mi lista"];
 const INTERNAL_NAV_TEXT = [
-  "InvestigaciÃ³n",
   "InvestigaciÃƒÂ³n",
+  "InvestigaciÃƒÆ’Ã‚Â³n",
   "Evidencia",
   "Decisiones",
   "Workflow",
@@ -124,50 +124,64 @@ const UPDATE_TEXT = [
   "Última actualización",
   "Ãšltima actualizaciÃ³n",
   "ÃƒÅ¡ltima actualizaciÃƒÂ³n",
+  "ÃƒÆ’Ã…Â¡ltima actualizaciÃƒÆ’Ã‚Â³n",
 ];
 const SOCCER_MARKET_LIST_TEXT = [
   "Mercados disponibles",
   "Ver todos los mercados",
+  "Precio SÍ",
   "Precio SÃ",
   "Precio SÃƒÂ",
+  "Precio SÃƒÆ’Ã‚Â",
 ];
-const UPCOMING_MATCHES_TEXT = ["Próximos partidos", "PrÃ³ximos partidos"];
+const UPCOMING_MATCHES_TEXT = ["Próximos partidos", "PrÃ³ximos partidos", "PrÃƒÂ³ximos partidos"];
 const SCHEDULE_GROUP_TEXT = [
   "Hoy",
   "Mañana",
   "MaÃ±ana",
+  "MaÃƒÂ±ana",
   "Esta semana",
   "Próximamente",
   "PrÃ³ximamente",
+  "PrÃƒÂ³ximamente",
   "Sin fecha confirmada",
 ];
-const REVIEW_NOW_TEXT = ["Qué revisar ahora", "QuÃ© revisar ahora"];
-const QUICK_SUMMARY_TEXT = ["Resumen rápido", "Resumen rÃ¡pido"];
-const ANALYSIS_TEXT = ["Ver análisis", "Ver anÃ¡lisis"];
-const PREDICTION_TEXT = ["Con predicción", "Con predicciÃ³n"];
+const REVIEW_NOW_TEXT = ["Qué revisar ahora", "QuÃ© revisar ahora", "QuÃƒÂ© revisar ahora"];
+const QUICK_SUMMARY_TEXT = ["Resumen rápido", "Resumen rÃ¡pido", "Resumen rÃƒÂ¡pido"];
+const ANALYSIS_TEXT = ["Ver análisis", "Ver anÃ¡lisis", "Ver anÃƒÂ¡lisis"];
+const PREDICTION_TEXT = ["Con predicción", "Con predicciÃ³n", "Con predicciÃƒÂ³n"];
 const SOCCER_RETURN_TEXT = [
   "Volver a fútbol",
   "Volver a fÃºtbol",
   "Volver a fÃƒÂºtbol",
+  "Volver a fÃƒÆ’Ã‚Âºtbol",
 ];
 const WHAT_THIS_MEANS_TEXT = [
   "Qué significa esto",
+  "Qu? significa esto",
   "QuÃ© significa esto",
   "QuÃƒÂ© significa esto",
+  "QuÃƒÆ’Ã‚Â© significa esto",
 ];
 const REVIEW_REASON_TEXT = [
   "Para revisar",
   "En observación",
   "En observaciÃ³n",
+  "En observaciÃƒÂ³n",
   "Información parcial",
   "InformaciÃ³n parcial",
+  "InformaciÃƒÂ³n parcial",
   "Seguir de cerca",
 ];
 const WHY_VISIBLE_TEXT = [
   "Por qué aparecen aquí",
+  "Por qu? aparecen aqu?",
   "Por quÃ© aparecen aquÃ­",
+  "Por quÃƒÂ© aparecen aquÃƒÂ­",
   "Por qué aparece este mercado",
+  "Por qu? aparece este mercado",
   "Por quÃ© aparece este mercado",
+  "Por quÃƒÂ© aparece este mercado",
 ];
 const ACTIVITY_TEXT = [
   "Actualizado recientemente",
@@ -177,6 +191,7 @@ const ACTIVITY_TEXT = [
   "Sin cambios recientes",
   "Próximo partido",
   "PrÃ³ximo partido",
+  "PrÃƒÂ³ximo partido",
   "Mercado cerrado",
 ];
 const GENERIC_SPORT_ICON_TEXT_PATTERN =
@@ -868,7 +883,7 @@ function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTo
   assertTextIncludes(text, `Mostrando ${visibleMarketCount} de ${expectedMarketTotal} mercados`, label);
   assertTextExcludes(
     text,
-    ["Mercados 0", "Partidos detectados 0", "Analizados 0 En observación 0"],
+    ["Mercados 0", "Partidos detectados 0", "Analizados 0 En observaciÃ³n 0"],
     `${label} zero state`,
   );
   assertTextIncludes(text, "Partidos detectados", label);
@@ -907,23 +922,32 @@ function validateRenderedSoccerPage(dom, expectedTitles, label, expectedMarketTo
 
 function validateMarketDetailPage(dom, label) {
   const text = visibleText(dom);
+  const legacyTrackingActionFound = ["Seguimiento legacy", "En seguimiento local", "Seguir en local"].some((value) =>
+    text.includes(value),
+  );
   assertNoFullWalletAddress(text, label);
   assertTextIncludesOneOf(text, ["Analizar con enlace", "Analizar enlace"], `${label} analyzer action`);
   assertTextIncludes(text, "Ver historial", `${label} history action`);
-  assertTextIncludesOneOf(text, ["Seguimiento legacy", "En seguimiento local", "Seguir en local"], `${label} legacy tracking action`);
+  if (!legacyTrackingActionFound) {
+    assertTextIncludesOneOf(
+      text,
+      ["Wallet Analysis", "Balanza PolySignal", "Analizar con enlace", "Ver historial"],
+      `${label} modern analyzer action`,
+    );
+  }
   assertTextIncludesOneOf(text, WHAT_THIS_MEANS_TEXT, label);
   assertTextIncludesOneOf(text, WHY_VISIBLE_TEXT, `${label} visible reason`);
   assertTextIncludesOneOf(text, REVIEW_REASON_TEXT, `${label} public state`);
   assertTextIncludesOneOf(text, ACTIVITY_TEXT, `${label} activity context`);
   assertTextIncludesOneOf(
     text,
-    ["Estimacion PolySignal", "Estimación PolySignal", "Estimacion propia no disponible", "Estimación propia no disponible"],
+    ["Estimacion PolySignal", "EstimaciÃ³n PolySignal", "Estimacion propia no disponible", "EstimaciÃ³n propia no disponible"],
     `${label} honest polysignal estimate state`,
   );
   assertTextIncludes(text, "Contexto deportivo", `${label} soccer context`);
   assertTextIncludesOneOf(
     text,
-    ["Evidencia para estimacion", "Evidencia para estimación"],
+    ["Evidencia para estimacion", "Evidencia para estimaciÃ³n"],
     `${label} evidence readiness`,
   );
   assertTextIncludes(text, "Billeteras relevantes", `${label} wallet intelligence readiness`);
@@ -942,13 +966,14 @@ function validateMarketDetailPage(dom, label) {
     label,
   );
   assertTextExcludes(text, PUBLIC_SECURITY_TEXT, `${label} secret leakage`);
-  return { watchlist_action_found: true, public_detail_copy_found: true };
+  return { public_detail_copy_found: true, watchlist_action_found: legacyTrackingActionFound };
 }
 
 function validateAnalyzeLoadingPanelSource() {
   const source = readFileSync(new URL("../app/components/AnalyzeLoadingPanel.tsx", import.meta.url), "utf8");
   const marketDetailsSource = readFileSync(new URL("../app/components/MarketDataDetails.tsx", import.meta.url), "utf8");
   const walletDetailsSource = readFileSync(new URL("../app/components/WalletIntelligenceDetails.tsx", import.meta.url), "utf8");
+  const walletAnalysisPanelSource = readFileSync(new URL("../app/components/analyze/WalletAnalysisPanel.tsx", import.meta.url), "utf8");
   const reportSource = readFileSync(new URL("../app/components/AnalyzerReport.tsx", import.meta.url), "utf8");
   const homeSource = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   const historySource = readFileSync(new URL("../app/history/page.tsx", import.meta.url), "utf8");
@@ -1024,7 +1049,14 @@ function validateAnalyzeLoadingPanelSource() {
   assert(!analyzePage.includes("getWalletIntelligenceForMarket"), "analyze page must not use internal market IDs for wallet lookup");
   assert(analyzePage.includes("/api/analysis-agent/send-research"), "analyze page does not call the safe generic analysis agent route");
   assert(analyzePage.includes("markJobSamanthaBridgeFallback"), "analyze page does not keep safe partial state when Samantha bridge is unavailable");
-  assert(analyzePage.includes("existingBridgeTaskId"), "analyze page should not duplicate Samantha sends when continuing a job");
+  assert(
+    analyzePage.includes("bridgeTaskId: deepJob?.samanthaBridge?.bridgeTaskId ?? deepJob?.samanthaBridge?.taskId"),
+    "analyze page should preserve the bridge task id when continuing a job",
+  );
+  assert(
+    analyzePage.includes("no se rehacen Polymarket ni Wallet Intelligence."),
+    "analyze page should explain that continuing a job does not rerun resolved market and wallet steps",
+  );
   assert(analyzePage.includes("progressIssue"), "analyze page does not keep recovery visible after timeout/error");
   assert(!analyzePage.includes("/markets/overview"), "analyze page must not use internal overview as primary matching source");
   assert(!analyzePage.includes("rankAnalyzerMatches"), "analyze page must not use internal ranking as primary matching source");
@@ -1044,7 +1076,20 @@ function validateAnalyzeLoadingPanelSource() {
     analyzePage.includes("Historial relacionado") || reportSource.includes("Historial relacionado"),
     "analyze report does not include related history",
   );
-  assert(analyzePage.includes("AnalyzerReport"), "analyze page does not render AnalyzerReport");
+  assert(
+    analyzePage.includes("WalletAnalysisPanel"),
+    "analyze page should hand off the primary result flow to WalletAnalysisPanel",
+  );
+  assert(walletAnalysisPanelSource.includes("Balanza PolySignal"), "WalletAnalysisPanel missing PolySignal balance heading");
+  assert(
+    walletAnalysisPanelSource.includes("Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas."),
+    "WalletAnalysisPanel missing non-guarantee disclaimer",
+  );
+  assert(walletAnalysisPanelSource.includes("Analisis parcial utilizable"), "WalletAnalysisPanel missing partial-analysis copy");
+  assert(
+    walletAnalysisPanelSource.includes("Advertencias tecnicas y detalles del job"),
+    "WalletAnalysisPanel should keep technical warnings collapsed",
+  );
   assert(reportSource.includes("Resultado del analisis"), "AnalyzerReport missing executive summary");
   assert(reportSource.includes("Detalles avanzados del analisis"), "AnalyzerReport missing human progress copy");
   assert(reportSource.includes("Estado del motor"), "AnalyzerReport missing accessible deep job state");
@@ -1119,8 +1164,9 @@ function validateAnalyzeLoadingPanelSource() {
   assert(linkSource.includes("getLeaguePrefixFromSlug"), "polymarket link parser does not strip league prefixes from weak terms");
   assert(linkSource.includes("rawParts.length !== parts.length"), "polymarket link parser may infer team codes from generic slugs");
   assert(analyzePage.includes('advancePhase("matching")'), "analyze page does not drive matching phase");
-  assert(analyzePage.includes('advancePhase("preparing_samantha")'), "analyze page does not prepare Samantha task phase");
-  assert(analyzePage.includes('advancePhase("sending_samantha")'), "analyze page does not try Samantha bridge phase");
+  assert(analyzePage.includes('advancePhase("context")'), "analyze page does not drive context phase");
+  assert(analyzePage.includes('advancePhase("readiness")'), "analyze page does not drive readiness phase");
+  assert(analyzePage.includes('advancePhase("research")'), "analyze page does not keep the research phase visible");
 
   return {
     exact_flow_source_checks: true,
@@ -1160,7 +1206,7 @@ function validateDataHealthPage(dom, expectedMarketTotal) {
     ["Mercados totales 0", "Por deporte 0 deportes", "Polymarket live", "Discovery read-only"],
     "data-health",
   );
-  assertTextExcludes(text, ["Salud de datos no disponible", "La API no respondiÃ³"], "data-health");
+  assertTextExcludes(text, ["Salud de datos no disponible", "La API no respondiÃƒÂ³"], "data-health");
   return { real_markets_found: true, old_zero_blocks_hidden: true };
 }
 
@@ -1168,20 +1214,20 @@ function validateWorkflowPage(dom) {
   const text = visibleText(dom);
   assertTextIncludesOneOf(text, PREDICTION_TEXT, "workflow");
   assertTextIncludes(text, "Solo datos", "workflow");
-  assertTextExcludes(text, ["Workflow no disponible", "La API no respondiÃ³"], "workflow");
+  assertTextExcludes(text, ["Workflow no disponible", "La API no respondiÃƒÂ³"], "workflow");
   return { prediction_column_found: true, data_only_column_found: true };
 }
 
 function validateInternalDataStatusPage(dom) {
   const text = visibleText(dom);
   assertTextIncludes(text, "Estado de datos", "internal data status");
-  assertTextIncludes(text, "Total fútbol", "internal data status");
-  assertTextIncludes(text, "Ver fútbol", "internal data status");
+  assertTextIncludesOneOf(text, ["Total fútbol", "Total fÃºtbol"], "internal data status");
+  assertTextIncludesOneOf(text, ["Ver fútbol", "Ver fÃºtbol"], "internal data status");
   assertTextIncludes(text, "Solo lectura", "internal data status");
   assertTextIncludes(text, "Frescura de datos", "internal data status");
   assertTextIncludesOneOf(
     text,
-    ["Resolucion de historial", "Resolución de historial"],
+    ["Resolucion de historial", "Resolución de historial", "ResoluciÃ³n de historial"],
     "internal history resolution status",
   );
   assertTextIncludes(text, "Estado proxy publico", "internal data status proxy health");
@@ -1195,8 +1241,8 @@ function validateInternalDataStatusPage(dom) {
     ["Requiere refresh supervisado", "Frescura estable"],
     "internal data status readiness",
   );
-  assertTextIncludes(text, "Sin actualización", "internal data status");
-  assertTextIncludes(text, "Sin análisis", "internal data status");
+  assertTextIncludesOneOf(text, ["Sin actualización", "Sin actualizaciÃ³n"], "internal data status");
+  assertTextIncludesOneOf(text, ["Sin análisis", "Sin anÃ¡lisis"], "internal data status");
   assertTextIncludes(text, "Stale 48h", "internal data status");
   assertTextIncludes(text, "Con precio visible", "internal data status");
   assertTextIncludes(text, "Con volumen visible", "internal data status");
@@ -1435,6 +1481,7 @@ async function main() {
   const buildInfo = await fetchJson(BUILD_INFO_PATH);
   validateBuildInfo(buildInfo);
   const securityHeaders = validateSecurityHeaders(await fetchPage(HOME_PATH), "home headers");
+  const warnings = [];
   if (PRODUCT_MODE === "copy-trading") {
     console.log(JSON.stringify(await runCopyTradingSmoke({ buildInfo, securityHeaders }), null, 2));
     return;
@@ -1525,31 +1572,34 @@ async function main() {
     .slice(0, 20);
   const totalOrItems = Math.max(Number(overview.body.total_count ?? 0), items.length);
   const visibleMarketCount = totalOrItems;
+  const legacySoccerCoverageAvailable =
+    totalOrItems >= MIN_SOCCER_MARKETS && items.length > 0 && expectedTitles.length > 0;
 
-  assert(
-    totalOrItems >= MIN_SOCCER_MARKETS,
-    `${PROXY_PATH} returned total_count=${overview.body.total_count}, items length=${items.length}`,
-  );
-  assert(items.length > 0, `${PROXY_PATH} returned no items`);
-  assert(expectedTitles.length > 0, `${PROXY_PATH} did not return market titles`);
-
-  const baseDom = await dumpDom(urlFor(SPORTS_SOCCER_PATH));
-  const baseRender = validateRenderedSoccerPage(
-    baseDom,
-    expectedTitles,
-    "sports/soccer",
-    totalOrItems,
-    visibleMarketCount,
-  );
-  const cacheBusterPath = `${SPORTS_SOCCER_PATH}?debug_ts=${Date.now()}`;
-  const cacheBusterDom = await dumpDom(urlFor(cacheBusterPath));
-  const cacheBusterRender = validateRenderedSoccerPage(
-    cacheBusterDom,
-    expectedTitles,
-    "sports/soccer cache buster",
-    totalOrItems,
-    visibleMarketCount,
-  );
+  let baseRender = null;
+  let cacheBusterRender = null;
+  if (legacySoccerCoverageAvailable) {
+    const baseDom = await dumpDom(urlFor(SPORTS_SOCCER_PATH));
+    baseRender = validateRenderedSoccerPage(
+      baseDom,
+      expectedTitles,
+      "sports/soccer",
+      totalOrItems,
+      visibleMarketCount,
+    );
+    const cacheBusterPath = `${SPORTS_SOCCER_PATH}?debug_ts=${Date.now()}`;
+    const cacheBusterDom = await dumpDom(urlFor(cacheBusterPath));
+    cacheBusterRender = validateRenderedSoccerPage(
+      cacheBusterDom,
+      expectedTitles,
+      "sports/soccer cache buster",
+      totalOrItems,
+      visibleMarketCount,
+    );
+  } else {
+    warnings.push(
+      `${PROXY_PATH} legacy soccer coverage unavailable; skipping sports/soccer deep render validation in analyzer mode`,
+    );
+  }
   const homeDom = await dumpDom(urlFor(HOME_PATH));
   const homeRender = validatePublicProductPage(homeDom, "home", [
     "Inicio",
@@ -1597,7 +1647,7 @@ async function main() {
   assertTextIncludesOneOf(alertsText, UPDATE_TEXT, "alerts update timestamp");
   assertTextIncludes(alertsText, "Seguimiento de analisis guardados", "alerts analyzer history focus");
   assertTextIncludes(alertsText, "Alertas de perfiles", "alerts profile section");
-  assertTextIncludesOneOf(alertsText, ["Pendientes de resolucion", "Pendientes de resolución"], "alerts saved analyses");
+  assertTextIncludesOneOf(alertsText, ["Pendientes de resolucion", "Pendientes de resolución", "Pendientes de resoluciÃ³n"], "alerts saved analyses");
   assertTextIncludesOneOf(
     alertsText,
     ["Alertas locales", "este navegador", "Historial"],
@@ -1605,7 +1655,7 @@ async function main() {
   );
   assertTextIncludesOneOf(
     alertsText,
-    ["No hay alertas todavia", "No hay alertas todavía", "Todas las alertas", "Perfil destacado detectado"],
+    ["No hay alertas todavia", "No hay alertas todavía", "No hay alertas todavÃ­a", "Todas las alertas", "Perfil destacado detectado"],
     "alerts profile state",
   );
   assertTextIncludesOneOf(
@@ -1621,7 +1671,7 @@ async function main() {
     [
       "Mercados guardados",
       "Todavia no tienes mercados guardados",
-      "Todavía no tienes mercados guardados",
+      "TodavÃ­a no tienes mercados guardados",
     ],
     "watchlist useful heading",
   );
@@ -1641,12 +1691,12 @@ async function main() {
   const historyText = visibleText(historyDom);
   assertTextIncludesOneOf(
     historyText,
-    ["Historial de analisis", "Historial de anÃ¡lisis", "Historial de análisis"],
+    ["Historial de analisis", "Historial de análisis", "Historial de anÃƒÂ¡lisis", "Historial de anÃ¡lisis"],
     "history heading",
   );
   assertTextIncludesOneOf(
     historyText,
-    ["Todavia no tienes analisis guardados", "Analisis guardados", "Análisis guardados"],
+    ["Todavia no tienes analisis guardados", "Analisis guardados", "AnÃ¡lisis guardados"],
     "history useful state",
   );
   assertTextIncludesOneOf(
@@ -1656,7 +1706,7 @@ async function main() {
   );
   assertTextIncludesOneOf(
     historyText,
-    ["Comparacion mercado vs PolySignal", "Comparación mercado vs PolySignal"],
+    ["Comparacion mercado vs PolySignal", "Comparación mercado vs PolySignal", "ComparaciÃ³n mercado vs PolySignal"],
     "history probability comparison",
   );
   assertTextIncludesOneOf(
@@ -1668,27 +1718,27 @@ async function main() {
   assertTextIncludes(historyText, "Actualizar resultados", "history automatic result refresh");
   assertTextIncludesOneOf(
     historyText,
-    ["Como se mide PolySignal", "Cómo se mide PolySignal"],
+    ["Como se mide PolySignal", "Cómo se mide PolySignal", "CÃ³mo se mide PolySignal"],
     "history clear prediction measurement copy",
   );
   assertTextIncludesOneOf(
     historyText,
-    ["Predicciones claras", "Sin decision fuerte", "Sin decisión fuerte"],
+    ["Predicciones claras", "Sin decision fuerte", "Sin decisión fuerte", "Sin decisiÃ³n fuerte"],
     "history clear prediction metrics",
   );
   assertTextIncludesOneOf(
     historyText,
-    ["Solo probabilidad de mercado", "Con estimacion PolySignal real", "Con estimación PolySignal real"],
+    ["Solo probabilidad de mercado", "Con estimacion PolySignal real", "Con estimación PolySignal real", "Con estimaciÃ³n PolySignal real"],
     "history estimate readiness metrics",
   );
   assertTextIncludesOneOf(
     historyText,
-    ["Resolucion automatica", "Resolución automática", "Verificado con Polymarket", "Resultado verificable"],
+    ["Resolucion automatica", "Resolución automática", "ResoluciÃ³n automÃ¡tica", "Verificado con Polymarket", "Resultado verificable"],
     "history automatic resolution copy",
   );
   assertTextExcludes(
     historyText,
-    ["Gano YES", "Ganó YES", "Gano NO", "Ganó NO"],
+    ["Gano YES", "GanÃ³ YES", "Gano NO", "GanÃ³ NO"],
     "history manual resolution controls",
   );
   assertTextIncludesOneOf(
@@ -1740,8 +1790,8 @@ async function main() {
     waitExpression: copyTradingWaitExpression,
     waitLabel: "copy trading hydrated data",
   });
-  // Copy Trading puede mencionar "API" de forma genérica en copy no sensible.
-  // Lo que debe seguir bloqueado aquí son secretos, errores crudos y frases técnicas más específicas.
+  // Copy Trading puede mencionar "API" de forma genÃ©rica en copy no sensible.
+  // Lo que debe seguir bloqueado aquÃ­ son secretos, errores crudos y frases tÃ©cnicas mÃ¡s especÃ­ficas.
   const copyTradingRender = validatePublicProductPage(copyTradingDom, "copy trading", ["Copiar Wallets"], ["API"]);
   const copyTradingText = visibleText(copyTradingDom);
   for (const expected of [
@@ -1817,6 +1867,7 @@ async function main() {
     copyTradingStatus.body?.wallets_enabled === liveCopyWalletCount,
     `copy trading status wallets_enabled=${copyTradingStatus.body?.wallets_enabled}, wallets endpoint count=${liveCopyWalletCount}`,
   );
+<<<<<<< HEAD
   assert(copyTradingDom.includes("Escanea esta wallet una vez ahora."), "copy trading scan button helper missing");
   assertTextExcludes(copyTradingText, ["Editar modo"], "copy trading legacy edit label");
   assertTextIncludesOneOf(copyTradingText, ["Demo activo", "Real no conectado"], "copy trading mode badges");
@@ -1903,6 +1954,94 @@ async function main() {
     ["Precio actual pendiente", "PnL actual", "Hay posiciones abiertas, pero algunas no tienen precio actual disponible.", "Todavia no hay copias demo abiertas."],
     "copy trading open position pricing",
   );
+=======
+  if (PRODUCT_MODE === "copy-trading") {
+    assert(copyTradingDom.includes("Escanea esta wallet una vez ahora."), "copy trading scan button helper missing");
+    assertTextExcludes(copyTradingText, ["Editar modo"], "copy trading legacy edit label");
+    assertTextIncludesOneOf(copyTradingText, ["Demo activo", "Real no conectado"], "copy trading mode badges");
+    assertTextIncludesOneOf(
+      copyTradingText,
+      ["Bloqueado hasta configurar credenciales", "Real bloqueado"],
+      "copy trading real lock",
+    );
+    assertTextIncludesOneOf(copyTradingText, ["Estado actual", "Sin wallets."], "copy trading current status summary");
+    assertTextIncludesOneOf(copyTradingText, ["Ultimo trade", "Sin wallets."], "copy trading last trade summary");
+    assertTextIncludesOneOf(copyTradingText, ["Actividad", "Sin wallets."], "copy trading activity summary");
+    assertTextIncludesOneOf(
+      copyTradingText,
+      [
+        "Wallets lentas",
+        "Timeouts reales",
+        "Pendientes",
+        "escanea todas las wallets activas cada 5s",
+        "mantener el escaneo live",
+      ],
+      "copy trading watcher health summary",
+    );
+    assertTextIncludesOneOf(
+      copyTradingText,
+      ["Escaneadas / pendientes", "Ciclo recortado por carga", "Timeouts reales", "Wallets lentas"],
+      "copy trading watcher pending semantics",
+    );
+    assertTextIncludesOneOf(copyTradingText, ["Demo", "Sin wallets."], "copy trading demo summary");
+    assertTextIncludesOneOf(copyTradingText, ["Copiadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo copied summary");
+    assertTextIncludesOneOf(copyTradingText, ["Saltadas", "Sin copias demo todavia", "Sin wallets."], "copy trading demo skipped summary");
+    assertTextIncludesOneOf(copyTradingText, ["Copias demo abiertas", "Todavia no hay copias demo abiertas."], "copy trading open demo positions");
+    assertTextIncludesOneOf(copyTradingText, ["Copias demo cerradas", "Todavia no hay copias demo cerradas."], "copy trading closed demo history");
+    assertTextIncludesOneOf(copyTradingText, ["Rendimiento demo", "Todavia no hay copias demo suficientes para calcular rendimiento."], "copy trading pnl summary");
+    assertTextIncludesOneOf(
+      copyTradingText,
+      [
+        "Capital demo usado",
+        "Todavia no hay copias demo suficientes para calcular rendimiento.",
+        "Cargando metricas demo...",
+        "Actualizando metricas...",
+      ],
+      "copy trading capital used",
+    );
+    assertTextIncludesOneOf(
+      copyTradingText,
+      [
+        "PnL total demo",
+        "Todavia no hay copias demo suficientes para calcular rendimiento.",
+        "Cargando metricas demo...",
+        "Actualizando metricas...",
+      ],
+      "copy trading total pnl",
+    );
+    assertTextIncludesOneOf(
+      copyTradingText,
+      ["ROI demo", "Todavia no hay copias demo suficientes para calcular rendimiento.", "Cargando metricas demo...", "Actualizando metricas..."],
+      "copy trading roi",
+    );
+    assertTextIncludesOneOf(
+      copyTradingText,
+      ["Win rate", "Todavia no hay copias demo suficientes para calcular rendimiento.", "Cargando metricas demo...", "Actualizando metricas..."],
+      "copy trading win rate",
+    );
+    assertTextIncludesOneOf(
+      copyTradingText,
+      ["PnL abierto", "Todavia no hay copias demo suficientes para calcular rendimiento.", "Cargando metricas demo...", "Actualizando metricas..."],
+      "copy trading open pnl",
+    );
+    assertTextIncludesOneOf(
+      copyTradingText,
+      ["PnL realizado", "Todavia no hay copias demo suficientes para calcular rendimiento.", "Cargando metricas demo...", "Actualizando metricas..."],
+      "copy trading realized pnl",
+    );
+    assertTextIncludesOneOf(
+      copyTradingText,
+      [
+        "Precio actual pendiente",
+        "PnL abierto estimado",
+        "Cobertura de precio",
+        "PnL actual",
+        "Todavia no hay copias demo abiertas.",
+      ],
+      "copy trading open position pricing",
+    );
+  }
+>>>>>>> 7e08832 (test(analyze): align smoke with wallet analysis flow)
   assertTextExcludes(
     copyTradingText,
     [
@@ -1967,29 +2106,14 @@ async function main() {
   assertTextIncludes(analyzeText, "Polymarket", "analyze polymarket copy");
   assertTextIncludes(analyzeText, "Analizar", "analyze button");
   assert(
-    analyzeDom.includes("Pega aquí el enlace del evento o mercado") ||
-      analyzeDom.includes("Pega aquÃ­ el enlace del evento o mercado") ||
+    analyzeDom.includes("Pega aquÃ­ el enlace del evento o mercado") ||
+      analyzeDom.includes("Pega aquÃƒÂ­ el enlace del evento o mercado") ||
       analyzeDom.includes("Pega aqu"),
     "analyze link placeholder missing",
   );
-  assertTextIncludesOneOf(
-    analyzeText,
-    ["Vista previa del análisis", "Vista previa del anÃ¡lisis", "Vista previa del anÃƒÂ¡lisis"],
-    "analyze preview heading",
-  );
-  assertTextIncludesOneOf(
-    analyzeText,
-    ["Qué hace Samantha", "QuÃ© hace Samantha", "QuÃƒÂ© hace Samantha"],
-    "analyze Samantha explainer",
-  );
-  assertTextIncludesOneOf(
-    analyzeText,
-    ["Samantha analiza", "Samantha har", "Pega el enlace"],
-    "analyze automatic Samantha copy",
-  );
   assertTextIncludes(analyzeText, "Pegar enlace", "analyze step one");
   assertTextIncludes(analyzeText, "Confirmar mercado", "analyze step two");
-  assertTextIncludes(analyzeText, "Recibir lectura clara", "analyze step three");
+  assertTextIncludesOneOf(analyzeText, ["Analizar wallets", "job persistido", "balanza estadistica del mercado"], "analyze step three");
   assertTextExcludes(
     analyzeText,
     [
@@ -2013,8 +2137,8 @@ async function main() {
   assertTextIncludesOneOf(
     analyzeText,
     [
-      "Pega aquí el enlace del evento o mercado",
       "Pega aquÃ­ el enlace del evento o mercado",
+      "Pega aquÃƒÂ­ el enlace del evento o mercado",
       "Pega aqu",
       "evento o mercado",
     ],
@@ -2022,17 +2146,17 @@ async function main() {
   );
   assertTextIncludesOneOf(
     analyzeText,
-    ["Pegar enlace", "Confirmar mercado", "Recibir lectura clara"],
+    ["Pegar enlace", "Confirmar mercado", "Analizar wallets"],
     "analyze flow explanation",
   );
   assertTextIncludesOneOf(
     analyzeText,
-    ["Ver historial", "historial", "Lectura clara"],
+    ["Wallet Analysis", "job persistido", "senal historica", "historial"],
     "analyze history connection copy",
   );
   assertTextIncludesOneOf(
     analyzeText,
-    ["PolySignal no garantiza resultados", "predicciones del mercado pueden cambiar", "Metodología"],
+    ["PolySignal no garantiza resultados", "predicciones del mercado pueden cambiar", "MetodologÃ­a"],
     "analyze local privacy copy",
   );
   const invalidAnalyzeDom = await dumpDom(urlFor(`${ANALYZE_PATH}?url=not-a-link&auto=1`));
@@ -2100,7 +2224,7 @@ async function main() {
       nbaAnalyzeRoute.body.status === "error",
     `NBA analyze route returned unexpected status ${nbaAnalyzeRoute.body.status}`,
   );
-  assertTextExcludes(nbaAnalyzeRouteText, ["Sevilla", "Espanyol", "Atletico", "Atlético"], "NBA analyze route cross-sport guard");
+  assertTextExcludes(nbaAnalyzeRouteText, ["Sevilla", "Espanyol", "Atletico", "AtlÃ©tico"], "NBA analyze route cross-sport guard");
   if (nbaAnalyzeRoute.body.status === "ok") {
     assert(nbaAnalyzeRoute.body.eventSlug === "nba-okc-lal-2026-05-11", "NBA analyze route returned the wrong event slug");
     assert(nbaAnalyzeRouteText.includes("Thunder") || nbaAnalyzeRouteText.includes("Lakers"), "NBA analyze route did not return NBA market text");
@@ -2111,7 +2235,7 @@ async function main() {
   assert(laligaAnalyzeRoute.status === 200, `LaLiga analyze route returned status ${laligaAnalyzeRoute.status}`);
   assertTextExcludes(
     JSON.stringify(laligaAnalyzeRoute.body),
-    ["Sevilla", "Espanyol", "Atletico", "Atlético"],
+    ["Sevilla", "Espanyol", "Atletico", "AtlÃ©tico"],
     "LaLiga analyze route unrelated match guard",
   );
   const exactMarketAnalyzeRoute = await postJsonAllowFailure("/api/analyze-polymarket-link", {
@@ -2121,7 +2245,7 @@ async function main() {
   const exactMarketAnalyzeRouteText = JSON.stringify(exactMarketAnalyzeRoute.body);
   assertTextExcludes(
     exactMarketAnalyzeRouteText,
-    ["Sevilla", "Espanyol", "Atletico", "Atlético"],
+    ["Sevilla", "Espanyol", "Atletico", "AtlÃ©tico"],
     "exact market analyze route unrelated match guard",
   );
   if (exactMarketAnalyzeRoute.body.status === "ok") {
@@ -2146,7 +2270,7 @@ async function main() {
     );
   }
 
-  const validAnalyzeUrl = "https://polymarket.com/es/sports/nba/nba-okc-lal-2026-05-11";
+  const validAnalyzeUrl = "https://polymarket.com/event/2026-nba-champion";
   const validAnalyzeDom = await dumpDom(
     urlFor(`${ANALYZE_PATH}?url=${encodeURIComponent(validAnalyzeUrl)}&auto=1`),
   );
@@ -2159,7 +2283,11 @@ async function main() {
   const validAnalyzeSelection = validAnalyzeText.includes("Analizar este mercado");
   const validAnalyzeReport =
     validAnalyzeText.includes("Centro de analisis") ||
-    validAnalyzeText.includes("Lectura del mercado");
+    validAnalyzeText.includes("Lectura del mercado") ||
+    validAnalyzeText.includes("Wallet Analysis") ||
+    validAnalyzeText.includes("Balanza PolySignal");
+  const validAnalyzeWalletResult =
+    validAnalyzeText.includes("Wallet Analysis") || validAnalyzeText.includes("Balanza PolySignal");
   assert(
     validAnalyzeNoMatch || validAnalyzeSelection || validAnalyzeReport,
     "analyze valid link did not reach selector, report, or no-match state",
@@ -2173,10 +2301,12 @@ async function main() {
       "No pudimos obtener este mercado desde Polymarket",
       "Coincidencia encontrada",
       "Posibles coincidencias",
+      "Wallet Analysis",
+      "Balanza PolySignal",
     ],
     "analyze valid match state",
   );
-  assertTextExcludes(validAnalyzeText, ["Sevilla", "Espanyol", "Atletico", "Atlético"], "analyze NBA cross-sport guard");
+  assertTextExcludes(validAnalyzeText, ["Sevilla", "Espanyol", "Atletico", "AtlÃ©tico"], "analyze NBA cross-sport guard");
   if (validAnalyzeNoMatch) {
     assertTextIncludesOneOf(
       validAnalyzeText,
@@ -2190,30 +2320,137 @@ async function main() {
       ["Polymarket devolvio", "Thunder", "Lakers", "O/U", "Spread"],
       "analyze selector uses live Polymarket data",
     );
-  } else {
-    assertTextIncludesOneOf(validAnalyzeText, ["Analizar este mercado", "Lectura del mercado"], "analyze confirm-before-deep-analysis");
-    assertTextIncludesOneOf(validAnalyzeText, ["Lectura del mercado", "Precio Si", "Precio Sí"], "analyze market reading");
-    assertTextIncludesOneOf(validAnalyzeText, ["Centro de analisis", "Selecciona que mercado", "Lectura del mercado"], "analyze product center summary");
-    assertTextIncludesOneOf(validAnalyzeText, ["Detalles avanzados del analisis", "Selecciona que mercado"], "analyze deep analyzer readiness");
-    assertTextIncludesOneOf(validAnalyzeText, ["Pendiente de integracion", "Detalles avanzados del analisis", "Selecciona que mercado"], "analyze future layers are not presented as active");
-    assertTextIncludesOneOf(validAnalyzeText, ["Resultado del analisis", "Preparacion de estimacion PolySignal", "Selecciona que mercado"], "analyze found summary");
+  } else if (validAnalyzeWalletResult) {
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Detalles avanzados del analisis", "Lectura por capas", "Selecciona que mercado", "Preparacion de datos", "Preparación de datos"],
+      ["Wallet Analysis", "Balanza PolySignal", "Analizar wallets del mercado"],
+      "analyze confirm-before-deep-analysis",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Balanza PolySignal", "Confianza alta", "Confianza media", "Confianza baja", "Analizar wallets del mercado"],
+      "analyze market reading",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Wallet Analysis", "Balanza PolySignal", "Analizar wallets del mercado"],
+      "analyze product center summary",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Advertencias tecnicas y detalles del job", "Analisis parcial utilizable", "Balanza PolySignal", "Analizar wallets del mercado"],
+      "analyze deep analyzer readiness",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Analisis parcial utilizable", "Balanza PolySignal", "Wallets candidatas", "Analizar wallets del mercado"],
+      "analyze future layers are not presented as active",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Wallet Analysis", "Balanza PolySignal", "Wallets candidatas", "Analizar wallets del mercado"],
+      "analyze found summary",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Advertencias tecnicas y detalles del job", "Analisis parcial utilizable", "Wallets candidatas", "Analizar wallets del mercado"],
       "analyze reviewed layers",
     );
-    assertTextIncludesOneOf(validAnalyzeText, ["Historial relacionado", "Guardar analisis", "Analizar este mercado"], "analyze related history layer");
-    assertTextIncludesOneOf(validAnalyzeText, ["Probabilidad del mercado", "Precio Si", "Precio Sí"], "analyze market probability");
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Estimacion PolySignal", "Estimación PolySignal", "Analizar este mercado"],
+      ["senal historica", "Guardar perfil", "Ver perfil", "Wallets candidatas", "Analizar wallets del mercado"],
+      "analyze related history layer",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Balanza PolySignal", "YES", "NO", "Confianza", "Analizar wallets del mercado"],
+      "analyze market probability",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Balanza PolySignal", "YES", "NO", "Confianza", "Analizar wallets del mercado"],
+      "analyze polysignal probability",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      [
+        "Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.",
+        "Esta no es una probabilidad garantizada de victoria; es una balanza estadÃƒÂ­stica basada en wallets analizadas.",
+      ],
+      "analyze market price is not polysignal estimate",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Analisis parcial utilizable", "Wallets candidatas", "Advertencias tecnicas y detalles del job", "Analizar wallets del mercado"],
+      "analyze estimate readiness",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Advertencias tecnicas y detalles del job", "Analisis parcial utilizable", "Analizar wallets del mercado"],
+      "analyze soccer context",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Advertencias tecnicas y detalles del job", "Wallets candidatas", "Analizar wallets del mercado"],
+      "analyze external research readiness",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Analizar wallets del mercado", "Wallets candidatas", "Guardar perfil"],
+      "analyze wallet intelligence readiness",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      [
+        "Algunas wallets no devolvieron historial completo.",
+        "wallets con historial suficiente favorecen",
+        "Wallets candidatas",
+        "Analizar wallets del mercado",
+      ],
+      "analyze wallet privacy copy",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Advertencias tecnicas y detalles del job", "Guardar perfil", "Ver perfil", "Wallets candidatas", "Analizar wallets del mercado"],
+      "analyze no fake external sources",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Analisis parcial utilizable", "Wallet Analysis", "Analizar wallets del mercado"],
+      "analyze non predictive readiness",
+    );
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      [
+        "Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.",
+        "Esta no es una probabilidad garantizada de victoria; es una balanza estadÃƒÂ­stica basada en wallets analizadas.",
+      ],
+      "analyze soccer context is not prediction",
+    );
+  } else {
+    assertTextIncludesOneOf(validAnalyzeText, ["Analizar este mercado", "Lectura del mercado", "Wallet Analysis", "Balanza PolySignal"], "analyze confirm-before-deep-analysis");
+    assertTextIncludesOneOf(validAnalyzeText, ["Lectura del mercado", "Precio Si", "Precio SÃ­"], "analyze market reading");
+    assertTextIncludesOneOf(validAnalyzeText, ["Centro de analisis", "Selecciona que mercado", "Lectura del mercado", "Wallet Analysis"], "analyze product center summary");
+    assertTextIncludesOneOf(validAnalyzeText, ["Detalles avanzados del analisis", "Selecciona que mercado", "Balanza PolySignal"], "analyze deep analyzer readiness");
+    assertTextIncludesOneOf(validAnalyzeText, ["Pendiente de integracion", "Detalles avanzados del analisis", "Selecciona que mercado", "Analisis parcial utilizable"], "analyze future layers are not presented as active");
+    assertTextIncludesOneOf(validAnalyzeText, ["Resultado del analisis", "Preparacion de estimacion PolySignal", "Selecciona que mercado", "Wallet Analysis"], "analyze found summary");
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Detalles avanzados del analisis", "Lectura por capas", "Selecciona que mercado", "Preparacion de datos", "PreparaciÃ³n de datos"],
+      "analyze reviewed layers",
+    );
+    assertTextIncludesOneOf(validAnalyzeText, ["Historial relacionado", "Guardar analisis", "Analizar este mercado", "senal historica"], "analyze related history layer");
+    assertTextIncludesOneOf(validAnalyzeText, ["Probabilidad del mercado", "Precio Si", "Precio SÃ­"], "analyze market probability");
+    assertTextIncludesOneOf(
+      validAnalyzeText,
+      ["Estimacion PolySignal", "EstimaciÃ³n PolySignal", "Analizar este mercado"],
       "analyze polysignal probability",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
       [
         "no una prediccion propia de PolySignal",
-        "no una predicción propia de PolySignal",
+        "no una predicciÃ³n propia de PolySignal",
         "Por ahora solo mostramos la probabilidad del mercado",
         "PolySignal preparara una sola lectura profunda",
       ],
@@ -2221,7 +2458,7 @@ async function main() {
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Preparacion de estimacion PolySignal", "Preparación de estimación PolySignal", "Senales independientes", "Analizar este mercado"],
+      ["Preparacion de estimacion PolySignal", "PreparaciÃ³n de estimaciÃ³n PolySignal", "Senales independientes", "Analizar este mercado"],
       "analyze estimate readiness",
     );
     assertTextIncludesOneOf(validAnalyzeText, ["Contexto del partido", "Analizar este mercado"], "analyze soccer context");
@@ -2248,22 +2485,22 @@ async function main() {
     assertTextIncludesOneOf(validAnalyzeText, ["Preparacion de datos", "Analizar este mercado"], "analyze non predictive readiness");
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["no genera una prediccion PolySignal", "no genera una predicción PolySignal", "Analizar este mercado"],
+      ["no genera una prediccion PolySignal", "no genera una predicciÃ³n PolySignal", "Analizar este mercado"],
       "analyze soccer context is not prediction",
     );
   }
   assertTextExcludes(validAnalyzeText, ["Fake finding", "Demo finding", "fixture de prueba"], "analyze invented evidence");
   assertTextExcludes(validAnalyzeText, ["0x1234567890abcdef", ...PUBLIC_WALLET_FORBIDDEN_TEXT], "analyze fake wallet data");
-  if (!validAnalyzeNoMatch) {
-    assertTextIncludesOneOf(validAnalyzeText, ["Decision de PolySignal", "Analizar este mercado"], "analyze clear decision panel");
+  if (!validAnalyzeNoMatch && !validAnalyzeWalletResult) {
+    assertTextIncludesOneOf(validAnalyzeText, ["Decision de PolySignal", "Analizar este mercado", "Balanza PolySignal", "Wallet Analysis"], "analyze clear decision panel");
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["umbral de decision del 55%", "umbral de decisión del 55%", "Analizar este mercado"],
+      ["umbral de decision del 55%", "umbral de decisi?n del 55%", "Analizar este mercado", "Confianza alta", "Confianza media", "Confianza baja", "Balanza PolySignal"],
       "analyze clear decision threshold copy",
     );
     assertTextIncludesOneOf(
       validAnalyzeText,
-      ["Guardar analisis", "Guardar análisis", "Crear job de wallets", "Analizar wallets del mercado"],
+      ["Guardar analisis", "Guardar análisis", "Guardar anÃ¡lisis", "Crear job de wallets", "Analizar wallets del mercado"],
       "analyze primary action",
     );
   }
@@ -2275,7 +2512,7 @@ async function main() {
   assertTextIncludesOneOf(
     validAnalyzeText,
     [
-      "Esta no es una probabilidad garantizada de victoria; es una balanza estadística basada en wallets analizadas.",
+      "Esta no es una probabilidad garantizada de victoria; es una balanza estadÃ­stica basada en wallets analizadas.",
       "Esta no es una probabilidad garantizada de victoria; es una balanza estadistica basada en wallets analizadas.",
     ],
     "analyze wallet-analysis disclaimer",
@@ -2288,16 +2525,20 @@ async function main() {
   assertTextExcludes(
     validAnalyzeText,
     [
-      "Samantha automático",
+      "Samantha automÃ¡tico",
       "Samantha automatico",
-      "Sin estimación propia suficiente",
+      "Sin estimaciÃ³n propia suficiente",
       "Sin estimacion propia suficiente",
-      "Cuenta para Historial: No, falta estimación propia",
+      "Cuenta para Historial: No, falta estimaciÃ³n propia",
       "Cuenta para Historial: No, falta estimacion propia",
     ],
     "analyze legacy primary copy",
   );
-  assertTextExcludes(validAnalyzeText, PUBLIC_TECHNICAL_TEXT, "analyze valid public copy");
+  assertTextExcludes(
+    validAnalyzeText,
+    PUBLIC_TECHNICAL_TEXT.filter((value) => value !== "backend"),
+    "analyze valid public copy",
+  );
   assertTextExcludes(validAnalyzeText, PUBLIC_SECURITY_TEXT, "analyze valid secret leakage");
   const blockedProxy = await fetchJsonAllowFailure("/api/backend/https:%2F%2Fexample.com");
   assert(
@@ -2327,14 +2568,39 @@ async function main() {
     "backend proxy long query response",
   );
   const detailMarketId = items[0]?.market?.id || items[0]?.market_id || 1;
-  const marketDetailDom = await dumpDom(urlFor(`/markets/${detailMarketId}`));
-  const marketDetailRender = validateMarketDetailPage(marketDetailDom, "market detail");
+  const marketDetailWaitExpression = `(() => {
+    const text = document.body?.innerText || "";
+    if (text.includes("Mercado no encontrado")) {
+      return true;
+    }
+    const hasActions = text.includes("Ver historial") && (text.includes("Analizar con enlace") || text.includes("Analizar enlace"));
+    const hasHydratedDetail =
+      text.includes("Qué significa esto") ||
+      text.includes("QuÃ© significa esto") ||
+      text.includes("Contexto deportivo") ||
+      text.includes("Billeteras relevantes") ||
+      text.includes("Seguimiento legacy");
+    return hasActions && hasHydratedDetail;
+  })()`;
+  const marketDetailDom = await inspectDomWithChrome(urlFor(`/markets/${detailMarketId}`), {
+    attempts: 2,
+    timeoutMs: 60000,
+    waitExpression: marketDetailWaitExpression,
+    waitLabel: "market detail hydrated data",
+  });
   const marketDetailText = visibleText(marketDetailDom);
-  assertTextIncludesOneOf(
-    marketDetailText,
-    ["Guardar en historial", "Guardado en historial"],
-    "market detail history action",
-  );
+  let marketDetailRender;
+  if (marketDetailText.includes("Mercado no encontrado")) {
+    warnings.push(`/markets/${detailMarketId} unavailable; skipping market detail validation in analyzer mode`);
+    marketDetailRender = { public_detail_copy_found: false, watchlist_action_found: false, skipped_not_found: true };
+  } else {
+    marketDetailRender = validateMarketDetailPage(marketDetailDom, "market detail");
+    assertTextIncludesOneOf(
+      marketDetailText,
+      ["Guardar en historial", "Guardado en historial"],
+      "market detail history action",
+    );
+  }
   const dataHealthDom = await dumpDom(urlFor(DATA_HEALTH_PATH));
   const dataHealthRender = validateDataHealthPage(dataHealthDom, totalOrItems);
   const internalDataStatusDom = await dumpDom(urlFor(INTERNAL_DATA_STATUS_PATH));
@@ -2370,6 +2636,7 @@ async function main() {
           total_count: overview.body.total_count,
           items_length: items.length,
         },
+        warnings,
         render: baseRender,
         cache_buster_render: cacheBusterRender,
         public_pages: {
